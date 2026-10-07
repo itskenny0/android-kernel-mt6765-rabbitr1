@@ -72,9 +72,10 @@ and is not equivalent to the vendor behavior.
 
 On resume, the vendor driver asks ATF to set shadow-register mode through
 `MTK_SIP_I2C_CONTROL(id, 0xf8c, 2)`. Its probe path assumes the firmware has
-already established that mode. The current mainline MT8183 fallback has no
-instance channel offset; its `MULTI_DMA` debug register is at `0x8c`, not the
-vendor global `0xf8c`. Routing, reset/arbitration, DMA ownership and firmware
+already established that mode. The new MT6765 match handles the AP interrupt
+gate and terminal errors and records global `MULTI_DMA` at `0xf8c`, correcting
+the previous MT8183 fallback's `0x8c`. It still has no instance channel offset
+or firmware handshake. Routing, reset/arbitration, DMA ownership and firmware
 state must be resolved before enabling this bus. See [I2C.md](I2C.md).
 
 ## Validation and acceptance
@@ -98,7 +99,7 @@ The CST836 binding documentation, compiled example and r1 touch node pass
 schema checks. Building the shared schema cache still reports the existing
 `mediatek,software-role-switch` missing-type warning, and the optional yamllint
 step is unavailable in this workspace. Full-board validation still has the
-48 diagnostics recorded in [VALIDATION.md](VALIDATION.md).
+41 diagnostics recorded in [VALIDATION.md](VALIDATION.md).
 
 Before touch is accepted: implement the host channel routing, identify the
 controller on a device, verify supplies and reset/IRQ waveforms, capture raw

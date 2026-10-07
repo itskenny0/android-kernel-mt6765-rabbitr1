@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run production I2C timing/init code with register stubs, without hardware.
 
-The clock model assumes the MT8183 register semantics selected by the DT fallback.
+The clock model assumes the MT8183 timing semantics retained for MT6765.
 It detects an unprogrammed fixed divider; it does not prove MT6765 waveforms.
 An optional DTS input supports running the check against the original source.
 """
@@ -35,8 +35,8 @@ if len(nodes) != 7 or len({index for index, _ in nodes}) != 7:
     raise SystemExit('Expected all seven MT6765 I2C controllers')
 dividers = []
 for index, node in sorted(nodes):
-    if '"mediatek,mt8183-i2c"' not in node:
-        raise SystemExit('Review the timing harness when changing the I2C fallback')
+    if '"mediatek,mt6765-i2c"' not in node:
+        raise SystemExit('Review the timing harness when changing the I2C compatible')
     dividers.append(int(re.search(r'clock-div = <(\d+)>;', node)[1]))
 
 prelude = r'''
@@ -62,12 +62,14 @@ static const struct i2c_adapter_quirks mt8183_i2c_quirks;
 defines = '\n'.join(re.findall(r'^#define (?:I2C_\w+|MAX_\w+)[^\n]*', s, re.M))
 body = ''.join(block(prefix) for prefix in [
     'enum DMA_REGS_OFFSET {', 'enum I2C_REGS_OFFSET {',
-    'static const u16 mt_i2c_regs_v2[]', 'struct mtk_i2c_compatible {',
+    'static const u16 mt_i2c_regs_v2[]', 'static const u16 mt_i2c_regs_mt6765[]',
+    'struct mtk_i2c_compatible {',
     'struct mtk_i2c_ac_timing {', 'struct i2c_spec_values {',
     'static const struct i2c_spec_values standard_mode_spec',
     'static const struct i2c_spec_values fast_mode_spec',
     'static const struct i2c_spec_values fast_mode_plus_spec',
     'static const struct mtk_i2c_compatible mt8183_compat',
+    'static const struct mtk_i2c_compatible mt6765_compat',
 ])
 body += r'''
 struct mtk_i2c {
@@ -98,12 +100,14 @@ int main(void)
     /* Test clock-rate inputs, not measurements of a particular r1. */
     const unsigned int parents[] = {26000000, 65000000, 104000000, 124800000, 136500000};
     const unsigned int speeds[] = {100000, 400000};
+    const struct mtk_i2c_compatible *variants[] = {&mt8183_compat, &mt6765_compat};
     unsigned int count = 0;
+    for (unsigned int variant = 0; variant < 2; variant++) {
     for (unsigned int bus = 0; bus < 7; bus++) {
         for (unsigned int p = 0; p < sizeof(parents) / sizeof(parents[0]); p++) {
             for (unsigned int f = 0; f < sizeof(speeds) / sizeof(speeds[0]); f++) {
                 struct mtk_i2c i2c = {
-                    .dev_comp = &mt8183_compat,
+                    .dev_comp = variants[variant],
                     .clk_src_div = dt_dividers[bus], .speed_hz = speeds[f],
                 };
                 mtk_i2c_set_speed(&i2c, parents[p]);
@@ -129,6 +133,7 @@ int main(void)
                 count++;
             }
         }
+    }
     }
     printf("PASS: %u production timing/init cases; programmed dividers respect requested rates\n", count);
     return 0;

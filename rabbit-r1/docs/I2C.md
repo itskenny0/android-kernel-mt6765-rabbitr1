@@ -1,8 +1,9 @@
 # MT6765 I2C bring-up
 
-The fork's I2C nodes use the MT8183 driver fallback. The first confirmed problem
-is a mismatch in the meaning of `clock-div`, copied from the vendor tree.
-All seven controllers now specify `clock-div = <1>`.
+The I2C nodes now select an explicit MT6765 match, with its AP interrupt gate
+and terminal error interrupts. Timing calculation still uses the inherited
+MT8183 algorithm and needs electrical validation. All seven controllers specify
+`clock-div = <1>`; only I2C5 is enabled on the r1 at present.
 
 ## Divider correction
 
@@ -23,7 +24,7 @@ that division into the controller. The upstream
 also use a fixed divider of one with this driver.
 
 At a 26 MHz input and a 100 kHz request, the original DT produces
-`CLOCK_DIV=0`, `TIMING=0x17`, `LTIMING=0x1b`. Under the selected fallback's count
+`CLOCK_DIV=0`, `TIMING=0x17`, `LTIMING=0x1b`. Under the inherited MT8183 count
 semantics, those registers describe 500 kHz. This is a calculated result from
 the production code, not an oscilloscope measurement.
 
@@ -31,8 +32,59 @@ the production code, not an oscilloscope measurement.
 data and hardware-initialization function with MMIO stubs. It decodes the
 registers written by that function and checks the requested rate against the
 undivided input clock. It covers all seven DT nodes, five input-clock fixtures,
-and 100/400 kHz requests. The test rejects the original DT. It does not exercise
+and 100/400 kHz requests for both MT6765 and MT8183 compatibility data: 140 cases.
+The test rejects the original divider. It does not exercise
 DMA, interrupts, actual transfers or electrical setup/hold times.
+
+## AP interrupt gate and transfer errors
+
+In the stock version-2 transfer path, `mt_i2c_do_transfer()` writes
+`I2C_MCU_INTR_EN = 1` to `V2_OFFSET_MCU_INTR = 0x40` before START. This is separate
+from the event mask at `0x08`. The MT8183 fallback never programmed this AP
+interrupt destination. Depending on inherited firmware state, enabling event
+bits alone can leave a transfer without an interrupt delivered to Linux.
+
+The new MT6765 match supplies this register and writes the gate before both a
+normal START and the restart after a high-speed master code. Other supported
+SoCs retain their existing start behavior. All MT6765 DT nodes use the single
+`mediatek,mt6765-i2c` compatible; MT8183 is no longer advertised as a fallback.
+The MT6765 register table also records the stock global `MULTI_DMA` offset
+`0xf8c`, but no channel-routing operation is enabled by that table alone.
+
+The vendor headers identify timeout (bit 5), DMA error (6), in-band interrupt
+(7), and bus error (8), in addition to ACK/NACK, arbitration and completion.
+The new interrupt enable mask follows the stock driver: timeout and bus error
+are enabled; DMA error and in-band status are checked when reported alongside
+an enabled event. All known status bits are cleared before starting a transfer,
+and all event enables are cleared during initialization and when the wait ends.
+
+The old handler only completed the wait on a transaction-complete or restart
+interrupt. MT6765 fault IRQs now wake the waiter directly, including ACK/NACK
+and arbitration loss. A fault cannot be discarded as the otherwise ignored
+master-code restart. Results are:
+
+| Condition | Result |
+| --- | --- |
+| Software or hardware timeout | `-ETIMEDOUT` |
+| Arbitration lost | `-EAGAIN`, allowing the I2C core's bounded retry |
+| DMA, bus or unexpected in-band interrupt | `-EIO` |
+| ACK/NACK error | `-ENXIO` |
+
+Before unmapping a failed transfer's DMA buffers, the driver now resets the
+controller and DMA engine. Previously it unmapped and released the buffers
+first, then reset on timeout/NACK. Failed transfers no longer ask the DMA-buffer
+helper to copy read bounce buffers into the caller's buffer. This ordering also
+applies to existing supported SoCs; their IRQ completion rules are unchanged.
+
+`test-i2c-irq.py` executes the production transfer, IRQ, start, reset and error
+callbacks with MMIO and DMA stubs under ASan/UBSan. It checks 36 MT6765
+read/write/combined transfer cases, every terminal fault, two-stage repeated
+starts, master-code restart handling, allocation/mapping failures, gate ordering
+and MT8183 behavior. The DMA model deliberately keeps a failed transfer active
+until reset and rejects premature unmapping. Mutations removing the gate or
+terminal handling, restoring the old cleanup order, or copying failed buffers
+are rejected. This proves software sequencing against the model, not interrupt
+delivery, DMA quiescence or bus operation on hardware.
 
 ## Remaining controller work
 
@@ -40,13 +92,15 @@ The correction does not establish full MT6765/MT8183 compatibility. Rabbit's
 driver has additional behavior that still needs review:
 
 * `cnt_constraint` changes the step encoding when the sample count is one.
-  The fallback also adjusts counts, but its divider-dependent rules need to be
+  The inherited algorithm also adjusts counts, but its divider-dependent rules need to be
   compared with the MT6765 hardware before claiming equivalent timing.
 * Controllers 2, 3 and 4 use additional channel offsets in the vendor DT.
   I2C4's AP transactions use `0x100`, while initialization uses channel zero.
   Its stock resume path asks ATF to restore shadow-register mode at `0xf8c`;
-  the mainline fallback has neither that channel selection nor the matching
-  global register offset. The [touch audit](TOUCH.md) records this evidence.
+  the mainline driver still lacks that channel selection and firmware handshake.
+  Channel FIFO clearing also uses bit 2, and the stock channel path masks direct
+  ACK/NACK IRQs until completion. These differences are not fixed by the AP gate.
+  The [touch audit](TOUCH.md) records the board evidence.
 * Bus arbitration gates, reset behavior and 33-bit DMA need transfer tests.
 
 The vendor source also contains a `DEBUGCTRL=0x28` write guarded by

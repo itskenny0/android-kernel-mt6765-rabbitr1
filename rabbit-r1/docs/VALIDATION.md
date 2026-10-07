@@ -9,7 +9,9 @@
 | Original MMC source-clock regression | Rejected as expected | `logs/mmc-regression-before.log` |
 | MT6357 register mappings and new helpers | PASS | `logs/mt6357-tests.log` |
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
-| I2C programmable-divider calculation | PASS: 70 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
+| I2C programmable-divider calculation | PASS: 140 MT6765/MT8183 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
+| MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, repeated starts and allocation errors; MT8183 regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
+| I2C gate, terminal IRQ, DMA cleanup and failed-copy regressions | All rejected | `logs/i2c-irq-regression-*.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
 | Compiled r1 power-device wiring | PASS against stock FDT, including IRQs, pin muxes and child gates | `logs/r1-power-tests.log` |
@@ -19,7 +21,7 @@
 | CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
 | CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 14 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 16 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |
@@ -35,7 +37,8 @@
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
 | r1 board-compatible schema | PASS | `logs/r1-board-schema.log` (empty diagnostics) |
-| Full r1 DT schema validation | **FAIL: 48 diagnostics remain** | `logs/r1-dt-validate.log` |
+| MT6765 I2C schema | PASS, all seven controller nodes | `logs/mt6765-i2c-schema.log`, `out/mt6765-i2c-schema.json` |
+| Full r1 DT schema validation | **FAIL: 41 diagnostics remain** | `logs/r1-dt-validate.log`, `out/r1-i2c-full-schema.json` |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
 | MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
@@ -72,6 +75,9 @@ python3 scripts/test-mt6357.py
 python3 scripts/test-mt6370.py
 python3 scripts/test-r1-power.py
 python3 scripts/test-i2c.py
+python3 scripts/test-i2c-irq.py
+python3 scripts/test-cst836.py
+python3 scripts/test-r1-touch.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py
 toolchains/boot-tools/bin/python scripts/test-lk.py

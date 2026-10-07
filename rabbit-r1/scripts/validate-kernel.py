@@ -63,9 +63,11 @@ def check_mainline(dtb):
     assert nodes['/soc/mmc@11230000']['status'] == b'disabled\0', 'Default eMMC bring-up gate lost'
     assert nodes['/soc/usb@11200000']['dr_mode'] == b'peripheral\0'
     for addr in ['11007000', '11008000', '11009000', '1100f000', '11011000', '11016000', '1100d000']:
+        assert nodes['/soc/i2c@'+addr]['compatible'] == b'mediatek,mt6765-i2c\0', \
+            f'I2C {addr}: MT6765 interrupt handling requires its own compatible'
         assert nodes['/soc/i2c@'+addr]['clock-div'] == struct.pack('>I', 1), \
             f'I2C {addr}: unexpected fixed prescaler'
-    print('PASS: r1 identity, LK memory path, MMC clock providers/IDs, eMMC gate, USB role, I2C dividers')
+    print('PASS: r1 identity, LK memory path, MMC clock providers/IDs, eMMC gate, USB role, I2C match/dividers')
 
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == '--dtb':

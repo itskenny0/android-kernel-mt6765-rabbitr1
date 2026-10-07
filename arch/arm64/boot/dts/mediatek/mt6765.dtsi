@@ -593,8 +593,7 @@
 
 		/* No fixed prescaler: the driver programs CLOCK_DIV itself. */
 		i2c0: i2c@11007000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x11007000 0 0x1000>,
 			      <0 0x11000080 0 0x0080>;
 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>;
@@ -608,8 +607,7 @@
 		};
 
 		i2c1: i2c@11008000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x11008000 0 0x1000>,
 				  <0 0x11000100 0 0x0080>;
 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>;
@@ -623,8 +621,7 @@
 		};
 
 		i2c2: i2c@11009000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x11009000 0 0x1000>,
 				  <0 0x11000180 0 0x0180>;
 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
@@ -651,8 +648,7 @@
 		};
 
 		i2c3: i2c@1100f000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x1100f000 0 0x1000>,
 			      <0 0x11000300 0 0x0100>;
 			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
@@ -680,8 +676,7 @@
 		};
 
 		i2c4: i2c@11011000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x11011000 0 0x1000>,
 			      <0 0x11000400 0 0x0180>;
 			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_LOW>;
@@ -748,8 +743,7 @@
 		};
 
 		i2c6: i2c@1100d000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x1100d000 0 0x1000>,
 			      <0 0x11000600 0 0x0080>;
 			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_LOW>;
@@ -776,8 +770,7 @@
 
 
 		i2c5: i2c@11016000 {
-			compatible = "mediatek,mt6765-i2c",
-				     "mediatek,mt8183-i2c";
+			compatible = "mediatek,mt6765-i2c";
 			reg = <0 0x11016000 0 0x1000>,
 			      <0 0x11000580 0 0x0080>;
 			interrupts = <GIC_SPI 130 IRQ_TYPE_LEVEL_LOW>;

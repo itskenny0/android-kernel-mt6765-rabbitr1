@@ -13,7 +13,8 @@ The workflow:
 
 1. Installs the tracked workspace tools and fetches pinned build inputs.
 2. Checks the patch series, MT6357 mappings, MT6370 current measurement, I2C
-   timing, CST836 transport/input callbacks, bounded expdb mapper and log decoder.
+   timing, I2C transfer/IRQ handling, CST836 transport/input callbacks,
+   bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks the draft touch wiring and disabled I2C4 gate, builds patched LK and the LineageOS splash with

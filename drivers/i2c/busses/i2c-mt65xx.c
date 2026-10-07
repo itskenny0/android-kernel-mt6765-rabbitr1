@@ -28,6 +28,10 @@
 #include <linux/units.h>
 
 #define I2C_RS_TRANSFER			(1 << 4)
+#define I2C_TIMEOUT			(1 << 5)
+#define I2C_DMAERR			(1 << 6)
+#define I2C_IBI				(1 << 7)
+#define I2C_BUS_ERR			(1 << 8)
 #define I2C_ARB_LOST			(1 << 3)
 #define I2C_HS_NACKERR			(1 << 2)
 #define I2C_ACKERR			(1 << 1)
@@ -52,6 +56,7 @@
 #define I2C_CHN_CLR_FLAG		0x0000
 #define I2C_RELIABILITY		0x0010
 #define I2C_DMAACK_ENABLE		0x0008
+#define I2C_MCU_INTR_EN			0x0001
 
 #define I2C_DMA_CON_TX			0x0000
 #define I2C_DMA_CON_RX			0x0001
@@ -165,6 +170,7 @@ enum I2C_REGS_OFFSET {
 	OFFSET_STA_STO_AC_TIMING,
 	OFFSET_HS_STA_STO_AC_TIMING,
 	OFFSET_SDA_TIMING,
+	OFFSET_MCU_INTR,
 };
 
 static const u16 mt_i2c_regs_v1[] = {
@@ -229,6 +235,35 @@ static const u16 mt_i2c_regs_v2[] = {
 	[OFFSET_DCM_EN] = 0xf88,
 };
 
+static const u16 mt_i2c_regs_mt6765[] = {
+	[OFFSET_DATA_PORT] = 0x0,
+	[OFFSET_SLAVE_ADDR] = 0x4,
+	[OFFSET_INTR_MASK] = 0x8,
+	[OFFSET_INTR_STAT] = 0xc,
+	[OFFSET_CONTROL] = 0x10,
+	[OFFSET_TRANSFER_LEN] = 0x14,
+	[OFFSET_TRANSAC_LEN] = 0x18,
+	[OFFSET_DELAY_LEN] = 0x1c,
+	[OFFSET_TIMING] = 0x20,
+	[OFFSET_START] = 0x24,
+	[OFFSET_EXT_CONF] = 0x28,
+	[OFFSET_LTIMING] = 0x2c,
+	[OFFSET_HS] = 0x30,
+	[OFFSET_IO_CONFIG] = 0x34,
+	[OFFSET_FIFO_ADDR_CLR] = 0x38,
+	[OFFSET_SDA_TIMING] = 0x3c,
+	[OFFSET_MCU_INTR] = 0x40,
+	[OFFSET_TRANSFER_LEN_AUX] = 0x44,
+	[OFFSET_CLOCK_DIV] = 0x48,
+	[OFFSET_SOFTRESET] = 0x50,
+	[OFFSET_SCL_MIS_COMP_POINT] = 0x90,
+	[OFFSET_DEBUGSTAT] = 0xe4,
+	[OFFSET_DEBUGCTRL] = 0xe8,
+	[OFFSET_FIFO_STAT] = 0xf4,
+	[OFFSET_FIFO_THRESH] = 0xf8,
+	[OFFSET_MULTI_DMA] = 0xf8c,
+};
+
 static const u16 mt_i2c_regs_v3[] = {
 	[OFFSET_DATA_PORT] = 0x0,
 	[OFFSET_INTR_MASK] = 0x8,
@@ -269,7 +304,10 @@ struct mtk_i2c_compatible {
 	unsigned char dma_sync: 1;
 	unsigned char ltiming_adjust: 1;
 	unsigned char apdma_sync: 1;
+	unsigned char ap_irq_gate: 1;
 	unsigned char max_dma_support;
+	u16 error_irq_mask;
+	u16 error_stat_mask;
 };
 
 struct mtk_i2c_ac_timing {
@@ -404,6 +442,22 @@ static const struct mtk_i2c_compatible mt6589_compat = {
 	.max_dma_support = 32,
 };
 
+static const struct mtk_i2c_compatible mt6765_compat = {
+	.quirks = &mt8183_i2c_quirks,
+	.regs = mt_i2c_regs_mt6765,
+	.auto_restart = 1,
+	.aux_len_reg = 1,
+	.timing_adjust = 1,
+	.dma_sync = 1,
+	.ltiming_adjust = 1,
+	.ap_irq_gate = 1,
+	.max_dma_support = 33,
+	.error_irq_mask = I2C_HS_NACKERR | I2C_ACKERR | I2C_ARB_LOST |
+			  I2C_TIMEOUT | I2C_BUS_ERR,
+	.error_stat_mask = I2C_HS_NACKERR | I2C_ACKERR | I2C_ARB_LOST |
+			  I2C_TIMEOUT | I2C_DMAERR | I2C_IBI | I2C_BUS_ERR,
+};
+
 static const struct mtk_i2c_compatible mt7622_compat = {
 	.quirks = &mt7622_i2c_quirks,
 	.regs = mt_i2c_regs_v1,
@@ -527,6 +581,7 @@ static const struct of_device_id mtk_i2c_of_match[] = {
 	{ .compatible = "mediatek,mt2712-i2c", .data = &mt2712_compat },
 	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
 	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
+	{ .compatible = "mediatek,mt6765-i2c", .data = &mt6765_compat },
 	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
 	{ .compatible = "mediatek,mt7981-i2c", .data = &mt7981_compat },
 	{ .compatible = "mediatek,mt7986-i2c", .data = &mt7986_compat },
@@ -551,12 +606,44 @@ static void mtk_i2c_writew(struct mtk_i2c *i2c, u16 val,
 	writew(val, i2c->base + i2c->dev_comp->regs[reg]);
 }
 
+static u16 mtk_i2c_irq_mask(struct mtk_i2c *i2c)
+{
+	return I2C_HS_NACKERR | I2C_ACKERR | I2C_ARB_LOST | I2C_TRANSAC_COMP |
+	       (i2c->auto_restart ? I2C_RS_TRANSFER : 0) |
+	       i2c->dev_comp->error_irq_mask;
+}
+
+static void mtk_i2c_start(struct mtk_i2c *i2c, u16 start)
+{
+	/* MT6765 also requires the AP interrupt destination to be enabled. */
+	if (i2c->dev_comp->ap_irq_gate)
+		mtk_i2c_writew(i2c, I2C_MCU_INTR_EN, OFFSET_MCU_INTR);
+	mtk_i2c_writew(i2c, start, OFFSET_START);
+}
+
+static int mtk_i2c_transfer_error(struct mtk_i2c *i2c, bool completed)
+{
+	u16 errors = i2c->irq_stat & i2c->dev_comp->error_stat_mask;
+
+	if (!completed || errors & I2C_TIMEOUT)
+		return -ETIMEDOUT;
+	if (errors & I2C_ARB_LOST)
+		return -EAGAIN;
+	if (errors & (I2C_DMAERR | I2C_IBI | I2C_BUS_ERR))
+		return -EIO;
+	if (i2c->irq_stat & (I2C_HS_NACKERR | I2C_ACKERR))
+		return -ENXIO;
+	return 0;
+}
+
 static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
 {
 	u16 control_reg;
 	u16 intr_stat_reg;
 	u16 ext_conf_val;
 
+	if (i2c->dev_comp->ap_irq_gate)
+		mtk_i2c_writew(i2c, 0, OFFSET_INTR_MASK);
 	mtk_i2c_writew(i2c, I2C_CHN_CLR_FLAG, OFFSET_START);
 	intr_stat_reg = mtk_i2c_readw(i2c, OFFSET_INTR_STAT);
 	mtk_i2c_writew(i2c, intr_stat_reg, OFFSET_INTR_STAT);
@@ -962,8 +1049,10 @@ static void i2c_dump_register(struct mtk_i2c *i2c)
 	dev_dbg(i2c->dev, "HS: 0x%x, IO_CONFIG: 0x%x\n",
 		mtk_i2c_readw(i2c, OFFSET_HS),
 		mtk_i2c_readw(i2c, OFFSET_IO_CONFIG));
-	dev_dbg(i2c->dev, "DCM_EN: 0x%x, TRANSFER_LEN_AUX: 0x%x\n",
-		mtk_i2c_readw(i2c, OFFSET_DCM_EN),
+	if (i2c->dev_comp->dcm)
+		dev_dbg(i2c->dev, "DCM_EN: 0x%x\n",
+			mtk_i2c_readw(i2c, OFFSET_DCM_EN));
+	dev_dbg(i2c->dev, "TRANSFER_LEN_AUX: 0x%x\n",
 		mtk_i2c_readw(i2c, OFFSET_TRANSFER_LEN_AUX));
 	dev_dbg(i2c->dev, "CLOCK_DIV: 0x%x, FIFO_STAT: 0x%x\n",
 		mtk_i2c_readw(i2c, OFFSET_CLOCK_DIV),
@@ -999,7 +1088,8 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 	u16 addr_reg;
 	u16 start_reg;
 	u16 control_reg;
-	u16 restart_flag = 0;
+	u16 irq_mask = mtk_i2c_irq_mask(i2c);
+	u16 clear_mask = irq_mask;
 	u16 dma_sync = 0;
 	u32 reg_4g_mode;
 	u32 reg_dma_reset;
@@ -1010,9 +1100,8 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 	int ret;
 
 	i2c->irq_stat = 0;
-
-	if (i2c->auto_restart)
-		restart_flag = I2C_RS_TRANSFER;
+	if (i2c->dev_comp->ap_irq_gate)
+		clear_mask |= I2C_RS_TRANSFER | i2c->dev_comp->error_stat_mask;
 
 	reinit_completion(&i2c->msg_complete);
 
@@ -1052,14 +1141,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 	mtk_i2c_writew(i2c, addr_reg, OFFSET_SLAVE_ADDR);
 
 	/* Clear interrupt status */
-	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
-			    I2C_ARB_LOST | I2C_TRANSAC_COMP, OFFSET_INTR_STAT);
+	mtk_i2c_writew(i2c, clear_mask, OFFSET_INTR_STAT);
 
 	mtk_i2c_writew(i2c, I2C_FIFO_ADDR_CLR, OFFSET_FIFO_ADDR_CLR);
 
 	/* Enable interrupt */
-	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
-			    I2C_ARB_LOST | I2C_TRANSAC_COMP, OFFSET_INTR_MASK);
+	mtk_i2c_writew(i2c, irq_mask, OFFSET_INTR_MASK);
 
 	/* Set transfer and transaction len */
 	if (i2c->op == I2C_MASTER_WRRD) {
@@ -1192,49 +1279,45 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 		if (left_num >= 1)
 			start_reg |= I2C_RS_MUL_CNFG;
 	}
-	mtk_i2c_writew(i2c, start_reg, OFFSET_START);
+	mtk_i2c_start(i2c, start_reg);
 
 	ret = wait_for_completion_timeout(&i2c->msg_complete,
 					  i2c->adap.timeout);
 
 	/* Clear interrupt mask */
-	mtk_i2c_writew(i2c, ~(restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
-			    I2C_ARB_LOST | I2C_TRANSAC_COMP), OFFSET_INTR_MASK);
+	mtk_i2c_writew(i2c, i2c->dev_comp->ap_irq_gate ? 0 : ~irq_mask,
+		       OFFSET_INTR_MASK);
+
+	ret = mtk_i2c_transfer_error(i2c, ret != 0);
+	if (ret) {
+		dev_dbg(i2c->dev, "addr: %x, transfer error: %d, status: %#x\n",
+			msgs->addr, ret, i2c->irq_stat);
+		i2c_dump_register(i2c);
+		/* Stop DMA before returning its buffers to the caller. */
+		mtk_i2c_init_hw(i2c);
+	}
 
 	if (i2c->op == I2C_MASTER_WR) {
 		dma_unmap_single(i2c->dev, wpaddr,
 				 msgs->len, DMA_TO_DEVICE);
 
-		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, true);
+		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, !ret);
 	} else if (i2c->op == I2C_MASTER_RD) {
 		dma_unmap_single(i2c->dev, rpaddr,
 				 msgs->len, DMA_FROM_DEVICE);
 
-		i2c_put_dma_safe_msg_buf(dma_rd_buf, msgs, true);
+		i2c_put_dma_safe_msg_buf(dma_rd_buf, msgs, !ret);
 	} else {
 		dma_unmap_single(i2c->dev, wpaddr, msgs->len,
 				 DMA_TO_DEVICE);
 		dma_unmap_single(i2c->dev, rpaddr, (msgs + 1)->len,
 				 DMA_FROM_DEVICE);
 
-		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, true);
-		i2c_put_dma_safe_msg_buf(dma_rd_buf, (msgs + 1), true);
+		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, !ret);
+		i2c_put_dma_safe_msg_buf(dma_rd_buf, (msgs + 1), !ret);
 	}
 
-	if (ret == 0) {
-		dev_dbg(i2c->dev, "addr: %x, transfer timeout\n", msgs->addr);
-		i2c_dump_register(i2c);
-		mtk_i2c_init_hw(i2c);
-		return -ETIMEDOUT;
-	}
-
-	if (i2c->irq_stat & (I2C_HS_NACKERR | I2C_ACKERR)) {
-		dev_dbg(i2c->dev, "addr: %x, transfer ACK error\n", msgs->addr);
-		mtk_i2c_init_hw(i2c);
-		return -ENXIO;
-	}
-
-	return 0;
+	return ret;
 }
 
 static int mtk_i2c_transfer(struct i2c_adapter *adap,
@@ -1331,11 +1414,13 @@ static irqreturn_t mtk_i2c_irq(int irqno, void *dev_id)
 	 */
 	i2c->irq_stat |= intr_stat;
 
-	if (i2c->ignore_restart_irq && (i2c->irq_stat & restart_flag)) {
+	if (i2c->irq_stat & i2c->dev_comp->error_stat_mask) {
+		complete(&i2c->msg_complete);
+	} else if (i2c->ignore_restart_irq && (i2c->irq_stat & restart_flag)) {
 		i2c->ignore_restart_irq = false;
 		i2c->irq_stat = 0;
-		mtk_i2c_writew(i2c, I2C_RS_MUL_CNFG | I2C_RS_MUL_TRIG |
-				    I2C_TRANSAC_START, OFFSET_START);
+		mtk_i2c_start(i2c, I2C_RS_MUL_CNFG | I2C_RS_MUL_TRIG |
+			      I2C_TRANSAC_START);
 	} else {
 		if (i2c->irq_stat & (I2C_TRANSAC_COMP | restart_flag))
 			complete(&i2c->msg_complete);

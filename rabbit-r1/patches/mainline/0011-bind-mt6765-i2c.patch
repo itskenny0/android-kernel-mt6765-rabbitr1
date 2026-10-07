@@ -1,0 +1,21 @@
+Subject: [PATCH] dt-bindings: i2c: add MT6765
+
+Describe MT6765 with its own compatible. Its AP interrupt destination
+and event handling differ from MT8183.
+
+---
+ Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml b/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
+index ecd5783f00..a39f8c7873 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
+@@ -22,6 +22,7 @@ properties:
+       - const: mediatek,mt2712-i2c
+       - const: mediatek,mt6577-i2c
+       - const: mediatek,mt6589-i2c
++      - const: mediatek,mt6765-i2c
+       - const: mediatek,mt7622-i2c
+       - const: mediatek,mt7981-i2c
+       - const: mediatek,mt7986-i2c
