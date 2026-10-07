@@ -98,6 +98,7 @@ def shell_script(out, slot, restore=False):
         '#!/usr/bin/env bash', 'set -euo pipefail',
         f'cd {shlex.quote(str(out))}',
         f'echo {shlex.quote(mode + " slot " + slot + ": " + names)}',
+        'echo "Do not relock until the complete stock firmware package, including every LK slot, is restored."',
         'if [[ ${1:-} != --write ]]; then',
         f'    echo "Preview only. Run bash {mode}.sh --write to perform these writes."',
         f'    echo {shlex.quote("mtk.py w " + names + " " + inputs)}',
@@ -132,6 +133,8 @@ def prepare(args):
     manifest = json.loads((args.package/'manifest.json').read_text())
     if manifest.get('format') != 2:
         raise ValueError('Requires the LK-aware package format 2')
+    if manifest.get('lk_build', {}).get('relock_protection', {}).get('enabled') is not True:
+        raise ValueError('Package lacks LK relock protection; rebuild it')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')
@@ -184,6 +187,7 @@ def prepare(args):
     (args.out/'plan.json').write_text(json.dumps({
         'slot': args.slot, 'profile': args.profile, 'gpt': gpt,
         'write_partitions': [partition_name(p, args.slot) for p in WRITE_PARTS],
+        'relock': 'Restore complete stock firmware, including every LK slot, before relocking; this restore script only replays saved backups',
         'shared_logo': 'changes both slots; original retained for restore',
         'lk': 'mainline handoff and warning patches; restore together with stock boot',
         'backup_directory': str(args.backup), 'package_directory': str(args.package),

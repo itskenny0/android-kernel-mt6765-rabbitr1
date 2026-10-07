@@ -1,7 +1,7 @@
 # LK and splash build
 
 `build-lk.py` uses the pinned [mtklkzap](https://github.com/itskenny0/mtklkzap)
-revision `1eca1f4dc557069db79fb9b813cb9d47df6c4aac` after stock firmware extraction.
+revision `a86e9ade4e835d4292f922a04e885ace72f5cc31` after stock firmware extraction.
 It produces `dist/lk/lk.bin`, `logo.bin`, a splash preview, a build record and
 checksums. Packaging consumes these files; CI builds and tests them before
 creating the mtkclient ZIP. No device commands run during the build.
@@ -10,6 +10,28 @@ The input is **only** RabbitOS v0.8.293 LK, SHA256
 `534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e`.
 An unknown image is rejected before patching. The output keeps the original
 864,000-byte length and MTK header. No new bootloader is compiled from source.
+
+## Relock protection
+
+The first patch uses mtklkzap's reviewed r1 profile to make `flashing lock`
+return `FAILRelock blocked: restore complete stock firmware first`. It exits
+before the confirmation screen, factory reset or any lock-state write. The
+separate verifier checks the handler-only diff and actual Fastboot error path;
+Unicorn tests execute the stock registration and the refusal instructions.
+The build then applies the warning patches and verifies their diff against this
+guarded intermediate image.
+
+**Never relock until the complete stock firmware package has been restored,
+including every LK slot and every other modified verified partition.** Patched
+LK can fail signature verification and leave the system unable to boot. The
+guard covers this LK's command handler; a different slot's loader or direct
+`seccfg` writes through tools such as mtkclient can still relock the device.
+The generated restore script replays saved backups; it does not establish that
+the complete device firmware is stock or that relocking is safe.
+
+See [mtklkzap's relock documentation](https://github.com/itskenny0/mtklkzap/blob/main/docs/RELOCK.md)
+for the profile and test details. Unknown stock LK images are rejected; this
+protection has not been hardware-tested.
 
 ## Warning patches
 

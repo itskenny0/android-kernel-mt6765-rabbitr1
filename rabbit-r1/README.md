@@ -38,6 +38,11 @@ enabled by `r1.usb=1`. It does not mount Android filesystems. The expdb boot
 profile enables eMMC and writes kernel console logs to the first 18 MiB of the
 20 MiB `expdb` partition, preserving its final 2 MiB from our writes.
 
+**Do not relock until the complete stock firmware package, including every LK
+slot, has been restored.** Patched LK can fail signature verification and prevent
+booting. The build blocks its Fastboot lock handler; other loaders and direct
+`seccfg` writes remain outside that protection.
+
 Read [FLASHING.md](docs/FLASHING.md) for the two boot profiles, device backups,
 slot selection, readback verification, log retrieval and restoration. The
 package has passed offline format checks but remains untested on hardware.

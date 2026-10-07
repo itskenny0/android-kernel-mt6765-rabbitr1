@@ -6,6 +6,13 @@ booted it yet. Header checks establish the image format, not whether LK can hand
 off to this kernel. RAM fixups, firmware carve-outs, USB and eMMC still need a
 device test. The initramfs exposes an unauthenticated development shell.
 
+**Do not relock the bootloader before restoring the complete stock firmware
+package, including every LK slot and all other modified verified partitions.**
+Patched LK can fail signature verification and leave the device unbootable.
+This package blocks the patched LK's Fastboot lock command. A different LK slot
+or a direct `seccfg` write can still relock it. The backup restore script below
+is not proof that the whole device is stock or safe to relock.
+
 The package includes a patched LK and retains the stock DTBO for LK's own board
 setup. The Linux handoff bypasses the vendor overlay. The warning patches and
 LineageOS splash are built with pinned mtklkzap tools; see
@@ -18,7 +25,7 @@ need a device test. Restore LK and boot together when returning to RabbitOS.
 | `boot-expdb.img` | eMMC enabled; kernel console logs written to `expdb` after storage starts |
 | `boot-ram.img` | eMMC disabled; RAM shell and UART/USB diagnostics without persistent logs |
 | `dtbo.img` | Stock overlay retained for LK board initialization |
-| `lk.bin` | Patched stock LK: mainline DT handoff, orange-state and dm-verity warning removal |
+| `lk.bin` | Patched stock LK: relock guard, mainline DT handoff, orange-state and dm-verity warning removal |
 | `logo.bin` | LineageOS splash in the shared logo partition |
 
 Both boot images use the RabbitOS v0.8.293 v2 header, load addresses, 2048-byte

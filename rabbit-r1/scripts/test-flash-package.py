@@ -56,6 +56,7 @@ def cpio(blob):
 
 
 manifest = json.loads((PACKAGE/'manifest.json').read_text())
+assert manifest['lk_build']['relock_protection']['enabled'] is True
 for profile in ['ram', 'expdb']:
     blob = (PACKAGE/f'boot-{profile}.img').read_bytes()
     assert len(blob) == 32*1024*1024 and blob[:8] == b'ANDROID!'
@@ -200,6 +201,7 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='flash-test-') as tmp:
         subprocess.run(['bash', '-n', str(tmp/'prepared'/script)], check=True)
         preview = subprocess.check_output(['bash', str(tmp/'prepared'/script)], text=True)
         assert 'Preview only' in preview
+        assert 'Do not relock until the complete stock firmware package' in preview
         text = (tmp/'prepared'/script).read_text()
         assert 'boot_a,dtbo_a,vbmeta_a,logo,lk_a' in text
         assert 'boot_b' not in text and 'seccfg' not in text

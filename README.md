@@ -37,6 +37,11 @@ The source fetch verifies pinned archives, including RabbitOS v0.8.293 and the
 mtkclient source release. Host packages are not installed by these scripts.
 Dependencies and all build steps are in the [workspace guide](rabbit-r1/README.md).
 
+**Do not relock until the complete stock firmware package, including every LK
+slot, has been restored.** Patched LK can fail signature verification and prevent
+booting. The build blocks its Fastboot lock handler; other loaders and direct
+`seccfg` writes remain outside that protection.
+
 Read the [flashing guide](rabbit-r1/docs/FLASHING.md) before using the package.
 It covers full device backups, explicit slot selection, readback verification,
 log recovery and restore. Persistent logs require working eMMC; early crashes

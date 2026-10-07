@@ -69,11 +69,15 @@ def main():
         raise ValueError('mtklkzap must match its clean pinned revision')
     stock = (STOCK/'lk.img').read_bytes()
     check_stock(stock)
-    run(sys.executable, ZAP/'patch_lk_orangestate.py', STOCK/'lk.img', '--mode', 'both',
+    # Relock protection identifies pristine firmware; it must precede other patches.
+    run(sys.executable, ZAP/'patch_lk_relock.py', STOCK/'lk.img', '--force', '-o', OUT/'relock.bin')
+    run(sys.executable, ZAP/'verify_lk_relock.py', STOCK/'lk.img', OUT/'relock.bin')
+    relock = (OUT/'relock.bin').read_bytes()
+    run(sys.executable, ZAP/'patch_lk_orangestate.py', OUT/'relock.bin', '--mode', 'both',
         '--force', '-o', OUT/'orange.bin')
     run(sys.executable, ZAP/'patch_lk_dmverity.py', OUT/'orange.bin', '--force', '-o', OUT/'warnings.bin')
     # Upstream checks the exact warning diff, before our separate DT handoff edit.
-    run(sys.executable, ZAP/'verify-lk.py', STOCK/'lk.img', OUT/'warnings.bin')
+    run(sys.executable, ZAP/'verify-lk.py', OUT/'relock.bin', OUT/'warnings.bin')
     warnings = (OUT/'warnings.bin').read_bytes()
     patched = patch_handoff(stock, warnings)
     (DIST/'lk.bin').write_bytes(patched)
@@ -87,10 +91,17 @@ def main():
     if len(before) != 60 or len(after) != 60 or [i for i in range(60) if before[i] != after[i]] != [0,38]:
         raise ValueError('Unexpected logo slot changes')
     report = {
-        'format': 1, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
-        'mtklkzap_commit': revision, 'warning_bytes_changed': sum(a != b for a,b in zip(stock,warnings)),
+        'format': 2, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
+        'mtklkzap_commit': revision, 'warning_bytes_changed': sum(a != b for a,b in zip(relock,warnings)),
         'handoff_patches': [{'file_offset': offset, 'before': before.hex(), 'after': after.hex()}
                             for offset,before,after in HANDOFF_PATCHES],
+        'relock_protection': {
+            'enabled': True, 'profile': 'rabbit-r1-v0.8.293',
+            'bytes_changed': sum(a != b for a,b in zip(stock,relock)),
+            'command': 'flashing lock',
+            'response': 'FAILRelock blocked: restore complete stock firmware first',
+            'scope': 'patched LK handler; other loaders and direct seccfg writes unaffected',
+        },
         'kernel_overlay': 'bypassed; mainline base copied with original bounds and later fixups',
         'lk_overlay': 'stock DTBO; shared overlay function and early caller unchanged',
         'logo': {'width': 480, 'height': 640, 'color_model': 'bgrabe', 'changed_slots': [0,38]},

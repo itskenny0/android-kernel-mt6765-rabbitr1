@@ -70,6 +70,8 @@ def main():
     validate = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validate)
     lk_record = json.loads((ROOT/'dist/lk/build.json').read_text())
+    if lk_record.get('relock_protection', {}).get('enabled') is not True:
+        raise ValueError('Rebuild LK with relock protection before packaging')
     if lk_record['stock_lk_sha256'] != sha(STOCK/'lk.img'):
         raise ValueError('LK build uses a different stock image')
     for name, facts in lk_record['files'].items():

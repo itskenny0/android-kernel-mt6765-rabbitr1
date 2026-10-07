@@ -19,6 +19,7 @@
 | Flash preparation and restore | PASS: synthetic GPT/backups, CRC rejection, AVB flags, preview scripts | `logs/flash-package-tests.log` |
 | Matching pstore modules and target shell syntax | PASS | `logs/flash-package-tests.log` |
 | LK warning patches and instruction verification | PASS, 102 warning bytes changed | `logs/build-lk.log` |
+| LK relock guard | PASS: real Fastboot registration, FAIL response, no memory writes; unknown/tampered images rejected | `logs/lk-tests.log` |
 | Linux DT handoff and memory ownership | PASS, actual Thumb instructions with modeled external calls | `logs/lk-tests.log` |
 | Stock LK board overlay and LineageOS splash | PASS, GPIO/charger tree retained; 58 logo slots unchanged | `logs/lk-tests.log` |
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |

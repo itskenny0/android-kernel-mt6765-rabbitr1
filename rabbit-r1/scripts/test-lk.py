@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Execute the patched Thumb handoff with Unicorn; no hardware or USB access."""
 import importlib.util
+import json
+import os
+import sys
 from pathlib import Path
 import struct
 import subprocess
@@ -33,6 +36,14 @@ for bad in [stock[:-1], bytes(len(stock)), stock[:100]+bytes([stock[100]^1])+sto
     else:
         raise AssertionError('Unknown LK accepted')
 assert patched[:512] == stock[:512] and len(patched) == len(stock)
+# Upstream tests trace the stock Fastboot registration and execute the refusal.
+subprocess.run([sys.executable, str(build.ZAP/'tests/test_relock.py'), '-v'], check=True,
+               env=dict(os.environ, MTKLKZAP_TEST_LK=str(build.STOCK/'lk.img')))
+relock = (build.OUT/'relock.bin').read_bytes()
+profile = json.loads((build.ZAP/'profiles/lk/rabbit-r1-v0.8.293.json').read_text())
+assert patched[profile['handler']:profile['handler_end']] == relock[profile['handler']:profile['handler_end']]
+assert patched[profile['fastboot_fail']:profile['fastboot_fail']+16] == stock[profile['fastboot_fail']:profile['fastboot_fail']+16]
+print('PASS: relock guard survives warning and mainline handoff patches')
 assert patched[0x211bc:0x212e8] == stock[0x211bc:0x212e8]  # shared overlay function
 assert patched[0x3e064:0x3e3d0] == stock[0x3e064:0x3e3d0]  # early LK caller
 for offset, before, after in build.HANDOFF_PATCHES:
