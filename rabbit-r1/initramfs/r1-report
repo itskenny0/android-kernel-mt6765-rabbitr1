@@ -1,0 +1,37 @@
+#!/bin/sh
+# Read-only diagnostics, run on the target. Does not dump raw PMIC registers.
+echo '=== Kernel and command line ==='
+uname -a
+cat /proc/cmdline
+echo '=== Device model and compatible ==='
+for name in model compatible; do
+    [ ! -r "/sys/firmware/devicetree/base/$name" ] || tr '\000' '\n' < "/sys/firmware/devicetree/base/$name"
+done
+echo '=== Regulators ==='
+for rail in /sys/class/regulator/regulator.*; do
+    [ -d "$rail" ] || continue
+    echo "$rail"
+    for property in name state status microvolts num_users; do
+        if [ -r "$rail/$property" ]; then
+            printf '%s: ' "$property"
+            cat "$rail/$property"
+        fi
+    done
+done
+echo '=== Regulator consumers and deferred probes ==='
+for file in /sys/kernel/debug/regulator/regulator_summary /sys/kernel/debug/devices_deferred; do
+    [ ! -r "$file" ] || cat "$file"
+done
+echo '=== Power supplies ==='
+for file in /sys/class/power_supply/*/uevent; do
+    [ ! -r "$file" ] || cat "$file"
+done
+echo '=== USB device controllers ==='
+ls /sys/class/udc
+echo '=== Persistent kernel log ==='
+for file in /run/expdb-start.log /run/expdb-logger; do
+    [ ! -r "$file" ] || cat "$file"
+done
+ls /sys/fs/pstore
+echo '=== Kernel log ==='
+dmesg

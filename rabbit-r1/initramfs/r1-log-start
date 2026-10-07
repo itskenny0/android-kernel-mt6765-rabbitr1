@@ -1,0 +1,37 @@
+#!/bin/sh
+# Run on the r1 only. Nothing writes expdb unless the boot image opts in.
+set -eu
+case " $(cat /proc/cmdline) " in
+    *' r1.expdb=1 '*) ;;
+    *) echo 'expdb logging disabled by boot profile'; exit 0 ;;
+esac
+if [ -e /sys/module/pstore_blk ]; then
+    echo 'pstore_blk is already loaded; refusing to reconfigure it' >&2
+    exit 1
+fi
+
+# Wait for discovery without preventing the RAM/USB console from starting.
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    found=
+    for uevent in /sys/class/block/mmcblk*p*/uevent; do
+        [ -r "$uevent" ] || continue
+        if grep -qx 'PARTNAME=expdb' "$uevent"; then
+            [ -z "$found" ] || { echo 'Multiple expdb partitions; refusing' >&2; exit 1; }
+            found=${uevent%/uevent}
+            found=${found##*/}
+        fi
+    done
+    [ -z "$found" ] || break
+    attempt=$((attempt + 1))
+    sleep 1
+done
+[ -n "$found" ] || { echo 'expdb not found; logs remain in RAM' >&2; exit 1; }
+mapped=$(expdb-map "$found")
+insmod /lib/modules/pstore_zone.ko
+insmod /lib/modules/pstore_blk.ko blkdev="$mapped" best_effort=1 \
+    console_size=1024 pmsg_size=64 kmsg_size=64 ftrace_size=0 max_reason=2
+mount -t pstore pstore /sys/fs/pstore
+echo "$found -> $mapped; first 18 MiB; best-effort pstore console" > /run/expdb-logger
+echo '<6>r1: expdb pstore console enabled; final 2 MiB excluded' > /dev/kmsg
+echo 'expdb kernel logging enabled; earlier records are in /sys/fs/pstore'

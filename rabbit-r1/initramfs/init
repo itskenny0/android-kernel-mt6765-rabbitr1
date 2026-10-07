@@ -1,0 +1,46 @@
+#!/bin/sh
+# Runs on the r1 only. Lab initramfs: no Android, no storage mounts, root console.
+export PATH=/bin
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /proc /sys /run
+mount -t devpts devpts /dev/pts
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t tmpfs tmpfs /run
+mount -t debugfs debugfs /sys/kernel/debug
+
+echo 'rabbit r1 mainline bring-up; hardware support is experimental'
+uname -a
+echo 'Run r1-report for diagnostics. The expdb profile enables storage logging.'
+(r1-log-start > /run/expdb-start.log 2>&1) &
+
+# Explicit opt-in for USB ACM. Physical USB/VBUS operation is unverified.
+case " $(cat /proc/cmdline) " in
+  *' r1.usb=1 '*)
+    mount -t configfs configfs /sys/kernel/config
+    gadget=/sys/kernel/config/usb_gadget/r1
+    mkdir -p "$gadget"
+    echo 0x1d6b > "$gadget/idVendor"
+    echo 0x0104 > "$gadget/idProduct"
+    mkdir -p "$gadget/strings/0x409"
+    echo 'r1-bringup' > "$gadget/strings/0x409/serialnumber"
+    echo 'r1 development' > "$gadget/strings/0x409/manufacturer"
+    echo 'Mainline lab console' > "$gadget/strings/0x409/product"
+    mkdir -p "$gadget/configs/c.1/strings/0x409"
+    echo 'ACM console' > "$gadget/configs/c.1/strings/0x409/configuration"
+    echo 100 > "$gadget/configs/c.1/MaxPower"
+    mkdir -p "$gadget/functions/acm.usb0"
+    ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/"
+    for controller in /sys/class/udc/*; do
+      [ -e "$controller" ] || continue
+      echo "${controller##*/}" > "$gadget/UDC"
+      break
+    done
+    (while :; do getty -L -n -l /bin/sh ttyGS0 115200; sleep 2; done) &
+    ;;
+esac
+
+while :; do
+    setsid cttyhack sh
+    sleep 1
+done

@@ -1,0 +1,214 @@
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.yaml b/Documentation/devicetree/bindings/arm/mediatek.yaml
+index 382d0eb4d0..4201ea5ed0 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.yaml
++++ b/Documentation/devicetree/bindings/arm/mediatek.yaml
+@@ -57,6 +57,7 @@ properties:
+       - items:
+           - enum:
+               - mediatek,mt6765-evb
++              - rabbit,r1
+           - const: mediatek,mt6765
+       - items:
+           - enum:
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.yaml b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+index d31198268f..3591a8cca8 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.yaml
++++ b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+@@ -1359,6 +1359,8 @@ patternProperties:
+     description: QNAP Systems, Inc.
+   "^quanta,.*":
+     description: Quanta Computer Inc.
++  "^rabbit,.*":
++    description: rabbit inc.
+   "^radxa,.*":
+     description: Radxa
+   "^raidsonic,.*":
+diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+index b73e613d1a..7e58781431 100644
+--- a/arch/arm64/boot/dts/mediatek/Makefile
++++ b/arch/arm64/boot/dts/mediatek/Makefile
+@@ -2,6 +2,7 @@
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+ # dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-nokia-roo.dtb
++dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-rabbit-r1.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6762g-xiaomi-dandelion.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6779-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+new file mode 100644
+index 0000000000..bdd2ebef13
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -0,0 +1,171 @@
++// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
++/*
++ * Experimental rabbit r1 bring-up tree. NOT hardware validated.
++ * Board wiring: rabbit-hmi-oss r1 source and RabbitOS v0.8.293 DT/DTBO.
++ * Pin groups follow the MT6765 port's Nokia ROO example where the SoC
++ * muxes agree with Rabbit's gpio_init_default table.
++ *
++ * The stock loader must populate actual RAM and firmware carve-outs.
++ * The memory entry below is the stock DT's 512 MiB placeholder, NOT an
++ * assertion that the device has only 512 MiB. Inspect the live FDT before
++ * relying on it. Do not apply the stock vendor overlay to this tree.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/pinctrl/mediatek,mt6765-pinfunc.h>
++#include "mt6765.dtsi"
++#include "mt6357.dtsi"
++
++/ {
++	model = "rabbit r1 (experimental mainline bring-up)";
++	compatible = "rabbit,r1", "mediatek,mt6765";
++	chassis-type = "handset";
++
++	aliases {
++		mmc0 = &mmc0;
++	};
++
++	chosen {
++		stdout-path = "serial0:921600n8";
++		/* Single CPU until the r1's PSCI/firmware behavior is measured. */
++		bootargs = "earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused";
++	};
++
++	/* RabbitOS v0.8.293 LK looks up the exact path /memory. Keep that
++	 * name so its RAM fixup cannot leave a second, stale memory bank.
++	 */
++	memory {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x20000000>;
++	};
++
++	/* Dynamic reservations copied from the stock base tree. Their final
++	 * addresses, plus loader-added TEE/modem reservations, need live-FDT
++	 * verification. Remote processors are not enabled by this board file.
++	 */
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		reserve-memory-sspm_share {
++			compatible = "mediatek,reserve-memory-sspm_share";
++			no-map;
++			size = <0 0x510000>;
++			alignment = <0 0x10000>;
++			alloc-ranges = <0 0x40000000 0 0x60000000>;
++		};
++
++		reserve-memory-scp_share {
++			compatible = "mediatek,reserve-memory-scp_share";
++			no-map;
++			size = <0 0x300000>;
++			alignment = <0 0x1000000>;
++			alloc-ranges = <0 0x40000000 0 0x50000000>;
++		};
++
++		consys-reserve-memory {
++			compatible = "mediatek,consys-reserve-memory";
++			no-map;
++			size = <0 0x400000>;
++			alignment = <0 0x1000000>;
++			alloc-ranges = <0 0x40000000 0 0x80000000>;
++		};
++
++		wifi-reserve-memory {
++			compatible = "shared-dma-pool";
++			no-map;
++			size = <0 0x300000>;
++			alignment = <0 0x1000000>;
++			alloc-ranges = <0 0x40000000 0 0x80000000>;
++		};
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r1_uart0_pins>;
++	status = "okay";
++};
++
++&pwrap {
++	status = "okay";
++};
++
++&mt6357_pmic {
++	interrupt-controller;
++	interrupt-parent = <&pio>;
++	interrupts = <144 IRQ_TYPE_LEVEL_HIGH>;
++	#interrupt-cells = <2>;
++};
++
++&mt6357_vdram_reg {
++	regulator-always-on;
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r1_mmc0_pins>;
++	bus-width = <8>;
++	/* Start at legacy/high-speed timing; HS200/HS400 tuning is untested. */
++	max-frequency = <52000000>;
++	cap-mmc-highspeed;
++	non-removable;
++	no-sd;
++	no-sdio;
++	vmmc-supply = <&mt6357_vemc_reg>;
++	/* VIO18 is inferred from the SoC reference; verify on the board. */
++	vqmmc-supply = <&mt6357_vio18_reg>;
++	/* MT6765 port reports partial eMMC support. First boot uses initramfs.
++	 * Enable only for an instrumented storage test after PMIC validation.
++	 */
++	status = "disabled";
++};
++
++&usb2 {
++	dr_mode = "peripheral";
++	status = "okay";
++};
++
++&u2phy {
++	status = "okay";
++};
++
++&pio {
++	r1_uart0_pins: uart0-pins {
++		pins {
++			pinmux = <PINMUX_GPIO95__FUNC_URXD0>,
++				 <PINMUX_GPIO96__FUNC_UTXD0>;
++		};
++	};
++
++	r1_mmc0_pins: mmc0-pins {
++		pins-cmd-dat {
++			pinmux = <PINMUX_GPIO129__FUNC_MSDC0_DAT0>,
++				 <PINMUX_GPIO127__FUNC_MSDC0_DAT1>,
++				 <PINMUX_GPIO126__FUNC_MSDC0_DAT2>,
++				 <PINMUX_GPIO132__FUNC_AUX1_MSDC0_DAT3>,
++				 <PINMUX_GPIO123__FUNC_MSDC0_DAT4>,
++				 <PINMUX_GPIO125__FUNC_MSDC0_DAT5>,
++				 <PINMUX_GPIO128__FUNC_MSDC0_DAT6>,
++				 <PINMUX_GPIO130__FUNC_AUX2_MSDC0_DAT7>,
++				 <PINMUX_GPIO122__FUNC_AUX2_MSDC0_CMD>;
++			input-enable;
++			drive-strength = <3>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
++		};
++
++		pins-clk {
++			pinmux = <PINMUX_GPIO124__FUNC_AUX2_MSDC0_CLK>;
++			drive-strength = <3>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins-rst {
++			pinmux = <PINMUX_GPIO133__FUNC_AUX2_MSDC0_RSTB>;
++			drive-strength = <3>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
++		};
++	};
++};

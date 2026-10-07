@@ -1,0 +1,139 @@
+{
+  "date_utc": "2026-10-07",
+  "mainline": {
+    "target": "mainline",
+    "status": "compiled; not boot-tested; not a flashable firmware release",
+    "kernel_release": "7.1.0-rabbit-r1-bringup+",
+    "source_commit": "cceb223d0c2d7ce52fade7bb6b9ef679c560bea7",
+    "source_diff_sha256": "c5ee80f7555dbd7c7ff80c310f7db3376a169ac673435a0aa6f104160a4f6d39",
+    "untracked_source_files": {},
+    "compiler": "aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "host_compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "source_date_epoch": "1783620182",
+    "config_sha256": "7a0215c333cd1bcaf6943752e44e173202af4b77230b7e8f07b14d46d7f82c5d",
+    "module_count": 8,
+    "modules": {
+      "drivers/clk/mediatek/clk-mt8196-disp0.ko": "2253212a3e6cbc95be2024bb6db616f6ad91f8021ad141d80703da172315afe7",
+      "drivers/clk/mediatek/clk-mt8196-disp1.ko": "6f1ecf26031e6c994d5049a2322c9ada9e8e6dccdfa7c2c75254767b3e3e7b8f",
+      "drivers/clk/mediatek/clk-mt8196-mfg.ko": "bc3e7bbefca7cce68a102b5a11a40098de72dff866a87b551e52f72f37692189",
+      "drivers/clk/mediatek/clk-mt8196-ovl0.ko": "b6315d3309193914f35e6578092d3ff6215d02924903983d789a0bd4dc0f0b3f",
+      "drivers/clk/mediatek/clk-mt8196-ovl1.ko": "5e5e413692456a8f5d8d1ad7ed4e31343d2ff2d0f1b8d18fa6320420a3d93806",
+      "drivers/clk/mediatek/clk-mt8196-vdec.ko": "7e5e4c8633a1323beda19da0ad43694764876d9d1674e66dcaebc5acc57c3336",
+      "drivers/clk/mediatek/clk-mt8196-vdisp_ao.ko": "48a06a1560024b27c29d19956559875b2906c7bb0b5d0b780e09872466400f1c",
+      "drivers/clk/mediatek/clk-mt8196-venc.ko": "c03e9d3a2cb4c2c4921378b0c8d51e3b39c64a286f5eed4b9040ed1e304c3f2d"
+    },
+    "artifacts": {
+      "Image": {
+        "bytes": 35209224,
+        "sha256": "9bb096d8b83e6b07372b70491b57b1252fe8e1795b640db0a13a021657057057"
+      },
+      "Image.gz": {
+        "bytes": 12526087,
+        "sha256": "7f2844011e060a3f05c4db5e034d732fe7cd8ea610334fe264aab0fcd0e62b36"
+      },
+      "Module.symvers": {
+        "bytes": 857944,
+        "sha256": "7db118d0e2a9d9a6b008eebdf947ff3cd438660685b1a01518da4d38e0fd88f6"
+      },
+      "System.map": {
+        "bytes": 7697560,
+        "sha256": "69f3bab6fc956552102f1000946bf00379dff55dc3bb1488e026ab51272d3d5d"
+      },
+      "config": {
+        "bytes": 194829,
+        "sha256": "7a0215c333cd1bcaf6943752e44e173202af4b77230b7e8f07b14d46d7f82c5d"
+      },
+      "defconfig": {
+        "bytes": 17092,
+        "sha256": "21e23779ed9aec8b5c767133236065a27fbe75c4c0810d20e65f0a5e924c66aa"
+      },
+      "modules.tar.gz": {
+        "bytes": 13141,
+        "sha256": "2747d05ad4e969b8d8b2716c099d2ee24ba0341f56e8f21970f752cf02628029"
+      },
+      "mt6765-rabbit-r1.dtb": {
+        "bytes": 25120,
+        "sha256": "ce76b4712e8ef7ccbcdf39bec959d99ecbcc495fb4cd9d2e4e3f3f8f9e12a9c1"
+      },
+      "vmlinux": {
+        "bytes": 44900936,
+        "sha256": "b70e25479497aa0acfd0920129f693efef5ab3f4b9f5e0a82a605a1b84b3bbdf"
+      }
+    }
+  },
+  "vendor": {
+    "target": "vendor",
+    "status": "compiled; not boot-tested; not a flashable firmware release",
+    "kernel_release": "4.19.191-g8167c8c1087f",
+    "source_commit": "8167c8c1087f057d2ef302fc93b47554291687ec",
+    "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked_source_files": {},
+    "compiler": "Android (6443078 based on r383902) clang version 11.0.1 (https://android.googlesource.com/toolchain/llvm-project b397f81060ce6d701042b782172ed13bee898b79)\nTarget: x86_64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /rabbitr1/toolchains/clang-r383902/bin",
+    "host_compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "source_date_epoch": "1753109523",
+    "config_sha256": "b980807c37253cf3f54f8bcb978937c0c137b7132ecbaf5091586e50d5cbb78f",
+    "module_count": 11,
+    "modules": {
+      "drivers/mmc/host/sdhci-pltfm.ko": "7b637c4f1aac9c9183da1b653c8e41fa215584e2e209a5d95fc3876cacea376a",
+      "drivers/mmc/host/sdhci.ko": "163483655c2dd28b358fca3213e58cbf0dbb80f04b66c4ded84830fc7b47d240",
+      "drivers/power/supply/mt6359_battery.ko": "7972c745a9150d9fba9f48dbc71ad33b7a14e9dfd32705493b740a0e7a0a5487",
+      "drivers/tty/serial/8250/8250_of.ko": "13221f080a4f25a81574df5f35e4e733d92ab535731d50bcb911698b55aa928b",
+      "drivers/usb/gadget/udc/dummy_hcd.ko": "135c7fff93fe5c1a0ea00371559eb52427aded409e1abc97118bfbbb910ddb0b",
+      "kernel/kheaders.ko": "9f341663de229ff2feb1e18833b0c934a8bb764c771fcef7d985dca6efff0bcf",
+      "kernel/trace/trace_mmstat.ko": "627f52fdf557e71c6169537faa5b52975a69218430a78260c349e7111eb5c49d",
+      "net/ipv4/tcp_htcp.ko": "5e5daed5264e1790f58d2cedd30b3394fad4586d90ad225e46429983a480bb9a",
+      "net/ipv4/tcp_westwood.ko": "55b9b8c2b6d3413f66f9c992c765591e6e23cdd1067bfa3aa2cbbe9e004ba11b",
+      "sound/soc/codecs/mt6357-accdet.ko": "35a71b1c4ef8261760157a32122f85ff5e5e1841f488ca2a3410981f21122fc1",
+      "sound/soc/codecs/mt6359-accdet.ko": "52e9442761fca927de69d360c23b6adc6a111258ad20019b9036228f35bb3236"
+    },
+    "artifacts": {
+      "Image": {
+        "bytes": 26333184,
+        "sha256": "0809f44ec57b268821e386749fe89fcb2751a162284a0ab426abee2d3c4255f0"
+      },
+      "Image.gz": {
+        "bytes": 11269455,
+        "sha256": "12800771fd144a663d5e94870dee10d35585389b458f8981c542d72b0c242c79"
+      },
+      "Module.symvers": {
+        "bytes": 687554,
+        "sha256": "6afd40960323956431da96c8962207e28946a4e2adde34b86fc1c3a5791ef083"
+      },
+      "System.map": {
+        "bytes": 6845040,
+        "sha256": "a86cacbe085810611bc629b5c443d55ac78f1aafb130f7aca2078e5c994f1b7d"
+      },
+      "config": {
+        "bytes": 150121,
+        "sha256": "b980807c37253cf3f54f8bcb978937c0c137b7132ecbaf5091586e50d5cbb78f"
+      },
+      "k65v1_64_bsp.dtb": {
+        "bytes": 43693,
+        "sha256": "ac3ddef6827481cd44f5c83963948e68c3f631f5de48c8d419f00e9beeacc499"
+      },
+      "modules.tar.gz": {
+        "bytes": 5204826,
+        "sha256": "de598ddee72d55d38e01344995c9c0581a65ffdd6d3dfb6f10176ffad0d5946d"
+      },
+      "mt6765.dtb": {
+        "bytes": 104027,
+        "sha256": "8af245cf00dcb833aff150e3ca9cbcaa465efda92f708d2500b5e9655908d76d"
+      },
+      "vmlinux": {
+        "bytes": 321472992,
+        "sha256": "64056ceaad1cdb63b9c56dea7ba9c289788d571ff6f658bb0c86cd71c70a5aef"
+      }
+    }
+  },
+  "initramfs_sha256": "6616779b591e787b1756996a6dc0c88b66633c594a89e38d62df2b25ee4f3d26",
+  "hardware_tested": false,
+  "lineage_rom_built": false,
+  "full_dt_schema_diagnostics": 48,
+  "patches": {
+    "0001-rabbit-r1-bringup-dts.patch": "239e56bf925e3b37ba023bcb0067b7b41119faf1ab35f945ba90fed5e7d8480c",
+    "0002-mt6765-correct-mmc-source-clock-provider.patch": "b32daa516ec94f101391746a5d19e551e05caa7a0f56664cda3aa9d29ee62762",
+    "0003-mt6765-fix-mutex-merge-errors.patch": "ff95e5daf409d6e13c7ad44f01729f154785c4166b0ceb7ce5ec7f9fbcc1a97e",
+    "0004-mt6357-sram-mapping-and-status.patch": "b28f220ab36c2e3faa4b92240fa71a5f669349a8a6c43f02d04b4605cd8c0f90",
+    "0005-rabbit-r1-defconfig.patch": "0d30284ca890f3ac89644270d28edae96ff7b7ddd7318cfc22cb5a3f2456fd58"
+  }
+}

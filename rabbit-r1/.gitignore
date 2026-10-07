@@ -1,0 +1,19 @@
+/.cache/
+/.tmp/
+/downloads/
+/toolchains/
+/src/
+/out/
+/dist/
+/logs/
+/firmware/
+/lost+found/
+/backups/
+/prepared/
+/.gitconfig
+__pycache__/
+*.pyc
+
+# Keep the reproducible series inside the kernel fork.
+!/patches/
+!/patches/**

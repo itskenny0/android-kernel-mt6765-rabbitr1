@@ -1,0 +1,259 @@
+diff --git a/drivers/regulator/mt6357-regulator.c b/drivers/regulator/mt6357-regulator.c
+index 815ef7d3e5..0b6aa45f9a 100644
+--- a/drivers/regulator/mt6357-regulator.c
++++ b/drivers/regulator/mt6357-regulator.c
+@@ -19,6 +19,7 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/mt6357-regulator.h>
+ #include <linux/regulator/of_regulator.h>
++#include <linux/slab.h>
+ 
+ /*
+  * MT6357 regulators' information
+@@ -26,11 +27,15 @@
+  * @desc: standard fields of regulator description.
+  * @da_vsel_reg: Monitor register for query buck's voltage.
+  * @da_vsel_mask: Mask for query buck's voltage.
++ * @status_reg: Register containing the hardware enable status.
++ * @status_mask: Mask for the hardware enable status.
+  */
+ struct mt6357_regulator_info {
+ 	struct regulator_desc desc;
+ 	u32 da_vsel_reg;
+ 	u32 da_vsel_mask;
++	u32 status_reg;
++	u32 status_mask;
+ };
+ 
+ #define MT6357_BUCK(match, vreg, min, max, step,		\
+@@ -54,10 +59,12 @@ struct mt6357_regulator_info {
+ 	},	\
+ 	.da_vsel_reg = MT6357_BUCK_##vreg##_DBG0,		\
+ 	.da_vsel_mask = vosel_mask,		\
++	.status_reg = MT6357_BUCK_##vreg##_DBG1,	\
++	.status_mask = BIT(0),			\
+ }
+ 
+ #define MT6357_LDO(match, vreg, ldo_volt_table,	\
+-	enreg, vosel, vosel_mask)		\
++	enreg, vosel, vosel_mask, status)	\
+ [MT6357_ID_##vreg] = {		\
+ 	.desc = {		\
+ 		.name = #vreg,	\
+@@ -74,6 +81,8 @@ struct mt6357_regulator_info {
+ 		.enable_reg = enreg,		\
+ 		.enable_mask = BIT(0),		\
+ 	},	\
++	.status_reg = status,		\
++	.status_mask = BIT(15),		\
+ }
+ 
+ #define MT6357_LDO1(match, vreg, min, max, step, volt_ranges,	\
+@@ -97,6 +106,8 @@ struct mt6357_regulator_info {
+ 	},	\
+ 	.da_vsel_reg = MT6357_LDO_##vreg##_DBG0,		\
+ 	.da_vsel_mask = 0x7f00,	\
++	.status_reg = MT6357_LDO_##vreg##_DBG1,	\
++	.status_mask = BIT(0),			\
+ }
+ 
+ #define MT6357_REG_FIXED(match, vreg, volt)	\
+@@ -114,6 +125,21 @@ struct mt6357_regulator_info {
+ 		.enable_mask = BIT(0),			\
+ 		.min_uV = volt,				\
+ 	},						\
++	.status_reg = MT6357_LDO_##vreg##_CON1,	\
++	.status_mask = BIT(15),			\
++}
++
++static int mt6357_get_status(struct regulator_dev *rdev)
++{
++	struct mt6357_regulator_info *info = rdev_get_drvdata(rdev);
++	unsigned int val;
++	int ret;
++
++	ret = regmap_read(rdev->regmap, info->status_reg, &val);
++	if (ret)
++		return ret;
++
++	return val & info->status_mask ? REGULATOR_STATUS_ON : REGULATOR_STATUS_OFF;
+ }
+ 
+ /**
+@@ -153,6 +179,7 @@ static const struct regulator_ops mt6357_volt_range_ops = {
+ 	.enable = regulator_enable_regmap,
+ 	.disable = regulator_disable_regmap,
+ 	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6357_get_status,
+ };
+ 
+ static const struct regulator_ops mt6357_volt_table_ops = {
+@@ -164,6 +191,7 @@ static const struct regulator_ops mt6357_volt_table_ops = {
+ 	.enable = regulator_enable_regmap,
+ 	.disable = regulator_disable_regmap,
+ 	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6357_get_status,
+ };
+ 
+ static const struct regulator_ops mt6357_volt_fixed_ops = {
+@@ -171,6 +199,7 @@ static const struct regulator_ops mt6357_volt_fixed_ops = {
+ 	.enable = regulator_enable_regmap,
+ 	.disable = regulator_disable_regmap,
+ 	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6357_get_status,
+ };
+ 
+ static const int vxo22_voltages[] = {
+@@ -339,7 +368,7 @@ static const struct linear_range buck_volt_range4[] = {
+ };
+ 
+ /* The array is indexed by id(MT6357_ID_XXX) */
+-static struct mt6357_regulator_info mt6357_regulators[] = {
++static const struct mt6357_regulator_info mt6357_regulators[] = {
+ 	/* Bucks */
+ 	MT6357_BUCK("buck-vcore", VCORE, 518750, 1312500, 6250,
+ 		buck_volt_range1, MT6357_BUCK_VCORE_ELR0, 0x7f, 0x7f),
+@@ -354,42 +383,57 @@ static struct mt6357_regulator_info mt6357_regulators[] = {
+ 
+ 	/* LDOs */
+ 	MT6357_LDO("ldo-vcama", VCAMA, vcama_voltages,
+-		   MT6357_LDO_VCAMA_CON0, MT6357_VCAMA_ANA_CON0, 0xf00),
++		   MT6357_LDO_VCAMA_CON0, MT6357_VCAMA_ANA_CON0, 0xf00,
++		   MT6357_LDO_VCAMA_CON1),
+ 	MT6357_LDO("ldo-vcamd", VCAMD, vcamd_voltages,
+-		   MT6357_LDO_VCAMD_CON0, MT6357_VCAMD_ANA_CON0, 0xf00),
++		   MT6357_LDO_VCAMD_CON0, MT6357_VCAMD_ANA_CON0, 0xf00,
++		   MT6357_LDO_VCAMD_CON1),
+ 	MT6357_LDO("ldo-vcn33-bt", VCN33_BT, vcn33_voltages,
+-		   MT6357_LDO_VCN33_CON0_0, MT6357_VCN33_ANA_CON0, 0x300),
++		   MT6357_LDO_VCN33_CON0_0, MT6357_VCN33_ANA_CON0, 0x300,
++		   MT6357_LDO_VCN33_CON1),
+ 	MT6357_LDO("ldo-vcn33-wifi", VCN33_WIFI, vcn33_voltages,
+-		   MT6357_LDO_VCN33_CON0_1, MT6357_VCN33_ANA_CON0, 0x300),
++		   MT6357_LDO_VCN33_CON0_1, MT6357_VCN33_ANA_CON0, 0x300,
++		   MT6357_LDO_VCN33_CON1),
+ 	MT6357_LDO("ldo-vdram", VDRAM, vdram_voltages,
+-		   MT6357_LDO_VDRAM_CON0, MT6357_VDRAM_ELR_2, 0x300),
++		   MT6357_LDO_VDRAM_CON0, MT6357_VDRAM_ELR_2, 0x300,
++		   MT6357_LDO_VDRAM_CON1),
+ 	MT6357_LDO("ldo-vefuse", VEFUSE, vefuse_voltages,
+-		   MT6357_LDO_VEFUSE_CON0, MT6357_VEFUSE_ANA_CON0, 0xf00),
++		   MT6357_LDO_VEFUSE_CON0, MT6357_VEFUSE_ANA_CON0, 0xf00,
++		   MT6357_LDO_VEFUSE_CON1),
+ 	MT6357_LDO("ldo-vemc", VEMC, vemc_voltages,
+-		   MT6357_LDO_VEMC_CON0, MT6357_VEMC_ANA_CON0, 0x700),
++		   MT6357_LDO_VEMC_CON0, MT6357_VEMC_ANA_CON0, 0x700,
++		   MT6357_LDO_VEMC_CON1),
+ 	MT6357_LDO("ldo-vibr", VIBR, vibr_voltages,
+-		   MT6357_LDO_VIBR_CON0, MT6357_VIBR_ANA_CON0, 0xf00),
++		   MT6357_LDO_VIBR_CON0, MT6357_VIBR_ANA_CON0, 0xf00,
++		   MT6357_LDO_VIBR_CON1),
+ 	MT6357_LDO("ldo-vldo28", VLDO28, vldo28_voltages,
+-		   MT6357_LDO_VLDO28_CON0_0, MT6357_VLDO28_ANA_CON0, 0x300),
++		   MT6357_LDO_VLDO28_CON0_0, MT6357_VLDO28_ANA_CON0, 0x300,
++		   MT6357_LDO_VLDO28_CON1),
+ 	MT6357_LDO("ldo-vmc", VMC, vmc_voltages,
+-		   MT6357_LDO_VMC_CON0, MT6357_VMC_ANA_CON0, 0xf00),
++		   MT6357_LDO_VMC_CON0, MT6357_VMC_ANA_CON0, 0xf00,
++		   MT6357_LDO_VMC_CON1),
+ 	MT6357_LDO("ldo-vmch", VMCH, vmch_voltages,
+-		   MT6357_LDO_VMCH_CON0, MT6357_VMCH_ANA_CON0, 0x700),
++		   MT6357_LDO_VMCH_CON0, MT6357_VMCH_ANA_CON0, 0x700,
++		   MT6357_LDO_VMCH_CON1),
+ 	MT6357_LDO("ldo-vsim1", VSIM1, vsim_voltages,
+-		   MT6357_LDO_VSIM1_CON0, MT6357_VSIM1_ANA_CON0, 0xf00),
++		   MT6357_LDO_VSIM1_CON0, MT6357_VSIM1_ANA_CON0, 0xf00,
++		   MT6357_LDO_VSIM1_CON1),
+ 	MT6357_LDO("ldo-vsim2", VSIM2, vsim_voltages,
+-		   MT6357_LDO_VSIM2_CON0, MT6357_VSIM2_ANA_CON0, 0xf00),
++		   MT6357_LDO_VSIM2_CON0, MT6357_VSIM2_ANA_CON0, 0xf00,
++		   MT6357_LDO_VSIM2_CON1),
+ 	MT6357_LDO("ldo-vusb33", VUSB33, vusb_voltages,
+-		   MT6357_LDO_VUSB33_CON0_0, MT6357_VUSB33_ANA_CON0, 0x700),
++		   MT6357_LDO_VUSB33_CON0_0, MT6357_VUSB33_ANA_CON0, 0x700,
++		   MT6357_LDO_VUSB33_CON1),
+ 	MT6357_LDO("ldo-vxo22", VXO22, vxo22_voltages,
+-		   MT6357_LDO_VXO22_CON0, MT6357_VXO22_ANA_CON0, 0x300),
++		   MT6357_LDO_VXO22_CON0, MT6357_VXO22_ANA_CON0, 0x300,
++		   MT6357_LDO_VXO22_CON1),
+ 
+ 	MT6357_LDO1("ldo-vsram-proc", VSRAM_PROC, 518750, 1312500, 6250,
+ 		   buck_volt_range1, MT6357_LDO_VSRAM_PROC_CON0,
+-		   MT6357_LDO_VSRAM_CON0, 0x7f00),
++		   MT6357_LDO_VSRAM_CON0, 0x7f),
+ 	MT6357_LDO1("ldo-vsram-others", VSRAM_OTHERS, 518750, 1312500, 6250,
+ 		   buck_volt_range1, MT6357_LDO_VSRAM_OTHERS_CON0,
+-		   MT6357_LDO_VSRAM_CON1, 0x7f00),
++		   MT6357_LDO_VSRAM_CON1, 0x7f),
+ 
+ 	MT6357_REG_FIXED("ldo-vaud28", VAUD28, 2800000),
+ 	MT6357_REG_FIXED("ldo-vaux18", VAUX18, 1800000),
+@@ -403,26 +447,64 @@ static struct mt6357_regulator_info mt6357_regulators[] = {
+ 	MT6357_REG_FIXED("ldo-vrf18", VRF18, 1800000),
+ };
+ 
++static int mt6357_apply_mrv_mapping(struct regmap *regmap,
++				  struct mt6357_regulator_info *regulators)
++{
++	struct mt6357_regulator_info *proc = &regulators[MT6357_ID_VSRAM_PROC];
++	struct mt6357_regulator_info *others = &regulators[MT6357_ID_VSRAM_OTHERS];
++	unsigned int val;
++	int ret;
++
++	/* The vendor driver identifies MRV by TOP2_RSV0[15] (TOP2_ELR0).
++	 * This revision interchanges the two SRAM regulator register banks.
++	 */
++	ret = regmap_read(regmap, MT6357_TOP2_ELR0, &val);
++	if (ret)
++		return ret;
++
++	if (!(val & BIT(15)))
++		return 0;
++
++	swap(proc->desc.enable_reg, others->desc.enable_reg);
++	swap(proc->desc.vsel_reg, others->desc.vsel_reg);
++	swap(proc->da_vsel_reg, others->da_vsel_reg);
++	swap(proc->status_reg, others->status_reg);
++
++	return 0;
++}
++
+ static int mt6357_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct mt6397_chip *mt6357 = dev_get_drvdata(pdev->dev.parent);
++	struct mt6357_regulator_info *regulators;
+ 	struct regulator_config config = {};
+ 	struct regulator_dev *rdev;
+-	int i;
++	int i, ret;
++
++	/* Keep revision-specific mappings private to this PMIC instance. */
++	regulators = devm_kmemdup(&pdev->dev, mt6357_regulators,
++				 sizeof(mt6357_regulators), GFP_KERNEL);
++	if (!regulators)
++		return -ENOMEM;
++
++	ret = mt6357_apply_mrv_mapping(mt6357->regmap, regulators);
++	if (ret)
++		return dev_err_probe(&pdev->dev, ret,
++				     "failed to read MT6357 revision mapping\n");
+ 
+ 	device_set_of_node_from_dev(&pdev->dev, pdev->dev.parent);
+ 
+ 	for (i = 0; i < MT6357_MAX_REGULATOR; i++) {
+ 		config.dev = &pdev->dev;
+-		config.driver_data = &mt6357_regulators[i];
++		config.driver_data = &regulators[i];
+ 		config.regmap = mt6357->regmap;
+ 
+ 		rdev = devm_regulator_register(&pdev->dev,
+-					       &mt6357_regulators[i].desc,
++					       &regulators[i].desc,
+ 					       &config);
+ 		if (IS_ERR(rdev)) {
+ 			dev_err(&pdev->dev, "failed to register %s\n",
+-				mt6357_regulators[i].desc.name);
++				regulators[i].desc.name);
+ 			return PTR_ERR(rdev);
+ 		}
+ 	}

@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
+/* Matched replacement for the stock vendor overlay when booting mainline. */
+/dts-v1/;
+/plugin/;
+/ {
+    fragment@0 {
+        target-path = "/";
+        __overlay__ { };
+    };
+};

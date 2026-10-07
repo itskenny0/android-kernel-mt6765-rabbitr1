@@ -1,0 +1,388 @@
+{
+  "firmware": "RabbitOS v0.8.293",
+  "archive_sha256": "f6c28b221a91055ec5e44ab0ac0ee59c7e6b52fac12ad08f2bb23c8f0551c6c0",
+  "kernel_version": "Linux version 4.19.191-g6d50255ed13e (nobody@android-build) (Android (6443078 based on r383902) clang version 11.0.1 (https://android.googlesource.com/toolchain/llvm-project b397f81060ce6d701042b782172ed13bee898b79), LLD 11.0.1 (/buildbot/tmp/tmp6_m7QH b397f81060ce6d701042b782172ed13bee898b79)) #2 SMP PREEMPT Wed Mar 19 22:10:25 CST 2025",
+  "base_dt_entries": [
+    {
+      "index": 0,
+      "size": 103765,
+      "offset": 64,
+      "id": 0,
+      "rev": 0,
+      "custom": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "overlay_entries": [
+    {
+      "index": 0,
+      "size": 40730,
+      "offset": 64,
+      "id": 0,
+      "rev": 0,
+      "custom": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "partitions": [
+    {
+      "partition_name": "preloader",
+      "file_name": "preloader_k65v1_64_bsp.bin",
+      "linear_start_addr": "0x0",
+      "partition_size": "0x40000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "pgpt",
+      "file_name": "NONE",
+      "linear_start_addr": "0x0",
+      "partition_size": "0x8000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "boot_para",
+      "file_name": "NONE",
+      "linear_start_addr": "0x8000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "para",
+      "file_name": "NONE",
+      "linear_start_addr": "0x108000",
+      "partition_size": "0x80000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "expdb",
+      "file_name": "NONE",
+      "linear_start_addr": "0x188000",
+      "partition_size": "0x1400000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "frp",
+      "file_name": "NONE",
+      "linear_start_addr": "0x1588000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "nvcfg",
+      "file_name": "NONE",
+      "linear_start_addr": "0x1688000",
+      "partition_size": "0x2000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "nvdata",
+      "file_name": "NONE",
+      "linear_start_addr": "0x3688000",
+      "partition_size": "0x4000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "md_udc",
+      "file_name": "NONE",
+      "linear_start_addr": "0x7688000",
+      "partition_size": "0x169a000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "metadata",
+      "file_name": "NONE",
+      "linear_start_addr": "0x8d22000",
+      "partition_size": "0x2000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "protect1",
+      "file_name": "NONE",
+      "linear_start_addr": "0xad22000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "protect2",
+      "file_name": "NONE",
+      "linear_start_addr": "0xb522000",
+      "partition_size": "0xade000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "seccfg",
+      "file_name": "NONE",
+      "linear_start_addr": "0xc000000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "sec1",
+      "file_name": "NONE",
+      "linear_start_addr": "0xc800000",
+      "partition_size": "0x200000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "proinfo",
+      "file_name": "NONE",
+      "linear_start_addr": "0xca00000",
+      "partition_size": "0x300000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "nvram",
+      "file_name": "NONE",
+      "linear_start_addr": "0xcd00000",
+      "partition_size": "0x4000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "logo",
+      "file_name": "logo.bin",
+      "linear_start_addr": "0x10d00000",
+      "partition_size": "0xb00000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "md1img_a",
+      "file_name": "md1img.img",
+      "linear_start_addr": "0x11800000",
+      "partition_size": "0x6400000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "spmfw_a",
+      "file_name": "spmfw.img",
+      "linear_start_addr": "0x17c00000",
+      "partition_size": "0x100000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "scp_a",
+      "file_name": "scp.img",
+      "linear_start_addr": "0x17d00000",
+      "partition_size": "0x100000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "sspm_a",
+      "file_name": "sspm.img",
+      "linear_start_addr": "0x17e00000",
+      "partition_size": "0x100000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "gz_a",
+      "file_name": "gz.img",
+      "linear_start_addr": "0x17f00000",
+      "partition_size": "0x1000000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "lk_a",
+      "file_name": "lk.img",
+      "linear_start_addr": "0x18f00000",
+      "partition_size": "0x100000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "boot_a",
+      "file_name": "boot.img",
+      "linear_start_addr": "0x19000000",
+      "partition_size": "0x2000000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "vendor_boot_a",
+      "file_name": "NONE",
+      "linear_start_addr": "0x1b000000",
+      "partition_size": "0x4000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "init_boot_a",
+      "file_name": "NONE",
+      "linear_start_addr": "0x1f000000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "dtbo_a",
+      "file_name": "dtbo.img",
+      "linear_start_addr": "0x1f800000",
+      "partition_size": "0x800000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "tee_a",
+      "file_name": "tee.img",
+      "linear_start_addr": "0x20000000",
+      "partition_size": "0x500000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "vbmeta_a",
+      "file_name": "vbmeta.img",
+      "linear_start_addr": "0x20500000",
+      "partition_size": "0x800000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "vbmeta_system_a",
+      "file_name": "vbmeta_system.img",
+      "linear_start_addr": "0x20d00000",
+      "partition_size": "0x800000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "vbmeta_vendor_a",
+      "file_name": "vbmeta_vendor.img",
+      "linear_start_addr": "0x21500000",
+      "partition_size": "0xb00000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "md1img_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x22000000",
+      "partition_size": "0x6400000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "spmfw_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x28400000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "scp_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x28500000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "sspm_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x28600000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "gz_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x28700000",
+      "partition_size": "0x1000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "lk_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x29700000",
+      "partition_size": "0x100000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "boot_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x29800000",
+      "partition_size": "0x2000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "vendor_boot_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x2b800000",
+      "partition_size": "0x4000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "init_boot_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x2f800000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "dtbo_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x30000000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "tee_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x30800000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "super",
+      "file_name": "super.img",
+      "linear_start_addr": "0x31000000",
+      "partition_size": "0x20c0c4000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "vbmeta_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x23d0c4000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "vbmeta_system_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x23d8c4000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "vbmeta_vendor_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x23e0c4000",
+      "partition_size": "0xf3c000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "userdata",
+      "file_name": "userdata.img",
+      "linear_start_addr": "0x23f000000",
+      "partition_size": "0xc0000000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "otp",
+      "file_name": "NONE",
+      "linear_start_addr": "0xFFFF01d8",
+      "partition_size": "0x2b00000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "flashinfo",
+      "file_name": "NONE",
+      "linear_start_addr": "0xFFFF0080",
+      "partition_size": "0x1000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "sgpt",
+      "file_name": "NONE",
+      "linear_start_addr": "0xFFFF0000",
+      "partition_size": "0x8000",
+      "is_download": "false"
+    }
+  ],
+  "note": "Static firmware data; loader-time RAM/carve-out changes are not captured."
+}

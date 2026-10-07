@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "recorded_utc": "2026-10-07",
+  "lineage_target": "lineage-24.0",
+  "repositories": {
+    "kernel": {
+      "url": "https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765.git",
+      "branch": "r1",
+      "commit": "8167c8c1087f057d2ef302fc93b47554291687ec"
+    },
+    "modules": {
+      "url": "https://github.com/rabbit-hmi-oss/android_kernel_modules_rabbit_mt6765.git",
+      "branch": "r1",
+      "commit": "0afdf059a0dfa17becc4bbe47363280a42224c2f"
+    },
+    "mainline": {
+      "url": "https://github.com/itskenny0/android-kernel-mt6765-rabbitr1.git",
+      "branch": "mt6765-devel",
+      "commit": "cceb223d0c2d7ce52fade7bb6b9ef679c560bea7",
+      "upstream": "https://github.com/fenolftalein-mamir/linux-mt6765.git"
+    },
+    "xiaomi": {
+      "url": "https://github.com/xiaomi-mt6765/android_kernel_xiaomi_mt6765.git",
+      "branch": "lineage-17.1",
+      "commit": "31dbe7b6881b35094fa220a68f6c476c615f10dc"
+    },
+    "xiaomi-devs": {
+      "url": "https://github.com/xiaomi-mt6765-devs/android_kernel_xiaomi_mt6765.git",
+      "branch": "4.9.117-p_arm_gcc-linaro-7.5.0",
+      "commit": "96a87ca49d904dd2bfc9c744d125622074e70e45"
+    },
+    "mkbootimg": {
+      "url": "https://android.googlesource.com/platform/system/tools/mkbootimg",
+      "branch": "android16-release",
+      "commit": "808ecd09666ffe0ff5800f02af693abce56eb395"
+    },
+    "lineage-manifest": {
+      "url": "https://github.com/LineageOS/android.git",
+      "branch": "lineage-24.0",
+      "commit": "2a50ca061bffe4e73918ae2e0b99b7a05f647154"
+    },
+    "lineage-mainline-common": {
+      "url": "https://github.com/LineageOS/android_device_mainline_common.git",
+      "branch": "lineage-24.0",
+      "commit": "1cd4a6850df2ce31d4e5c77a41210e2c590325ab"
+    }
+  },
+  "archives": {
+    "clang-r383902.tar.gz": {
+      "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902.tar.gz",
+      "sha256": "0c97ab5be895d839fdd724af0c6b636314ce93ed8360eadbcb354e2301b163d9",
+      "bytes": 342331946,
+      "extract_to": "toolchains/clang-r383902"
+    },
+    "busybox-1.37.0.tar.bz2": {
+      "url": "https://busybox.net/downloads/busybox-1.37.0.tar.bz2",
+      "sha256": "3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4",
+      "bytes": 2565764,
+      "extract_to": "src"
+    },
+    "rabbit_OS_v0.8.293.zip": {
+      "url": "https://github.com/rabbit-hmi-oss/firmware/releases/download/v0.8.293/rabbit_OS_v0.8.293.zip",
+      "sha256": "f6c28b221a91055ec5e44ab0ac0ee59c7e6b52fac12ad08f2bb23c8f0551c6c0",
+      "bytes": 967477397,
+      "extract_to": null
+    },
+    "mtkclient-v2.1.4.1.tar.gz": {
+      "url": "https://api.github.com/repos/bkerler/mtkclient/tarball/v2.1.4.1",
+      "sha256": "b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d",
+      "bytes": 31733040,
+      "extract_to": "src/mtkclient",
+      "strip_components": 1
+    }
+  },
+  "reference_mainline_before_rebase": {
+    "url": "https://github.com/evilMyQueen/linux-mt6765.git",
+    "branch": "mt6765-devel",
+    "commit": "22b4320e48480edd891d0a7d872a578b5d2f7f98"
+  }
+}

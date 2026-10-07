@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-07",
+  "status": "experimental package; offline checks passed; no device available",
+  "kernel_source_commit": "181c1f25643cbe742e8c1a360890ef779f729024",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "logging": {
+    "backend": "pstore_blk",
+    "mapped_bytes": 18874368,
+    "preserved_tail_bytes": 2097152,
+    "panic_safe": false
+  },
+  "profiles": {
+    "ram": {
+      "image": "boot-ram.img",
+      "emmc": false,
+      "expdb_logging": false,
+      "cmdline": "bootopt=64S3,32N2,64N2 buildvariant=userdebug earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused rdinit=/init loglevel=8 ignore_loglevel r1.usb=1 r1.expdb=0",
+      "dtb_sha256": "ce76b4712e8ef7ccbcdf39bec959d99ecbcc495fb4cd9d2e4e3f3f8f9e12a9c1"
+    },
+    "expdb": {
+      "image": "boot-expdb.img",
+      "emmc": true,
+      "expdb_logging": true,
+      "cmdline": "bootopt=64S3,32N2,64N2 buildvariant=userdebug earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused rdinit=/init loglevel=8 ignore_loglevel r1.usb=1 r1.expdb=1",
+      "dtb_sha256": "6b5c761c942ae140872c3e4c41d7bc20629987378d34c5eefbb1cac4b033f892"
+    }
+  },
+  "package_sha256": "9effaa7995d127e3ff01ccf781088de2cbf8da97412c66f91070087758f2b2b8",
+  "checks": [
+    "AOSP boot unpack round trip",
+    "v2 header SHA1 and partition padding",
+    "DT table and matched no-op overlay",
+    "exact pstore module content/vermagic",
+    "target shell syntax",
+    "DM mapping bounds",
+    "wrapped log decoding",
+    "GPT CRC/bounds/overlap rejection",
+    "device backup preparation",
+    "preview/restore script syntax",
+    "package/initramfs reproducibility"
+  ],
+  "not_tested": [
+    "LK handoff",
+    "MMC writes",
+    "pstore persistence",
+    "panic recovery",
+    "any hardware peripheral"
+  ]
+}
