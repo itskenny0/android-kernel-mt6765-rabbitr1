@@ -814,7 +814,7 @@
 				     "mediatek,mt8183-mmc";
 			reg = <0 0x11230000 0 0x1000>;
 			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_TOP_MSDC50_0>,
+			clocks = <&topckgen CLK_TOP_MSDC50_0>,
 				 <&infracfg CLK_IFR_MSDC0>,
 				 <&infracfg CLK_IFR_MSDC0_SRC>;
 			clock-names = "source", "hclk", "source_cg";
@@ -826,7 +826,7 @@
 				     "mediatek,mt8183-mmc";
 			reg = <0 0x11240000 0 0x1000>;
 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_TOP_MSDC30_1>,
+			clocks = <&topckgen CLK_TOP_MSDC30_1>,
 				 <&infracfg CLK_IFR_MSDC1>,
 				 <&infracfg CLK_IFR_MSDC1_SRC>;
 			clock-names = "source", "hclk", "source_cg";
