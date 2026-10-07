@@ -4,6 +4,7 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -204,5 +205,63 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='flash-test-') as tmp:
         assert 'boot_b' not in text and 'seccfg' not in text
     subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=tmp/'prepared', check=True,
                    stdout=subprocess.DEVNULL)
+    # Exercise generated --write scripts against files, never a USB backend.
+    device = tmp/'device'
+    shutil.copytree(backup, device)
+    simulator = tmp/'mtk-simulator.py'
+    simulator.write_text("""import json, shutil, sys
+from pathlib import Path
+root = Path(__file__).parent/'device'
+args = sys.argv[1:]
+if args[0] == 'gpt':
+    shutil.copyfile(root/'gpt.bin', Path(args[1])/'gpt.bin')
+    with (root/'runs.txt').open('a') as stream:
+        stream.write(args[1]+'\\n')
+elif args[0] in ['r','w']:
+    parts, files = args[1].split(','), args[2].split(',')
+    assert len(parts) == len(files) == 5
+    assert parts == ['boot_a','dtbo_a','vbmeta_a','logo','lk_a']
+    for part, filename in zip(parts,files):
+        a,b = (root/(part+'.img')), Path(filename)
+        shutil.copyfile(a,b) if args[0]=='r' else shutil.copyfile(b,a)
+    if args[0] == 'w':
+        with (root/'writes.txt').open('a') as stream:
+            stream.write(json.dumps(parts)+'\\n')
+else:
+    raise RuntimeError('Unexpected command: '+repr(args))
+""")
+    def simulate(script, success):
+        text = (prepared/script).read_text()
+        old = 'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)'
+        assert text.count(old) == 1
+        text = text.replace(old, f'mtk=(python3 {simulator})')
+        result = subprocess.run(['bash','-c',text,'test-flash','--write'], capture_output=True, text=True)
+        assert (result.returncode == 0) == success, result.stdout+result.stderr
+    try:
+        simulate('flash.sh', True)
+        for part in flash.WRITE_PARTS:
+            assert (device/(flash.partition_name(part,'a')+'.img')).read_bytes() == (prepared/(part+'-new.img')).read_bytes()
+        # A second write must stop at preflight: the device no longer matches its backup.
+        simulate('flash.sh', False)
+        assert len((device/'writes.txt').read_text().splitlines()) == 1
+        # Restore must work even if an interrupted earlier write left a broken LK.
+        (device/'lk_a.img').write_bytes(bytes(flash.SIZES['lk']))
+        simulate('restore.sh', True)
+        for part in flash.WRITE_PARTS:
+            name = flash.partition_name(part,'a')+'.img'
+            assert (device/name).read_bytes() == (backup/name).read_bytes()
+        assert len((device/'writes.txt').read_text().splitlines()) == 2
+        wrong_gpt = bytearray(gpt)
+        wrong_gpt[568] ^= 1
+        repair_crcs(wrong_gpt)
+        (device/'gpt.bin').write_bytes(wrong_gpt)
+        simulate('restore.sh', False)
+        assert len((device/'writes.txt').read_text().splitlines()) == 2
+    finally:
+        for name in (device/'runs.txt').read_text().splitlines():
+            run = Path(name).resolve()
+            assert run.parent == ROOT/'.tmp' and run.name.startswith('r1-')
+            shutil.rmtree(run)
+    print('PASS: simulated writes/readbacks, changed-device rejection, partial LK restore and device identity checks')
 print('PASS: GPT CRC/bounds rejection, AVB flags only, wrong-path rejection, backup preparation, dry run and restore scripts')
 print('No hardware was accessed.')
