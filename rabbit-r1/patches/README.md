@@ -30,3 +30,9 @@ and the remaining hardware checks.
 Patch 0018 corrects MT6370 backlight field masks, mapping and shutdown polarity,
 handles the vendor's early-revision restriction and preserves reserved brightness
 bits. The r1 node remains disabled pending panel integration; see `docs/BACKLIGHT.md`.
+
+Patch 0019 makes successful MediaTek DSI writes return the transmitted length.
+Patch 0020 adds the r1 panel driver, binding, disabled graph and build setting.
+The driver reproduces the stock sequence and GPIO45 reset, with transport error
+handling. It relies on firmware-established supplies; native DSI/PHY timing and
+actual scanout remain unfinished. See `docs/DISPLAY.md`.

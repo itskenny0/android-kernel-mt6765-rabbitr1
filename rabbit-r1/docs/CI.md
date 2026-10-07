@@ -15,14 +15,15 @@ The workflow:
 1. Installs the tracked workspace tools and fetches pinned build inputs.
 2. Checks the patch series, MT6357 mappings, MT6370 current measurement and
    backlight register/brightness behavior, I2C timing, transfer/IRQ and channel
-   setup/recovery, CST836 transport/input callbacks,
+   setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
    stock ATF I2C service, compares timing registers with the shipped kernel,
    audits the shipped FIFO setup, eight/nine-byte DMA selection and stock
-   backlight setup instructions, then builds patched LK and the LineageOS splash with
+   backlight setup instructions, and compares the panel driver with shipped
+   init/suspend instructions. It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and

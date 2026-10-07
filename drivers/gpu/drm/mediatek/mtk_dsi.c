@@ -1145,7 +1145,7 @@ static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
 		goto restore_dsi_mode;
 
 	if (!MTK_DSI_HOST_IS_READ(msg->type)) {
-		recv_cnt = 0;
+		recv_cnt = msg->tx_len;
 		goto restore_dsi_mode;
 	}
 

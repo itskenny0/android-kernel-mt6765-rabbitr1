@@ -100,6 +100,7 @@ def main():
             assert f'CONFIG_{key}=y\n' in config, f'Missing CONFIG_{key}'
         for key in ['MFD_MT6370', 'MEDIATEK_MT6370_ADC', 'SENSORS_IIO_HWMON']:
             assert f'CONFIG_{key}=y\n' in config, f'Missing power monitor CONFIG_{key}'
+        assert 'CONFIG_DRM_PANEL_RABBIT_R1=y\n' in config, 'Missing r1 panel driver'
         for key in ['USB_ETH','USB_G_HID','CPU_FREQ','CPU_IDLE','SUSPEND','HIBERNATION']:
             assert f'CONFIG_{key}=y\n' not in config and f'CONFIG_{key}=m\n' not in config, f'Unexpected CONFIG_{key}'
         for key in ['PSTORE_ZONE', 'PSTORE_BLK']:

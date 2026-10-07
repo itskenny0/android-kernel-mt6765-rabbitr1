@@ -106,6 +106,30 @@
 	status = "okay";
 };
 
+&dsi {
+	/* Host timing, PHY and power handoff still need validation. */
+	status = "disabled";
+
+	port {
+		r1_dsi_out: endpoint {
+			remote-endpoint = <&r1_panel_in>;
+		};
+	};
+
+	panel@0 {
+		compatible = "rabbit,r1-panel";
+		reg = <0>;
+		reset-gpios = <&pio 45 GPIO_ACTIVE_LOW>;
+		backlight = <&r1_backlight>;
+
+		port {
+			r1_panel_in: endpoint {
+				remote-endpoint = <&r1_dsi_out>;
+			};
+		};
+	};
+};
+
 &mt6357_pmic {
 	interrupt-controller;
 	interrupt-parent = <&pio>;

@@ -683,6 +683,14 @@ config DRM_PANEL_PANASONIC_VVX10F034N00
 	  WUXGA (1920x1200) Novatek NT1397-based DSI panel as found in some
 	  Xperia Z2 tablets
 
+config DRM_PANEL_RABBIT_R1
+	tristate "rabbit r1 MIPI DSI panel"
+	depends on OF && DRM_MIPI_DSI && GPIOLIB
+	help
+	  Enable the experimental 480x640, two-lane panel driver for the rabbit
+	  r1. This uses the stock firmware's command sequence and relies on
+	  firmware-established power rails. Cold power-on is not supported yet.
+
 config DRM_PANEL_RASPBERRYPI_TOUCHSCREEN
 	tristate "Raspberry Pi 7-inch touchscreen panel"
 	depends on DRM_MIPI_DSI
