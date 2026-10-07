@@ -8,6 +8,7 @@
 #include <linux/component.h>
 #include <linux/iopoll.h>
 #include <linux/irq.h>
+#include <linux/math64.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/phy/phy.h>
@@ -76,6 +77,8 @@
 #define PACKED_PS_18BIT_RGB666		1
 #define LOOSELY_PS_24BIT_RGB666		2
 #define PACKED_PS_24BIT_RGB888		3
+#define MT6765_LOOSELY_PS_RGB666		1
+#define MT6765_PACKED_PS_RGB666		2
 
 #define DSI_VSA_NL		0x20
 #define DSI_VBP_NL		0x24
@@ -90,6 +93,8 @@
 #define DSI_HFP_WC		0x58
 #define HFP_HS_VB_PS_WC		GENMASK(30, 16)
 #define HFP_HS_EN			BIT(31)
+
+#define DSI_BLLP_WC		0x5c
 
 #define DSI_CMDQ_SIZE		0x60
 #define CMDQ_SIZE			0x3f
@@ -194,6 +199,7 @@ struct mtk_dsi_driver_data {
 	bool has_size_ctl;
 	bool cmdq_long_packet_ctl;
 	bool support_per_frame_lp;
+	bool mt6765_regs;
 };
 
 struct mtk_dsi {
@@ -243,11 +249,9 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
 	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
 }
 
-static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
+static void mtk_dsi_phy_timing(struct mtk_phy_timing *timing, u32 data_rate)
 {
-	u32 timcon0, timcon1, timcon2, timcon3;
-	u32 data_rate_mhz = DIV_ROUND_UP(dsi->data_rate, HZ_PER_MHZ);
-	struct mtk_phy_timing *timing = &dsi->phy_timing;
+	u32 data_rate_mhz = DIV_ROUND_UP(data_rate, HZ_PER_MHZ);
 
 	timing->lpx = (60 * data_rate_mhz / (8 * 1000)) + 1;
 	timing->da_hs_prepare = (80 * data_rate_mhz + 4 * 1000) / 8000;
@@ -265,6 +269,43 @@ static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
 	timing->clk_hs_trail = timing->clk_hs_prepare;
 	timing->clk_hs_zero = timing->clk_hs_trail * 4;
 	timing->clk_hs_exit = 2 * timing->clk_hs_trail;
+}
+
+static void mt6765_dsi_phy_timing(struct mtk_phy_timing *timing, u32 data_rate)
+{
+	u32 ui = div_u64(NSEC_PER_SEC, data_rate) + 1;
+	u32 cycle = div_u64(8ULL * NSEC_PER_SEC, data_rate) + 1;
+
+	/* MT6765 vendor D-PHY defaults, retaining precision for fractional MHz. */
+	timing->lpx = div64_u64((u64)data_rate * 75, 8ULL * NSEC_PER_SEC) + 1;
+	timing->da_hs_prepare = (64 + 5 * ui) / cycle + 1;
+	timing->da_hs_zero = (200 + 10 * ui) / cycle;
+	if (timing->da_hs_zero > timing->da_hs_prepare)
+		timing->da_hs_zero -= timing->da_hs_prepare;
+	timing->da_hs_trail = div64_u64((u64)(4 * ui + 80) * data_rate,
+				      8ULL * NSEC_PER_SEC) + 1;
+	timing->ta_go = 4 * timing->lpx;
+	timing->ta_sure = 3 * timing->lpx / 2;
+	timing->ta_get = 5 * timing->lpx;
+	timing->da_hs_exit = 2 * timing->lpx;
+	timing->clk_hs_zero = 400 / cycle;
+	timing->clk_hs_trail = max_t(u32, 2,
+		div64_u64((u64)data_rate * 100, 8ULL * NSEC_PER_SEC) + 1);
+	timing->clk_hs_prepare = max_t(u32, 1,
+		div64_u64((u64)data_rate * 80, 8ULL * NSEC_PER_SEC));
+	timing->clk_hs_post = (96 + 52 * ui) / cycle;
+	timing->clk_hs_exit = 2 * timing->lpx;
+}
+
+static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
+{
+	u32 timcon0, timcon1, timcon2, timcon3;
+	struct mtk_phy_timing *timing = &dsi->phy_timing;
+
+	if (dsi->driver_data->mt6765_regs)
+		mt6765_dsi_phy_timing(timing, dsi->data_rate);
+	else
+		mtk_dsi_phy_timing(timing, dsi->data_rate);
 
 	timcon0 = FIELD_PREP(LPX, timing->lpx) |
 		  FIELD_PREP(HS_PREP, timing->da_hs_prepare) |
@@ -414,10 +455,12 @@ static void mtk_dsi_ps_control(struct mtk_dsi *dsi, bool config_vact)
 		ps_val |= FIELD_PREP(DSI_PS_SEL, PACKED_PS_24BIT_RGB888);
 		break;
 	case MIPI_DSI_FMT_RGB666:
-		ps_val |= FIELD_PREP(DSI_PS_SEL, LOOSELY_PS_24BIT_RGB666);
+		ps_val |= FIELD_PREP(DSI_PS_SEL, dsi->driver_data->mt6765_regs ?
+				     MT6765_LOOSELY_PS_RGB666 : LOOSELY_PS_24BIT_RGB666);
 		break;
 	case MIPI_DSI_FMT_RGB666_PACKED:
-		ps_val |= FIELD_PREP(DSI_PS_SEL, PACKED_PS_18BIT_RGB666);
+		ps_val |= FIELD_PREP(DSI_PS_SEL, dsi->driver_data->mt6765_regs ?
+				     MT6765_PACKED_PS_RGB666 : PACKED_PS_18BIT_RGB666);
 		break;
 	case MIPI_DSI_FMT_RGB565:
 		ps_val |= FIELD_PREP(DSI_PS_SEL, PACKED_PS_16BIT_RGB565);
@@ -427,7 +470,12 @@ static void mtk_dsi_ps_control(struct mtk_dsi *dsi, bool config_vact)
 	if (config_vact) {
 		vact_nl = FIELD_PREP(VACT_NL, dsi->vm.vactive);
 		writel(vact_nl, dsi->regs + DSI_VACT_NL);
-		writel(ps_wc, dsi->regs + DSI_HSTX_CKL_WC);
+		/*
+		 * Stock MT6765 leaves clock-LP word count to firmware unless
+		 * its optional per-line clock-LP mode is requested.
+		 */
+		if (!dsi->driver_data->mt6765_regs)
+			writel(ps_wc, dsi->regs + DSI_HSTX_CKL_WC);
 	}
 	writel(ps_val, dsi->regs + DSI_PSCTRL);
 }
@@ -564,6 +612,29 @@ static void mtk_dsi_config_vdo_timing_per_line_lp(struct mtk_dsi *dsi)
 	writel(horizontal_frontporch_byte, dsi->regs + DSI_HFP_WC);
 }
 
+static void mt6765_dsi_config_vdo_timing(struct mtk_dsi *dsi)
+{
+	struct videomode *vm = &dsi->vm;
+	u32 bpp = dsi->format == MIPI_DSI_FMT_RGB565 ? 2 : 3;
+	u32 hsa, hbp, hfp;
+
+	/* Blanking payloads exclude packet overhead and use four-byte units. */
+	if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE) &&
+	    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)) {
+		hsa = vm->hsync_len * bpp - 10;
+		hbp = vm->hback_porch * bpp - 10;
+	} else {
+		hsa = vm->hsync_len * bpp - 4;
+		hbp = (vm->hback_porch + vm->hsync_len) * bpp - 10;
+	}
+	hfp = vm->hfront_porch * bpp - 12;
+
+	writel(ALIGN(hsa, 4), dsi->regs + DSI_HSA_WC);
+	writel(ALIGN(hbp, 4), dsi->regs + DSI_HBP_WC);
+	writel(ALIGN(hfp, 4), dsi->regs + DSI_HFP_WC);
+	writel(0, dsi->regs + DSI_BLLP_WC);
+}
+
 static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
 {
 	struct videomode *vm = &dsi->vm;
@@ -578,7 +649,9 @@ static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
 			FIELD_PREP(DSI_WIDTH, vm->hactive),
 			dsi->regs + DSI_SIZE_CON);
 
-	if (dsi->driver_data->support_per_frame_lp)
+	if (dsi->driver_data->mt6765_regs)
+		mt6765_dsi_config_vdo_timing(dsi);
+	else if (dsi->driver_data->support_per_frame_lp)
 		mtk_dsi_config_vdo_timing_per_frame_lp(dsi);
 	else
 		mtk_dsi_config_vdo_timing_per_line_lp(dsi);
@@ -693,6 +766,7 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	struct device *dev = dsi->host.dev;
 	int ret;
 	u32 bit_per_pixel;
+	u64 data_rate;
 
 	if (++dsi->refcount != 1)
 		return 0;
@@ -700,12 +774,19 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	ret = mipi_dsi_pixel_format_to_bpp(dsi->format);
 	if (ret < 0) {
 		dev_err(dev, "Unknown MIPI DSI format %d\n", dsi->format);
-		return ret;
+		goto err_refcount;
 	}
 	bit_per_pixel = ret;
 
-	dsi->data_rate = DIV_ROUND_UP_ULL(dsi->vm.pixelclock * bit_per_pixel,
-					  dsi->lanes);
+	data_rate = DIV_ROUND_UP_ULL((u64)dsi->vm.pixelclock * bit_per_pixel,
+				     dsi->lanes);
+
+	if (dsi->driver_data->mt6765_regs &&
+	    (data_rate < 125000000 || data_rate > 1500000000)) {
+		ret = -EINVAL;
+		goto err_refcount;
+	}
+	dsi->data_rate = data_rate;
 
 	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate);
 	if (ret < 0) {
@@ -713,7 +794,11 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 		goto err_refcount;
 	}
 
-	phy_power_on(dsi->phy);
+	ret = phy_power_on(dsi->phy);
+	if (ret < 0) {
+		dev_err(dev, "Failed to enable PHY: %d\n", ret);
+		goto err_refcount;
+	}
 
 	ret = clk_prepare_enable(dsi->engine_clk);
 	if (ret < 0) {
@@ -865,12 +950,71 @@ static void mtk_dsi_bridge_atomic_post_disable(struct drm_bridge *bridge,
 }
 
 static enum drm_mode_status
+mt6765_dsi_mode_valid(struct mtk_dsi *dsi, const struct drm_display_mode *mode)
+{
+	u32 bpp = dsi->format == MIPI_DSI_FMT_RGB565 ? 2 : 3;
+	u32 hsa, hbp, hfp;
+	u64 rate;
+	int bits;
+
+	if (!dsi->lanes || dsi->lanes > 4 || dsi->format > MIPI_DSI_FMT_RGB565)
+		return MODE_ERROR;
+	bits = mipi_dsi_pixel_format_to_bpp(dsi->format);
+	if (bits < 0)
+		return MODE_ERROR;
+	if (mode->clock <= 0)
+		return MODE_CLOCK_LOW;
+	rate = DIV_ROUND_UP_ULL((u64)mode->clock * 1000 * bits, dsi->lanes);
+	if (rate < 125000000)
+		return MODE_CLOCK_LOW;
+	if (rate > 1500000000)
+		return MODE_CLOCK_HIGH;
+
+	/* Register fields are 12-bit blanking, 15-bit active lines/size. */
+	if (mode->vdisplay <= 0 || mode->vdisplay > 0x7fff ||
+	    mode->vsync_start < mode->vdisplay ||
+	    mode->vsync_end <= mode->vsync_start ||
+	    mode->vtotal < mode->vsync_end ||
+	    mode->vsync_start - mode->vdisplay > 0xfff ||
+	    mode->vsync_end - mode->vsync_start > 0xfff ||
+	    mode->vtotal - mode->vsync_end > 0xfff)
+		return MODE_BAD_VVALUE;
+	if (mode->hdisplay <= 0 || mode->hdisplay > FIELD_MAX(DSI_PS_WC) / bpp ||
+	    mode->hsync_start < mode->hdisplay ||
+	    mode->hsync_end <= mode->hsync_start ||
+	    mode->htotal < mode->hsync_end)
+		return MODE_BAD_HVALUE;
+	hsa = (mode->hsync_end - mode->hsync_start) * bpp;
+	hbp = (mode->htotal - mode->hsync_end) * bpp;
+	hfp = (mode->hsync_start - mode->hdisplay) * bpp;
+	if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE) &&
+	    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)) {
+		if (hsa < 10 || hbp < 10)
+			return MODE_BAD_HVALUE;
+		hsa -= 10;
+	} else {
+		hbp += hsa;
+		if (hsa < 4 || hbp < 10)
+			return MODE_BAD_HVALUE;
+		hsa -= 4;
+	}
+	if (hfp < 12 || ALIGN(hsa, 4) > 0xfff ||
+	    ALIGN(hbp - 10, 4) > 0xfff || ALIGN(hfp - 12, 4) > 0xfff)
+		return MODE_BAD_HVALUE;
+
+	return MODE_OK;
+}
+
+static enum drm_mode_status
 mtk_dsi_bridge_mode_valid(struct drm_bridge *bridge,
 			  const struct drm_display_info *info,
 			  const struct drm_display_mode *mode)
 {
 	struct mtk_dsi *dsi = bridge_to_dsi(bridge);
 	int bpp;
+
+	if (dsi->driver_data->mt6765_regs)
+		return mt6765_dsi_mode_valid(dsi, mode);
 
 	bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
 	if (bpp < 0)
@@ -986,6 +1130,9 @@ static int mtk_dsi_host_attach(struct mipi_dsi_host *host,
 	struct mtk_dsi *dsi = host_to_dsi(host);
 	struct device *dev = host->dev;
 	int ret;
+
+	if (!device->lanes || device->lanes > 4)
+		return -EINVAL;
 
 	dsi->lanes = device->lanes;
 	dsi->format = device->format;
@@ -1277,6 +1424,15 @@ static const struct mtk_dsi_driver_data mt2701_dsi_driver_data = {
 	.reg_shadow_dbg_off = 0x190
 };
 
+static const struct mtk_dsi_driver_data mt6765_dsi_driver_data = {
+	.reg_cmdq_off = 0x200,
+	.reg_vm_cmd_off = 0x130,
+	.reg_shadow_dbg_off = 0x190,
+	.has_shadow_ctl = true,
+	.has_size_ctl = true,
+	.mt6765_regs = true,
+};
+
 static const struct mtk_dsi_driver_data mt8183_dsi_driver_data = {
 	.reg_cmdq_off = 0x200,
 	.reg_vm_cmd_off = 0x130,
@@ -1305,6 +1461,7 @@ static const struct mtk_dsi_driver_data mt8188_dsi_driver_data = {
 
 static const struct of_device_id mtk_dsi_of_match[] = {
 	{ .compatible = "mediatek,mt2701-dsi", .data = &mt2701_dsi_driver_data },
+	{ .compatible = "mediatek,mt6765-dsi", .data = &mt6765_dsi_driver_data },
 	{ .compatible = "mediatek,mt8173-dsi", .data = &mt8173_dsi_driver_data },
 	{ .compatible = "mediatek,mt8183-dsi", .data = &mt8183_dsi_driver_data },
 	{ .compatible = "mediatek,mt8186-dsi", .data = &mt8186_dsi_driver_data },

@@ -1,0 +1,12 @@
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.yaml b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.yaml
+index 27ffbccc2a..d848d08f99 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.yaml
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.yaml
+@@ -24,6 +24,7 @@ properties:
+     oneOf:
+       - enum:
+           - mediatek,mt2701-dsi
++          - mediatek,mt6765-dsi
+           - mediatek,mt7623-dsi
+           - mediatek,mt8167-dsi
+           - mediatek,mt8173-dsi

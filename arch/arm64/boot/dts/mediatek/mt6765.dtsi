@@ -1015,8 +1015,7 @@
 		};
 
 		dsi: dsi@14014000 {
-			compatible = "mediatek,mt6765-dsi",
-				     "mediatek,mt8183-dsi";
+			compatible = "mediatek,mt6765-dsi";
 			reg = <0 0x14014000 0 0x1000>;
 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&mmsys CLK_MM_DSI0>,

@@ -34,5 +34,13 @@ bits. The r1 node remains disabled pending panel integration; see `docs/BACKLIGH
 Patch 0019 makes successful MediaTek DSI writes return the transmitted length.
 Patch 0020 adds the r1 panel driver, binding, disabled graph and build setting.
 The driver reproduces the stock sequence and GPIO45 reset, with transport error
-handling. It relies on firmware-established supplies; native DSI/PHY timing and
+handling. It relies on firmware-established supplies; analog PHY setup and
 actual scanout remain unfinished. See `docs/DISPLAY.md`.
+
+Patch 0021 documents the native MT6765 DSI compatible. Patch 0022 selects it,
+adds stock-derived digital PHY and video blanking timings, corrects RGB666
+selectors and sets the r1 non-continuous clock flag. It validates mode fields
+and rate limits and stops host startup on PHY errors. The analog PHY/PLL,
+remaining startup sequence and display routing still need work; the graph
+remains disabled. See `docs/DISPLAY.md` for the selected-register comparison
+and its limits.

@@ -18,12 +18,17 @@ The workflow:
    setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
+   It also compiles the DSI host and DRM driver objects, which are not enabled
+   in the boot profile.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
    stock ATF I2C service, compares timing registers with the shipped kernel,
    audits the shipped FIFO setup, eight/nine-byte DMA selection and stock
    backlight setup instructions, and compares the panel driver with shipped
-   init/suspend instructions. It then builds patched LK and the LineageOS splash with
+   init/suspend instructions. Native DSI timing, pixel formats and lane/clock
+   settings are compared with selected stock setup instructions; invalid modes,
+   early power failures and MT8183 behavior are checked with host stubs.
+   It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and

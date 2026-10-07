@@ -108,6 +108,14 @@ jobs:
       - name: Build the kernel and modules
         run: bash scripts/build-mainline.sh
 
+      - name: Compile the inactive display drivers
+        run: |
+          source scripts/env.sh
+          make -C src/mainline O=/rabbitr1/out/mainline ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- drivers/gpu/drm/mediatek/mtk_dsi.o \
+            drivers/gpu/drm/mediatek/mtk_drm_drv.o \
+            2>&1 | tee logs/mt6765-dsi-build.log
+
       - name: Build the diagnostic initramfs
         run: bash scripts/build-initramfs.sh
 
@@ -122,6 +130,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-i2c-stock-fifo.py 2>&1 | tee logs/i2c-stock-fifo.log
           toolchains/boot-tools/bin/python scripts/test-stock-backlight.py 2>&1 | tee logs/stock-backlight-tests.log
           toolchains/boot-tools/bin/python scripts/test-r1-panel.py 2>&1 | tee logs/r1-panel-tests.log
+          toolchains/boot-tools/bin/python scripts/test-dsi-timing.py 2>&1 | tee logs/dsi-timing-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

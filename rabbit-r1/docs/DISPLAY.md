@@ -1,8 +1,9 @@
 # rabbit r1 display bring-up
 
 The kernel includes a board-specific `panel-rabbit-r1` driver and a disabled
-DSI graph. The driver reproduces the shipped RabbitOS v0.8.293 panel callbacks
-in offline tests. **There is no working display result yet.** DSI, its PHY and
+DSI graph. The panel callbacks and selected native MT6765 host setup registers
+match the shipped RabbitOS v0.8.293 code in offline tests.
+**There is no working display result yet.** DSI, its PHY and
 the MT6370 backlight stay disabled, and `CONFIG_DRM_MEDIATEK` stays unset.
 
 ## Panel evidence
@@ -84,6 +85,7 @@ The shipped `lcm_get_params` confirms these values:
 | Vertical front / sync / back | 26 / 2 / 14 lines |
 | Vendor PLL clock | 130 MHz |
 | Active word count | 1440 bytes |
+| Non-continuous clock | Enabled (`cont_clock = 0`) |
 | Per-line clock LP | Disabled |
 
 The vendor D-PHY code doubles `PLL_CLOCK`, requesting 260 Mbit/s per lane.
@@ -92,12 +94,64 @@ The provisional DRM mode requests 21667 kHz so the current host's
 preserves the requested link rate to kHz precision; it is **not a measured
 refresh rate** or a proof that the host produces the vendor waveform.
 
-The inherited MT8183 DSI fallback differs materially from stock MT6765:
-`DSI_Config_VDO_Timing` aligns HSA/HBP/HFP byte counts to four bytes, yielding
-52/52/48 for this panel. The mainline fallback subtracts PHY transition cycles
-from HBP/HFP and yields 50/29/34 with the provisional mode. The native timing,
-PHY register setup, clocks, MMSYS routing and complete DRM path need an audit
-before enabling the graph. The panel sequence alone cannot resolve those gaps.
+The host now selects native data through `mediatek,mt6765-dsi`, also registered
+in the DRM component table. Its video blanking counts exclude the stock packet
+overhead and align to four bytes.
+HSA/HBP/HFP are 52/52/48 for the r1. The previous MT8183 fallback produced
+50/29/34. Burst takes precedence over the sync-pulse flag, as in the common
+mode-selection code. RGB888 already had the correct hardware selector (3):
+the vendor converts its software enum before writing it. The native path
+corrects the two RGB666 selectors; MT8183 retains its existing values.
+
+The native D-PHY digital timing calculation follows the stock defaults with
+64-bit arithmetic in Hz. This avoids rounding a 260.004 Mbit/s request up to
+261 Mbit/s before calculating timing. For the r1 mode, the selected registers
+match the shipped setup:
+
+| Register | Value |
+| --- | --- |
+| `DSI_TXRX_CTRL` (`0x18`) | `0x0001000c` |
+| `DSI_PSCTRL` (`0x1c`) | `0x000305a0` |
+| `DSI_PHY_TIMECON0` (`0x110`) | `0x04040303` |
+| `DSI_PHY_TIMECON1` (`0x114`) | `0x060f040c` |
+| `DSI_PHY_TIMECON2` (`0x118`) | `0x040c0100` |
+| `DSI_PHY_TIMECON3` (`0x11c`) | `0x00060902` |
+
+The panel sets `MIPI_DSI_CLOCK_NON_CONTINUOUS` to reproduce the stock clock
+lane flag. That flag is separate from the vendor's optional per-line clock-LP
+mode, which the r1 does not request. The native host leaves `DSI_HSTX_CKL_WC`
+(`0x64`) untouched, as the selected stock setup does. This remains a firmware
+handoff dependency; its reset value and cold-start behavior are not established.
+
+Mode validation rejects field overflow, packet-overhead underflow, invalid
+lane counts and unsupported formats. Bring-up is restricted to the audited
+125..1500 Mbit/s range, within the inherited PHY driver's software limits;
+these are not established MT6765 silicon limits. Power-on checks the full
+64-bit rate before narrowing it and unwinds its reference count on format,
+clock or PHY errors. A failed PHY startup stops further host programming.
+
+`test-dsi-timing.py` executes these routines from the checksum-verified stock
+Image, with MMIO, logging and profiling calls modeled:
+
+| Routine | Raw Image offset |
+| --- | --- |
+| `DSI_Config_VDO_Timing` | `0x711a60` |
+| `DSI_PS_Control` | `0x712a94` |
+| `DSI_TXRX_Control` | `0x713024` |
+| `DSI_PHY_TIMCONFIG` | `0x716540` |
+
+Production callbacks are compiled with ASan/UBSan and matched against those
+instructions for 12 D-PHY rates, 24 video/pixel-format combinations and eight
+lane/clock combinations. The actual r1 panel flags and native compatible
+match table and DRM component lookup are included. Tests also cover the
+fractional r1 rate, invalid modes, early power failures and the unchanged
+MT8183 setup. The recorded
+`0x64 = 0x1234` is a preservation-test seed, not a hardware value.
+
+This audit covers selected setup writes, not all controller registers or
+startup sequencing. It excludes the stock `MEM_CONTI` setup at `0x90`, packet
+transmission, the analog PHY/PLL, clocks, MMSYS routing and complete DRM path.
+The PHY still inherits an MT8183 fallback and must be audited before activation.
 
 An independent host API bug is fixed: successful writes now return `tx_len`
 instead of zero, as required by `mipi_dsi_host_ops.transfer`. Without this,
@@ -109,7 +163,7 @@ transport operations are modeled, not hardware-tested.
 
 ## Remaining acceptance work
 
-1. Resolve the native MT6765 host/PHY timing and display routing differences.
+1. Audit the remaining host startup, analog PHY/PLL, clocks and display routing.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
 4. Measure link/frame timing, check an RGB test pattern and touch orientation,
