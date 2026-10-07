@@ -1,7 +1,7 @@
 # LK and splash build
 
 `build-lk.py` uses the pinned [mtklkzap](https://github.com/itskenny0/mtklkzap)
-revision `a86e9ade4e835d4292f922a04e885ace72f5cc31` after stock firmware extraction.
+revision `0decfc224e7f47c98092e85d1174f23575cc4980` after stock firmware extraction.
 It produces `dist/lk/lk.bin`, `logo.bin`, a splash preview, a build record and
 checksums. Packaging consumes these files; CI builds and tests them before
 creating the mtkclient ZIP. No device commands run during the build.

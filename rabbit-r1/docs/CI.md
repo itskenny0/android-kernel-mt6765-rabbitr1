@@ -32,6 +32,12 @@ Build outputs are not cached. The cache and artifact actions are pinned to full
 commit IDs. The workflow uses a read-only repository token and no stored secrets;
 the public source checkout itself needs no credentials.
 
+[mtklkzap's relock workflow](https://github.com/itskenny0/mtklkzap/actions/workflows/relock.yml)
+also tests the pinned tool independently. It checks the official stock LK,
+executes its Fastboot registration and refusal path, tests command-line write
+protection, and confirms relock refusal survives the warning patches. These
+checks run here as part of `test-lk.py` as well.
+
 ## Artifacts
 
 Successful runs upload `rabbit-r1-mainline-<commit>` with the kernel, DTB,
