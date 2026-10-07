@@ -20,12 +20,12 @@ matches = re.findall(r'\.compatible\s*=\s*"mediatek,mt6765-i2c"\s*,\s*\.data\s*=
 assert matches == ['mt6765_compat'], 'MT6765 must select the tested compatibility data'
 
 
-def block(prefix):
-    start = s.index(prefix)
-    end = s.index('\n}',start)+2
-    if s[end:end+1] == ';':
+def block(prefix, text=s):
+    start = text.index(prefix)
+    end = text.index('\n}',start)+2
+    if text[end:end+1] == ';':
         end += 1
-    return s[start:end]+'\n'
+    return text[start:end]+'\n'
 
 
 prelude = r'''
@@ -71,10 +71,19 @@ struct i2c_adapter {
     bool suspended;
 };
 struct i2c_msg { u16 addr, flags, len; u8 *buf; };
+#define I2C_AQ_COMB 1
+#define I2C_AQ_COMB_WRITE_FIRST 2
+#define I2C_AQ_COMB_READ_SECOND 4
+#define I2C_AQ_COMB_SAME_ADDR 8
 #define I2C_AQ_COMB_WRITE_THEN_READ 15
+#define I2C_AQ_NO_ZERO_LEN_READ 32
+#define I2C_AQ_NO_ZERO_LEN_WRITE 64
 #define I2C_AQ_NO_ZERO_LEN 96
+#define dev_err_ratelimited(...) ((void)0)
+#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
 struct i2c_adapter_quirks {
     unsigned int flags, max_num_msgs, max_comb_1st_msg_len, max_comb_2nd_msg_len;
+    unsigned int max_read_len, max_write_len;
 };
 struct device_node { int unused; };
 struct arm_smccc_res { unsigned long a0; };
@@ -84,7 +93,7 @@ struct arm_smccc_res { unsigned long a0; };
 #define ARM_SMCCC_OWNER_SIP 2
 #define ARM_SMCCC_CALL_VAL(t,c,o,f) ((unsigned long)(t)<<31 | (c)<<30 | (o)<<24 | (f))
 #include "/rabbitr1/src/mainline/include/linux/soc/mediatek/mtk_sip_svc.h"
-static const struct i2c_adapter_quirks mt8183_i2c_quirks;
+static const struct i2c_adapter_quirks mt8183_i2c_quirks, mt6765_i2c_quirks;
 '''
 defines = '\n'.join(re.findall(r'^#define (?:I2C_\w+|MAX_\w+)[^\n]*',s,re.M))
 declarations = ''.join(block(prefix) for prefix in [
@@ -98,12 +107,14 @@ declarations = ''.join(block(prefix) for prefix in [
     'static const struct i2c_spec_values fast_mode_plus_spec',
     'static const struct mtk_i2c_compatible mt8183_compat',
     'static const struct mtk_i2c_compatible mt6765_compat',
-    'static const struct i2c_adapter_quirks mt6765_channel_quirks',
+    'static const struct i2c_adapter_quirks mt6765_i2c_quirks',
 ])
 stubs = r'''
 static u32 controller[0x1000/4], dma[0x100/4];
 static struct mtk_i2c *current;
-static bool expect_gate, dma_active, transfer_started;
+static bool expect_gate, dma_active, transfer_started, fifo_case;
+static u8 fifo_tx[8], fifo_rx[8];
+static unsigned int fifo_writes, fifo_reads, fifo_rx_len;
 static unsigned int gate_writes, starts, maps, unmaps, gets, releases, resets, copies;
 static unsigned int injected_irq, global_resets, kicks, controller_writes;
 static int clocks_prepared, clocks_enabled, clock_failure;
@@ -121,6 +132,21 @@ static u16 readw(void *address)
     u16 value;
     memcpy(&value,address,sizeof(value));
     return value;
+}
+static u8 readb(void *address)
+{
+    assert(fifo_case && transfer_started && current->msg_complete.done);
+    assert(!dma_active && current->irq_stat == 1);
+    assert((u8 *)address == (u8 *)controller+current->ch_offset);
+    assert(fifo_reads < fifo_rx_len);
+    return fifo_rx[fifo_reads++];
+}
+static void writeb(u8 value, void *address)
+{
+    assert(fifo_case && !transfer_started && !dma_active);
+    assert((u8 *)address == (u8 *)controller+current->ch_offset);
+    assert(fifo_writes < sizeof(fifo_tx));
+    fifo_tx[fifo_writes++] = value;
 }
 static void writew(u16 value, void *address)
 {
@@ -145,13 +171,13 @@ static void writew(u16 value, void *address)
             assert(readw((u8 *)controller + bank + 0x0c) == 0);
         } else
             assert(!gate_writes);
-        if (bank) {
-            assert(value == 1); /* No unverified multi-restart bits on the AP bank. */
-            assert(readw((u8 *)controller+bank+0x38) == 5);
+        if (expect_gate) {
+            assert(value == 1); /* Native START on both MT6765 banks. */
+            assert(readw((u8 *)controller+bank+0x38) == (bank ? 5 : 1));
             assert(readw((u8 *)controller+bank+0x10) ==
-                   (current->op == I2C_MASTER_WRRD ? 0x33e : 0x32c));
+                   ((current->op == I2C_MASTER_WRRD ? 0x3a : 0x28) | (fifo_case ? 0 : 0x304)));
         }
-        if (expect_gate && dma_active) {
+        if (expect_gate && (dma_active || fifo_case)) {
             assert(readw((u8 *)controller+bank+0x20) == expected_timing);
             assert(readw((u8 *)controller+bank+0x2c) == expected_ltiming);
             assert(readw((u8 *)controller+bank+0x48) == 0x404);
@@ -182,7 +208,7 @@ static u16 i2c_8bit_addr_from_msg(const struct i2c_msg *msg)
     return (msg->addr << 1) | !!(msg->flags & I2C_M_RD);
 }
 static void complete(struct completion *done) { done->done++; }
-static void reinit_completion(struct completion *done) { done->done = 0; }
+static void reinit_completion(struct completion *done) { done->done = 0; transfer_started = false; }
 static void i2c_dump_register(struct mtk_i2c *i2c) { assert(i2c == current); }
 static unsigned long wait_for_completion_timeout(struct completion *, unsigned long);
 static u8 *i2c_get_dma_safe_msg_buf(struct i2c_msg *msg, unsigned int threshold)
@@ -302,6 +328,7 @@ body = s[s.index('static const struct i2c_spec_values *mtk_i2c_get_spec('):
 body += ''.join(block(prefix) for prefix in [
     'static u16 mtk_i2c_readw_bank(', 'static void mtk_i2c_writew_bank(',
     'static u16 mtk_i2c_readw(', 'static void mtk_i2c_writew(',
+    'static u8 mtk_i2c_readb(', 'static void mtk_i2c_writeb(',
     'static u16 mtk_i2c_irq_mask(', 'static void mtk_i2c_start(',
     'static int mtk_i2c_transfer_error(', 'static void mtk_i2c_configure(',
     'static void mtk_i2c_reset_dma(', 'static void mtk_i2c_init_hw(',
@@ -311,6 +338,9 @@ body += ''.join(block(prefix) for prefix in [
     'static irqreturn_t mtk_i2c_irq(', 'static int mtk_i2c_parse_dt(',
     'static int mtk_i2c_suspend_noirq(', 'static int mtk_i2c_resume_noirq(',
 ])
+core = (ROOT/'src/mainline/drivers/i2c/i2c-core-base.c').read_text()
+body += block('static int i2c_quirk_error(', core)
+body += block('static int i2c_check_for_quirks(', core)
 checks = r'''
 static void inject_irq(unsigned int status)
 {
@@ -352,13 +382,16 @@ static void setup(struct mtk_i2c *i2c, bool mt6765)
     i2c->base = controller;
     i2c->pdmabase = dma;
     i2c->adap.timeout = 200;
+    i2c->adap.quirks = i2c->dev_comp->quirks;
     i2c->speed_hz = 100000;
     i2c->clk_src_div = mt6765 ? 5 : 1;
     parent_clock = 26000000;
     expected_timing = 0x1b; expected_ltiming = 0x1a; expected_timeout = 386;
     assert(!mtk_i2c_set_speed(i2c,parent_clock));
     expect_gate = mt6765;
-    dma_active = transfer_started = false;
+    dma_active = transfer_started = fifo_case = false;
+    fifo_writes = fifo_reads = fifo_rx_len = 0;
+    memset(fifo_tx,0,sizeof(fifo_tx));
     gate_writes = starts = maps = unmaps = gets = releases = resets = copies = 0;
     get_failure = map_failure = 0;
     injected_irq = 1;
@@ -377,7 +410,7 @@ static void setup_channel(struct mtk_i2c *i2c)
     dt_secure = true; dt_id = 4;
     assert(mtk_i2c_parse_dt(NULL,i2c) == 0);
     assert(i2c->ch_offset == 0x100 && i2c->secure_id == 4);
-    assert(i2c->adap.quirks == &mt6765_channel_quirks);
+    assert(i2c->adap.quirks == &mt6765_i2c_quirks);
     assert(i2c->adap.quirks->flags == (I2C_AQ_COMB_WRITE_THEN_READ | I2C_AQ_NO_ZERO_LEN));
     assert(i2c->adap.quirks->max_num_msgs == 1);
     u16 stale = 0x1ff;
@@ -485,12 +518,140 @@ static void test_channel_setup(void)
     assert(resume_calls == 1 && smc_calls == 3 && i2c.clocks_prepared);
     assert(mtk_i2c_suspend_noirq(i2c.dev) == 0);
 }
+
+static void test_native_quirks(void)
+{
+    struct mtk_i2c i2c;
+    u8 buf[16] = {0};
+    struct i2c_msg msgs[3] = {{.addr=0x34,.len=9,.buf=buf},
+                            {.addr=0x34,.flags=1,.len=9,.buf=buf},
+                            {.addr=0x34,.len=9,.buf=buf}};
+    for (unsigned int channel = 0; channel < 2; channel++) {
+        if (channel) setup_channel(&i2c); else setup(&i2c,true);
+        assert(!i2c.dev_comp->auto_restart && i2c.adap.quirks == &mt6765_i2c_quirks);
+        assert(!i2c_check_for_quirks(&i2c.adap,msgs,1));
+        assert(!i2c_check_for_quirks(&i2c.adap,msgs+1,1));
+        assert(!i2c_check_for_quirks(&i2c.adap,msgs,2));
+        assert(i2c_check_for_quirks(&i2c.adap,msgs,3) == -EOPNOTSUPP);
+        msgs[1].flags = 0;
+        assert(i2c_check_for_quirks(&i2c.adap,msgs,2) == -EOPNOTSUPP);
+        msgs[1].flags = msgs[0].flags = 1;
+        assert(i2c_check_for_quirks(&i2c.adap,msgs,2) == -EOPNOTSUPP);
+        msgs[0].flags = 0; msgs[1].addr = 0x15;
+        assert(i2c_check_for_quirks(&i2c.adap,msgs,2) == -EOPNOTSUPP);
+        msgs[1].addr = 0x34;
+        for (unsigned int msg = 0; msg < 2; msg++) {
+            msgs[msg].len = 0;
+            assert(i2c_check_for_quirks(&i2c.adap,msgs+msg,1) == -EOPNOTSUPP);
+            assert(i2c_check_for_quirks(&i2c.adap,msgs,2) == -EOPNOTSUPP);
+            msgs[msg].len = 9;
+        }
+        assert(!starts && !clocks_enabled && !controller_writes);
+    }
+}
+static void run_fifo(unsigned int channel, int op, unsigned int txlen, unsigned int rxlen,
+                     unsigned int irq, int error)
+{
+    struct mtk_i2c i2c;
+    u8 tx[10], rx[10];
+    memset(rx,0xa5,sizeof(rx));
+    for (unsigned int i = 0; i < sizeof(tx); i++) tx[i] = 0x30+i;
+    struct i2c_msg msgs[2] = {{.addr=0x15,.len=txlen,.buf=tx+1},
+                            {.addr=0x15,.flags=1,.len=rxlen,.buf=rx+1}};
+    if (channel) setup_channel(&i2c); else setup(&i2c,true);
+    check_clocks = true;
+    assert(!mtk_i2c_prepare_hw(&i2c));
+    fifo_case = true;
+    fifo_rx_len = rxlen;
+    for (unsigned int i = 0; i < rxlen; i++) fifo_rx[i] = 0x90+i;
+    injected_irq = irq;
+    int num = op == 3 ? 2 : 1;
+    assert(!i2c_check_for_quirks(&i2c.adap,op == 2 ? msgs+1 : msgs,num));
+    assert(mtk_i2c_transfer(&i2c.adap,op == 2 ? msgs+1 : msgs,num) == (error ? error : num));
+    assert(i2c.op == (enum mtk_trans_op)op && !i2c.auto_restart);
+    assert(starts == 1 && gate_writes == 1 && !dma_active);
+    assert(!maps && !unmaps && !gets && !releases && !copies);
+    assert(!clocks_enabled && clocks_prepared);
+    assert(fifo_writes == (op == 2 ? 0 : txlen));
+    assert(!memcmp(fifo_tx,tx+1,fifo_writes));
+    for (unsigned int i = 0; i < sizeof(tx); i++) assert(tx[i] == 0x30+i);
+    assert(fifo_reads == ((!error && op != 1) ? rxlen : 0));
+    for (unsigned int i = 0; i < sizeof(rx); i++)
+        assert(rx[i] == ((!error && op != 1 && i > 0 && i <= rxlen) ? 0x90+i-1 : 0xa5));
+    assert(readw((u8 *)controller+channel*0x100+0x08) == 0);
+    if (!error) {
+        assert(readw((u8 *)controller+channel*0x100+0x14) == (op == 2 ? rxlen : txlen));
+        assert(readw((u8 *)controller+channel*0x100+0x18) == (op == 3 ? 2 : 1));
+        if (op == 3) assert(readw((u8 *)controller+channel*0x100+0x44) == rxlen);
+    }
+    assert(!mtk_i2c_suspend_noirq(i2c.dev));
+}
+static unsigned int test_fifo(void)
+{
+    const unsigned int lengths[] = {1,3,5,8};
+    const struct {unsigned int irq; int error;} errors[] = {
+        {0,-ETIMEDOUT},{3,-ENXIO},{5,-ENXIO},{8,-EAGAIN},{32,-ETIMEDOUT},
+        {65,-EIO},{129,-EIO},{256,-EIO},{257,-EIO},{288,-ETIMEDOUT}
+    };
+    unsigned int runs = 0;
+    for (unsigned int bank = 0; bank < 2; bank++) {
+        for (unsigned int t = 0; t < 4; t++) {
+            run_fifo(bank,1,lengths[t],1,1,0); runs++;
+            run_fifo(bank,2,1,lengths[t],1,0); runs++;
+            for (unsigned int r = 0; r < 4; r++) {
+                run_fifo(bank,3,lengths[t],lengths[r],1,0); runs++;
+            }
+        }
+        for (unsigned int e = 0; e < sizeof(errors)/sizeof(errors[0]); e++) {
+            for (int op = 1; op <= 3; op++) {
+                run_fifo(bank,op,8,8,errors[e].irq,errors[e].error); runs++;
+            }
+        }
+        /* FIFO -> DMA -> FIFO must reprogram control and lengths each time. */
+        struct mtk_i2c i2c;
+        u8 tx[9] = {0}, rx[9] = {0};
+        struct i2c_msg msgs[2] = {{.addr=0x34,.len=8,.buf=tx},
+                                {.addr=0x34,.flags=1,.len=8,.buf=rx}};
+        if (bank) setup_channel(&i2c); else setup(&i2c,true);
+        check_clocks = true;
+        assert(!mtk_i2c_prepare_hw(&i2c));
+        for (unsigned int step = 0; step < 3; step++) {
+            fifo_case = step != 1;
+            fifo_reads = fifo_writes = 0;
+            fifo_rx_len = 8;
+            msgs[0].len = msgs[1].len = fifo_case ? 8 : 9;
+            assert(mtk_i2c_transfer(&i2c.adap,msgs,2) == 2);
+            assert(readw((u8 *)controller+bank*0x100+0x14) == msgs[0].len);
+            assert(readw((u8 *)controller+bank*0x100+0x44) == msgs[1].len);
+            assert(readw((u8 *)controller+bank*0x100+0x18) == 2);
+            assert(readw((u8 *)controller+bank*0x100+0x24) == 1);
+            assert(maps == (step ? 2U : 0U) && unmaps == maps);
+        }
+        assert(starts == 3 && !clocks_enabled && clocks_prepared);
+        assert(!mtk_i2c_suspend_noirq(i2c.dev));
+        /* Either long message must select DMA for the complete WRRD pair. */
+        for (unsigned int long_msg = 0; long_msg < 2; long_msg++) {
+            if (bank) setup_channel(&i2c); else setup(&i2c,true);
+            check_clocks = true;
+            assert(!mtk_i2c_prepare_hw(&i2c));
+            msgs[0].len = long_msg == 0 ? 9 : 8;
+            msgs[1].len = long_msg == 1 ? 9 : 8;
+            assert(mtk_i2c_transfer(&i2c.adap,msgs,2) == 2);
+            assert(!fifo_reads && !fifo_writes && !dma_active);
+            assert(maps == 2 && unmaps == 2 && releases == 2);
+            assert(starts == 1 && !clocks_enabled && clocks_prepared);
+            assert(!mtk_i2c_suspend_noirq(i2c.dev));
+        }
+    }
+    return runs;
+}
+
 int main(void)
 {
     struct mtk_i2c i2c;
-    u8 tx[3] = {0}, rx[5] = {0};
-    struct i2c_msg msgs[2] = {{.addr=0x15,.len=3,.buf=tx},
-                            {.addr=0x15,.flags=1,.len=5,.buf=rx}};
+    u8 tx[9] = {0}, rx[9] = {0};
+    struct i2c_msg msgs[2] = {{.addr=0x15,.len=9,.buf=tx},
+                            {.addr=0x15,.flags=1,.len=9,.buf=rx}};
     const struct { unsigned int irq; int error; } cases[] = {
         {1,0}, {0,-ETIMEDOUT}, {2,-ENXIO}, {4,-ENXIO}, {8,-EAGAIN},
         {32,-ETIMEDOUT}, {65,-EIO}, {129,-EIO}, {256,-EIO},
@@ -507,8 +668,7 @@ int main(void)
     for (unsigned int c = 0; c < sizeof(cases)/sizeof(cases[0]); c++) {
         for (int op = 1; op <= 3; op++) {
             setup(&i2c,true); i2c.op = op; injected_irq = cases[c].irq;
-            i2c.auto_restart = op != I2C_MASTER_WRRD;
-            assert(mtk_i2c_irq_mask(&i2c) == (op == I2C_MASTER_WRRD ? 0x12f : 0x13f));
+            assert(mtk_i2c_irq_mask(&i2c) == 0x12f);
             assert(mtk_i2c_do_transfer(&i2c,op == 2 ? msgs+1 : msgs,op == 3 ? 2 : 1,0)
                    == cases[c].error);
             assert(starts == 1 && gate_writes == 1 && !dma_active);
@@ -519,14 +679,14 @@ int main(void)
             runs++;
         }
     }
-    setup(&i2c,true); i2c.auto_restart = 1; i2c.op = I2C_MASTER_WR;
+    setup(&i2c,false); i2c.auto_restart = 1; i2c.op = I2C_MASTER_WR;
     injected_irq = 16;
     assert(mtk_i2c_do_transfer(&i2c,msgs,2,1) == 0);
     assert(readw((u8 *)controller+0x24) == 0xc001);
     i2c.op = I2C_MASTER_RD; injected_irq = 1;
     assert(mtk_i2c_do_transfer(&i2c,msgs+1,2,0) == 0);
     assert(readw((u8 *)controller+0x24) == 0x4001);
-    assert(starts == 2 && gate_writes == 2 && maps == 2 && unmaps == 2 && !resets);
+    assert(starts == 2 && gate_writes == 0 && maps == 2 && unmaps == 2 && !resets);
     for (int failed = 1; failed <= 2; failed++) {
         for (int mapping = 0; mapping < 2; mapping++) {
             setup(&i2c,true); i2c.op = I2C_MASTER_WRRD;
@@ -544,7 +704,7 @@ int main(void)
         assert(mtk_i2c_do_transfer(&i2c,msgs+1,1,0) == (failed ? -ENXIO : 0));
         assert(!gate_writes && starts == 1 && resets == (unsigned int)failed);
     }
-    for (int variant = 0; variant < 2; variant++) {
+    for (int variant = 0; variant < 1; variant++) {
         setup(&i2c,variant); i2c.auto_restart = 1; i2c.ignore_restart_irq = true;
         inject_irq(16);
         assert(!i2c.msg_complete.done && !i2c.ignore_restart_irq && !i2c.irq_stat);
@@ -552,7 +712,7 @@ int main(void)
         inject_irq(1);
         assert(i2c.msg_complete.done == 1);
     }
-    setup(&i2c,true); i2c.auto_restart = 1; i2c.ignore_restart_irq = true;
+    setup(&i2c,true); i2c.ignore_restart_irq = true;
     inject_irq(16 | 256); /* A fault must not be discarded as a master-code IRQ. */
     assert(i2c.msg_complete.done == 1 && !starts);
     assert(mtk_i2c_transfer_error(&i2c,true) == -EIO);
@@ -573,9 +733,12 @@ int main(void)
     }
     unsigned int channel_runs = test_channel_transfers(msgs);
     test_channel_setup();
+    test_native_quirks();
+    unsigned int fifo_runs = test_fifo();
     printf("PASS: %u MT6765 DMA transfers, terminal faults, AP gate, cleanup order,\n",runs);
     puts("      allocation/map failures, repeated starts and legacy MT8183 IRQ behavior");
     printf("PASS: %u AP-bank transfers, shared recovery, secure setup and suspend/resume failures\n",channel_runs);
+    printf("PASS: %u FIFO transfers, unchanged failed read buffers, DMA transitions and core quirks\n",fifo_runs);
     return 0;
 }
 '''

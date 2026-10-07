@@ -74,9 +74,9 @@ from the event mask at `0x08`. The MT8183 fallback never programmed this AP
 interrupt destination. Depending on inherited firmware state, enabling event
 bits alone can leave a transfer without an interrupt delivered to Linux.
 
-The new MT6765 match supplies this register and writes the gate before both a
-normal START and the restart after a high-speed master code. Other supported
-SoCs retain their existing start behavior. All MT6765 DT nodes use the single
+The new MT6765 match supplies this register and writes the gate before START.
+The native path uses the hardware's single-transfer or combined WRRD mode;
+other supported SoCs retain their existing restart behavior. All MT6765 DT nodes use the single
 `mediatek,mt6765-i2c` compatible; MT8183 is no longer advertised as a fallback.
 The MT6765 register table also records the stock global `MULTI_DMA` offset
 `0xf8c`, which the channel setup passes to secure firmware.
@@ -108,9 +108,9 @@ applies to existing supported SoCs; their IRQ completion rules are unchanged.
 
 `test-i2c-irq.py` executes the production transfer, IRQ, start, reset and error
 callbacks with MMIO and DMA stubs under ASan/UBSan. It checks 36 MT6765
-read/write/combined transfer cases, every terminal fault, two-stage repeated
-starts, master-code restart handling, allocation/mapping failures, gate ordering
-and MT8183 behavior. The DMA model deliberately keeps a failed transfer active
+read/write/combined DMA cases, every terminal fault, allocation/mapping failures
+and gate ordering. MT8183 regression checks retain its two-stage repeated starts
+and master-code restart handling. The DMA model deliberately keeps a failed transfer active
 until reset and rejects premature unmapping. Mutations removing the gate or
 terminal handling, restoring the old cleanup order, or copying failed buffers
 are rejected. This proves software sequencing against the model, not interrupt
@@ -178,21 +178,20 @@ request on real firmware; the Linux error path is exercised with stubs.
 
 Register accessors take the AP offset for transfers and IRQs. Shared reset,
 initial timing and arbitration recovery explicitly use bank zero. Each channel
-transfer programs its own timing, I/O mode and full DMA/control configuration,
-resets its AP DMA engine, clears FIFO with `0x5`, and clears all known status
+transfer programs its own timing, I/O mode and full control configuration,
+resets its AP DMA engine when DMA is used, clears FIFO with `0x5`, and clears all known status
 bits. Its event mask is `0x129`: completion, arbitration loss, timeout and bus
 error. ACK/NACK stays latched until an enabled event; the IRQ handler masks the
 channel before waking the waiter. Allocation failures leave interrupts masked.
 
-The channel adapter advertises single writes, single reads and same-address
+Both MT6765 banks advertise single writes, single reads and same-address
 combined write/read transactions, with nonzero lengths. Combined transactions
 use the hardware WRRD mode; START is `1`. The generic driver's software-driven
-multi-restart bits are not used on the AP bank. Arbitrary multi-message
-repeated-start sequences are rejected by the adapter quirks until their channel
-semantics are established. The normal-bank path retains its existing restart
-support. All lengths currently use DMA, including the short touch transfers;
-the vendor uses FIFO for transfers of at most eight bytes. DMA for these short
-transfers needs hardware validation.
+multi-restart bits are not used on either bank. Arbitrary multi-message
+repeated-start sequences are rejected by the adapter quirks until their hardware
+semantics are established. The vendor explicitly documents STOPs between its
+separate transfers; exposing those as an arbitrary repeated-start operation
+would violate the Linux I2C contract. Existing MT8183 support is unchanged.
 
 After a completed channel error without BUS_ERR, recovery clears the channel
 FIFO and resets only AP DMA. It does not reset the shared controller and disrupt
@@ -212,6 +211,41 @@ firmware errors, resetting shared state after a completed NACK, or omitting the
 channel FIFO bit are rejected. These are software/MMIO-model tests, not board
 acceptance results.
 
+## Short transfers through FIFO
+
+MT6765 now uses its eight-byte FIFO for short transfers on both banks. A WRRD
+pair uses FIFO only if both lengths are at most eight; either longer message
+selects DMA for the whole pair. This follows the stock driver and covers the
+CST836's short register reads and the MT6370's small register accesses.
+
+FIFO mode clears the controller's DMA, DMA-acknowledge and asynchronous-mode
+bits. It uses byte accesses to the selected bank's data port and does not map,
+start or release DMA buffers. Reads copy exactly the requested length only after
+successful completion; failed reads leave the caller's buffer unchanged. Each
+transfer refreshes control and length registers, including when changing between
+FIFO and DMA. IRQs stay masked until buffer preparation is complete. Error
+recovery retains the shared/controller arbitration rules described above.
+
+`test-i2c-irq.py` exercises 108 FIFO cases under ASan/UBSan, with read/write
+lengths 1/3/5/8, both banks, all terminal faults, buffer canaries and balanced
+clocks. Additional cases cover FIFO-to-DMA-to-FIFO transitions and mixed 8/9-byte
+WRRD pairs. It compiles the kernel's actual `i2c_check_for_quirks()` to check
+accepted and rejected message sequences. Six mutations are rejected at runtime:
+generic restart, retained DMA bits, a nine-byte FIFO limit, ignored auxiliary
+length, copying failed reads and reading from the wrong bank.
+
+`test-i2c-stock-fifo.py` independently executes the checksummed shipped kernel's
+selected setup fragment, starting at file offset `0xa1d490`. It verifies the
+length decision and stops long-message cases at `0xa1d4d4`, before DMA setup.
+Short cases continue through the real timing helpers and FIFO setup to
+`0xa1e938`, immediately after START. All 48 short cases match an exact MMIO-write
+whitelist: control, timing, address, IRQs, lengths, byte FIFO writes, MCU gate and
+`START=1`. Another 22 cases select DMA at the eight/nine-byte boundary. Only
+`_mcount` and `clk_get_rate` are stubbed; context, clocks and MMIO are modeled.
+The audit does not execute FIFO reception, DMA, IRQ delivery or a peripheral.
+CI runs it after stock extraction. These checks establish software sequencing,
+not a successful transfer on hardware.
+
 ## Remaining controller work
 
 The timing path now has an independent stock-instruction comparison, but more
@@ -221,11 +255,9 @@ controller work remains:
   logic analyzer, including parent-clock changes. Matching stock register
   programming does not replace electrical validation.
 * Channel setup, firmware caller acceptance and transfer/recovery sequencing
-  need tests on a device, including short DMA transfers and CCU coexistence.
-  Arbitrary repeated-start sequences are not implemented for the AP bank.
+  need tests on a device, including FIFO, DMA and CCU coexistence.
+  Arbitrary repeated-start sequences are not implemented for either bank.
   The [touch audit](TOUCH.md) records the board evidence.
-* The normal-bank path still inherits generic multi-restart START bits. Its
-  transaction sequencing needs a separate comparison with the stock path.
 * Bus arbitration gates, reset behavior and 33-bit DMA need transfer tests.
 
 The vendor source also contains a `DEBUGCTRL=0x28` write guarded by

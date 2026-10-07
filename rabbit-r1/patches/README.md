@@ -21,3 +21,8 @@ see `docs/POWER.md` for validation and limits.
 Do not apply that historical patch to the current series. Current changes are
 committed on `rabbit-r1/bringup`; no change is represented as hardware-tested or
 submitted upstream.
+
+Patch 0017 adds native MT6765 FIFO transfers and uses the stock START sequence
+on both banks. It keeps DMA for transfers longer than eight bytes and rejects
+unsupported message sequences. See `docs/I2C.md` for stock-instruction evidence
+and the remaining hardware checks.

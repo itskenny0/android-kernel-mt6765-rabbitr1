@@ -1,0 +1,167 @@
+Subject: [PATCH] i2c: mediatek: use MT6765 FIFO transfers
+
+Use byte FIFO access for transfers of at most eight bytes on either bank.
+Keep DMA for longer messages, and use native START and WRRD instead of
+unverified software-driven restarts. Reject unsupported message sequences.
+
+---
+ drivers/i2c/busses/i2c-mt65xx.c | 53 +++++++++++++++++++++++++++++++----------
+ 1 file changed, 41 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index 34500e4e96..3fa80f9221 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -66,6 +66,7 @@
+ #define I2C_MT6765_TIMEOUT_EN		0x0001
+ #define I2C_MT6765_MAX_CLOCK_DIV		8
+ #define I2C_MT6765_TIMEOUT_MS		2
++#define I2C_MT6765_FIFO_SIZE		8
+ 
+ #define I2C_DMA_CON_TX			0x0000
+ #define I2C_DMA_CON_RX			0x0001
+@@ -409,7 +410,7 @@ static const struct i2c_adapter_quirks mt6577_i2c_quirks = {
+ 	.max_comb_2nd_msg_len = 31,
+ };
+ 
+-static const struct i2c_adapter_quirks mt6765_channel_quirks = {
++static const struct i2c_adapter_quirks mt6765_i2c_quirks = {
+ 	.flags = I2C_AQ_COMB_WRITE_THEN_READ | I2C_AQ_NO_ZERO_LEN,
+ 	.max_num_msgs = 1,
+ 	.max_comb_1st_msg_len = 65535,
+@@ -466,9 +467,8 @@ static const struct mtk_i2c_compatible mt6589_compat = {
+ };
+ 
+ static const struct mtk_i2c_compatible mt6765_compat = {
+-	.quirks = &mt8183_i2c_quirks,
++	.quirks = &mt6765_i2c_quirks,
+ 	.regs = mt_i2c_regs_mt6765,
+-	.auto_restart = 1,
+ 	.aux_len_reg = 1,
+ 	.mt6765_timing = 1,
+ 	.dma_sync = 1,
+@@ -641,6 +641,16 @@ static void mtk_i2c_writew(struct mtk_i2c *i2c, u16 val,
+ 	mtk_i2c_writew_bank(i2c, i2c->ch_offset, val, reg);
+ }
+ 
++static u8 mtk_i2c_readb(struct mtk_i2c *i2c, enum I2C_REGS_OFFSET reg)
++{
++	return readb(i2c->base + i2c->ch_offset + i2c->dev_comp->regs[reg]);
++}
++
++static void mtk_i2c_writeb(struct mtk_i2c *i2c, u8 val, enum I2C_REGS_OFFSET reg)
++{
++	writeb(val, i2c->base + i2c->ch_offset + i2c->dev_comp->regs[reg]);
++}
++
+ static u16 mtk_i2c_irq_mask(struct mtk_i2c *i2c)
+ {
+ 	u16 mask = I2C_HS_NACKERR | I2C_ACKERR | I2C_ARB_LOST |
+@@ -1313,8 +1323,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 	u8 *dma_wr_buf = NULL;
+ 	dma_addr_t rpaddr = 0;
+ 	dma_addr_t wpaddr = 0;
++	bool use_fifo = i2c->dev_comp->mt6765_timing &&
++			msgs->len <= I2C_MT6765_FIFO_SIZE &&
++			(i2c->op != I2C_MASTER_WRRD ||
++			 (msgs + 1)->len <= I2C_MT6765_FIFO_SIZE);
+ 	bool completed;
+-	int ret;
++	int ret, i;
+ 
+ 	i2c->irq_stat = 0;
+ 	if (i2c->dev_comp->ap_irq_gate)
+@@ -1325,7 +1339,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		mtk_i2c_writew(i2c, 0, OFFSET_INTR_MASK);
+ 		mtk_i2c_configure(i2c, i2c->ch_offset);
+ 	}
+-	if (i2c->ch_offset)
++	if (i2c->ch_offset && !use_fifo)
+ 		mtk_i2c_reset_dma(i2c);
+ 
+ 	if (i2c->dev_comp->apdma_sync &&
+@@ -1352,6 +1366,9 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 
+ 	control_reg = mtk_i2c_readw(i2c, OFFSET_CONTROL) &
+ 			~(I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS);
++	if (use_fifo)
++		control_reg &= ~(I2C_CONTROL_DMA_EN | I2C_CONTROL_DMAACK_EN |
++				 I2C_CONTROL_ASYNC_MODE);
+ 	if ((i2c->speed_hz > restart_speed) || (left_num >= 1))
+ 		control_reg |= I2C_CONTROL_RS;
+ 
+@@ -1371,7 +1388,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		       OFFSET_FIFO_ADDR_CLR);
+ 
+ 	/* Enable interrupt */
+-	if (!i2c->ch_offset)
++	if (!i2c->dev_comp->mt6765_timing)
+ 		mtk_i2c_writew(i2c, irq_mask, OFFSET_INTR_MASK);
+ 
+ 	/* Set transfer and transaction len */
+@@ -1397,7 +1414,11 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 	}
+ 
+ 	/* Prepare buffer data to start transfer */
+-	if (i2c->op == I2C_MASTER_RD) {
++	if (use_fifo) {
++		if (i2c->op != I2C_MASTER_RD)
++			for (i = 0; i < msgs->len; i++)
++				mtk_i2c_writeb(i2c, msgs->buf[i], OFFSET_DATA_PORT);
++	} else if (i2c->op == I2C_MASTER_RD) {
+ 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
+ 		writel(I2C_DMA_CON_RX | dma_sync, i2c->pdmabase + OFFSET_CON);
+ 
+@@ -1496,8 +1517,9 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		writel((msgs + 1)->len, i2c->pdmabase + OFFSET_RX_LEN);
+ 	}
+ 
+-	writel(I2C_DMA_START_EN, i2c->pdmabase + OFFSET_EN);
+-	if (i2c->ch_offset)
++	if (!use_fifo)
++		writel(I2C_DMA_START_EN, i2c->pdmabase + OFFSET_EN);
++	if (i2c->dev_comp->mt6765_timing)
+ 		mtk_i2c_writew(i2c, irq_mask, OFFSET_INTR_MASK);
+ 
+ 	if (!i2c->auto_restart) {
+@@ -1525,6 +1547,15 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		/* Stop DMA before returning its buffers to the caller. */
+ 		mtk_i2c_recover(i2c, completed);
+ 	}
++	if (use_fifo) {
++		if (!ret && i2c->op != I2C_MASTER_WR) {
++			struct i2c_msg *read_msg = msgs + (i2c->op == I2C_MASTER_WRRD);
++
++			for (i = 0; i < read_msg->len; i++)
++				read_msg->buf[i] = mtk_i2c_readb(i2c, OFFSET_DATA_PORT);
++		}
++		return ret;
++	}
+ 
+ 	if (i2c->op == I2C_MASTER_WR) {
+ 		dma_unmap_single(i2c->dev, wpaddr,
+@@ -1576,7 +1607,7 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+ 	i2c->auto_restart = i2c->dev_comp->auto_restart && !i2c->ch_offset;
+ 
+ 	/* checking if we can skip restart and optimize using WRRD mode */
+-	if ((i2c->auto_restart || i2c->ch_offset) && num == 2) {
++	if ((i2c->auto_restart || i2c->dev_comp->mt6765_timing) && num == 2) {
+ 		if (!(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
+ 		    msgs[0].addr == msgs[1].addr) {
+ 			i2c->auto_restart = 0;
+@@ -1611,7 +1642,6 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+ 			left_num--;
+ 		}
+ 
+-		/* always use DMA mode. */
+ 		ret = mtk_i2c_do_transfer(i2c, msgs, num, left_num);
+ 		if (ret < 0)
+ 			goto err_exit;
+@@ -1709,7 +1739,6 @@ static int mtk_i2c_parse_dt(struct device_node *np, struct mtk_i2c *i2c)
+ 		    i2c->secure_id != 4 && i2c->secure_id != 6)
+ 			return -EINVAL;
+ 		i2c->ch_offset = I2C_AP_CHANNEL_OFFSET;
+-		i2c->adap.quirks = &mt6765_channel_quirks;
+ 	}
+ 
+ 	i2c->have_pmic = of_property_read_bool(np, "mediatek,have-pmic");

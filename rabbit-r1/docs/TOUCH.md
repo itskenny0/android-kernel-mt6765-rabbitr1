@@ -81,6 +81,8 @@ the previous MT8183 fallback's `0x8c`. The host now selects AP bank `0x100`,
 configures shadow mode at probe/resume and keeps shared resets in bank zero.
 Completed NACKs do not reset the shared controller. See [I2C.md](I2C.md) for
 supported transactions, tests and the remaining hardware validation.
+Short touch transfers now use the native eight-byte FIFO, matching the stock
+host; longer transfers use DMA. Both controller banks use native `START=1`.
 
 The stock ATF audit now verifies the selected I2C service path: controller ID 4,
 offset `0xf8c`, value 2 writes a halfword to `0x11011f8c` and returns zero.

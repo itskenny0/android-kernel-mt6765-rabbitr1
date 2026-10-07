@@ -11,7 +11,10 @@
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
 | I2C programmable-divider calculation | PASS: 70 MT8183 and 140 MT6765 bank/setup cases, invalid inputs and count boundary | `logs/i2c-tests.log` |
 | MT6765 timing vs shipped kernel | PASS: 180 identical register sets, 20 rejected rate combinations and count-boundary check | `logs/i2c-stock-timing.log`, `out/i2c-stock-timing.json`; selected AArch64 setup fragment only |
-| MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, repeated starts and allocation errors; MT8183 regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
+| MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, native START and allocation errors; MT8183 restart regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
+| MT6765 FIFO transfers | PASS: 108 FIFO cases, failed reads unchanged, mixed 8/9-byte DMA pairs, mode transitions and real core quirks | `logs/i2c-irq-tests.log`; modeled MMIO only |
+| Shipped kernel FIFO setup | PASS: 48 exact write sequences and 22 DMA selections on both banks | `logs/i2c-stock-fifo.log`, `out/i2c-stock-fifo.json`; selected setup instructions, no RX or bus activity |
+| FIFO limit, auxiliary length, DMA flags, failed read, bank and START regressions | All rejected by runtime assertions | `logs/i2c-fifo-regression-*.log` |
 | Stock ATF I2C service | PASS: 64 selected-dispatch cases, firmware/DT IDs, exact writes, rejected requests and signed return | `logs/i2c-firmware-tests.log`, `out/i2c-firmware-audit.json`; excludes EL3 entry/caller checks and hardware |
 | MT6765 AP channel | PASS: 36 transfer cases, adapter entry, secure IDs, firmware/clock failures, recovery and suspend/resume | `logs/i2c-irq-tests.log`; modeled hardware |
 | Channel bank, firmware refusal, shared reset and FIFO regressions | All rejected | `logs/i2c-channel-regression-*.log` |
@@ -47,6 +50,7 @@
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
 | I2C native timing/binding patches checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-native-checkpatch.log` |
+| I2C FIFO patch checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-fifo-checkpatch.log` |
 | I2C channel patches checkpatch | No errors or warnings | `logs/i2c-channel-checkpatch.log` |
 | MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
@@ -84,6 +88,7 @@ python3 scripts/test-r1-power.py
 python3 scripts/test-i2c.py
 python3 scripts/test-i2c-irq.py
 toolchains/boot-tools/bin/python scripts/test-i2c-stock-timing.py
+toolchains/boot-tools/bin/python scripts/test-i2c-stock-fifo.py
 python3 scripts/test-cst836.py
 python3 scripts/test-r1-touch.py
 python3 scripts/check-patches.py

@@ -60,7 +60,7 @@ typedef uint16_t u16;
 #define udelay(n) ((void)0)
 #define writel(v, p) ((void)(v), (void)(p))
 struct i2c_adapter_quirks { int unused; };
-static const struct i2c_adapter_quirks mt8183_i2c_quirks;
+static const struct i2c_adapter_quirks mt8183_i2c_quirks, mt6765_i2c_quirks;
 '''
 defines = '\n'.join(re.findall(r'^#define (?:I2C_\w+|MAX_\w+)[^\n]*', s, re.M))
 body = ''.join(block(prefix) for prefix in [

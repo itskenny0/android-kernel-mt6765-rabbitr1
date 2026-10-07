@@ -18,7 +18,8 @@ The workflow:
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
-   stock ATF I2C service and compares timing registers with the shipped kernel,
+   stock ATF I2C service, compares timing registers with the shipped kernel,
+   and audits the shipped FIFO setup and eight/nine-byte DMA selection,
    builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
