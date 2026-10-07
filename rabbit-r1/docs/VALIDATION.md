@@ -22,6 +22,9 @@
 | I2C gate, terminal IRQ, DMA cleanup and failed-copy regressions | All rejected | `logs/i2c-irq-regression-*.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
+| MT6370 backlight configuration and brightness | PASS: 65,536 property/register cases, both brightness formats, revisions and errors | `logs/mt6370-backlight-tests.log`; production callbacks with stubs and ASan/UBSan |
+| Shipped backlight setup | PASS: 48 instruction fixtures, four synthetic revision cases and stock-DT values | `logs/stock-backlight-tests.log`, `out/stock-backlight-audit.json`; PMIC transport modeled |
+| Backlight masks, mode bit, shutdown polarity, revision and brightness regressions | All seven rejected at runtime | `logs/mt6370-backlight-regression-*.log` |
 | Compiled r1 power-device wiring | PASS against stock FDT, including IRQs, pin muxes and child gates | `logs/r1-power-tests.log` |
 | MT6370 and hwmon schemas | PASS, zero diagnostics for the new power nodes | `logs/r1-power-schema.log`, `out/r1-power-schema.json` |
 | CST836 report/transport/PM logic | PASS with I2C/input/GPIO stubs and ASan/UBSan | `logs/cst836-tests.log`; no hardware events |
@@ -29,7 +32,7 @@
 | CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
 | CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 17 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 18 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |
@@ -53,6 +56,7 @@
 | I2C FIFO patch checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-fifo-checkpatch.log` |
 | I2C channel patches checkpatch | No errors or warnings | `logs/i2c-channel-checkpatch.log` |
 | MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
+| MT6370 backlight patch checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/mt6370-backlight-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 
 The full schema failures are recorded, not inferred from the validator's exit
@@ -84,6 +88,8 @@ python3 scripts/validate-kernel.py mainline
 python3 scripts/validate-kernel.py vendor
 python3 scripts/test-mt6357.py
 python3 scripts/test-mt6370.py
+python3 scripts/test-mt6370-backlight.py
+toolchains/boot-tools/bin/python scripts/test-stock-backlight.py
 python3 scripts/test-r1-power.py
 python3 scripts/test-i2c.py
 python3 scripts/test-i2c-irq.py

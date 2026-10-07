@@ -3,7 +3,8 @@
 The [Rabbit r1 workflow](../../.github/workflows/rabbit-r1.yml) runs on pushes to
 `rabbit-r1/**` and `mt6765-devel`, on pull requests, and on manual dispatch.
 It builds the exact event commit, including GitHub's test merge commit for a PR.
-An updated branch cancels an older run for that branch.
+An active run finishes when the branch is updated. GitHub retains the newest
+pending run for that branch, so frequent pushes do not prevent complete builds.
 
 The Ubuntu 24.04 runner puts the checkout, downloads, caches and build outputs
 under `/rabbitr1`. Build tools are installed on the disposable runner. No local
@@ -12,15 +13,16 @@ host packages or device partitions are changed by this workflow.
 The workflow:
 
 1. Installs the tracked workspace tools and fetches pinned build inputs.
-2. Checks the patch series, MT6357 mappings, MT6370 current measurement, I2C
-   timing, I2C transfer/IRQ and channel setup/recovery, CST836 transport/input callbacks,
+2. Checks the patch series, MT6357 mappings, MT6370 current measurement and
+   backlight register/brightness behavior, I2C timing, transfer/IRQ and channel
+   setup/recovery, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
    stock ATF I2C service, compares timing registers with the shipped kernel,
-   and audits the shipped FIFO setup and eight/nine-byte DMA selection,
-   builds patched LK and the LineageOS splash with
+   audits the shipped FIFO setup, eight/nine-byte DMA selection and stock
+   backlight setup instructions, then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and

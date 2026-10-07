@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: rabbit-r1-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   TMPDIR: /rabbitr1/.tmp
@@ -98,6 +98,7 @@ jobs:
           python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
           python3 scripts/test-mt6357.py 2>&1 | tee logs/mt6357-tests.log
           python3 scripts/test-mt6370.py 2>&1 | tee logs/mt6370-tests.log
+          python3 scripts/test-mt6370-backlight.py 2>&1 | tee logs/mt6370-backlight-tests.log
           python3 scripts/test-i2c.py 2>&1 | tee logs/i2c-tests.log
           python3 scripts/test-i2c-irq.py 2>&1 | tee logs/i2c-irq-tests.log
           python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
@@ -118,6 +119,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-i2c-firmware.py 2>&1 | tee logs/i2c-firmware-tests.log
           toolchains/boot-tools/bin/python scripts/test-i2c-stock-timing.py 2>&1 | tee logs/i2c-stock-timing.log
           toolchains/boot-tools/bin/python scripts/test-i2c-stock-fifo.py 2>&1 | tee logs/i2c-stock-fifo.log
+          toolchains/boot-tools/bin/python scripts/test-stock-backlight.py 2>&1 | tee logs/stock-backlight-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

@@ -150,9 +150,13 @@ This does not guarantee or manage whatever charging state LK left behind.
 
 The MT6370 and hwmon schemas pass for these nodes. A compiled-DTB test compares
 the wiring with the stock image and rejects a changed IRQ or enabled unfinished
-child. Full-board schema validation still has the previously recorded 48
+child. Full-board schema validation still has the previously recorded 41
 diagnostics. Actual bus transfers, interrupt routing and measured ADC accuracy
 require the device; none are inferred from a successful build.
+
+The [backlight investigation](BACKLIGHT.md) fixes register masks, brightness
+mapping, shutdown polarity and reserved-bit handling before panel integration.
+The board backlight remains disabled; this does not change charging behavior.
 
 ## Persistent logs
 

@@ -22,11 +22,13 @@
 #define MT6370_REG_BL_BSTCTRL		0x1A1
 #define MT6370_REG_BL_PWM		0x1A2
 #define MT6370_REG_BL_DIM2		0x1A4
+#define MT6370_REG_BL_DIM1		0x1A5
 
 #define MT6370_VENID_MASK		GENMASK(7, 4)
+#define MT6370_REV_MASK			GENMASK(3, 0)
 #define MT6370_BL_EXT_EN_MASK		BIT(7)
 #define MT6370_BL_EN_MASK		BIT(6)
-#define MT6370_BL_CODE_MASK		BIT(0)
+#define MT6370_BL_CODE_MASK		BIT(1)
 #define MT6370_BL_CH_MASK		GENMASK(5, 2)
 #define MT6370_BL_CH_SHIFT		2
 #define MT6370_BL_DIM2_COMMON_MASK	GENMASK(2, 0)
@@ -36,10 +38,10 @@
 #define MT6370_BL_PWM_EN_MASK		BIT(7)
 #define MT6370_BL_PWM_HYS_EN_MASK	BIT(2)
 #define MT6370_BL_PWM_HYS_SEL_MASK	GENMASK(1, 0)
-#define MT6370_BL_OVP_EN_MASK		BIT(7)
+#define MT6370_BL_OVP_SHDN_DIS_MASK	BIT(7)
 #define MT6370_BL_OVP_SEL_MASK		GENMASK(6, 5)
 #define MT6370_BL_OVP_SEL_SHIFT		5
-#define MT6370_BL_OC_EN_MASK		BIT(3)
+#define MT6370_BL_OC_SHDN_DIS_MASK	BIT(3)
 #define MT6370_BL_OC_SEL_MASK		GENMASK(2, 1)
 #define MT6370_BL_OC_SEL_SHIFT		1
 
@@ -63,6 +65,7 @@ enum {
 struct mt6370_priv {
 	u8 dim2_mask;
 	u8 dim2_shift;
+	u8 revision;
 	int def_max_brightness;
 	struct backlight_device *bl;
 	struct device *dev;
@@ -82,8 +85,14 @@ static int mt6370_bl_update_status(struct backlight_device *bl_dev)
 		brightness_val[0] = (brightness - 1) & priv->dim2_mask;
 		brightness_val[1] = (brightness - 1) >> priv->dim2_shift;
 
-		ret = regmap_raw_write(priv->regmap, MT6370_REG_BL_DIM2,
-				       brightness_val, sizeof(brightness_val));
+		/* DIM1 latches both fields; preserve the reserved DIM2 bits. */
+		ret = regmap_update_bits(priv->regmap, MT6370_REG_BL_DIM2,
+					 priv->dim2_mask, brightness_val[0]);
+		if (ret)
+			return ret;
+
+		ret = regmap_write(priv->regmap, MT6370_REG_BL_DIM1,
+				   brightness_val[1]);
 		if (ret)
 			return ret;
 	}
@@ -130,12 +139,27 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 					    struct backlight_properties *props)
 {
 	struct device *dev = priv->dev;
-	u8 prop_val;
+	u8 prop_val, channels;
 	u32 brightness, ovp_uV, ocp_uA;
 	unsigned int mask, val;
+	bool ovp_shutdown, ocp_shutdown;
 	int ret;
 
+	ret = device_property_read_u8(dev, "mediatek,bled-channel-use", &channels);
+	if (ret)
+		return dev_err_probe(dev, ret, "Missing backlight channels\n");
+	if (!channels || channels > MT6370_BL_MAX_CH)
+		return dev_err_probe(dev, -EINVAL, "Invalid backlight channels\n");
+
+	ovp_shutdown = device_property_read_bool(dev, "mediatek,bled-ovp-shutdown");
+	ocp_shutdown = device_property_read_bool(dev, "mediatek,bled-ocp-shutdown");
+	/* The vendor driver keeps shutdown disabled on these revisions. */
+	if (priv->revision <= 1 && (ovp_shutdown || ocp_shutdown))
+		return dev_err_probe(dev, -EOPNOTSUPP,
+				     "Backlight shutdown unsupported on this revision\n");
+
 	/* Vendor optional properties */
+	mask = MT6370_BL_PWM_EN_MASK | MT6370_BL_PWM_HYS_EN_MASK;
 	val = 0;
 	if (device_property_read_bool(dev, "mediatek,bled-pwm-enable"))
 		val |= MT6370_BL_PWM_EN_MASK;
@@ -147,6 +171,7 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 				      "mediatek,bled-pwm-hys-input-th-steps",
 				      &prop_val);
 	if (!ret) {
+		mask |= MT6370_BL_PWM_HYS_SEL_MASK;
 		prop_val = clamp_val(prop_val,
 				     MT6370_BL_PWM_HYS_TH_MIN_STEP,
 				     MT6370_BL_PWM_HYS_TH_MAX_STEP);
@@ -157,17 +182,19 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 	}
 
 	ret = regmap_update_bits(priv->regmap, MT6370_REG_BL_PWM,
-				 val, val);
+				 mask, val);
 	if (ret)
 		return ret;
 
+	mask = MT6370_BL_OVP_SHDN_DIS_MASK | MT6370_BL_OC_SHDN_DIS_MASK;
 	val = 0;
-	if (device_property_read_bool(dev, "mediatek,bled-ovp-shutdown"))
-		val |= MT6370_BL_OVP_EN_MASK;
+	if (!ovp_shutdown)
+		val |= MT6370_BL_OVP_SHDN_DIS_MASK;
 
 	ret = device_property_read_u32(dev, "mediatek,bled-ovp-microvolt",
 				       &ovp_uV);
 	if (!ret) {
+		mask |= MT6370_BL_OVP_SEL_MASK;
 		ovp_uV = clamp_val(ovp_uV, MT6370_BL_OVP_MIN_UV,
 				   MT6370_BL_OVP_MAX_UV);
 		ovp_uV = DIV_ROUND_UP(ovp_uV - MT6370_BL_OVP_MIN_UV,
@@ -175,12 +202,13 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 		val |= ovp_uV << MT6370_BL_OVP_SEL_SHIFT;
 	}
 
-	if (device_property_read_bool(dev, "mediatek,bled-ocp-shutdown"))
-		val |= MT6370_BL_OC_EN_MASK;
+	if (!ocp_shutdown)
+		val |= MT6370_BL_OC_SHDN_DIS_MASK;
 
 	ret = device_property_read_u32(dev, "mediatek,bled-ocp-microamp",
 				       &ocp_uA);
 	if (!ret) {
+		mask |= MT6370_BL_OC_SEL_MASK;
 		ocp_uA = clamp_val(ocp_uA, MT6370_BL_OCP_MIN_UA,
 				   MT6370_BL_OCP_MAX_UA);
 		ocp_uA = DIV_ROUND_UP(ocp_uA - MT6370_BL_OCP_MIN_UA,
@@ -189,7 +217,7 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 	}
 
 	ret = regmap_update_bits(priv->regmap, MT6370_REG_BL_BSTCTRL,
-				 val, val);
+				 mask, val);
 	if (ret)
 		return ret;
 
@@ -208,27 +236,14 @@ static int mt6370_init_backlight_properties(struct mt6370_priv *priv,
 
 	val = 0;
 	if (device_property_read_bool(dev, "mediatek,bled-exponential-mode-enable")) {
-		val |= MT6370_BL_CODE_MASK;
 		props->scale = BACKLIGHT_SCALE_NON_LINEAR;
-	} else
+	} else {
+		val |= MT6370_BL_CODE_MASK;
 		props->scale = BACKLIGHT_SCALE_LINEAR;
-
-	ret = device_property_read_u8(dev, "mediatek,bled-channel-use",
-				      &prop_val);
-	if (ret) {
-		dev_err(dev, "mediatek,bled-channel-use DT property missing\n");
-		return ret;
 	}
 
-	if (!prop_val || prop_val > MT6370_BL_MAX_CH) {
-		dev_err(dev,
-			"No channel specified or over than upper bound (%d)\n",
-			prop_val);
-		return -EINVAL;
-	}
-
-	mask = MT6370_BL_EXT_EN_MASK | MT6370_BL_CH_MASK;
-	val |= prop_val << MT6370_BL_CH_SHIFT;
+	mask = MT6370_BL_EXT_EN_MASK | MT6370_BL_CH_MASK | MT6370_BL_CODE_MASK;
+	val |= channels << MT6370_BL_CH_SHIFT;
 
 	if (priv->enable_gpio)
 		val |= MT6370_BL_EXT_EN_MASK;
@@ -252,6 +267,7 @@ static int mt6370_check_vendor_info(struct mt6370_priv *priv)
 	if (ret)
 		return ret;
 
+	priv->revision = FIELD_GET(MT6370_REV_MASK, dev_info);
 	of_vid = (uintptr_t)device_get_match_data(priv->dev);
 	hw_vid = FIELD_GET(MT6370_VENID_MASK, dev_info);
 	hw_vid = (hw_vid == 0x9 || hw_vid == 0xb) ? MT6370_VID_6372 : MT6370_VID_COMMON;

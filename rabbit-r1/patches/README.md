@@ -26,3 +26,7 @@ Patch 0017 adds native MT6765 FIFO transfers and uses the stock START sequence
 on both banks. It keeps DMA for transfers longer than eight bytes and rejects
 unsupported message sequences. See `docs/I2C.md` for stock-instruction evidence
 and the remaining hardware checks.
+
+Patch 0018 corrects MT6370 backlight field masks, mapping and shutdown polarity,
+handles the vendor's early-revision restriction and preserves reserved brightness
+bits. The r1 node remains disabled pending panel integration; see `docs/BACKLIGHT.md`.
