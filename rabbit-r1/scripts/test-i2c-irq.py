@@ -44,6 +44,12 @@ typedef int irqreturn_t;
 #define __iomem
 #define IRQ_HANDLED 1
 #define I2C_M_RD 1
+#define HZ_PER_GHZ 1000000000U
+#define DIV_ROUND_UP(n,d) (((n)+(d)-1)/(d))
+#define GENMASK(h,l) ((~0U << (l)) & (~0U >> (31-(h))))
+#define div_u64(n,d) ((n)/(d))
+#define I2C_MAX_FAST_MODE_FREQ 400000U
+#define I2C_MAX_HIGH_SPEED_MODE_FREQ 3400000U
 #define I2C_MAX_STANDARD_MODE_FREQ 100000U
 #define I2C_MAX_FAST_MODE_PLUS_FREQ 1000000U
 #define DMA_TO_DEVICE 1
@@ -86,6 +92,10 @@ declarations = ''.join(block(prefix) for prefix in [
     'enum I2C_REGS_OFFSET {', 'static const u16 mt_i2c_regs_v2[]',
     'static const u16 mt_i2c_regs_mt6765[]', 'struct mtk_i2c_compatible {',
     'struct mtk_i2c_ac_timing {', 'struct mtk_i2c {',
+    'struct i2c_spec_values {',
+    'static const struct i2c_spec_values standard_mode_spec',
+    'static const struct i2c_spec_values fast_mode_spec',
+    'static const struct i2c_spec_values fast_mode_plus_spec',
     'static const struct mtk_i2c_compatible mt8183_compat',
     'static const struct mtk_i2c_compatible mt6765_compat',
     'static const struct i2c_adapter_quirks mt6765_channel_quirks',
@@ -97,6 +107,9 @@ static bool expect_gate, dma_active, transfer_started;
 static unsigned int gate_writes, starts, maps, unmaps, gets, releases, resets, copies;
 static unsigned int injected_irq, global_resets, kicks, controller_writes;
 static int clocks_prepared, clocks_enabled, clock_failure;
+static unsigned int parent_clock;
+static u16 expected_timing, expected_ltiming, expected_timeout;
+static unsigned long clk_get_rate(void *clk) { assert(clocks_enabled); return parent_clock; }
 static unsigned long smc_reply;
 static unsigned int smc_calls, resume_calls, dt_id;
 static bool dt_secure, dt_malformed, check_clocks;
@@ -137,10 +150,13 @@ static void writew(u16 value, void *address)
             assert(readw((u8 *)controller+bank+0x38) == 5);
             assert(readw((u8 *)controller+bank+0x10) ==
                    (current->op == I2C_MASTER_WRRD ? 0x33e : 0x32c));
-            assert(readw((u8 *)controller+bank+0x20) == 0x14);
-            assert(readw((u8 *)controller+bank+0x2c) == 0x1a);
-            assert(readw((u8 *)controller+bank+0x48) == 3);
+        }
+        if (expect_gate && dma_active) {
+            assert(readw((u8 *)controller+bank+0x20) == expected_timing);
+            assert(readw((u8 *)controller+bank+0x2c) == expected_ltiming);
+            assert(readw((u8 *)controller+bank+0x48) == 0x404);
             assert(readw((u8 *)controller+bank+0x34) == 3);
+            assert(readw((u8 *)controller+bank+0x4c) == expected_timeout);
         }
         starts++;
         transfer_started = true;
@@ -275,13 +291,15 @@ static int of_property_read_u32(struct device_node *node, const char *name, unsi
         assert(dt_secure);
         if (dt_malformed) return -EINVAL;
         *value = dt_id;
-    } else if (!strcmp(name,"clock-div")) *value = 1;
+    } else if (!strcmp(name,"clock-div")) *value = current->dev_comp == &mt6765_compat ? 5 : 1;
     else { assert(!strcmp(name,"clock-frequency")); *value = 100000; }
     return 0;
 }
 static void i2c_parse_fw_timings(struct device *dev, struct i2c_timings *timing, bool defaults) {}
 '''
-body = ''.join(block(prefix) for prefix in [
+body = s[s.index('static const struct i2c_spec_values *mtk_i2c_get_spec('):
+         s.index('static void i2c_dump_register(')]
+body += ''.join(block(prefix) for prefix in [
     'static u16 mtk_i2c_readw_bank(', 'static void mtk_i2c_writew_bank(',
     'static u16 mtk_i2c_readw(', 'static void mtk_i2c_writew(',
     'static u16 mtk_i2c_irq_mask(', 'static void mtk_i2c_start(',
@@ -335,6 +353,10 @@ static void setup(struct mtk_i2c *i2c, bool mt6765)
     i2c->pdmabase = dma;
     i2c->adap.timeout = 200;
     i2c->speed_hz = 100000;
+    i2c->clk_src_div = mt6765 ? 5 : 1;
+    parent_clock = 26000000;
+    expected_timing = 0x1b; expected_ltiming = 0x1a; expected_timeout = 386;
+    assert(!mtk_i2c_set_speed(i2c,parent_clock));
     expect_gate = mt6765;
     dma_active = transfer_started = false;
     gate_writes = starts = maps = unmaps = gets = releases = resets = copies = 0;
@@ -358,9 +380,6 @@ static void setup_channel(struct mtk_i2c *i2c)
     assert(i2c->adap.quirks == &mt6765_channel_quirks);
     assert(i2c->adap.quirks->flags == (I2C_AQ_COMB_WRITE_THEN_READ | I2C_AQ_NO_ZERO_LEN));
     assert(i2c->adap.quirks->max_num_msgs == 1);
-    i2c->ac_timing.htiming = 0x14;
-    i2c->ac_timing.ltiming = 0x1a;
-    i2c->ac_timing.inter_clk_div = 3;
     u16 stale = 0x1ff;
     memcpy((u8 *)controller+0x10c,&stale,sizeof(stale));
     memset((u8 *)controller+0x200,0xa5,0x100); /* CCU's bank must be untouched. */
@@ -537,6 +556,21 @@ int main(void)
     inject_irq(16 | 256); /* A fault must not be discarded as a master-code IRQ. */
     assert(i2c.msg_complete.done == 1 && !starts);
     assert(mtk_i2c_transfer_error(&i2c,true) == -EIO);
+    /* A changed parent must refresh timing before START in either bank. */
+    for (unsigned int channel = 0; channel < 2; channel++) {
+        if (channel) setup_channel(&i2c); else setup(&i2c,true);
+        check_clocks = true;
+        assert(!mtk_i2c_prepare_hw(&i2c));
+        parent_clock = 52000000;
+        expected_timing = 0x35; expected_ltiming = 0x34; expected_timeout = 393;
+        assert(mtk_i2c_transfer(&i2c.adap,msgs,1) == 1);
+        assert(starts == 1 && !clocks_enabled && clocks_prepared);
+        parent_clock = 0;
+        unsigned int writes = controller_writes;
+        assert(mtk_i2c_transfer(&i2c.adap,msgs,1) == -EINVAL);
+        assert(starts == 1 && controller_writes == writes && !clocks_enabled);
+        assert(!mtk_i2c_suspend_noirq(i2c.dev));
+    }
     unsigned int channel_runs = test_channel_transfers(msgs);
     test_channel_setup();
     printf("PASS: %u MT6765 DMA transfers, terminal faults, AP gate, cleanup order,\n",runs);

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run production I2C timing/init code with register stubs, without hardware.
 
-The clock model assumes the MT8183 timing semantics retained for MT6765.
-It detects an unprogrammed fixed divider; it does not prove MT6765 waveforms.
+The MT8183 clock model checks fixed-divider regressions. MT6765 register
+programming is also compared with the shipped kernel by test-i2c-stock-timing.py.
 An optional DTS input supports running the check against the original source.
 """
 import os
@@ -40,6 +40,9 @@ for index, node in sorted(nodes):
     dividers.append(int(re.search(r'clock-div = <(\d+)>;', node)[1]))
 
 prelude = r'''
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -78,7 +81,7 @@ struct mtk_i2c {
     struct { unsigned int scl_int_delay_ns; } timing_info;
     unsigned int clk_src_div, speed_hz;
     uintptr_t pdmabase;
-    u16 timing_reg, high_speed_reg, ltiming_reg, ch_offset;
+    u16 timing_reg, high_speed_reg, ltiming_reg, ch_offset, hw_timeout;
     bool use_push_pull, have_pmic;
     u16 registers[0x1000 / 2];
 };
@@ -106,22 +109,43 @@ body += s[s.index('static const struct i2c_spec_values *mtk_i2c_get_spec('):
           s.index('static void i2c_dump_register(')]
 checks = 'static const unsigned int dt_dividers[] = {' + ','.join(map(str, dividers)) + '};\n'
 checks += r'''
-int main(void)
+static int emit(unsigned int parent, unsigned int speed, unsigned int div, unsigned int bank)
 {
+    struct mtk_i2c i2c = {
+        .dev_comp = &mt6765_compat, .clk_src_div = div, .speed_hz = speed,
+        .ch_offset = bank,
+    };
+    int ret = mtk_i2c_set_speed(&i2c,parent);
+    printf("%d",ret);
+    if (!ret) {
+        mtk_i2c_configure(&i2c,bank);
+        const unsigned int regs[] = {0x20,0x2c,0x30,0x48,0x4c,0x28,0x1c,0x34};
+        for (unsigned int i = 0; i < sizeof(regs)/sizeof(regs[0]); i++)
+            printf(" %u",i2c.registers[(bank+regs[i])/2]);
+    }
+    putchar('\n');
+    return 0;
+}
+int main(int argc, char **argv)
+{
+    if (argc == 5)
+        return emit(strtoul(argv[1],NULL,0),strtoul(argv[2],NULL,0),
+                    strtoul(argv[3],NULL,0),strtoul(argv[4],NULL,0));
+    assert(argc == 1);
     /* Test clock-rate inputs, not measurements of a particular r1. */
     const unsigned int parents[] = {26000000, 65000000, 104000000, 124800000, 136500000};
     const unsigned int speeds[] = {100000, 400000};
-    const struct mtk_i2c_compatible *variants[] = {&mt8183_compat, &mt6765_compat};
+    const struct mtk_i2c_compatible *variants[] = {&mt8183_compat};
     unsigned int count = 0;
-    for (unsigned int variant = 0; variant < 2; variant++) {
+    for (unsigned int variant = 0; variant < 1; variant++) {
     for (unsigned int bus = 0; bus < 7; bus++) {
         for (unsigned int p = 0; p < sizeof(parents) / sizeof(parents[0]); p++) {
             for (unsigned int f = 0; f < sizeof(speeds) / sizeof(speeds[0]); f++) {
                 struct mtk_i2c i2c = {
                     .dev_comp = variants[variant],
-                    .clk_src_div = dt_dividers[bus], .speed_hz = speeds[f],
+                    .clk_src_div = 1, .speed_hz = speeds[f],
                 };
-                mtk_i2c_set_speed(&i2c, parents[p]);
+                assert(mtk_i2c_set_speed(&i2c, parents[p]) == 0);
                 mtk_i2c_init_hw(&i2c);
                 unsigned int div = mtk_i2c_readw(&i2c, OFFSET_CLOCK_DIV) + 1;
                 unsigned int high = mtk_i2c_readw(&i2c, OFFSET_TIMING);
@@ -146,14 +170,50 @@ int main(void)
         }
     }
     }
-    printf("PASS: %u production timing/init cases; programmed dividers respect requested rates\n", count);
+    printf("PASS: %u MT8183 timing/init cases; programmed dividers respect requested rates\n", count);
+    count = 0;
+    for (unsigned int bus = 0; bus < 7; bus++) {
+        assert(dt_dividers[bus] == 5);
+        for (unsigned int p = 0; p < sizeof(parents)/sizeof(parents[0]); p++) {
+            for (unsigned int f = 0; f < sizeof(speeds)/sizeof(speeds[0]); f++) {
+                for (unsigned int bank = 0; bank <= 0x100; bank += 0x100) {
+                    struct mtk_i2c i2c = {.dev_comp = &mt6765_compat,
+                        .clk_src_div = dt_dividers[bus], .speed_hz = speeds[f], .ch_offset = bank};
+                    for (unsigned int at = 0; at < sizeof(i2c.registers)/sizeof(u16); at++)
+                        i2c.registers[at] = 0xa55a;
+                    assert(!mtk_i2c_set_speed(&i2c,parents[p]));
+                    mtk_i2c_init_hw(&i2c);
+                    mtk_i2c_configure(&i2c,bank);
+                    assert(i2c.registers[(bank+0x48)/2] == 0x404);
+                    assert(i2c.registers[(bank+0x4c)/2] > 0);
+                    assert(i2c.registers[(bank+0x20)/2] & 1);
+                    assert(i2c.registers[(bank+0x3c)/2] == 0xa55a);
+                    assert(i2c.registers[(bank+0x90)/2] == 0xa55a);
+                    count++;
+                }
+            }
+        }
+    }
+    printf("PASS: %u MT6765 bank/divider/timeout setup cases; no MT8183-only timing writes\n",count);
+    struct mtk_i2c i2c = {.dev_comp = &mt6765_compat, .clk_src_div = 5, .speed_hz = 100000};
+    assert(mtk_i2c_set_speed(&i2c,0) == -EINVAL);
+    i2c.speed_hz = 0; assert(mtk_i2c_set_speed(&i2c,26000000) == -EINVAL);
+    i2c.speed_hz = 999; assert(mtk_i2c_set_speed(&i2c,26000000) == -EINVAL);
+    i2c.speed_hz = 3400001; assert(mtk_i2c_set_speed(&i2c,26000000) == -EINVAL);
+    i2c.speed_hz = 100000;
+    i2c.clk_src_div = 0; assert(mtk_i2c_set_speed(&i2c,26000000) == -EINVAL);
+    i2c.clk_src_div = 9; assert(mtk_i2c_set_speed(&i2c,26000000) == -EINVAL);
+    i2c.clk_src_div = 5;
+    assert(!mtk_i2c_set_speed(&i2c,64000000));
+    assert(i2c.timing_reg == 0x11f && i2c.ltiming_reg == 0x5f);
+    puts("PASS: invalid timing rejected; one-sample 64-step overflow avoided");
     return 0;
 }
 '''
 out = ROOT/'out/i2c-tests'
 out.mkdir(parents=True, exist_ok=True)
 (out/'timing.c').write_text(prelude + defines + '\n' + body + checks)
-subprocess.run(['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-O2',
+subprocess.run(['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-O1', '-g', '-fsanitize=address,undefined',
                 str(out/'timing.c'), '-o', str(out/'timing')], check=True)
 subprocess.run([str(out/'timing')], check=True)
-print('No I2C transfers executed. MT6765 electrical timing and DMA still need hardware tests.')
+print('No I2C transfers executed. Electrical timing and DMA still need hardware tests.')

@@ -1,0 +1,336 @@
+Subject: [PATCH] i2c: mediatek: use MT6765 counters and timeout
+
+Program both clock dividers and the per-bank SCL timeout using the stock
+MT6765 counter encoding. Refresh timing before transfers and reject invalid
+settings. Keep the MT8183 timing path for its existing users.
+
+---
+ arch/arm64/boot/dts/mediatek/mt6765.dtsi |  14 ++--
+ drivers/i2c/busses/i2c-mt65xx.c          | 131 +++++++++++++++++++++++++++++--
+ 2 files changed, 130 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+index ae45c3edae..3bf97bf552 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+@@ -600,7 +600,7 @@ i2c0: i2c@11007000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -614,7 +614,7 @@ i2c1: i2c@11008000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -629,7 +629,7 @@ i2c2: i2c@11009000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -657,7 +657,7 @@ i2c3: i2c@1100f000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -686,7 +686,7 @@ i2c4: i2c@11011000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -754,7 +754,7 @@ i2c6: i2c@1100d000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -781,7 +781,7 @@ i2c5: i2c@11016000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <1>;
++			clock-div = <5>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index 1ceb3c3beb..34500e4e96 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -63,6 +63,9 @@
+ #define I2C_SHADOW_REG_MODE		0x0002
+ #define I2C_RESUME_ARBIT			0x0002
+ #define I2C_FIFO_ADDR_CLR_MCH		0x0004
++#define I2C_MT6765_TIMEOUT_EN		0x0001
++#define I2C_MT6765_MAX_CLOCK_DIV		8
++#define I2C_MT6765_TIMEOUT_MS		2
+ 
+ #define I2C_DMA_CON_TX			0x0000
+ #define I2C_DMA_CON_RX			0x0001
+@@ -177,6 +180,7 @@ enum I2C_REGS_OFFSET {
+ 	OFFSET_HS_STA_STO_AC_TIMING,
+ 	OFFSET_SDA_TIMING,
+ 	OFFSET_MCU_INTR,
++	OFFSET_HW_TIMEOUT,
+ };
+ 
+ static const u16 mt_i2c_regs_v1[] = {
+@@ -261,6 +265,7 @@ static const u16 mt_i2c_regs_mt6765[] = {
+ 	[OFFSET_MCU_INTR] = 0x40,
+ 	[OFFSET_TRANSFER_LEN_AUX] = 0x44,
+ 	[OFFSET_CLOCK_DIV] = 0x48,
++	[OFFSET_HW_TIMEOUT] = 0x4c,
+ 	[OFFSET_SOFTRESET] = 0x50,
+ 	[OFFSET_SCL_MIS_COMP_POINT] = 0x90,
+ 	[OFFSET_DEBUGSTAT] = 0xe4,
+@@ -311,6 +316,7 @@ struct mtk_i2c_compatible {
+ 	unsigned char ltiming_adjust: 1;
+ 	unsigned char apdma_sync: 1;
+ 	unsigned char ap_irq_gate: 1;
++	unsigned char mt6765_timing: 1;
+ 	unsigned char max_dma_support;
+ 	u16 error_irq_mask;
+ 	u16 error_stat_mask;
+@@ -343,6 +349,7 @@ struct mtk_i2c {
+ 	bool use_push_pull;		/* IO config push-pull mode */
+ 	bool clocks_prepared;
+ 	u16 ch_offset;			/* AP transaction register bank */
++	u16 hw_timeout;
+ 	u32 secure_id;			/* firmware controller ID, not adapter nr */
+ 
+ 	u16 irq_stat;			/* interrupt status */
+@@ -463,7 +470,7 @@ static const struct mtk_i2c_compatible mt6765_compat = {
+ 	.regs = mt_i2c_regs_mt6765,
+ 	.auto_restart = 1,
+ 	.aux_len_reg = 1,
+-	.timing_adjust = 1,
++	.mt6765_timing = 1,
+ 	.dma_sync = 1,
+ 	.ltiming_adjust = 1,
+ 	.ap_irq_gate = 1,
+@@ -704,11 +711,23 @@ static void mtk_i2c_configure(struct mtk_i2c *i2c, u16 bank)
+ 	mtk_i2c_writew_bank(i2c, bank, i2c->high_speed_reg, OFFSET_HS);
+ 	if (i2c->dev_comp->ltiming_adjust)
+ 		mtk_i2c_writew_bank(i2c, bank, i2c->ltiming_reg, OFFSET_LTIMING);
++	if (i2c->dev_comp->mt6765_timing) {
++		mtk_i2c_writew_bank(i2c, bank, i2c->ac_timing.inter_clk_div,
++				    OFFSET_CLOCK_DIV);
++		mtk_i2c_writew_bank(i2c, bank, i2c->hw_timeout, OFFSET_HW_TIMEOUT);
++		mtk_i2c_writew_bank(i2c, bank,
++				    i2c->timing_reg | I2C_MT6765_TIMEOUT_EN,
++				    OFFSET_TIMING);
++	}
+ 
+ 	if (i2c->speed_hz <= I2C_MAX_STANDARD_MODE_FREQ)
+ 		ext_conf_val = I2C_ST_START_CON;
+ 	else
+ 		ext_conf_val = I2C_FS_START_CON;
++	if (i2c->dev_comp->mt6765_timing &&
++	    i2c->speed_hz > I2C_MAX_STANDARD_MODE_FREQ)
++		ext_conf_val = i2c->speed_hz > I2C_MAX_FAST_MODE_PLUS_FREQ ?
++			       0x0a0f : 0x1801;
+ 
+ 	if (i2c->dev_comp->timing_adjust) {
+ 		ext_conf_val = i2c->ac_timing.ext;
+@@ -746,9 +765,13 @@ static void mtk_i2c_configure(struct mtk_i2c *i2c, u16 bank)
+ 		      I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
+ 	if (i2c->dev_comp->dma_sync)
+ 		control_reg |= I2C_CONTROL_DMAACK_EN | I2C_CONTROL_ASYNC_MODE;
++	if (i2c->dev_comp->mt6765_timing && i2c->speed_hz > I2C_MAX_FAST_MODE_FREQ)
++		control_reg &= ~I2C_CONTROL_CLK_EXT_EN;
+ 
+ 	mtk_i2c_writew_bank(i2c, bank, control_reg, OFFSET_CONTROL);
+-	mtk_i2c_writew_bank(i2c, bank, I2C_DELAY_LEN, OFFSET_DELAY_LEN);
++	mtk_i2c_writew_bank(i2c, bank,
++			    i2c->dev_comp->mt6765_timing ? 10 : I2C_DELAY_LEN,
++			    OFFSET_DELAY_LEN);
+ }
+ 
+ static void mtk_i2c_reset_dma(struct mtk_i2c *i2c)
+@@ -1067,7 +1090,83 @@ static int mtk_i2c_calculate_speed(struct mtk_i2c *i2c, unsigned int clk_src,
+ 	return 0;
+ }
+ 
+-static void mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
++/* MT6765 uses a raw step count when the sample divider is one. */
++static int mtk_i2c_mt6765_counts(unsigned int clk_src, unsigned int speed,
++				unsigned int *step, unsigned int *sample)
++{
++	unsigned int hclk = clk_src / 1000;
++	unsigned int khz = speed / 1000;
++	unsigned int max_step, min_div, best, s, n;
++
++	if (!hclk || !khz || speed > I2C_MAX_HIGH_SPEED_MODE_FREQ)
++		return -EINVAL;
++	max_step = speed > I2C_MAX_FAST_MODE_FREQ ?
++		   MAX_HS_STEP_CNT_DIV : MAX_STEP_CNT_DIV;
++	min_div = DIV_ROUND_UP(hclk >> 1, khz);
++	best = MAX_SAMPLE_CNT_DIV * max_step + 1;
++	for (s = 1; s <= MAX_SAMPLE_CNT_DIV; s++) {
++		n = DIV_ROUND_UP(min_div, s);
++		if (!n || n > max_step || (s == 1 && n == MAX_STEP_CNT_DIV))
++			continue;
++		if (s * n < best) {
++			best = s * n;
++			*sample = s - 1;
++			*step = s == 1 ? n : n - 1;
++		}
++	}
++	if (best > MAX_SAMPLE_CNT_DIV * max_step || hclk / (2 * best) > khz)
++		return -EINVAL;
++	return 0;
++}
++
++static int mtk_i2c_set_speed_mt6765(struct mtk_i2c *i2c, unsigned int parent_clk)
++{
++	unsigned int clk_src, step, sample, low_step, low_sample, duty = 50;
++	unsigned int speed = i2c->speed_hz;
++	u16 timing, ltiming, hs = 0;
++	int ret;
++
++	/* Unlike the older bindings, clock-div programs both divider fields. */
++	if (!i2c->clk_src_div || i2c->clk_src_div > I2C_MT6765_MAX_CLOCK_DIV ||
++	    !speed || speed > I2C_MAX_HIGH_SPEED_MODE_FREQ)
++		return -EINVAL;
++	clk_src = parent_clk / i2c->clk_src_div;
++	if (speed > I2C_MAX_FAST_MODE_PLUS_FREQ) {
++		ret = mtk_i2c_mt6765_counts(clk_src, I2C_MAX_FAST_MODE_FREQ,
++					  &low_step, &low_sample);
++		if (ret)
++			return ret;
++		ret = mtk_i2c_mt6765_counts(clk_src, speed, &step, &sample);
++		if (ret)
++			return ret;
++		timing = (low_sample << 8) | low_step;
++		hs = 0x85 | (sample << 12) | (((step - 1) & 7) << 8);
++		ltiming = 0x8000 | (low_sample << 6) | low_step |
++			  (sample << 12) | (((step + 1) & 7) << 9);
++	} else {
++		if (speed > I2C_MAX_STANDARD_MODE_FREQ && speed <= I2C_MAX_FAST_MODE_FREQ)
++			duty = 45;
++		ret = mtk_i2c_mt6765_counts(clk_src, speed * 50 / duty, &step, &sample);
++		if (ret)
++			return ret;
++		ret = mtk_i2c_mt6765_counts(clk_src, speed * 50 / (100 - duty),
++					  &low_step, &low_sample);
++		if (ret)
++			return ret;
++		timing = (sample << 8) | step;
++		ltiming = (low_sample << 6) | low_step;
++	}
++
++	i2c->timing_reg = timing;
++	i2c->ltiming_reg = ltiming;
++	i2c->high_speed_reg = hs;
++	i2c->ac_timing.inter_clk_div = (i2c->clk_src_div - 1) * 0x101;
++	i2c->hw_timeout = DIV_ROUND_UP((clk_src / 1000) * I2C_MT6765_TIMEOUT_MS,
++				       ((ltiming & 0x3f) + 1) * (((ltiming >> 6) & 7) + 1));
++	return 0;
++}
++
++static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+ {
+ 	unsigned int clk_src;
+ 	unsigned int step_cnt;
+@@ -1079,6 +1178,10 @@ static void mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+ 	unsigned int max_clk_div;
+ 	int ret;
+ 
++	if (i2c->dev_comp->mt6765_timing)
++		return mtk_i2c_set_speed_mt6765(i2c, parent_clk);
++	if (!parent_clk || !i2c->speed_hz)
++		return -EINVAL;
+ 	target_speed = i2c->speed_hz;
+ 	parent_clk /= i2c->clk_src_div;
+ 
+@@ -1135,8 +1238,9 @@ static void mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+ 					(l_sample_cnt << 6) | l_step_cnt;
+ 		}
+ 
+-		break;
++		return 0;
+ 	}
++	return -EINVAL;
+ }
+ 
+ static void i2c_dump_register(struct mtk_i2c *i2c)
+@@ -1201,6 +1305,8 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 	u16 irq_mask = mtk_i2c_irq_mask(i2c);
+ 	u16 clear_mask = irq_mask;
+ 	u16 dma_sync = 0;
++	unsigned int restart_speed = i2c->dev_comp->mt6765_timing ?
++				     I2C_MAX_FAST_MODE_FREQ : I2C_MAX_FAST_MODE_PLUS_FREQ;
+ 	u32 reg_4g_mode;
+ 	u32 reg_dma_reset;
+ 	u8 *dma_rd_buf = NULL;
+@@ -1215,11 +1321,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		clear_mask |= I2C_RS_TRANSFER | i2c->dev_comp->error_stat_mask;
+ 
+ 	reinit_completion(&i2c->msg_complete);
+-	if (i2c->ch_offset) {
++	if (i2c->dev_comp->mt6765_timing) {
+ 		mtk_i2c_writew(i2c, 0, OFFSET_INTR_MASK);
+ 		mtk_i2c_configure(i2c, i2c->ch_offset);
+-		mtk_i2c_reset_dma(i2c);
+ 	}
++	if (i2c->ch_offset)
++		mtk_i2c_reset_dma(i2c);
+ 
+ 	if (i2c->dev_comp->apdma_sync &&
+ 	    i2c->op != I2C_MASTER_WRRD && num > 1) {
+@@ -1245,7 +1352,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 
+ 	control_reg = mtk_i2c_readw(i2c, OFFSET_CONTROL) &
+ 			~(I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS);
+-	if ((i2c->speed_hz > I2C_MAX_FAST_MODE_PLUS_FREQ) || (left_num >= 1))
++	if ((i2c->speed_hz > restart_speed) || (left_num >= 1))
+ 		control_reg |= I2C_CONTROL_RS;
+ 
+ 	if (i2c->op == I2C_MASTER_WRRD)
+@@ -1459,6 +1566,12 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+ 	ret = clk_bulk_enable(I2C_MT65XX_CLK_MAX, i2c->clocks);
+ 	if (ret)
+ 		goto err_regulator;
++	if (i2c->dev_comp->mt6765_timing) {
++		ret = mtk_i2c_set_speed(i2c,
++				      clk_get_rate(i2c->clocks[I2C_MT65XX_CLK_MAIN].clk));
++		if (ret)
++			goto err_exit;
++	}
+ 
+ 	i2c->auto_restart = i2c->dev_comp->auto_restart && !i2c->ch_offset;
+ 
+@@ -1695,7 +1808,9 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+ 
+ 	strscpy(i2c->adap.name, I2C_DRV_NAME, sizeof(i2c->adap.name));
+ 
+-	mtk_i2c_set_speed(i2c, clk_get_rate(i2c->clocks[speed_clk].clk));
++	ret = mtk_i2c_set_speed(i2c, clk_get_rate(i2c->clocks[speed_clk].clk));
++	if (ret)
++		return dev_err_probe(&pdev->dev, ret, "unsupported I2C timing\n");
+ 
+ 	if (i2c->dev_comp->max_dma_support > 32) {
+ 		ret = dma_set_mask(&pdev->dev,

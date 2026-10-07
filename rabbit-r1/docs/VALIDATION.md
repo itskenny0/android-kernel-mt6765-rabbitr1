@@ -9,11 +9,13 @@
 | Original MMC source-clock regression | Rejected as expected | `logs/mmc-regression-before.log` |
 | MT6357 register mappings and new helpers | PASS | `logs/mt6357-tests.log` |
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
-| I2C programmable-divider calculation | PASS: 140 MT6765/MT8183 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
+| I2C programmable-divider calculation | PASS: 70 MT8183 and 140 MT6765 bank/setup cases, invalid inputs and count boundary | `logs/i2c-tests.log` |
+| MT6765 timing vs shipped kernel | PASS: 180 identical register sets, 20 rejected rate combinations and count-boundary check | `logs/i2c-stock-timing.log`, `out/i2c-stock-timing.json`; selected AArch64 setup fragment only |
 | MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, repeated starts and allocation errors; MT8183 regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
 | Stock ATF I2C service | PASS: 64 selected-dispatch cases, firmware/DT IDs, exact writes, rejected requests and signed return | `logs/i2c-firmware-tests.log`, `out/i2c-firmware-audit.json`; excludes EL3 entry/caller checks and hardware |
 | MT6765 AP channel | PASS: 36 transfer cases, adapter entry, secure IDs, firmware/clock failures, recovery and suspend/resume | `logs/i2c-irq-tests.log`; modeled hardware |
 | Channel bank, firmware refusal, shared reset and FIFO regressions | All rejected | `logs/i2c-channel-regression-*.log` |
+| Native I2C divider, timeout, raw-count and clock-refresh regressions | All rejected by transfer assertions | `logs/i2c-native-regression-*.log` |
 | I2C gate, terminal IRQ, DMA cleanup and failed-copy regressions | All rejected | `logs/i2c-irq-regression-*.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
@@ -44,6 +46,7 @@
 | Full r1 DT schema validation | **FAIL: 41 diagnostics remain** | `logs/r1-dt-validate.log`, `out/r1-i2c-full-schema.json` |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
+| I2C native timing/binding patches checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-native-checkpatch.log` |
 | I2C channel patches checkpatch | No errors or warnings | `logs/i2c-channel-checkpatch.log` |
 | MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
@@ -80,6 +83,7 @@ python3 scripts/test-mt6370.py
 python3 scripts/test-r1-power.py
 python3 scripts/test-i2c.py
 python3 scripts/test-i2c-irq.py
+toolchains/boot-tools/bin/python scripts/test-i2c-stock-timing.py
 python3 scripts/test-cst836.py
 python3 scripts/test-r1-touch.py
 python3 scripts/check-patches.py

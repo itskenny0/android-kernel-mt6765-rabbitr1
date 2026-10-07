@@ -66,8 +66,8 @@ def check_mainline(dtb):
     for addr in ['11007000', '11008000', '11009000', '1100f000', '11011000', '11016000', '1100d000']:
         assert nodes['/soc/i2c@'+addr]['compatible'] == b'mediatek,mt6765-i2c\0', \
             f'I2C {addr}: MT6765 interrupt handling requires its own compatible'
-        assert nodes['/soc/i2c@'+addr]['clock-div'] == struct.pack('>I', 1), \
-            f'I2C {addr}: unexpected fixed prescaler'
+        assert nodes['/soc/i2c@'+addr]['clock-div'] == struct.pack('>I', 5), \
+            f'I2C {addr}: unexpected programmable divider'
         if addr in secure_ids:
             assert nodes['/soc/i2c@'+addr]['mediatek,secure-id'] == struct.pack('>I', secure_ids[addr])
         else:

@@ -1,0 +1,42 @@
+Subject: [PATCH] dt-bindings: i2c: mediatek: describe MT6765 divider
+
+Describe the programmable MT6765 divider and constrain it to its eight
+settings. Other matches retain the existing fixed-prescaler semantics.
+
+---
+ Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml b/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
+index fdb7d6c44f..b0fd0e8c46 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt65xx.yaml
+@@ -12,6 +12,16 @@ description:
+ 
+ allOf:
+   - $ref: /schemas/i2c/i2c-controller.yaml#
++  - if:
++      properties:
++        compatible:
++          contains:
++            const: mediatek,mt6765-i2c
++    then:
++      properties:
++        clock-div:
++          minimum: 1
++          maximum: 8
+   - if:
+       not:
+         properties:
+@@ -99,7 +109,10 @@ properties:
+ 
+   clock-div:
+     $ref: /schemas/types.yaml#/definitions/uint32
+-    description: Frequency divider of clock source in I2C module
++    description:
++      Frequency divider of clock source in I2C module. On MT6765 this programs
++      both fields of the controller's CLOCK_DIV register; on other controllers
++      it describes the fixed divider before any programmable timing divider.
+ 
+   clock-frequency:
+     default: 100000

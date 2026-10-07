@@ -13,6 +13,16 @@ description:
 allOf:
   - $ref: /schemas/i2c/i2c-controller.yaml#
   - if:
+      properties:
+        compatible:
+          contains:
+            const: mediatek,mt6765-i2c
+    then:
+      properties:
+        clock-div:
+          minimum: 1
+          maximum: 8
+  - if:
       not:
         properties:
           compatible:
@@ -99,7 +109,10 @@ properties:
 
   clock-div:
     $ref: /schemas/types.yaml#/definitions/uint32
-    description: Frequency divider of clock source in I2C module
+    description:
+      Frequency divider of clock source in I2C module. On MT6765 this programs
+      both fields of the controller's CLOCK_DIV register; on other controllers
+      it describes the fixed divider before any programmable timing divider.
 
   clock-frequency:
     default: 100000

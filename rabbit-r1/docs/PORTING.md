@@ -65,7 +65,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | MT6357 | Driver corrections and mocked register tests; [details](POWER.md) | PMIC access/IRQ and measured rail behavior |
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
 | USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
-| I2C | MT6765 interrupts, AP channel setup/recovery and divider correction; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
+| I2C | MT6765 interrupts, AP channels, native counters and hardware timeout; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | MT6370 MFD/ADC and hwmon bound; current-measurement bugs fixed; charger still disabled | Limits, battery gauge/temperature policy, charger detection and measured behavior |
 | Display | Vendor active sequence uses ST7701-style commands despite its ili9883 filename | Panel identity, reset/power/backlight, DSI timings, then DRM scanout |
 | Touch | CST836 driver compiled and host-tested; stock wiring and I2C4 enabled for experimental probing; [details](TOUCH.md) | Host transfer validation, fitted-controller identification and evdev events on hardware |
@@ -89,7 +89,7 @@ marked in the DTS and still needs board verification.
 
 Full DT schema validation is **not clean**. The log at
 `logs/r1-dt-validate.log` identifies incomplete MT6765 bindings and inherited
-node/property mismatches (I2C, MMC, USB, display and other blocks). The board's
+node/property mismatches (MMC, USB, display and other blocks). The board's
 intentional `/memory` loader-compatibility name also violates the current root
 schema's address-suffixed memory convention; the conservative MMC draft lacks
 the schema's second timing pin state. These are recorded porting work, not

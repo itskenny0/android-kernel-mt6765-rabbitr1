@@ -600,7 +600,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -614,7 +614,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -629,7 +629,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -657,7 +657,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -686,7 +686,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -754,7 +754,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -781,7 +781,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <1>;
+			clock-div = <5>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";

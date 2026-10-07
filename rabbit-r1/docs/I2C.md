@@ -1,41 +1,70 @@
 # MT6765 I2C bring-up
 
-The I2C nodes now select an explicit MT6765 match, with its AP interrupt gate
-and terminal error interrupts. Timing calculation still uses the inherited
-MT8183 algorithm and needs electrical validation. All seven controllers specify
-`clock-div = <1>`. The r1 enables I2C4 for experimental touch probing and I2C5
-for power monitoring at 100 kHz; neither bus has been tested on hardware.
+The r1 enables I2C4 for experimental touch probing and I2C5 for power
+monitoring at 100 kHz. The MT6765 match now supplies its own timing, divider,
+timeout, AP interrupt gate and channel setup. Neither bus has been tested on
+hardware.
 
-## Divider correction
+## Native counter and timeout programming
 
-Rabbit's [vendor driver](https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/i2c/busses/i2c-mtk.c)
-divides the main clock by the DT value when calculating timing. With
-`set_dt_div` enabled, it also writes `(clock_div - 1)` to both fields of
-`CLOCK_DIV`. The verified stock DT sets `clock-div = <5>` and `set_dt_div = [01]`;
-the resulting register value is `0x0404`. This is a programmable divider, not
-an extra fixed divide-by-five stage. The MT6765 clock provider supplies the
-undivided `i2c_ck` through the `CLK_IFR_I2C_AP` gate.
+The driver follows Rabbit's [published version-2 implementation](https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/i2c/busses/i2c-mtk.c),
+checked against the actual instructions in the supplied stock kernel.
+`clock-div` now means the programmable divider for MT6765, with a valid range
+of 1 through 8. All seven SoC nodes use the stock value of 5. Both fields of
+`CLOCK_DIV` receive 4 (`0x0404`), and timing uses the parent clock divided by 5.
+This interpretation is specific to MT6765; older matches keep their fixed
+prescaler semantics and existing timing calculations.
 
-Mainline's `mtk_i2c_set_speed()` treats the DT divider as a fixed hardware
-prescaler. It independently chooses a programmable divider and
-`mtk_i2c_init_hw()` writes only that chosen value to `CLOCK_DIV`. Keeping the
-vendor DT value therefore divides the calculation by five without programming
-that division into the controller. The upstream
-[MT8183 nodes](https://code.googlesource.com/linux/torvalds/linux/+/c6e169bc146a76d5ccbf4d3825f705414352bd03/arch/arm64/boot/dts/mediatek/mt8183.dtsi)
-also use a fixed divider of one with this driver.
+The former MT8183 fallback divided its timing input by the DT value without
+programming that division into hardware. The earlier correction used a fixed
+prescaler of 1 with that fallback. Restoring the stock DT value here is paired
+with explicit hardware programming; retaining that earlier calculation would
+reintroduce the mismatch.
 
-At a 26 MHz input and a 100 kHz request, the original DT produces
-`CLOCK_DIV=0`, `TIMING=0x17`, `LTIMING=0x1b`. Under the inherited MT8183 count
-semantics, those registers describe 500 kHz. This is a calculated result from
-the production code, not an oscilloscope measurement.
+MT6765 retains the raw step count when the sample divider is one. For larger
+sample dividers it encodes both counts minus one. The driver follows the stock
+50/50 standard-mode and 45/55 fast-mode targets, kHz rounding, and separate
+master-code/high-speed fields. It avoids a raw 64-step count with sample=1,
+which the vendor code masks to zero, by selecting sample=2 and step=32 instead.
+High-speed fixtures use the standard master-code phase; the vendor's special
+`hs_only` mode is not exposed. The board remains at 100 kHz.
 
-`scripts/test-i2c.py` compiles the production speed calculation, compatibility
-data and hardware-initialization function with MMIO stubs. It decodes the
-registers written by that function and checks the requested rate against the
-undivided input clock. It covers all seven DT nodes, five input-clock fixtures,
-and 100/400 kHz requests for both MT6765 and MT8183 compatibility data: 140 cases.
-The test rejects the original divider. It does not exercise
-DMA, interrupts, actual transfers or electrical setup/hold times.
+Every transfer refreshes the calculation from the enabled parent clock and
+programs the selected bank. `HW_TIMEOUT` at offset `0x4c` gets the stock
+2 ms count derived from `LTIMING`, and `TIMING` gets the vendor's bit-0 timeout
+enable. Fast/high-speed `EXT_CONF` configuration, clock extension and transaction
+delay follow the same source. The unverified MT8183 writes to `SDA_TIMING` and
+`SCL_MIS_COMP_POINT` are no longer made for MT6765. Invalid timing fails before
+starting a transfer, and probe now checks the timing result too.
+
+At a synthetic 26 MHz parent, divider 5 and 100 kHz request, the programmed
+values are `TIMING=0x1b`, `LTIMING=0x1a`, `CLOCK_DIV=0x0404` and
+`HW_TIMEOUT=386`. These are register values, not measured waveforms or proof
+that the selected timeout lasts 2 ms on hardware.
+
+`test-i2c.py` compiles the production timing and initialization functions with
+MMIO stubs: 70 MT8183 fixtures and 140 MT6765 bank/setup fixtures, including all
+seven DT dividers. It rejects invalid inputs and checks the 64-step boundary.
+The transfer harness checks clock changes between transfers and rejection of
+an invalid parent without MMIO or START, with balanced clocks.
+
+`test-i2c-stock-timing.py` independently executes the shipped AArch64 setup
+fragment and timing helpers in Unicorn, stopping before address, DMA and START.
+It checks the Image SHA256
+`71d9fd10bbf39272add38e94b993d17b81948e4978791e51bdaeb3f2736a431f`
+and stock DT compatibility bytes. The fragment at file offsets
+`0xa1d538..0xa1db78` calls `i2c_set_speed` at `0xa208b4` and
+`mtk_i2c_calculate_speed` at `0xa20ab0`. Only `_mcount` and `clk_get_rate`
+are stubbed. Clock fixtures are 26, 65, 104, 124.8 and 136.5 MHz; rates are
+100/400 kHz and 1/1.7/3.4 MHz; dividers are 1/2/5/8, on banks 0 and `0x100`.
+180 register sets match exactly and both implementations reject the remaining
+20 combinations. The 64 MHz boundary separately verifies the intentional
+alternative encoding and timeout initialization. CI runs this after stock
+extraction. No kernel ELF recovery tool is needed to repeat the test.
+
+These tests establish software behavior and agreement with stock instructions.
+They do not establish bus waveforms, physical clocks, FIFO/DMA operation,
+interrupt delivery or successful communication with an r1 peripheral.
 
 ## AP interrupt gate and transfer errors
 
@@ -185,20 +214,18 @@ acceptance results.
 
 ## Remaining controller work
 
-The correction does not establish full MT6765/MT8183 compatibility. Rabbit's
-driver has additional behavior that still needs review:
+The timing path now has an independent stock-instruction comparison, but more
+controller work remains:
 
-* `cnt_constraint` changes the step encoding when the sample count is one.
-  The inherited algorithm also adjusts counts, but its divider-dependent rules need to be
-  compared with the MT6765 hardware before claiming equivalent timing.
-* The stock version-2 transfer also programs per-bank `HW_TIMEOUT` at `0x4c`
-  and ORs `TIMING` with `I2C_TIMEOUT_EN` (bit 0). The inherited timing path does
-  not implement that timeout setup. Counter encoding and timeout programming
-  need to be ported together; enabling a fault IRQ does not configure its timer.
+* Confirm SCL frequency, setup/hold times and hardware timeout behavior with a
+  logic analyzer, including parent-clock changes. Matching stock register
+  programming does not replace electrical validation.
 * Channel setup, firmware caller acceptance and transfer/recovery sequencing
   need tests on a device, including short DMA transfers and CCU coexistence.
   Arbitrary repeated-start sequences are not implemented for the AP bank.
   The [touch audit](TOUCH.md) records the board evidence.
+* The normal-bank path still inherits generic multi-restart START bits. Its
+  transaction sequencing needs a separate comparison with the stock path.
 * Bus arbitration gates, reset behavior and 33-bit DMA need transfer tests.
 
 The vendor source also contains a `DEBUGCTRL=0x28` write guarded by
