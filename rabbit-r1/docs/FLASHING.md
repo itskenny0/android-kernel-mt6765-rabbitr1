@@ -6,6 +6,13 @@ booted it yet. Header checks establish the image format, not whether LK can hand
 off to this kernel. RAM fixups, firmware carve-outs, USB and eMMC still need a
 device test. The initramfs exposes an unauthenticated development shell.
 
+**Known loader compatibility issue:** the current no-op DTBO omits the GPIO
+initialization table that the stock overlay supplies to LK's own device tree.
+The DTBO strategy needs revision before a hardware flashing trial. The steps
+below document the experimental tooling; a passing package check does not
+clear this issue. See the
+[boot-notes review](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/BOOT-NOTES.md).
+
 | Image | Use |
 | --- | --- |
 | `boot-expdb.img` | eMMC enabled; kernel console logs written to `expdb` after storage starts |

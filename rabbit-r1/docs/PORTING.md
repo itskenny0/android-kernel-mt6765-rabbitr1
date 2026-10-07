@@ -48,6 +48,12 @@ The loader handoff remains untested. In particular,
 Do not infer vendor_boot/init_boot support from template scatter entries: the
 provided archive lacks those images and uses header v2.
 
+The [boot-notes review](BOOT-NOTES.md) adds a concrete unresolved issue: LK also
+uses the selected DTBO for its own embedded DT. Our v0.8.293 comparison shows
+that the current no-op overlay omits its stock GPIO initialization table and
+board settings. A clean overlay application to the mainline DT is insufficient;
+the loader-compatible DTBO strategy must be revised before a device trial.
+
 ## Hardware work
 
 The [community MT6765 matrix](https://wiki.nura.eco/wiki/MediaTek_Helio_P35_(MT6765))

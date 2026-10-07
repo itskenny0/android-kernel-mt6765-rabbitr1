@@ -1,0 +1,36 @@
+{
+  "reference_url": "https://github.com/DavidBuchanan314/rabbit_r1_boot_notes",
+  "reference_commit": "b1b35b1ea9023d7b38df407afb5911fd54287c2f",
+  "stock_firmware": "RabbitOS v0.8.293",
+  "stock_lk_sha256": "534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e",
+  "stock_lk_embedded_fdt": {
+    "file_offset": 756496,
+    "bytes": 103765,
+    "identical_to_stock_boot_base": true
+  },
+  "stock_overlay_gpio_init_default_bytes": 5040,
+  "lk_pattern_results": [
+    {
+      "pattern": "avb_hal_read_from_partition_ptr",
+      "match": "unique"
+    },
+    {
+      "pattern": "printf",
+      "match": "unique"
+    },
+    {
+      "pattern": "handle_vboot_state",
+      "match": "unique"
+    },
+    {
+      "pattern": "lcd_printf",
+      "match": "unique"
+    },
+    {
+      "pattern": "memcpy",
+      "match": "unique"
+    }
+  ],
+  "status": "read-only offline inspection; no hooks or device operations executed",
+  "open_issue": "No-op DTBO drops LK board setup from the stock overlay; loader-compatible packaging is unresolved."
+}

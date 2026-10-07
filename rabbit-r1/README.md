@@ -11,6 +11,8 @@ push this branch from the workspace.
 The official 4.19.191 kernel and an experimental 7.1.0 mainline r1 kernel compile.
 An experimental mtkclient boot package is built; there is no device boot test
 or LineageOS ROM yet.
+The current no-op DTBO omits board initialization used by stock LK and needs
+revision before a hardware trial; see [BOOT-NOTES.md](docs/BOOT-NOTES.md).
 The Android target is **LineageOS 24.0**: the inspected official manifest selects
 `android-17.0.0_r1`. Source-branch availability does not establish r1 compatibility.
 
