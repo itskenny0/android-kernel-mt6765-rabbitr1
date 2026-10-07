@@ -24,6 +24,7 @@
 	chassis-type = "handset";
 
 	aliases {
+		i2c4 = &i2c4;
 		i2c5 = &i2c5;
 		mmc0 = &mmc0;
 	};
@@ -114,6 +115,27 @@
 
 &mt6357_vdram_reg {
 	regulator-always-on;
+};
+
+&i2c4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&r1_i2c4_pins>;
+	clock-frequency = <100000>;
+	/* Stock uses AP channel 0x100; the current host driver lacks routing. */
+	status = "disabled";
+
+	touchscreen@15 {
+		/* Primary vendor configuration; CST328 variants need another driver. */
+		compatible = "hynitron,cst836";
+		reg = <0x15>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&r1_touch_pins>;
+		interrupt-parent = <&pio>;
+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&pio 174 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <480>;
+		touchscreen-size-y = <640>;
+	};
 };
 
 &i2c5 {
@@ -214,6 +236,25 @@
 };
 
 &pio {
+	r1_i2c4_pins: i2c4-pins {
+		pins-bus {
+			pinmux = <PINMUX_GPIO105__FUNC_SCL4>,
+				 <PINMUX_GPIO106__FUNC_SDA4>;
+			input-enable;
+		};
+	};
+
+	r1_touch_pins: touch-pins {
+		pins-irq {
+			pinmux = <PINMUX_GPIO0__FUNC_GPIO0>;
+			input-enable;
+		};
+
+		pins-reset {
+			pinmux = <PINMUX_GPIO174__FUNC_GPIO174>;
+		};
+	};
+
 	r1_i2c5_pins: i2c5-pins {
 		pins-bus {
 			pinmux = <PINMUX_GPIO48__FUNC_SCL5>,

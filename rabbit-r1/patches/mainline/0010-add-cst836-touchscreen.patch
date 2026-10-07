@@ -1,0 +1,391 @@
+Subject: [PATCH] Input: add Hynitron CST836 support
+
+Implement the stock register protocol and Type B input reporting. Describe
+r1 wiring under the disabled I2C4 bus pending channel support.
+
+---
+ MAINTAINERS                                       |    1 
+ arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts |   41 +++
+ arch/arm64/configs/rabbit_r1_defconfig            |    1 
+ drivers/input/touchscreen/Kconfig                 |   11 +
+ drivers/input/touchscreen/Makefile                |    1 
+ drivers/input/touchscreen/hynitron-cst836.c       |  247 +++++++++++++++++++++
+ 6 files changed, 302 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 13e0d9c3f8..c7ad977409 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11981,6 +11981,7 @@ M:	itskenny0 <0@kenny.cat>
+ L:	linux-input@vger.kernel.org
+ S:	Maintained
+ F:	Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml
++F:	drivers/input/touchscreen/hynitron-cst836.c
+ 
+ Hyper-V/Azure CORE AND DRIVERS
+ M:	"K. Y. Srinivasan" <kys@microsoft.com>
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+index 6fc31a5352..1c095767d6 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -24,6 +24,7 @@ / {
+ 	chassis-type = "handset";
+ 
+ 	aliases {
++		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		mmc0 = &mmc0;
+ 	};
+@@ -116,6 +117,27 @@ &mt6357_vdram_reg {
+ 	regulator-always-on;
+ };
+ 
++&i2c4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r1_i2c4_pins>;
++	clock-frequency = <100000>;
++	/* Stock uses AP channel 0x100; the current host driver lacks routing. */
++	status = "disabled";
++
++	touchscreen@15 {
++		/* Primary vendor configuration; CST328 variants need another driver. */
++		compatible = "hynitron,cst836";
++		reg = <0x15>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&r1_touch_pins>;
++		interrupt-parent = <&pio>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++		reset-gpios = <&pio 174 GPIO_ACTIVE_LOW>;
++		touchscreen-size-x = <480>;
++		touchscreen-size-y = <640>;
++	};
++};
++
+ &i2c5 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&r1_i2c5_pins>;
+@@ -214,6 +236,25 @@ &u2phy {
+ };
+ 
+ &pio {
++	r1_i2c4_pins: i2c4-pins {
++		pins-bus {
++			pinmux = <PINMUX_GPIO105__FUNC_SCL4>,
++				 <PINMUX_GPIO106__FUNC_SDA4>;
++			input-enable;
++		};
++	};
++
++	r1_touch_pins: touch-pins {
++		pins-irq {
++			pinmux = <PINMUX_GPIO0__FUNC_GPIO0>;
++			input-enable;
++		};
++
++		pins-reset {
++			pinmux = <PINMUX_GPIO174__FUNC_GPIO174>;
++		};
++	};
++
+ 	r1_i2c5_pins: i2c5-pins {
+ 		pins-bus {
+ 			pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
+diff --git a/arch/arm64/configs/rabbit_r1_defconfig b/arch/arm64/configs/rabbit_r1_defconfig
+index a698f2319a..885a0d9be4 100644
+--- a/arch/arm64/configs/rabbit_r1_defconfig
++++ b/arch/arm64/configs/rabbit_r1_defconfig
+@@ -302,6 +302,7 @@ CONFIG_TOUCHSCREEN_ATMEL_MXT=y
+ CONFIG_TOUCHSCREEN_GOODIX=y
+ CONFIG_TOUCHSCREEN_ELAN=y
+ CONFIG_TOUCHSCREEN_EDT_FT5X06=y
++CONFIG_TOUCHSCREEN_HYNITRON_CST836=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_REGULATOR_HAPTIC=y
+ CONFIG_INPUT_UINPUT=y
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 8de8882e00..8beac8b272 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -498,6 +498,17 @@ config TOUCHSCREEN_HYNITRON_CST816X
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called hynitron-cst816x.
+ 
++config TOUCHSCREEN_HYNITRON_CST836
++	tristate "Hynitron CST836 touchscreen"
++	depends on I2C && GPIOLIB
++	help
++	  Say Y here for the two-contact Hynitron CST836 self-capacitance
++	  touchscreen. This driver does not update controller firmware or
++	  support the different CST328 protocol.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called hynitron-cst836.
++
+ config TOUCHSCREEN_ILI210X
+ 	tristate "Ilitek ILI210X based touchscreen"
+ 	depends on I2C
+diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+index 3dde3054fb..7120f9af12 100644
+--- a/drivers/input/touchscreen/Makefile
++++ b/drivers/input/touchscreen/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_TOUCHSCREEN_HIDEEP)	+= hideep.o
+ obj-$(CONFIG_TOUCHSCREEN_HIMAX_HX852X)	+= himax_hx852x.o
+ obj-$(CONFIG_TOUCHSCREEN_HYNITRON_CSTXXX)	+= hynitron_cstxxx.o
+ obj-$(CONFIG_TOUCHSCREEN_HYNITRON_CST816X)	+= hynitron-cst816x.o
++obj-$(CONFIG_TOUCHSCREEN_HYNITRON_CST836)	+= hynitron-cst836.o
+ obj-$(CONFIG_TOUCHSCREEN_ILI210X)	+= ili210x.o
+ obj-$(CONFIG_TOUCHSCREEN_ILITEK)	+= ilitek_ts_i2c.o
+ obj-$(CONFIG_TOUCHSCREEN_IMAGIS)	+= imagis.o
+diff --git a/drivers/input/touchscreen/hynitron-cst836.c b/drivers/input/touchscreen/hynitron-cst836.c
+new file mode 100644
+index 0000000000..160a471e91
+--- /dev/null
++++ b/drivers/input/touchscreen/hynitron-cst836.c
+@@ -0,0 +1,247 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Hynitron CST836 self-capacitance protocol used by the rabbit r1 vendor driver. */
++
++#include <linux/bitops.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/input.h>
++#include <linux/input/mt.h>
++#include <linux/input/touchscreen.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/pm.h>
++#include <linux/unaligned.h>
++
++#define CST836_MAX_CONTACTS	2
++#define CST836_REPORT_SIZE	15
++#define CST836_READ_SIZE		5
++#define CST836_FW_VERSION	0xa6
++#define CST836_EVENT_UP		1
++
++struct cst836_contact {
++	u16 x;
++	u16 y;
++	u8 id;
++	bool active;
++};
++
++struct cst836 {
++	struct i2c_client *client;
++	struct input_dev *input;
++	struct gpio_desc *reset;
++	struct touchscreen_properties prop;
++	bool irq_enabled;
++};
++
++static int cst836_read_register(struct cst836 *ts, u8 reg, u8 *data, int len)
++{
++	int ret;
++
++	/* Preserve the vendor driver's STOP between register selection and read. */
++	ret = i2c_master_send(ts->client, &reg, 1);
++	if (ret != 1)
++		return ret < 0 ? ret : -EIO;
++
++	ret = i2c_master_recv(ts->client, data, len);
++	return ret == len ? 0 : ret < 0 ? ret : -EIO;
++}
++
++static int cst836_decode(const u8 *data, struct cst836_contact *contacts,
++			 unsigned int max_x, unsigned int max_y)
++{
++	unsigned int seen = 0;
++	int count = data[2] & 0x0f;
++	int i;
++
++	if (data[0] & 0x70 || count > CST836_MAX_CONTACTS)
++		return -EPROTO;
++
++	for (i = 0; i < count; i++) {
++		const u8 *point = data + 3 + 6 * i;
++		u8 event = point[0] >> 6;
++		u8 id = point[2] >> 4;
++		u16 x = get_unaligned_be16(point) & 0x0fff;
++		u16 y = get_unaligned_be16(point + 2) & 0x0fff;
++
++		if (id >= CST836_MAX_CONTACTS || event == 3 || seen & BIT(id))
++			return -EPROTO;
++		if (event != CST836_EVENT_UP && (x > max_x || y > max_y))
++			return -EPROTO;
++		seen |= BIT(id);
++		contacts[i].id = id;
++		contacts[i].active = event != CST836_EVENT_UP;
++		contacts[i].x = x;
++		contacts[i].y = y;
++	}
++
++	return count;
++}
++
++static void cst836_report(struct cst836 *ts,
++			  const struct cst836_contact *contacts, int count)
++{
++	int i;
++
++	for (i = 0; i < count; i++) {
++		input_mt_slot(ts->input, contacts[i].id);
++		input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, contacts[i].active);
++		if (contacts[i].active)
++			touchscreen_report_pos(ts->input, &ts->prop, contacts[i].x,
++					       contacts[i].y, true);
++	}
++	input_mt_sync_frame(ts->input);
++	input_sync(ts->input);
++}
++
++static irqreturn_t cst836_irq(int irq, void *data)
++{
++	struct cst836 *ts = data;
++	struct cst836_contact contacts[CST836_MAX_CONTACTS];
++	u8 report[CST836_REPORT_SIZE];
++	int i, ret;
++
++	/* The stock driver reads registers 0, 5 and 10 in separate chunks. */
++	for (i = 0; i < CST836_REPORT_SIZE; i += CST836_READ_SIZE) {
++		ret = cst836_read_register(ts, i, report + i, CST836_READ_SIZE);
++		if (ret)
++			goto release;
++	}
++
++	ret = cst836_decode(report, contacts, ts->prop.max_x, ts->prop.max_y);
++	if (ret < 0)
++		goto release;
++
++	cst836_report(ts, contacts, ret);
++	return IRQ_HANDLED;
++
++release:
++	dev_dbg_ratelimited(&ts->client->dev, "Touch report failed: %d\n", ret);
++	/* An incomplete or malformed release report must not leave fingers down. */
++	cst836_report(ts, NULL, 0);
++	return IRQ_HANDLED;
++}
++
++static void cst836_hold_reset(void *data)
++{
++	struct cst836 *ts = data;
++
++	gpiod_set_value_cansleep(ts->reset, 1);
++}
++
++static int cst836_start(struct cst836 *ts)
++{
++	u8 version[2];
++	int ret;
++
++	gpiod_set_value_cansleep(ts->reset, 1);
++	msleep(20);
++	gpiod_set_value_cansleep(ts->reset, 0);
++	msleep(100);
++
++	/* A readable version is a presence check, not silicon identification. */
++	ret = cst836_read_register(ts, CST836_FW_VERSION, version, sizeof(version));
++	if (ret) {
++		cst836_hold_reset(ts);
++		return ret;
++	}
++	dev_dbg(&ts->client->dev, "Firmware version: %04x\n", get_unaligned_le16(version));
++	return 0;
++}
++
++static int cst836_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	struct cst836 *ts;
++	int ret;
++
++	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
++		return -EOPNOTSUPP;
++	if (client->irq <= 0)
++		return dev_err_probe(dev, -EINVAL, "Missing interrupt\n");
++
++	ts = devm_kzalloc(dev, sizeof(*ts), GFP_KERNEL);
++	if (!ts)
++		return -ENOMEM;
++	ts->client = client;
++	i2c_set_clientdata(client, ts);
++	ts->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ts->reset))
++		return dev_err_probe(dev, PTR_ERR(ts->reset), "Reset GPIO request failed\n");
++	ret = devm_add_action_or_reset(dev, cst836_hold_reset, ts);
++	if (ret)
++		return ret;
++
++	ts->input = devm_input_allocate_device(dev);
++	if (!ts->input)
++		return -ENOMEM;
++	ts->input->name = "Hynitron CST836 touchscreen";
++	ts->input->id.bustype = BUS_I2C;
++	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, 4095, 0, 0);
++	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, 4095, 0, 0);
++	touchscreen_parse_properties(ts->input, true, &ts->prop);
++	ret = input_mt_init_slots(ts->input, CST836_MAX_CONTACTS,
++				  INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED);
++	if (ret)
++		return ret;
++
++	ret = cst836_start(ts);
++	if (ret)
++		return dev_err_probe(dev, ret, "Firmware version read failed\n");
++	ret = input_register_device(ts->input);
++	if (ret)
++		return ret;
++	ret = devm_request_threaded_irq(dev, client->irq, NULL, cst836_irq,
++					IRQF_ONESHOT, dev_name(dev), ts);
++	if (ret)
++		return ret;
++	ts->irq_enabled = true;
++	return 0;
++}
++
++static int cst836_suspend(struct device *dev)
++{
++	struct cst836 *ts = i2c_get_clientdata(to_i2c_client(dev));
++
++	if (ts->irq_enabled) {
++		disable_irq(ts->client->irq);
++		ts->irq_enabled = false;
++	}
++	cst836_report(ts, NULL, 0);
++	cst836_hold_reset(ts);
++	return 0;
++}
++
++static int cst836_resume(struct device *dev)
++{
++	struct cst836 *ts = i2c_get_clientdata(to_i2c_client(dev));
++	int ret;
++
++	ret = cst836_start(ts);
++	if (ret)
++		return ret;
++	enable_irq(ts->client->irq);
++	ts->irq_enabled = true;
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(cst836_pm_ops, cst836_suspend, cst836_resume);
++
++static const struct of_device_id cst836_of_match[] = {
++	{ .compatible = "hynitron,cst836" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, cst836_of_match);
++
++static struct i2c_driver cst836_driver = {
++	.driver = {
++		.name = "hynitron-cst836",
++		.of_match_table = cst836_of_match,
++		.pm = pm_sleep_ptr(&cst836_pm_ops),
++	},
++	.probe = cst836_probe,
++};
++module_i2c_driver(cst836_driver);
++
++MODULE_DESCRIPTION("Hynitron CST836 touchscreen driver");
++MODULE_LICENSE("GPL");

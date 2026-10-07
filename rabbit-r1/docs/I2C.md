@@ -43,6 +43,10 @@ driver has additional behavior that still needs review:
   The fallback also adjusts counts, but its divider-dependent rules need to be
   compared with the MT6765 hardware before claiming equivalent timing.
 * Controllers 2, 3 and 4 use additional channel offsets in the vendor DT.
+  I2C4's AP transactions use `0x100`, while initialization uses channel zero.
+  Its stock resume path asks ATF to restore shadow-register mode at `0xf8c`;
+  the mainline fallback has neither that channel selection nor the matching
+  global register offset. The [touch audit](TOUCH.md) records this evidence.
 * Bus arbitration gates, reset behavior and 33-bit DMA need transfer tests.
 
 The vendor source also contains a `DEBUGCTRL=0x28` write guarded by

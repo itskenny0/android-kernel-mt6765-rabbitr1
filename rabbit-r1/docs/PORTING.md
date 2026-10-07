@@ -68,7 +68,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | I2C | Divider fixed; I2C5 enabled at 100 kHz with stock pin muxes/mode; [details](I2C.md) | Clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | MT6370 MFD/ADC and hwmon bound; current-measurement bugs fixed; charger still disabled | Limits, battery gauge/temperature policy, charger detection and measured behavior |
 | Display | Vendor active sequence uses ST7701-style commands despite its ili9883 filename | Panel identity, reset/power/backlight, DSI timings, then DRM scanout |
-| Touch | Stock Hynitron node uses address `0x15`, reset GPIO174, interrupt GPIO0 | Silicon/protocol identification and input events without firmware auto-update |
+| Touch | CST836 driver compiled and host-tested; stock wiring described, I2C4 still disabled; [details](TOUCH.md) | AP channel routing, fitted-controller identification and evdev events on hardware |
 | GPU | No working accelerated r1 stack established | Kernel/userspace compatibility and rendering tests; software rendering first |
 | Wi-Fi / Bluetooth / GNSS / modem | No r1 mainline implementation established | Connectivity power/firmware transport and appropriate Linux subsystems |
 | Audio / sensors / camera | Vendor sources are reference material | ASoC, IIO and V4L2/media integration, including the motor/hall hardware |

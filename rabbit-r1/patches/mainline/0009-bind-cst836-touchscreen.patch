@@ -1,0 +1,101 @@
+Subject: [PATCH] dt-bindings: input: describe Hynitron CST836
+
+Describe the two-contact controller and active-low reset, with a 480x640
+example.
+
+---
+ .../input/touchscreen/hynitron,cst836.yaml         |   68 ++++++++++++++++++++
+ MAINTAINERS                                        |    6 ++
+ 2 files changed, 74 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml b/Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml
+new file mode 100644
+index 0000000000..0566a660e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml
+@@ -0,0 +1,68 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/input/touchscreen/hynitron,cst836.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Hynitron CST836 touchscreen controller
++
++maintainers:
++  - itskenny0 <0@kenny.cat>
++
++description:
++  Self-capacitance controller with two contacts and an 8-bit register address.
++  The CST328 mutual-capacitance protocol is not compatible with this binding.
++
++allOf:
++  - $ref: touchscreen.yaml#
++
++properties:
++  compatible:
++    const: hynitron,cst836
++
++  reg:
++    maxItems: 1
++
++  interrupts:
++    maxItems: 1
++
++  reset-gpios:
++    maxItems: 1
++    description: Active-low reset line.
++
++  touchscreen-size-x:
++    minimum: 1
++    maximum: 4096
++
++  touchscreen-size-y:
++    minimum: 1
++    maximum: 4096
++
++required:
++  - compatible
++  - reg
++  - interrupts
++  - reset-gpios
++  - touchscreen-size-x
++  - touchscreen-size-y
++
++unevaluatedProperties: false
++
++examples:
++  - |
++    #include <dt-bindings/gpio/gpio.h>
++    #include <dt-bindings/interrupt-controller/irq.h>
++    i2c {
++        #address-cells = <1>;
++        #size-cells = <0>;
++
++        touchscreen@15 {
++            compatible = "hynitron,cst836";
++            reg = <0x15>;
++            interrupt-parent = <&gpio>;
++            interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++            reset-gpios = <&gpio 174 GPIO_ACTIVE_LOW>;
++            touchscreen-size-x = <480>;
++            touchscreen-size-y = <640>;
++        };
++    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0609d6e99c..13e0d9c3f8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11976,6 +11976,12 @@ L:	linux-media@vger.kernel.org
+ S:	Maintained
+ F:	drivers/media/i2c/hi847.c
+ 
++HYNITRON CST836 TOUCHSCREEN
++M:	itskenny0 <0@kenny.cat>
++L:	linux-input@vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml
++
+ Hyper-V/Azure CORE AND DRIVERS
+ M:	"K. Y. Srinivasan" <kys@microsoft.com>
+ M:	Haiyang Zhang <haiyangz@microsoft.com>

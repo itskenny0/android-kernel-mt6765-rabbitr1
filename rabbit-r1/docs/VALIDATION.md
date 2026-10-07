@@ -14,8 +14,12 @@
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
 | Compiled r1 power-device wiring | PASS against stock FDT, including IRQs, pin muxes and child gates | `logs/r1-power-tests.log` |
 | MT6370 and hwmon schemas | PASS, zero diagnostics for the new power nodes | `logs/r1-power-schema.log`, `out/r1-power-schema.json` |
+| CST836 report/transport/PM logic | PASS with I2C/input/GPIO stubs and ASan/UBSan | `logs/cst836-tests.log`; no hardware events |
+| CST836 driver and draft r1 touch wiring | AArch64 object compiled; DT matches stock pins/address/dimensions | `logs/cst836-compile.log`, `logs/r1-touch-tests.log`; I2C4 remains disabled |
+| CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
+| CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 9 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 14 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |

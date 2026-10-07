@@ -99,6 +99,7 @@ jobs:
           python3 scripts/test-mt6357.py 2>&1 | tee logs/mt6357-tests.log
           python3 scripts/test-mt6370.py 2>&1 | tee logs/mt6370-tests.log
           python3 scripts/test-i2c.py 2>&1 | tee logs/i2c-tests.log
+          python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
 
       - name: Build the kernel and modules
@@ -112,6 +113,7 @@ jobs:
           source scripts/env.sh
           python3 scripts/inspect-stock.py 2>&1 | tee logs/inspect-stock.log
           python3 scripts/test-r1-power.py 2>&1 | tee logs/r1-power-tests.log
+          python3 scripts/test-r1-touch.py 2>&1 | tee logs/r1-touch-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

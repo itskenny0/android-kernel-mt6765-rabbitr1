@@ -11976,6 +11976,13 @@ L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	drivers/media/i2c/hi847.c
 
+HYNITRON CST836 TOUCHSCREEN
+M:	itskenny0 <0@kenny.cat>
+L:	linux-input@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/input/touchscreen/hynitron,cst836.yaml
+F:	drivers/input/touchscreen/hynitron-cst836.c
+
 Hyper-V/Azure CORE AND DRIVERS
 M:	"K. Y. Srinivasan" <kys@microsoft.com>
 M:	Haiyang Zhang <haiyangz@microsoft.com>
