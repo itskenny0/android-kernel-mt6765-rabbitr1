@@ -69,22 +69,25 @@ def main():
     spec = importlib.util.spec_from_file_location('validate', ROOT/'scripts/validate-kernel.py')
     validate = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validate)
-    dtc = ROOT/'out/mainline/scripts/dtc'
-    overlay = OUT/'noop.dtbo'
-    run(dtc/'dtc', '-@', '-I', 'dts', '-O', 'dtb', '-o', overlay, ROOT/'configs/rabbit-r1-noop.dtso')
-    (DIST/'dtbo.img').write_bytes(dt_table(overlay.read_bytes()))
+    lk_record = json.loads((ROOT/'dist/lk/build.json').read_text())
+    if lk_record['stock_lk_sha256'] != sha(STOCK/'lk.img'):
+        raise ValueError('LK build uses a different stock image')
+    for name, facts in lk_record['files'].items():
+        path = ROOT/'dist/lk'/name
+        if path.stat().st_size != facts['bytes'] or sha(path) != facts['sha256']:
+            raise ValueError('LK build hash mismatch: ' + name)
+    # LK still needs the complete stock overlay for its private board DT.
+    shutil.copyfile(STOCK/'dtbo.img', DIST/'dtbo.img')
     pad(DIST/'dtbo.img', DTBO_SIZE)
+    for name in ['lk.bin', 'logo.bin', 'splash.png']:
+        shutil.copyfile(ROOT/'dist/lk'/name, DIST/name)
     profiles = {}
     for profile in ['ram', 'expdb']:
         dtb = OUT/f'{profile}.dtb'
         shutil.copyfile(KERNEL/'mt6765-rabbit-r1.dtb', dtb)
         if profile == 'expdb':
             run('fdtput', '-t', 's', dtb, '/soc/mmc@11230000', 'status', 'okay')
-        merged = OUT/f'{profile}-merged.dtb'
-        run(dtc/'fdtoverlay', '-i', dtb, '-o', merged, overlay)
         nodes = validate.fdt_nodes(dtb.read_bytes())
-        if nodes != validate.fdt_nodes(merged.read_bytes()):
-            raise ValueError('No-op DTBO changed the tree')
         expected_status = b'okay\0' if profile == 'expdb' else b'disabled\0'
         if nodes['/soc/mmc@11230000']['status'] != expected_status:
             raise ValueError('Wrong eMMC state')
@@ -116,15 +119,19 @@ def main():
         shutil.copyfile(ROOT/'scripts'/name, DIST/name)
     shutil.copyfile(ROOT/'docs/FLASHING.md', DIST/'README.md')
     manifest = {
-        'format': 1, 'device': 'rabbit r1', 'status': 'experimental; not boot-tested',
+        'format': 2, 'device': 'rabbit r1', 'status': 'experimental; not boot-tested',
         'source_commit': record['source_commit'], 'kernel_release': record['kernel_release'],
-        'kernel_build': record, 'profiles': profiles,
+        'kernel_build': record, 'profiles': profiles, 'lk_build': lk_record,
         'initramfs_sha256': sha(initramfs),
         'stock_reference': 'RabbitOS v0.8.293',
         'stock_lk_sha256': sha(STOCK/'lk.img'),
         'stock_lk_bytes': (STOCK/'lk.img').stat().st_size,
+        'stock_logo_sha256': sha(STOCK/'logo.bin'),
+        'stock_logo_bytes': (STOCK/'logo.bin').stat().st_size,
+        'stock_dtbo_sha256': sha(STOCK/'dtbo.img'),
+        'stock_dtbo_bytes': (STOCK/'dtbo.img').stat().st_size,
         'partitions': {'boot': BOOT_SIZE, 'dtbo': DTBO_SIZE, 'vbmeta': 8*1024*1024,
-                       'lk': 1024*1024, 'expdb': 20*1024*1024},
+                       'lk': 1024*1024, 'logo': 11*1024*1024, 'expdb': 20*1024*1024},
         'logging': {'backend': 'pstore_blk', 'mapped_bytes': 18*1024*1024,
                     'preserved_tail_bytes': 2*1024*1024, 'panic_safe': False},
         'files': {p.name: {'bytes': p.stat().st_size, 'sha256': sha(p)}

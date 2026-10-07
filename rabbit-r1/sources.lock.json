@@ -43,6 +43,11 @@
       "url": "https://github.com/LineageOS/android_device_mainline_common.git",
       "branch": "lineage-24.0",
       "commit": "1cd4a6850df2ce31d4e5c77a41210e2c590325ab"
+    },
+    "mtklkzap": {
+      "url": "https://github.com/itskenny0/mtklkzap.git",
+      "branch": "main",
+      "commit": "1eca1f4dc557069db79fb9b813cb9d47df6c4aac"
     }
   },
   "archives": {
@@ -69,6 +74,13 @@
       "sha256": "b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d",
       "bytes": 31733040,
       "extract_to": "src/mtkclient",
+      "strip_components": 1
+    },
+    "mtklogo-v0.1.2.tgz": {
+      "url": "https://github.com/arlept/mtklogo/releases/download/v0.1.2/mtklogo-v0.1.2.tgz",
+      "sha256": "342fe5ebfdd9d2b3cedc86ab27b3f185a1e94e90fd54d730a0053315e2659391",
+      "bytes": 1264624,
+      "extract_to": "toolchains/mtklogo",
       "strip_components": 1
     }
   },

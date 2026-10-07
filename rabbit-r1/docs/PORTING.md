@@ -41,18 +41,18 @@ The existing vendor overlay targets vendor nodes and phandles. Applying it to a
 mainline base may fail or misconfigure hardware. Packaging needs a deliberately
 matched DT table/overlay strategy, verified addresses and a recovery route.
 The experimental [mtkclient package](FLASHING.md) now wraps each mainline DTB
-in the stock table format and provides a no-op overlay checked against both
-profiles. It also provides backup-based preparation and restoration scripts.
+in the stock table format. It keeps the stock overlay for LK and includes a
+patched LK that copies the mainline base at the Linux handoff without applying
+that vendor overlay; see [LK.md](LK.md). It also provides backup-based preparation and restoration scripts.
 The loader handoff remains untested. In particular,
 `fastboot boot` support must not be assumed merely because a boot image exists.
 Do not infer vendor_boot/init_boot support from template scatter entries: the
 provided archive lacks those images and uses header v2.
 
-The [boot-notes review](BOOT-NOTES.md) adds a concrete unresolved issue: LK also
-uses the selected DTBO for its own embedded DT. Our v0.8.293 comparison shows
-that the current no-op overlay omits its stock GPIO initialization table and
-board settings. A clean overlay application to the mainline DT is insufficient;
-the loader-compatible DTBO strategy must be revised before a device trial.
+The [boot-notes review](BOOT-NOTES.md) identified LK's separate embedded DT path.
+The package preserves its stock GPIO and charger initialization. Emulator checks
+exercise the patched Linux DT copy and cleanup; they cannot establish that all
+later loader fixups or mainline hardware drivers work on an r1.
 
 ## Hardware work
 

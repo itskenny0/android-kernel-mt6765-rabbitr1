@@ -1,0 +1,4 @@
+capstone==5.0.7
+unicorn==2.1.4
+Pillow==12.2.0
+PyYAML==6.0.1

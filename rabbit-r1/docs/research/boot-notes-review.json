@@ -32,5 +32,5 @@
     }
   ],
   "status": "read-only offline inspection; no hooks or device operations executed",
-  "open_issue": "No-op DTBO drops LK board setup from the stock overlay; loader-compatible packaging is unresolved."
+  "follow_up": "Stock DTBO retained; pinned LK Linux handoff patched and emulated. See docs/LK.md; hardware boot remains untested."
 }

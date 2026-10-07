@@ -4,8 +4,9 @@ Experimental rabbit r1 support on the fenolftalein-mamir MT6765 kernel fork.
 The r1 target builds, and an mtkclient boot package can be generated. There is no
 hardware boot test or LineageOS image yet.
 
-The current no-op DTBO omits board initialization used by stock LK. This needs
-revision before a hardware trial; see the [boot-notes review](rabbit-r1/docs/BOOT-NOTES.md).
+The package retains the stock DTBO for LK board setup and includes a patched LK
+for the mainline DT handoff, warning removal and a separate LineageOS splash.
+See [LK.md](rabbit-r1/docs/LK.md) for the patches and offline tests.
 
 The changes add the r1 device tree and defconfig, fix MMC source clocks and
 MT6357 SRAM regulator handling, and enable pstore modules for logs in `expdb`.
@@ -23,6 +24,10 @@ python3 scripts/fetch-sources.py
 bash scripts/build-mainline.sh
 bash scripts/build-initramfs.sh
 python3 scripts/inspect-stock.py
+python3 -m venv toolchains/boot-tools
+toolchains/boot-tools/bin/pip install -r configs/boot-tools-requirements.txt
+toolchains/boot-tools/bin/python scripts/build-lk.py
+toolchains/boot-tools/bin/python scripts/test-lk.py
 python3 scripts/package-mtkclient.py
 python3 scripts/test-expdb.py
 python3 scripts/test-flash-package.py

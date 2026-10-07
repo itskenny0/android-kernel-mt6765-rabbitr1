@@ -24,7 +24,7 @@ with archive.open('rb') as f:
 if actual != expected:
     raise SystemExit('Stock archive checksum mismatch')
 keep = {'boot.img','dtbo.img','vbmeta.img','vbmeta_vendor.img','vbmeta_system.img',
-        'lk.img','MT6765_Android_scatter.txt','MT6765_Android_scatter.xml'}
+        'lk.img','logo.bin','MT6765_Android_scatter.txt','MT6765_Android_scatter.xml'}
 with zipfile.ZipFile(archive) as z:
     for info in z.infolist():
         name = Path(info.filename).name

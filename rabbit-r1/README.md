@@ -11,8 +11,9 @@ push this branch from the workspace.
 The official 4.19.191 kernel and an experimental 7.1.0 mainline r1 kernel compile.
 An experimental mtkclient boot package is built; there is no device boot test
 or LineageOS ROM yet.
-The current no-op DTBO omits board initialization used by stock LK and needs
-revision before a hardware trial; see [BOOT-NOTES.md](docs/BOOT-NOTES.md).
+The package preserves LK board setup using the stock DTBO and a separate
+mainline handoff patch. [LK.md](docs/LK.md) covers mtklkzap integration, the
+LineageOS splash, and emulation checks. Hardware acceptance remains untested.
 The Android target is **LineageOS 24.0**: the inspected official manifest selects
 `android-17.0.0_r1`. Source-branch availability does not establish r1 compatibility.
 
@@ -23,7 +24,8 @@ The Android target is **LineageOS 24.0**: the inspected official manifest select
 | Mainline Image, Image.gz, r1 DTB, modules, config, vmlinux | `dist/mainline/` | Experimental bring-up build; storage and DVFS disabled initially |
 | Official kernel Image, DTB/overlay, modules, config, vmlinux | `dist/vendor/` | Buildable vendor reference; not a bit-for-bit stock rebuild |
 | Static AArch64 diagnostic initramfs | `dist/bringup/initramfs.cpio.gz` | RAM userspace with a development shell; not Android |
-| mtkclient package | `dist/rabbit-r1-mainline-mtkclient.zip` | Boot/DTBO images, expdb logger and backup-based flash preparation |
+| Patched LK and LineageOS splash | `dist/lk/` | Pinned mtklkzap warning patches and mainline DT handoff; untested on hardware |
+| mtkclient package | `dist/rabbit-r1-mainline-mtkclient.zip` | Boot/DTBO/LK/logo images, expdb logger and backup-based flash preparation |
 | Source revisions and download checksums | `sources.lock.json` | Pins the inspected inputs |
 | Mainline changes | `patches/mainline/` | Reapplicable patches against the new fork |
 | Stock boot facts and decompiled DTs | `docs/research/` | Extracted from the supplied RabbitOS v0.8.293 archive |
@@ -62,6 +64,10 @@ bash scripts/build-mainline.sh
 bash scripts/build-vendor.sh
 bash scripts/build-initramfs.sh
 python3 scripts/inspect-stock.py
+python3 -m venv toolchains/boot-tools
+toolchains/boot-tools/bin/pip install -r configs/boot-tools-requirements.txt
+toolchains/boot-tools/bin/python scripts/build-lk.py
+toolchains/boot-tools/bin/python scripts/test-lk.py
 python3 scripts/test-mt6357.py
 python3 scripts/package-mtkclient.py
 python3 scripts/test-expdb.py

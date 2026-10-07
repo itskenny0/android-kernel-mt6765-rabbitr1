@@ -14,12 +14,14 @@ The workflow:
 1. Installs the tracked workspace tools and fetches pinned build inputs.
 2. Checks the patch series, MT6357 mappings, bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-4. Inspects the stock boot metadata and builds both mtkclient boot profiles.
-5. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
+4. Inspects stock metadata, builds patched LK and the LineageOS splash with
+   pinned mtklkzap, and emulates the Linux DT handoff.
+5. Builds both mtkclient boot profiles.
+6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
    backup validation, AVB flags, checksums and repeat packaging.
 
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
-archive and a checksummed MT6357 vendor header. It leaves the checked-out kernel
+archive, mtklkzap, the mtklogo binary and a checksummed MT6357 vendor header. It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.
 
@@ -31,7 +33,8 @@ the public source checkout itself needs no credentials.
 ## Artifacts
 
 Successful runs upload `rabbit-r1-mainline-<commit>` with the kernel, DTB,
-modules, configuration, symbols, build record, initramfs, mtkclient ZIP and
+modules, configuration, symbols, build record, initramfs, patched LK, logo,
+splash preview, mtkclient ZIP and
 checksums. `rabbit-r1-logs-<commit>` is uploaded even when a later step fails.
 Both artifacts are retained for 14 days. Download them from the run's Actions
 page and follow [FLASHING.md](FLASHING.md) before using a boot image.
@@ -39,8 +42,8 @@ page and follow [FLASHING.md](FLASHING.md) before using a boot image.
 The [first hosted run](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/actions/runs/37671533107)
 passed in 17m55s at `98375f81dbc0b060aa04b8480868833b96779311`. Both uploaded
 artifacts were downloaded and their file checksums verified. The record is in
-[ci-first-run.json](research/ci-first-run.json). Later boot-review documentation
-identifies an unresolved [LK/DTBO compatibility issue](BOOT-NOTES.md).
+[ci-first-run.json](research/ci-first-run.json). That historical artifact predates the [LK/DTBO fix](LK.md); use a run
+that includes the LK build and emulation steps for the corrected package.
 
 A green run means the build and listed offline checks passed. It does not
 establish a working r1 boot, charging, eMMC persistence or panic recovery. The

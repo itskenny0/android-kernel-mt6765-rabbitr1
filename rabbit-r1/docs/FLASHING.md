@@ -6,24 +6,26 @@ booted it yet. Header checks establish the image format, not whether LK can hand
 off to this kernel. RAM fixups, firmware carve-outs, USB and eMMC still need a
 device test. The initramfs exposes an unauthenticated development shell.
 
-**Known loader compatibility issue:** the current no-op DTBO omits the GPIO
-initialization table that the stock overlay supplies to LK's own device tree.
-The DTBO strategy needs revision before a hardware flashing trial. The steps
-below document the experimental tooling; a passing package check does not
-clear this issue. See the
-[boot-notes review](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/BOOT-NOTES.md).
+The package includes a patched LK and retains the stock DTBO for LK's own board
+setup. The Linux handoff bypasses the vendor overlay. The warning patches and
+LineageOS splash are built with pinned mtklkzap tools; see
+[LK.md](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/LK.md).
+The handoff is checked by emulation, but patched LK acceptance and booting still
+need a device test. Restore LK and boot together when returning to RabbitOS.
 
 | Image | Use |
 | --- | --- |
 | `boot-expdb.img` | eMMC enabled; kernel console logs written to `expdb` after storage starts |
 | `boot-ram.img` | eMMC disabled; RAM shell and UART/USB diagnostics without persistent logs |
-| `dtbo.img` | Matching no-op overlay; required with either mainline boot image |
+| `dtbo.img` | Stock overlay retained for LK board initialization |
+| `lk.bin` | Patched stock LK: mainline DT handoff, orange-state and dm-verity warning removal |
+| `logo.bin` | LineageOS splash in the shared logo partition |
 
 Both boot images use the RabbitOS v0.8.293 v2 header, load addresses, 2048-byte
 pages and a one-entry Android DT table. Boot images are padded to 32 MiB and DTBO
 to 8 MiB. The old OS-version fields are retained for loader compatibility; they
-do not describe a new Android build. Never mix the stock vendor DTBO with this
-mainline kernel.
+do not describe a new Android build. The mainline boot image and stock DTBO must
+be used with the packaged patched LK.
 
 ## Prepare the host and device backups
 
@@ -66,12 +68,12 @@ cd backups/r1-001
 mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)
 "${mtk[@]}" printgpt
 "${mtk[@]}" gpt .
-"${mtk[@]}" r boot_a,dtbo_a,vbmeta_a,lk_a,expdb boot_a.img,dtbo_a.img,vbmeta_a.img,lk_a.img,expdb.img
+"${mtk[@]}" r boot_a,dtbo_a,vbmeta_a,lk_a,logo,expdb boot_a.img,dtbo_a.img,vbmeta_a.img,lk_a.img,logo.img,expdb.img
 "${mtk[@]}" r para,seccfg para.img,seccfg.img
 sha256sum *.img gpt.bin > BACKUP-SHA256SUMS
 ```
 
-Retain these backups. `expdb` is shared by both slots. The logging build replaces
+Retain these backups. Both `logo` and `expdb` are shared by both slots. The logging build replaces
 old AEE dump contents in its first 18 MiB. The last 2 MiB are excluded from our
 mapping because the stock `log_store` uses that tail. This is not a claim that
 the stock bootloader or AEE will preserve our pstore data during a later crash.
@@ -94,9 +96,9 @@ bash /rabbitr1/prepared/r1-001-a/flash.sh
 The default preview does not access USB. `--bootloader-unlocked` records your
 verification of the device state; it is not an unlock command. The preparer
 checks the live GPT dump, full backup sizes, package hashes and the selected
-slot's LK payload against v0.8.293. A different LK stops preparation so that its
-boot format can be inspected first. It patches only AVB flags in your backed-up
-vbmeta. `plan.json` records the slot, layout and input paths.
+slot's LK, DTBO and shared logo payloads against v0.8.293. Different firmware
+stops preparation for inspection. It patches only AVB flags in your backed-up
+vbmeta and preserves the trailing bytes of your LK partition. `plan.json` records the slot, layout and input paths.
 
 Use `--profile ram` and a different output directory for the storage-disabled
 image. That profile is useful for the first UART session. The expdb profile is
@@ -109,9 +111,10 @@ bash /rabbitr1/prepared/r1-001-a/flash.sh --write
 ```
 
 The script first checks the live GPT, LK and current contents against the
-backups. It writes only `boot_a`, `dtbo_a` and `vbmeta_a` (or the selected `b`
-equivalents), then reads them back and compares every byte. It does not write
-preloader, LK, GPT, super, userdata or calibration partitions. It does not reboot
+backups. It writes `boot_a`, `dtbo_a`, `vbmeta_a`, the shared `logo`, then `lk_a`
+(or the selected `b` equivalents). LK is written last. It reads all five back
+and compares every byte. It does not write preloader, GPT, super, userdata or
+calibration partitions. It does not reboot
 or change the active slot. Confirm that the intended slot will be booted before
 leaving the connection mode. A failed boot may cause the stock A/B bootloader
 to fall back to another slot; record that behavior rather than reflashing both.
@@ -148,15 +151,16 @@ loss or interrupt-context messages not yet flushed can be missing. UART is
 still needed for early bring-up. Do not use this logging image as a daily system;
 continuous flash logging also creates write wear.
 
-Restore the three selected slot partitions from the saved device backups:
+Restore all five written partitions from the saved device backups:
 
 ```sh
 bash /rabbitr1/prepared/r1-001-a/restore.sh
 bash /rabbitr1/prepared/r1-001-a/restore.sh --write
 ```
 
-Restore verifies the device GPT/LK, then writes and reads back the original boot,
-DTBO and vbmeta. It leaves `expdb` intact for diagnosis. After copying out logs,
+Restore verifies the device GPT identity, then writes and reads back the original
+boot, DTBO, vbmeta, shared logo and LK. It accepts a partially completed earlier
+write and does not require LK to still equal its stock backup. It leaves `expdb` intact for diagnosis. After copying out logs,
 restoring the original shared log partition is a separate optional operation:
 
 ```sh

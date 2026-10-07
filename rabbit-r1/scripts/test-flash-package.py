@@ -104,16 +104,17 @@ for profile in ['ram', 'expdb']:
     print('PASS:', profile, 'v2 header, SHA1 ID, load addresses, padding, DT table, initramfs, AOSP unpack')
 
 assert len((PACKAGE/'dtbo.img').read_bytes()) == 8*1024*1024
-overlay = validate.fdt_nodes(table((PACKAGE/'dtbo.img').read_bytes()))
-assert overlay['/fragment@0']['target-path'] == b'/\0'
-assert not overlay['/fragment@0/__overlay__']
+stock_dtbo = (ROOT/'firmware/stock-v0.8.293/dtbo.img').read_bytes()
+assert (PACKAGE/'dtbo.img').read_bytes() == stock_dtbo.ljust(8*1024*1024, b'\0')
+assert (PACKAGE/'lk.bin').read_bytes() == (ROOT/'dist/lk/lk.bin').read_bytes()
+assert (PACKAGE/'logo.bin').read_bytes() == (ROOT/'dist/lk/logo.bin').read_bytes()
 
 
 def fixture_gpt():
     entries = bytearray(128*128)
     sector = 34
     for i, (name, size) in enumerate(flash.SIZES.items()):
-        name = name if name == 'expdb' else name+'_a'
+        name = flash.partition_name(name, 'a')
         offset = i*128
         entries[offset:offset+16] = bytes([i+1])*16
         entries[offset+16:offset+32] = bytes([i+6])*16
@@ -174,10 +175,12 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='flash-test-') as tmp:
     backup.mkdir()
     (backup/'gpt.bin').write_bytes(gpt)
     for name, size in flash.SIZES.items():
-        filename = name if name == 'expdb' else name+'_a'
+        filename = flash.partition_name(name, 'a')
         content = vbmeta if name == 'vbmeta' else b''
         if name == 'lk':
             content = (ROOT/'firmware/stock-v0.8.293/lk.img').read_bytes()
+        elif name == 'logo':
+            content = (ROOT/'firmware/stock-v0.8.293/logo.bin').read_bytes()
         elif name in ['boot', 'dtbo']:
             content = (ROOT/'firmware/stock-v0.8.293'/(name+'.img')).read_bytes()
         (backup/(filename+'.img')).write_bytes(content.ljust(size, b'\0'))
@@ -187,12 +190,17 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='flash-test-') as tmp:
     assert result.returncode and 'already unlocked' in result.stderr
     assert not (tmp/'prepared').exists()
     subprocess.run(cmd+['--bootloader-unlocked'], check=True)
+    prepared = tmp/'prepared'
+    assert (prepared/'lk-new.img').read_bytes() == (PACKAGE/'lk.bin').read_bytes().ljust(flash.SIZES['lk'], b'\0')
+    assert (prepared/'logo-new.img').read_bytes() == (PACKAGE/'logo.bin').read_bytes().ljust(flash.SIZES['logo'], b'\0')
+    for part in flash.WRITE_PARTS:
+        assert (prepared/(part+'-restore.img')).read_bytes() == (backup/(flash.partition_name(part,'a')+'.img')).read_bytes()
     for script in ['flash.sh', 'restore.sh']:
         subprocess.run(['bash', '-n', str(tmp/'prepared'/script)], check=True)
         preview = subprocess.check_output(['bash', str(tmp/'prepared'/script)], text=True)
         assert 'Preview only' in preview
         text = (tmp/'prepared'/script).read_text()
-        assert 'boot_a,dtbo_a,vbmeta_a' in text
+        assert 'boot_a,dtbo_a,vbmeta_a,logo,lk_a' in text
         assert 'boot_b' not in text and 'seccfg' not in text
     subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=tmp/'prepared', check=True,
                    stdout=subprocess.DEVNULL)

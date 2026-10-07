@@ -56,7 +56,13 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             bc bison build-essential device-tree-compiler flex \
             gcc-aarch64-linux-gnu libc6-dev-arm64-cross libelf-dev libssl-dev \
-            python3 qemu-user zstd
+            python3 python3-venv qemu-user zstd
+
+      - name: Set up boot image tools
+        run: |
+          source scripts/env.sh
+          python3 -m venv toolchains/boot-tools
+          toolchains/boot-tools/bin/pip install -r configs/boot-tools-requirements.txt
 
       - name: Read source pins
         id: pins
@@ -75,6 +81,7 @@ jobs:
           path: |
             /rabbitr1/downloads/busybox-1.37.0.tar.bz2
             /rabbitr1/downloads/rabbit_OS_v0.8.293.zip
+            /rabbitr1/downloads/mtklogo-v0.1.2.tgz
           key: r1-sources-v1-${{ runner.os }}-${{ steps.pins.outputs.cache-key }}
 
       - name: Fetch build inputs
@@ -103,6 +110,12 @@ jobs:
           source scripts/env.sh
           python3 scripts/inspect-stock.py 2>&1 | tee logs/inspect-stock.log
 
+      - name: Patch LK and build the LineageOS splash
+        run: |
+          source scripts/env.sh
+          toolchains/boot-tools/bin/python scripts/build-lk.py 2>&1 | tee logs/build-lk.log
+          toolchains/boot-tools/bin/python scripts/test-lk.py 2>&1 | tee logs/lk-tests.log
+
       - name: Build and check the mtkclient package
         run: |
           source scripts/env.sh
@@ -112,13 +125,14 @@ jobs:
       - name: Verify checksums and repeat packaging
         run: |
           source scripts/env.sh
-          for directory in dist/mainline dist/bringup dist/mtkclient; do
+          for directory in dist/mainline dist/bringup dist/lk dist/mtkclient; do
             (cd "$directory" && sha256sum -c SHA256SUMS)
           done
           (cd dist && sha256sum -c rabbit-r1-mainline-mtkclient.zip.sha256)
-          sha256sum dist/bringup/initramfs.cpio.gz dist/rabbit-r1-mainline-mtkclient.zip > logs/repeat.sha256
+          sha256sum dist/lk/lk.bin dist/lk/logo.bin dist/bringup/initramfs.cpio.gz dist/rabbit-r1-mainline-mtkclient.zip > logs/repeat.sha256
           r1_build_time src/mainline
           python3 scripts/make-initramfs.py
+          toolchains/boot-tools/bin/python scripts/build-lk.py
           python3 scripts/package-mtkclient.py
           sha256sum -c logs/repeat.sha256 | tee logs/reproducibility.log
           test -z "$(git -C src/mainline status --porcelain)"
@@ -130,6 +144,7 @@ jobs:
           path: |
             /rabbitr1/dist/mainline/
             /rabbitr1/dist/bringup/
+            /rabbitr1/dist/lk/
             /rabbitr1/dist/rabbit-r1-mainline-mtkclient.zip
             /rabbitr1/dist/rabbit-r1-mainline-mtkclient.zip.sha256
           if-no-files-found: error
@@ -153,7 +168,7 @@ jobs:
           {
             echo "Rabbit r1 build result: $RESULT"
             echo
-            echo 'Successful builds include the kernel, modules, initramfs and experimental mtkclient package.'
+            echo 'Successful builds include the kernel, modules, initramfs, patched LK, LineageOS splash and mtkclient package.'
             echo 'The expdb profile enables persistent logging; the RAM profile disables eMMC.'
             echo 'CI checks image formats and software behavior. Hardware boot and persistence remain untested.'
           } >> "$GITHUB_STEP_SUMMARY"

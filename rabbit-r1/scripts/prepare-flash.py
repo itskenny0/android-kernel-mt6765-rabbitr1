@@ -11,7 +11,7 @@ import zlib
 
 ROOT = Path('/rabbitr1')
 SIZES = {'boot': 32*1024*1024, 'dtbo': 8*1024*1024, 'vbmeta': 8*1024*1024,
-         'lk': 1024*1024, 'expdb': 20*1024*1024}
+         'lk': 1024*1024, 'logo': 11*1024*1024, 'expdb': 20*1024*1024}
 
 
 def local(value):
@@ -80,11 +80,18 @@ def patch_vbmeta(blob):
     return bytes(patched)
 
 
+WRITE_PARTS = ['boot', 'dtbo', 'vbmeta', 'logo', 'lk']
+
+
+def partition_name(part, slot):
+    return part if part in ['expdb', 'logo'] else f'{part}_{slot}'
+
+
 def shell_script(out, slot, restore=False):
-    """Write only the three selected partitions; check the live GPT and read back."""
-    names = ','.join(f'{part}_{slot}' for part in ['boot', 'dtbo', 'vbmeta'])
+    """Write the selected slot and shared logo; check GPT and every readback."""
+    names = ','.join(partition_name(part, slot) for part in WRITE_PARTS)
     inputs = ','.join(f'{part}-{ "restore" if restore else "new"}.img'
-                      for part in ['boot', 'dtbo', 'vbmeta'])
+                      for part in WRITE_PARTS)
     mode = 'restore' if restore else 'flash'
     # Everything is prepared locally. Running --write is a separate device action.
     lines = [
@@ -103,19 +110,16 @@ def shell_script(out, slot, restore=False):
         f'run=$(mktemp -d /rabbitr1/.tmp/r1-{mode}.XXXXXXXX)',
         '"${mtk[@]}" gpt "$run"',
         'python3 prepare-flash.py check-gpt gpt.bin "$run/gpt.bin"',
-        # Verify LK on this device before using the mainline package.
-        f'"${{mtk[@]}}" r lk_{slot} "$run/lk.img"',
-        'cmp lk-restore.img "$run/lk.img"',
     ]
     if not restore:
         lines += [
-            f'"${{mtk[@]}}" r {names} "$run/boot-before.img,$run/dtbo-before.img,$run/vbmeta-before.img"',
-            'for part in boot dtbo vbmeta; do cmp "$part-restore.img" "$run/$part-before.img"; done',
+            f'"${{mtk[@]}}" r {names} "$run/boot-before.img,$run/dtbo-before.img,$run/vbmeta-before.img,$run/logo-before.img,$run/lk-before.img"',
+            'for part in boot dtbo vbmeta logo lk; do cmp "$part-restore.img" "$run/$part-before.img"; done',
         ]
     lines += [
         f'"${{mtk[@]}}" w {names} {inputs}',
-        f'"${{mtk[@]}}" r {names} "$run/boot-readback.img,$run/dtbo-readback.img,$run/vbmeta-readback.img"',
-        'for part in boot dtbo vbmeta; do',
+        f'"${{mtk[@]}}" r {names} "$run/boot-readback.img,$run/dtbo-readback.img,$run/vbmeta-readback.img,$run/logo-readback.img,$run/lk-readback.img"',
+        'for part in boot dtbo vbmeta logo lk; do',
         f'    cmp "$part-{ "restore" if restore else "new"}.img" "$run/$part-readback.img"',
         'done',
         'echo "Readback matches. The tool has not changed the active slot or rebooted the device."',
@@ -126,6 +130,8 @@ def shell_script(out, slot, restore=False):
 
 def prepare(args):
     manifest = json.loads((args.package/'manifest.json').read_text())
+    if manifest.get('format') != 2:
+        raise ValueError('Requires the LK-aware package format 2')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')
@@ -136,7 +142,7 @@ def prepare(args):
     gpt = parse_gpt(gpt_path.read_bytes())
     backups = {}
     for part, size in SIZES.items():
-        name = part if part == 'expdb' else f'{part}_{args.slot}'
+        name = partition_name(part, args.slot)
         if gpt['partitions'].get(name, {}).get('bytes') != size:
             raise ValueError('Unexpected live partition layout: ' + name)
         path = local(args.backup/(name+'.img'))
@@ -149,9 +155,16 @@ def prepare(args):
     with backups['dtbo'].open('rb') as stream:
         if stream.read(4) != b'\xd7\xb7\xab\x1e':
             raise ValueError('Selected slot has no Android DT table; inspect the backup')
-    lk = backups['lk'].read_bytes()[:manifest['stock_lk_bytes']]
-    if hashlib.sha256(lk).hexdigest() != manifest['stock_lk_sha256']:
-        raise ValueError('LK differs from v0.8.293; inspect its boot format before packaging')
+    for part in ['lk', 'logo', 'dtbo']:
+        reference = backups[part].read_bytes()[:manifest[f'stock_{part}_bytes']]
+        if hashlib.sha256(reference).hexdigest() != manifest[f'stock_{part}_sha256']:
+            raise ValueError(part + ' differs from v0.8.293; inspect before packaging')
+    lk_payload = (args.package/'lk.bin').read_bytes()
+    logo_payload = (args.package/'logo.bin').read_bytes()
+    if len(lk_payload) != manifest['stock_lk_bytes'] or len(lk_payload) > SIZES['lk']:
+        raise ValueError('Unexpected patched LK size')
+    if len(logo_payload) > SIZES['logo']:
+        raise ValueError('Logo exceeds partition')
     patched = patch_vbmeta(backups['vbmeta'].read_bytes())
     if not args.bootloader_unlocked:
         raise ValueError('Requires an already unlocked bootloader; vbmeta flags do not unlock it')
@@ -163,10 +176,16 @@ def prepare(args):
     shutil.copyfile(args.package/f'boot-{args.profile}.img', args.out/'boot-new.img')
     shutil.copyfile(args.package/'dtbo.img', args.out/'dtbo-new.img')
     (args.out/'vbmeta-new.img').write_bytes(patched)
+    # Keep the device's trailing LK partition bytes; payload edits are same-size.
+    (args.out/'lk-new.img').write_bytes(lk_payload + backups['lk'].read_bytes()[len(lk_payload):])
+    (args.out/'logo-new.img').write_bytes(logo_payload.ljust(SIZES['logo'], b'\0'))
     (args.out/'flash.sh').write_text(shell_script(args.out, args.slot))
     (args.out/'restore.sh').write_text(shell_script(args.out, args.slot, restore=True))
     (args.out/'plan.json').write_text(json.dumps({
         'slot': args.slot, 'profile': args.profile, 'gpt': gpt,
+        'write_partitions': [partition_name(p, args.slot) for p in WRITE_PARTS],
+        'shared_logo': 'changes both slots; original retained for restore',
+        'lk': 'mainline handoff and warning patches; restore together with stock boot',
         'backup_directory': str(args.backup), 'package_directory': str(args.package),
         'bootloader_unlocked': 'operator assertion; not verified offline',
         'expdb': 'backup retained; only kernel pstore writes it after boot',

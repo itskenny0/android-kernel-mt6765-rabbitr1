@@ -21,17 +21,11 @@ An offline check against **our v0.8.293 images** found:
 * The stock overlay adds `gpio_init_default` (5,040 bytes). It also changes
   MT6370 charger properties and PMIC interrupt configuration.
 
-The current package's no-op DTBO applies cleanly to the mainline DT, but drops
-those stock overlay additions from LK's private DT. Its offline format tests
-therefore do **not** establish loader compatibility. The DTBO strategy needs
-revision before a hardware flashing trial. Simply restoring the stock DTBO
-beside the mainline DT is not an established fix: the stock overlay also has
-vendor-node/phandle dependencies that must be checked at the Linux stage.
-
-The next boot investigation should trace the two DTB paths in the exact stock
-LK, preserve its board initialization, and arrange a separately validated
-mainline DT handoff. Avoid guessing at replacement GPIO, charger or memory
-settings from a different firmware version.
+The old no-op DTBO dropped those additions from LK's private DT. The package
+now retains the complete stock DTBO and patches only the Linux overlay call
+site in the exact v0.8.293 LK. Its shared overlay function and early board setup
+remain unchanged. See [LK.md](LK.md) for the instruction changes and emulation
+checks. The final loader memory fixups and hardware boot remain untested.
 
 ## Logs and reserved memory
 

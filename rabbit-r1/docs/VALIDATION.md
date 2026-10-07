@@ -18,6 +18,9 @@
 | RAM and expdb boot images | PASS: v2 headers, IDs, tables, addresses, padding and AOSP unpack | `logs/flash-package-tests.log` |
 | Flash preparation and restore | PASS: synthetic GPT/backups, CRC rejection, AVB flags, preview scripts | `logs/flash-package-tests.log` |
 | Matching pstore modules and target shell syntax | PASS | `logs/flash-package-tests.log` |
+| LK warning patches and instruction verification | PASS, 102 warning bytes changed | `logs/build-lk.log` |
+| Linux DT handoff and memory ownership | PASS, actual Thumb instructions with modeled external calls | `logs/lk-tests.log` |
+| Stock LK board overlay and LineageOS splash | PASS, GPIO/charger tree retained; 58 logo slots unchanged | `logs/lk-tests.log` |
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
 | r1 board-compatible schema | PASS | `logs/r1-board-schema.log` (empty diagnostics) |
@@ -41,7 +44,9 @@ mocked register reads. QEMU testing here executes only the static BusyBox
 userspace binary; it does not emulate an MT6765 board or boot either kernel.
 The expdb tests exercise the actual DM table builder, partition-name filter
 and raw ring decoder. They do not execute device-mapper ioctls against a real
-block device. No flash, restore, persistence or panic-recovery result is claimed.
+block device. Unicorn executes the LK handoff routine with modeled allocation,
+accessor and copy calls; it does not emulate the complete bootloader or board.
+No flash, restore, persistence or panic-recovery result is claimed.
 
 To repeat the main checks:
 
@@ -53,6 +58,7 @@ python3 scripts/validate-kernel.py vendor
 python3 scripts/test-mt6357.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py
+toolchains/boot-tools/bin/python scripts/test-lk.py
 python3 scripts/test-flash-package.py
 ```
 

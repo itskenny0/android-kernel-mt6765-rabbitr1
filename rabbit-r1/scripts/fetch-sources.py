@@ -38,7 +38,7 @@ def sha(path):
 
 lock = json.loads((ROOT/'sources.lock.json').read_text())
 for name, repo in lock['repositories'].items():
-    if args.profile == 'ci' and name != 'mkbootimg':
+    if args.profile == 'ci' and name not in ['mkbootimg', 'mtklkzap']:
         continue
     dest = local('src/'+name)
     if (dest/'.git').exists():
@@ -60,7 +60,7 @@ for name, repo in lock['repositories'].items():
     print(name, repo['commit'], flush=True)
 
 for name, item in lock['archives'].items():
-    if args.profile == 'ci' and name not in ['busybox-1.37.0.tar.bz2', 'rabbit_OS_v0.8.293.zip']:
+    if args.profile == 'ci' and name not in ['busybox-1.37.0.tar.bz2', 'rabbit_OS_v0.8.293.zip', 'mtklogo-v0.1.2.tgz']:
         continue
     dest = local('downloads/'+name)
     if not dest.exists():
