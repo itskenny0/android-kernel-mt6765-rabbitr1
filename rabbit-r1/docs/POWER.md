@@ -1,4 +1,4 @@
-# MT6357 regulator investigation
+# Power driver investigation
 
 The supplied MT6765 support table marks **MT6357 regulators partial** and
 **MT6370 charging working**. These are different devices. The table describes
@@ -88,6 +88,43 @@ policy. The stock config enables the MT6370 charger/backlight and MT6357 battery
 drivers. Copying generic nodes from another MT6765 handset is insufficient.
 The [I2C investigation](I2C.md) records the r1 wiring and fixes the inherited
 clock-divider mismatch. Actual bus transfers and charging remain untested.
+
+## MT6370 input-current measurement
+
+Two inherited charger bugs are corrected before enabling this device on r1.
+They are independent of the community report about MT6357 regulators.
+
+The charger used ADC channel ID 5 as an index into the array returned by
+`devm_iio_channel_get_all()`. That array contains only the channels requested by
+the consumer's `io-channels` property. The binding's own example, also used by
+the Nokia ROO tree, requests only IBUS. The array then contains one channel and
+a sentinel, so accessing element 5 is out of bounds. The driver now searches
+the sentinel-terminated list for the MT6370 IBUS channel with current type and
+retains that channel. Probe fails if IBUS is absent, before charger settings
+or interrupts are initialized. Compact, reordered and complete ADC lists work.
+
+The MIVR workaround also compared `iio_read_channel_processed()` with a
+100,000 microamp threshold, although IIO current readings are in milliamps.
+For example, a 500 mA reading incorrectly satisfied `500 < 100000`, causing
+the workaround to toggle the CFO control above its intended 100 mA threshold.
+The driver now requests a scaled reading in microamps, retaining fractional
+milliamp precision, and checks that the reading is nonnegative and below
+100,000. This only corrects measurement and workaround selection; it does not
+raise charging limits or implement battery-temperature policy.
+
+The source evidence is `drivers/iio/inkern.c`, the MT6370 ADC driver's
+`mt6370_adc_read_scale()`, `include/linux/iio/consumer.h` (array termination),
+and `Documentation/ABI/testing/sysfs-bus-iio` (current units). The original
+charger code is also visible in the
+[driver submission](https://lists.infradead.org/pipermail/linux-arm-kernel/2022-August/766568.html).
+
+`scripts/test-mt6370.py` runs the production channel-selection and MIVR work
+functions with IIO/regmap stubs. It covers a lone IBUS channel, missing/wrong
+channels, every position in the list, the legacy full list, both sides of the
+100 mA threshold, fractional readings and failures. IRQ re-enabling and wake
+reference release are checked on every path. Restoring positional indexing or
+the old unscaled-reading behavior makes the test fail. These are host tests;
+the actual ADC calibration, IRQ delivery and charger operation remain untested.
 
 ## Persistent logs
 

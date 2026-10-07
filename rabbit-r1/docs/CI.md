@@ -12,7 +12,8 @@ host packages or device partitions are changed by this workflow.
 The workflow:
 
 1. Installs the tracked workspace tools and fetches pinned build inputs.
-2. Checks the patch series, MT6357 mappings, bounded expdb mapper and log decoder.
+2. Checks the patch series, MT6357 mappings, MT6370 current measurement, I2C
+   timing, bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.

@@ -10,6 +10,7 @@
 #include <linux/devm-helpers.h>
 #include <linux/gpio/consumer.h>
 #include <linux/iio/consumer.h>
+#include <linux/iio/iio.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -20,7 +21,10 @@
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
+#include <linux/units.h>
 #include <linux/workqueue.h>
+
+#include <dt-bindings/iio/adc/mediatek,mt6370_adc.h>
 
 #define MT6370_REG_CHG_CTRL1		0x111
 #define MT6370_REG_CHG_CTRL2		0x112
@@ -44,9 +48,7 @@
 #define MT6370_OPA_MODE_MASK		BIT(0)
 #define MT6370_OTG_OC_MASK		GENMASK(2, 0)
 
-#define MT6370_MIVR_IBUS_TH_100_mA	100000
-#define MT6370_ADC_CHAN_IBUS		5
-#define MT6370_ADC_CHAN_MAX		9
+#define MT6370_MIVR_IBUS_THRESHOLD_UA	100000
 
 enum mt6370_chg_reg_field {
 	/* MT6370_REG_CHG_CTRL2 */
@@ -87,7 +89,7 @@ enum mt6370_irq {
 
 struct mt6370_priv {
 	struct device *dev;
-	struct iio_channel *iio_adcs;
+	struct iio_channel *iio_ibus;
 	struct mutex attach_lock;
 	struct power_supply *psy;
 	struct regmap *regmap;
@@ -342,27 +344,26 @@ static int mt6370_chg_toggle_cfo(struct mt6370_priv *priv)
 	return ret;
 }
 
-static int mt6370_chg_read_adc_chan(struct mt6370_priv *priv, unsigned int chan,
-				    int *val)
+static struct iio_channel *mt6370_chg_find_ibus(struct iio_channel *channels)
 {
-	int ret;
+	struct iio_channel *channel;
 
-	if (chan >= MT6370_ADC_CHAN_MAX)
-		return -EINVAL;
+	/* The MT6370 ADC channel ID is not its position in io-channels. */
+	for (channel = channels; channel->indio_dev; channel++) {
+		if (channel->channel->type == IIO_CURRENT &&
+		    channel->channel->channel == MT6370_CHAN_IBUS)
+			return channel;
+	}
 
-	ret = iio_read_channel_processed(&priv->iio_adcs[chan], val);
-	if (ret)
-		dev_err(priv->dev, "Failed to read ADC\n");
-
-	return ret;
+	return NULL;
 }
 
 static void mt6370_chg_mivr_dwork_func(struct work_struct *work)
 {
 	struct mt6370_priv *priv = container_of(work, struct mt6370_priv,
 						mivr_dwork.work);
-	int ret;
-	unsigned int mivr_stat, ibus;
+	int ret, ibus;
+	unsigned int mivr_stat;
 
 	ret = mt6370_chg_field_get(priv, F_CHG_MIVR_STAT, &mivr_stat);
 	if (ret) {
@@ -373,13 +374,14 @@ static void mt6370_chg_mivr_dwork_func(struct work_struct *work)
 	if (!mivr_stat)
 		goto mivr_handler_out;
 
-	ret = mt6370_chg_read_adc_chan(priv, MT6370_ADC_CHAN_IBUS, &ibus);
+	/* IIO current is in mA; the charger workaround threshold is in uA. */
+	ret = iio_read_channel_processed_scale(priv->iio_ibus, &ibus, MILLI);
 	if (ret) {
 		dev_err(priv->dev, "Failed to get ibus\n");
 		goto mivr_handler_out;
 	}
 
-	if (ibus < MT6370_MIVR_IBUS_TH_100_mA) {
+	if (ibus >= 0 && ibus < MT6370_MIVR_IBUS_THRESHOLD_UA) {
 		ret = mt6370_chg_toggle_cfo(priv);
 		if (ret)
 			dev_err(priv->dev, "Failed to toggle cfo\n");
@@ -849,6 +851,7 @@ static int mt6370_chg_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mt6370_priv *priv;
+	struct iio_channel *channels;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
@@ -867,10 +870,13 @@ static int mt6370_chg_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
-	priv->iio_adcs = devm_iio_channel_get_all(priv->dev);
-	if (IS_ERR(priv->iio_adcs))
-		return dev_err_probe(dev, PTR_ERR(priv->iio_adcs),
+	channels = devm_iio_channel_get_all(priv->dev);
+	if (IS_ERR(channels))
+		return dev_err_probe(dev, PTR_ERR(channels),
 				     "Failed to get iio adc\n");
+	priv->iio_ibus = mt6370_chg_find_ibus(channels);
+	if (!priv->iio_ibus)
+		return dev_err_probe(dev, -EINVAL, "Missing MT6370 IBUS channel\n");
 
 	ret = mt6370_chg_init_otg_regulator(priv);
 	if (ret)

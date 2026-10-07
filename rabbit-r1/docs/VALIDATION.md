@@ -10,8 +10,10 @@
 | MT6357 register mappings and new helpers | PASS | `logs/mt6357-tests.log` |
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
 | I2C programmable-divider calculation | PASS: 70 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
+| MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
+| MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 8 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 9 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |
@@ -30,6 +32,7 @@
 | Full r1 DT schema validation | **FAIL: 48 diagnostics remain** | `logs/r1-dt-validate.log` |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
+| MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 
 The full schema failures are recorded, not inferred from the validator's exit
@@ -60,6 +63,7 @@ source scripts/env.sh
 python3 scripts/validate-kernel.py mainline
 python3 scripts/validate-kernel.py vendor
 python3 scripts/test-mt6357.py
+python3 scripts/test-mt6370.py
 python3 scripts/test-i2c.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py
