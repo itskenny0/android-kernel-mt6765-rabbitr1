@@ -7,6 +7,15 @@ echo '=== Device model and compatible ==='
 for name in model compatible; do
     [ ! -r "/sys/firmware/devicetree/base/$name" ] || tr '\000' '\n' < "/sys/firmware/devicetree/base/$name"
 done
+echo '=== I2C adapters ==='
+for file in /sys/class/i2c-adapter/i2c-*/name; do
+    if [ -r "$file" ]; then
+        printf '%s: ' "$file"
+        cat "$file"
+    fi
+done
+echo '=== Input devices ==='
+[ ! -r /proc/bus/input/devices ] || cat /proc/bus/input/devices
 echo '=== Regulators ==='
 for rail in /sys/class/regulator/regulator.*; do
     [ -d "$rail" ] || continue

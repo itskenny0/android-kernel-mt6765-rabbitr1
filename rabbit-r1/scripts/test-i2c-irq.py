@@ -57,9 +57,27 @@ struct device { int unused; };
 struct completion { unsigned int done; };
 struct i2c_timings { unsigned int scl_int_delay_ns; };
 struct clk_bulk_data { void *clk; };
-struct i2c_adapter { unsigned long timeout; };
+struct i2c_adapter_quirks;
+struct i2c_adapter {
+    unsigned long timeout;
+    const struct i2c_adapter_quirks *quirks;
+    void *bus_regulator;
+    bool suspended;
+};
 struct i2c_msg { u16 addr, flags, len; u8 *buf; };
-struct i2c_adapter_quirks { int unused; };
+#define I2C_AQ_COMB_WRITE_THEN_READ 15
+#define I2C_AQ_NO_ZERO_LEN 96
+struct i2c_adapter_quirks {
+    unsigned int flags, max_num_msgs, max_comb_1st_msg_len, max_comb_2nd_msg_len;
+};
+struct device_node { int unused; };
+struct arm_smccc_res { unsigned long a0; };
+#define CONFIG_ARM64 1
+#define ARM_SMCCC_SMC_64 1
+#define ARM_SMCCC_FAST_CALL 1
+#define ARM_SMCCC_OWNER_SIP 2
+#define ARM_SMCCC_CALL_VAL(t,c,o,f) ((unsigned long)(t)<<31 | (c)<<30 | (o)<<24 | (f))
+#include "/rabbitr1/src/mainline/include/linux/soc/mediatek/mtk_sip_svc.h"
 static const struct i2c_adapter_quirks mt8183_i2c_quirks;
 '''
 defines = '\n'.join(re.findall(r'^#define (?:I2C_\w+|MAX_\w+)[^\n]*',s,re.M))
@@ -70,13 +88,19 @@ declarations = ''.join(block(prefix) for prefix in [
     'struct mtk_i2c_ac_timing {', 'struct mtk_i2c {',
     'static const struct mtk_i2c_compatible mt8183_compat',
     'static const struct mtk_i2c_compatible mt6765_compat',
+    'static const struct i2c_adapter_quirks mt6765_channel_quirks',
 ])
 stubs = r'''
 static u32 controller[0x1000/4], dma[0x100/4];
 static struct mtk_i2c *current;
 static bool expect_gate, dma_active, transfer_started;
 static unsigned int gate_writes, starts, maps, unmaps, gets, releases, resets, copies;
-static unsigned int injected_irq;
+static unsigned int injected_irq, global_resets, kicks, controller_writes;
+static int clocks_prepared, clocks_enabled, clock_failure;
+static unsigned long smc_reply;
+static unsigned int smc_calls, resume_calls, dt_id;
+static bool dt_secure, dt_malformed, check_clocks;
+static struct device test_device;
 static int get_failure, map_failure;
 static u8 buffers[2][16];
 static u16 readw(void *address)
@@ -89,20 +113,39 @@ static void writew(u16 value, void *address)
 {
     ptrdiff_t offset = (u8 *)address - (u8 *)controller;
     assert(offset >= 0 && offset < 0x1000 && !(offset & 1));
-    if (offset == 0x40) {
+    controller_writes++;
+    if (check_clocks)
+        assert(clocks_enabled && (!current->ch_offset || smc_calls));
+    if (offset == 0x50 && value == 1)
+        global_resets++;
+    assert(!(current->ch_offset && offset == 0x150));
+    if (current->ch_offset && offset == 0x24 && value == 2)
+        kicks++;
+    ptrdiff_t bank = current->ch_offset;
+    if (offset == bank + 0x40) {
         assert(expect_gate && value == 1);
         gate_writes++;
     }
-    if (offset == 0x24 && value & 1) {
+    if (offset == bank + 0x24 && value & 1) {
         if (expect_gate) {
-            assert(gate_writes == starts + 1 && readw((u8 *)controller + 0x40) == 1);
-            assert(readw((u8 *)controller + 0x0c) == 0);
+            assert(gate_writes == starts + 1 && readw((u8 *)controller + bank + 0x40) == 1);
+            assert(readw((u8 *)controller + bank + 0x0c) == 0);
         } else
             assert(!gate_writes);
+        if (bank) {
+            assert(value == 1); /* No unverified multi-restart bits on the AP bank. */
+            assert(readw((u8 *)controller+bank+0x38) == 5);
+            assert(readw((u8 *)controller+bank+0x10) ==
+                   (current->op == I2C_MASTER_WRRD ? 0x33e : 0x32c));
+            assert(readw((u8 *)controller+bank+0x20) == 0x14);
+            assert(readw((u8 *)controller+bank+0x2c) == 0x1a);
+            assert(readw((u8 *)controller+bank+0x48) == 3);
+            assert(readw((u8 *)controller+bank+0x34) == 3);
+        }
         starts++;
         transfer_started = true;
     }
-    if (offset == 0x0c)
+    if (offset == 0x0c || offset == bank + 0x0c)
         value = readw(address) & ~value; /* W1C interrupt status */
     memcpy(address,&value,sizeof(value));
 }
@@ -159,29 +202,116 @@ static void dma_unmap_single(struct device *dev, dma_addr_t address, size_t len,
     assert(!dma_active); /* Reset must precede unmapping a failed transfer. */
     unmaps++;
 }
+static int clk_bulk_prepare_enable(int count, struct clk_bulk_data *clocks)
+{
+    assert(count == I2C_MT65XX_CLK_MAX && clocks == current->clocks);
+    assert(!clocks_prepared && !clocks_enabled);
+    if (clock_failure) return clock_failure;
+    clocks_prepared = clocks_enabled = 1;
+    return 0;
+}
+static int clk_bulk_enable(int count, struct clk_bulk_data *clocks)
+{
+    assert(count == I2C_MT65XX_CLK_MAX && clocks == current->clocks);
+    assert(clocks_prepared == 1 && !clocks_enabled);
+    clocks_enabled = 1;
+    return 0;
+}
+static void clk_bulk_disable(int count, struct clk_bulk_data *clocks)
+{
+    assert(count == I2C_MT65XX_CLK_MAX && clocks == current->clocks && clocks_enabled == 1);
+    clocks_enabled = 0;
+}
+static void clk_bulk_unprepare(int count, struct clk_bulk_data *clocks)
+{
+    assert(count == I2C_MT65XX_CLK_MAX && clocks == current->clocks);
+    assert(clocks_prepared == 1 && !clocks_enabled);
+    clocks_prepared = 0;
+}
+static void clk_bulk_disable_unprepare(int count, struct clk_bulk_data *clocks)
+{
+    clk_bulk_disable(count,clocks);
+    clk_bulk_unprepare(count,clocks);
+}
+static void arm_smccc_smc(unsigned long fn, unsigned long id, unsigned long reg,
+                         unsigned long value, unsigned long a, unsigned long b,
+                         unsigned long c, unsigned long d, struct arm_smccc_res *res)
+{
+    assert(clocks_prepared == 1 && clocks_enabled == 1);
+    assert(fn == 0xc20002a0 && id == current->secure_id);
+    assert(id == 2 || id == 3 || id == 4 || id == 6);
+    assert(reg == 0xf8c && value == 2 && !a && !b && !c && !d);
+    smc_calls++;
+    res->a0 = smc_reply;
+}
+static struct mtk_i2c *dev_get_drvdata(struct device *dev)
+{
+    assert(dev == current->dev);
+    return current;
+}
+static struct mtk_i2c *i2c_get_adapdata(struct i2c_adapter *adap)
+{
+    assert(adap == &current->adap);
+    return current;
+}
+static void i2c_mark_adapter_suspended(struct i2c_adapter *adap) { adap->suspended = true; }
+static void i2c_mark_adapter_resumed(struct i2c_adapter *adap)
+{
+    assert(clocks_prepared == 1 && !clocks_enabled && !smc_reply);
+    adap->suspended = false;
+    resume_calls++;
+}
+static int regulator_enable(void *regulator) { assert(regulator); return 0; }
+static int regulator_disable(void *regulator) { assert(regulator); return 0; }
+static bool of_property_present(struct device_node *node, const char *name)
+{
+    assert(!strcmp(name,"mediatek,secure-id"));
+    return dt_secure;
+}
+static bool of_property_read_bool(struct device_node *node, const char *name) { return false; }
+static int of_property_read_u32(struct device_node *node, const char *name, unsigned int *value)
+{
+    if (!strcmp(name,"mediatek,secure-id")) {
+        assert(dt_secure);
+        if (dt_malformed) return -EINVAL;
+        *value = dt_id;
+    } else if (!strcmp(name,"clock-div")) *value = 1;
+    else { assert(!strcmp(name,"clock-frequency")); *value = 100000; }
+    return 0;
+}
+static void i2c_parse_fw_timings(struct device *dev, struct i2c_timings *timing, bool defaults) {}
 '''
 body = ''.join(block(prefix) for prefix in [
+    'static u16 mtk_i2c_readw_bank(', 'static void mtk_i2c_writew_bank(',
     'static u16 mtk_i2c_readw(', 'static void mtk_i2c_writew(',
     'static u16 mtk_i2c_irq_mask(', 'static void mtk_i2c_start(',
-    'static int mtk_i2c_transfer_error(', 'static void mtk_i2c_init_hw(',
-    'static int mtk_i2c_do_transfer(', 'static irqreturn_t mtk_i2c_irq(',
+    'static int mtk_i2c_transfer_error(', 'static void mtk_i2c_configure(',
+    'static void mtk_i2c_reset_dma(', 'static void mtk_i2c_init_hw(',
+    'static void mtk_i2c_recover(', 'static int mtk_i2c_enable_channel(',
+    'static int mtk_i2c_prepare_hw(',
+    'static int mtk_i2c_do_transfer(', 'static int mtk_i2c_transfer(',
+    'static irqreturn_t mtk_i2c_irq(', 'static int mtk_i2c_parse_dt(',
+    'static int mtk_i2c_suspend_noirq(', 'static int mtk_i2c_resume_noirq(',
 ])
 checks = r'''
 static void inject_irq(unsigned int status)
 {
     u16 value = status;
-    memcpy((u8 *)controller+0x0c,&value,sizeof(value));
+    memcpy((u8 *)controller+current->ch_offset+0x0c,&value,sizeof(value));
     assert(mtk_i2c_irq(0,current) == IRQ_HANDLED);
-    assert(readw((u8 *)controller+0x0c) == 0);
+    assert(readw((u8 *)controller+current->ch_offset+0x0c) == 0);
 }
 static unsigned long wait_for_completion_timeout(struct completion *done, unsigned long timeout)
 {
     assert(done == &current->msg_complete && timeout == 200);
-    if (expect_gate)
-        assert(readw((u8 *)controller+0x08) == (current->auto_restart ? 0x13f : 0x12f));
+    if (expect_gate) {
+        unsigned int expected = current->ch_offset ? 0x129 :
+                                (current->auto_restart ? 0x13f : 0x12f);
+        assert(readw((u8 *)controller+current->ch_offset+0x08) == expected);
+    }
     if (!injected_irq)
         return 0;
-    assert(readw((u8 *)controller+0x08) & injected_irq);
+    assert(readw((u8 *)controller+current->ch_offset+0x08) & injected_irq);
     /* Completion-only means DMA has finished. Errors may leave it active. */
     if (injected_irq == 1 || injected_irq == 16)
         dma_active = false;
@@ -199,6 +329,7 @@ static void setup(struct mtk_i2c *i2c, bool mt6765)
     memset(controller,0,sizeof(controller));
     memset(dma,0,sizeof(dma));
     current = i2c;
+    i2c->dev = &test_device;
     i2c->dev_comp = mt6765 ? &mt6765_compat : &mt8183_compat;
     i2c->base = controller;
     i2c->pdmabase = dma;
@@ -209,10 +340,131 @@ static void setup(struct mtk_i2c *i2c, bool mt6765)
     gate_writes = starts = maps = unmaps = gets = releases = resets = copies = 0;
     get_failure = map_failure = 0;
     injected_irq = 1;
+    global_resets = kicks = controller_writes = 0;
+    clocks_prepared = clocks_enabled = clock_failure = 0;
+    smc_reply = smc_calls = resume_calls = dt_id = 0;
+    dt_secure = dt_malformed = check_clocks = false;
     if (mt6765) {
         u16 stale = 0x1ff;
         memcpy((u8 *)controller+0x0c,&stale,sizeof(stale));
     }
+}
+static void setup_channel(struct mtk_i2c *i2c)
+{
+    setup(i2c,true);
+    dt_secure = true; dt_id = 4;
+    assert(mtk_i2c_parse_dt(NULL,i2c) == 0);
+    assert(i2c->ch_offset == 0x100 && i2c->secure_id == 4);
+    assert(i2c->adap.quirks == &mt6765_channel_quirks);
+    assert(i2c->adap.quirks->flags == (I2C_AQ_COMB_WRITE_THEN_READ | I2C_AQ_NO_ZERO_LEN));
+    assert(i2c->adap.quirks->max_num_msgs == 1);
+    i2c->ac_timing.htiming = 0x14;
+    i2c->ac_timing.ltiming = 0x1a;
+    i2c->ac_timing.inter_clk_div = 3;
+    u16 stale = 0x1ff;
+    memcpy((u8 *)controller+0x10c,&stale,sizeof(stale));
+    memset((u8 *)controller+0x200,0xa5,0x100); /* CCU's bank must be untouched. */
+}
+static unsigned int test_channel_transfers(struct i2c_msg *msgs)
+{
+    struct mtk_i2c i2c;
+    const struct { unsigned int irq; int error; bool global; } cases[] = {
+        {1,0,false}, {0,-ETIMEDOUT,true}, {3,-ENXIO,false}, {5,-ENXIO,false},
+        {8,-EAGAIN,true}, {32,-ETIMEDOUT,true}, {65,-EIO,false}, {129,-EIO,false},
+        {256,-EIO,true}, {257,-EIO,true}, {288,-ETIMEDOUT,true}, {33,-ETIMEDOUT,false}
+    };
+    unsigned int runs = 0;
+    for (unsigned int c = 0; c < sizeof(cases)/sizeof(cases[0]); c++) {
+        for (int op = 1; op <= 3; op++) {
+            setup_channel(&i2c); i2c.op = op; injected_irq = cases[c].irq;
+            assert(mtk_i2c_irq_mask(&i2c) == 0x129);
+            assert(mtk_i2c_do_transfer(&i2c,op == 2 ? msgs+1 : msgs,op == 3 ? 2 : 1,0)
+                   == cases[c].error);
+            assert(starts == 1 && gate_writes == 1 && !dma_active);
+            assert(resets == 1U + !!cases[c].error);
+            assert(global_resets == (unsigned int)cases[c].global);
+            assert(kicks == (unsigned int)(cases[c].global && cases[c].irq));
+            assert(maps == (op == 3 ? 2U : 1U) && unmaps == maps && releases == maps);
+            assert(copies == (cases[c].error ? 0 : maps));
+            assert(readw((u8 *)controller+0x108) == 0);
+            for (unsigned int at = 0x200; at < 0x300; at++)
+                assert(((u8 *)controller)[at] == 0xa5);
+            runs++;
+        }
+    }
+    for (int failed = 1; failed <= 2; failed++) {
+        for (int mapping = 0; mapping < 2; mapping++) {
+            setup_channel(&i2c); i2c.op = I2C_MASTER_WRRD;
+            if (mapping) map_failure = failed; else get_failure = failed;
+            assert(mtk_i2c_do_transfer(&i2c,msgs,2,0) == -ENOMEM);
+            assert(!starts && !gate_writes && !dma_active && !global_resets);
+            assert(unmaps == maps - (mapping ? 1U : 0U) && !copies);
+            assert(readw((u8 *)controller+0x108) == 0);
+        }
+    }
+    setup_channel(&i2c);
+    inject_irq(2); /* Masked NACK must be latched until an enabled event. */
+    assert(i2c.irq_stat == 2 && !i2c.msg_complete.done);
+    inject_irq(1);
+    assert(i2c.msg_complete.done == 1 && mtk_i2c_transfer_error(&i2c,true) == -ENXIO);
+    /* Software timeout only kicks arbitration if this bank has ownership. */
+    setup_channel(&i2c);
+    writew(2,(u8 *)controller+0x124);
+    mtk_i2c_recover(&i2c,false);
+    assert(global_resets == 1 && kicks == 1);
+    /* Exercise the adapter entry point, including WRRD selection and clocks. */
+    for (int op = 1; op <= 3; op++) {
+        setup_channel(&i2c); check_clocks = true;
+        assert(mtk_i2c_prepare_hw(&i2c) == 0 && smc_calls == 1);
+        int num = op == 3 ? 2 : 1;
+        assert(mtk_i2c_transfer(&i2c.adap,op == 2 ? msgs+1 : msgs,num) == num);
+        assert(i2c.op == (enum mtk_trans_op)op && !i2c.auto_restart);
+        assert(starts == 1 && global_resets == 1 && !clocks_enabled && clocks_prepared);
+        assert(mtk_i2c_suspend_noirq(i2c.dev) == 0 && !clocks_prepared);
+    }
+    return runs;
+}
+static void test_channel_setup(void)
+{
+    struct mtk_i2c i2c;
+    for (unsigned int id = 0; id <= 7; id++) {
+        setup(&i2c,true); dt_secure = true; dt_id = id;
+        bool valid = id == 2 || id == 3 || id == 4 || id == 6;
+        assert(mtk_i2c_parse_dt(NULL,&i2c) == (valid ? 0 : -EINVAL));
+        if (!valid) { assert(!i2c.ch_offset); continue; }
+        check_clocks = true;
+        assert(mtk_i2c_prepare_hw(&i2c) == 0 && smc_calls == 1 && global_resets == 1);
+        assert(mtk_i2c_suspend_noirq(i2c.dev) == 0);
+    }
+    setup(&i2c,false); dt_secure = true; dt_id = 4;
+    assert(mtk_i2c_parse_dt(NULL,&i2c) == -EINVAL && !i2c.ch_offset);
+    setup(&i2c,true); dt_secure = dt_malformed = true; dt_id = 4;
+    assert(mtk_i2c_parse_dt(NULL,&i2c) == -EINVAL && !i2c.ch_offset);
+    for (int variant = 0; variant < 2; variant++) {
+        setup(&i2c,variant); check_clocks = true;
+        assert(mtk_i2c_parse_dt(NULL,&i2c) == 0 && !i2c.ch_offset);
+        assert(mtk_i2c_prepare_hw(&i2c) == 0 && !smc_calls);
+        assert(mtk_i2c_suspend_noirq(i2c.dev) == 0);
+    }
+    setup_channel(&i2c); check_clocks = true; clock_failure = -EIO;
+    assert(mtk_i2c_prepare_hw(&i2c) == -EIO);
+    assert(!clocks_prepared && !clocks_enabled && !i2c.clocks_prepared);
+    assert(!smc_calls && !controller_writes);
+    setup_channel(&i2c); check_clocks = true; smc_reply = (unsigned long)-1;
+    assert(mtk_i2c_prepare_hw(&i2c) == -EIO);
+    assert(smc_calls == 1 && !controller_writes);
+    assert(!clocks_prepared && !clocks_enabled && !i2c.clocks_prepared);
+    setup_channel(&i2c); check_clocks = true;
+    assert(mtk_i2c_prepare_hw(&i2c) == 0);
+    assert(mtk_i2c_suspend_noirq(i2c.dev) == 0 && i2c.adap.suspended);
+    smc_reply = (unsigned long)-1;
+    assert(mtk_i2c_resume_noirq(i2c.dev) == -EIO && i2c.adap.suspended);
+    assert(!resume_calls && !i2c.clocks_prepared && !clocks_prepared && !clocks_enabled);
+    assert(mtk_i2c_suspend_noirq(i2c.dev) == 0); /* No double unprepare. */
+    smc_reply = 0;
+    assert(mtk_i2c_resume_noirq(i2c.dev) == 0 && !i2c.adap.suspended);
+    assert(resume_calls == 1 && smc_calls == 3 && i2c.clocks_prepared);
+    assert(mtk_i2c_suspend_noirq(i2c.dev) == 0);
 }
 int main(void)
 {
@@ -285,8 +537,11 @@ int main(void)
     inject_irq(16 | 256); /* A fault must not be discarded as a master-code IRQ. */
     assert(i2c.msg_complete.done == 1 && !starts);
     assert(mtk_i2c_transfer_error(&i2c,true) == -EIO);
+    unsigned int channel_runs = test_channel_transfers(msgs);
+    test_channel_setup();
     printf("PASS: %u MT6765 DMA transfers, terminal faults, AP gate, cleanup order,\n",runs);
     puts("      allocation/map failures, repeated starts and legacy MT8183 IRQ behavior");
+    printf("PASS: %u AP-bank transfers, shared recovery, secure setup and suspend/resume failures\n",channel_runs);
     return 0;
 }
 '''

@@ -12,6 +12,15 @@ description:
 
 allOf:
   - $ref: /schemas/i2c/i2c-controller.yaml#
+  - if:
+      not:
+        properties:
+          compatible:
+            contains:
+              const: mediatek,mt6765-i2c
+    then:
+      properties:
+        mediatek,secure-id: false
 
 maintainers:
   - Qii Wang <qii.wang@mediatek.com>
@@ -104,6 +113,15 @@ properties:
   mediatek,use-push-pull:
     description: Use push-pull mode I/O config
     type: boolean
+
+  mediatek,secure-id:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [2, 3, 4, 6]
+    description:
+      MT6765 controller ID in the secure firmware I2C service. These controllers
+      use the AP transaction bank at offset 0x100 and the first DMA channel.
+      Firmware enables shadow-register mode through SiP function 0x2a0.
+      This is the hardware controller ID, independent of Linux bus numbering.
 
   vbus-supply:
     description: Phandle to the regulator providing power to SCL/SDA

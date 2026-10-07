@@ -12,17 +12,19 @@
 | I2C programmable-divider calculation | PASS: 140 MT6765/MT8183 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
 | MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, repeated starts and allocation errors; MT8183 regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
 | Stock ATF I2C service | PASS: 64 selected-dispatch cases, firmware/DT IDs, exact writes, rejected requests and signed return | `logs/i2c-firmware-tests.log`, `out/i2c-firmware-audit.json`; excludes EL3 entry/caller checks and hardware |
+| MT6765 AP channel | PASS: 36 transfer cases, adapter entry, secure IDs, firmware/clock failures, recovery and suspend/resume | `logs/i2c-irq-tests.log`; modeled hardware |
+| Channel bank, firmware refusal, shared reset and FIFO regressions | All rejected | `logs/i2c-channel-regression-*.log` |
 | I2C gate, terminal IRQ, DMA cleanup and failed-copy regressions | All rejected | `logs/i2c-irq-regression-*.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
 | Compiled r1 power-device wiring | PASS against stock FDT, including IRQs, pin muxes and child gates | `logs/r1-power-tests.log` |
 | MT6370 and hwmon schemas | PASS, zero diagnostics for the new power nodes | `logs/r1-power-schema.log`, `out/r1-power-schema.json` |
 | CST836 report/transport/PM logic | PASS with I2C/input/GPIO stubs and ASan/UBSan | `logs/cst836-tests.log`; no hardware events |
-| CST836 driver and draft r1 touch wiring | AArch64 object compiled; DT matches stock pins/address/dimensions | `logs/cst836-compile.log`, `logs/r1-touch-tests.log`; I2C4 remains disabled |
+| CST836 driver and draft r1 touch wiring | AArch64 object compiled; DT matches stock pins/address/dimensions | `logs/cst836-compile.log`, `logs/r1-touch-tests.log`; I2C4 enabled for experimental probing |
 | CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
 | CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 16 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 17 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |
@@ -42,6 +44,7 @@
 | Full r1 DT schema validation | **FAIL: 41 diagnostics remain** | `logs/r1-dt-validate.log`, `out/r1-i2c-full-schema.json` |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
+| I2C channel patches checkpatch | No errors or warnings | `logs/i2c-channel-checkpatch.log` |
 | MT6370 current-measurement patch checkpatch | No errors or warnings | `logs/mt6370-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 

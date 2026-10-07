@@ -55,7 +55,7 @@ typedef uint16_t u16;
 #define div_u64(n, d) ((n) / (d))
 #define dev_dbg(...) ((void)0)
 #define udelay(n) ((void)0)
-#define writel(v, p) ((void)0)
+#define writel(v, p) ((void)(v), (void)(p))
 struct i2c_adapter_quirks { int unused; };
 static const struct i2c_adapter_quirks mt8183_i2c_quirks;
 '''
@@ -77,19 +77,30 @@ struct mtk_i2c {
     struct mtk_i2c_ac_timing ac_timing;
     struct { unsigned int scl_int_delay_ns; } timing_info;
     unsigned int clk_src_div, speed_hz;
-    u16 timing_reg, high_speed_reg, ltiming_reg;
+    uintptr_t pdmabase;
+    u16 timing_reg, high_speed_reg, ltiming_reg, ch_offset;
     bool use_push_pull, have_pmic;
     u16 registers[0x1000 / 2];
 };
+static u16 mtk_i2c_readw_bank(struct mtk_i2c *i2c, u16 bank, enum I2C_REGS_OFFSET reg)
+{
+    return i2c->registers[(bank + i2c->dev_comp->regs[reg]) / 2];
+}
+static void mtk_i2c_writew_bank(struct mtk_i2c *i2c, u16 bank, u16 value, enum I2C_REGS_OFFSET reg)
+{
+    i2c->registers[(bank + i2c->dev_comp->regs[reg]) / 2] = value;
+}
 static u16 mtk_i2c_readw(struct mtk_i2c *i2c, enum I2C_REGS_OFFSET reg)
 {
-    return i2c->registers[i2c->dev_comp->regs[reg] / 2];
+    return mtk_i2c_readw_bank(i2c, i2c->ch_offset, reg);
 }
 static void mtk_i2c_writew(struct mtk_i2c *i2c, u16 value, enum I2C_REGS_OFFSET reg)
 {
-    i2c->registers[i2c->dev_comp->regs[reg] / 2] = value;
+    mtk_i2c_writew_bank(i2c, i2c->ch_offset, value, reg);
 }
 '''
+body += block('static void mtk_i2c_configure(')
+body += block('static void mtk_i2c_reset_dma(')
 body += block('static void mtk_i2c_init_hw(')
 body += s[s.index('static const struct i2c_spec_values *mtk_i2c_get_spec('):
           s.index('static void i2c_dump_register(')]

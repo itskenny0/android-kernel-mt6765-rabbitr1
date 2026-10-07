@@ -1,8 +1,8 @@
 # Touch input
 
 The CST836 driver is compiled and covered by host tests, but touch input is not
-working hardware in this port yet. I2C4 remains disabled until its AP channel
-routing is implemented and reviewed. No r1 or touch controller was accessed.
+working hardware in this port yet. I2C4 is now enabled for experimental probing
+with AP channel routing and firmware setup. No r1 or touch controller was accessed.
 
 ## Stock evidence
 
@@ -43,7 +43,7 @@ CST836 protocol separately; it does not claim CST328 support.
 ## Implementation
 
 `CONFIG_TOUCHSCREEN_HYNITRON_CST836` is built in. The board describes the primary
-CST836 configuration beneath the disabled I2C4 bus. Reset is an active-low GPIO
+CST836 configuration beneath the enabled I2C4 bus at 100 kHz. Reset is an active-low GPIO
 descriptor; the driver asserts it during removal, probe failure and suspend.
 Resume resets the controller and reads its firmware version before enabling the
 IRQ. A version response is only a presence check, not a silicon-ID check.
@@ -62,7 +62,10 @@ auto-update interfaces. Touch supplies currently depend on firmware rail setup;
 their regulator mapping and the fitted controller need board confirmation.
 Wake gestures and hardware suspend/resume are unverified.
 
-## Remaining bus work
+After a device boots, `r1-report` includes the I2C adapter names and registered
+input devices. Registration alone is not a touch-event or coordinate test.
+
+## Host channel support
 
 The stock host driver initializes shared registers in channel 0, then accesses
 transfer registers through the configured channel offset. I2C4 uses `0x100` for
@@ -74,16 +77,18 @@ On resume, the vendor driver asks ATF to set shadow-register mode through
 `MTK_SIP_I2C_CONTROL(id, 0xf8c, 2)`. Its probe path assumes the firmware has
 already established that mode. The new MT6765 match handles the AP interrupt
 gate and terminal errors and records global `MULTI_DMA` at `0xf8c`, correcting
-the previous MT8183 fallback's `0x8c`. It still has no instance channel offset
-or firmware handshake. Routing, reset/arbitration, DMA ownership and firmware
-state must be resolved before enabling this bus. See [I2C.md](I2C.md).
+the previous MT8183 fallback's `0x8c`. The host now selects AP bank `0x100`,
+configures shadow mode at probe/resume and keeps shared resets in bank zero.
+Completed NACKs do not reset the shared controller. See [I2C.md](I2C.md) for
+supported transactions, tests and the remaining hardware validation.
 
 The stock ATF audit now verifies the selected I2C service path: controller ID 4,
 offset `0xf8c`, value 2 writes a halfword to `0x11011f8c` and returns zero.
 The audit executes the original firmware instructions and checks rejection
 paths too. It does not establish the earlier SMC caller checks or physical
 channel routing. This removes uncertainty about the service's arguments and
-return convention; the Linux channel implementation is still outstanding.
+return convention. Host tests also check the Linux setup/failure paths, but
+physical DMA, IRQ delivery, bus ownership and clock behavior remain unverified.
 
 ## Validation and acceptance
 
@@ -99,8 +104,8 @@ this IRQ recovery are each rejected by the tests.
 This tests callback logic, not Linux input-core behavior or physical I2C timing.
 
 `scripts/test-r1-touch.py` compares the compiled DT against stock addresses,
-resolution, GPIO muxes and polarity evidence, and checks that I2C4 is still
-disabled. The driver is also compiled for AArch64. CI runs both tests.
+resolution, GPIO muxes and polarity evidence, and checks that I2C4 is enabled
+with firmware ID 4. The driver is also compiled for AArch64. CI runs both tests.
 
 The CST836 binding documentation, compiled example and r1 touch node pass
 schema checks. Building the shared schema cache still reports the existing
@@ -108,8 +113,8 @@ schema checks. Building the shared schema cache still reports the existing
 step is unavailable in this workspace. Full-board validation still has the
 41 diagnostics recorded in [VALIDATION.md](VALIDATION.md).
 
-Before touch is accepted: implement the host channel routing, identify the
-controller on a device, verify supplies and reset/IRQ waveforms, capture raw
+Before touch is accepted: validate the host channel setup and transfers, identify
+the controller on a device, verify supplies and reset/IRQ waveforms, capture raw
 reports, then exercise all screen corners, two fingers, drag/release and bus
 error recovery through evdev. Confirm suspend behavior before enabling it for
 the system. CST328 hardware needs its own driver/DT selection.

@@ -65,10 +65,10 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | MT6357 | Driver corrections and mocked register tests; [details](POWER.md) | PMIC access/IRQ and measured rail behavior |
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
 | USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
-| I2C | Explicit MT6765 interrupt handling and divider correction; I2C5 enabled at 100 kHz; [details](I2C.md) | Clock/DMA/IRQ validation, channel routing for I2C4 and repeated transfers on actual peripherals |
+| I2C | MT6765 interrupts, AP channel setup/recovery and divider correction; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | MT6370 MFD/ADC and hwmon bound; current-measurement bugs fixed; charger still disabled | Limits, battery gauge/temperature policy, charger detection and measured behavior |
 | Display | Vendor active sequence uses ST7701-style commands despite its ili9883 filename | Panel identity, reset/power/backlight, DSI timings, then DRM scanout |
-| Touch | CST836 driver compiled and host-tested; stock wiring described, I2C4 still disabled; [details](TOUCH.md) | AP channel routing, fitted-controller identification and evdev events on hardware |
+| Touch | CST836 driver compiled and host-tested; stock wiring and I2C4 enabled for experimental probing; [details](TOUCH.md) | Host transfer validation, fitted-controller identification and evdev events on hardware |
 | GPU | No working accelerated r1 stack established | Kernel/userspace compatibility and rendering tests; software rendering first |
 | Wi-Fi / Bluetooth / GNSS / modem | No r1 mainline implementation established | Connectivity power/firmware transport and appropriate Linux subsystems |
 | Audio / sensors / camera | Vendor sources are reference material | ASoC, IIO and V4L2/media integration, including the motor/hall hardware |

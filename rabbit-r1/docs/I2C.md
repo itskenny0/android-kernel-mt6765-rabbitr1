@@ -3,7 +3,8 @@
 The I2C nodes now select an explicit MT6765 match, with its AP interrupt gate
 and terminal error interrupts. Timing calculation still uses the inherited
 MT8183 algorithm and needs electrical validation. All seven controllers specify
-`clock-div = <1>`; only I2C5 is enabled on the r1 at present.
+`clock-div = <1>`. The r1 enables I2C4 for experimental touch probing and I2C5
+for power monitoring at 100 kHz; neither bus has been tested on hardware.
 
 ## Divider correction
 
@@ -49,7 +50,7 @@ normal START and the restart after a high-speed master code. Other supported
 SoCs retain their existing start behavior. All MT6765 DT nodes use the single
 `mediatek,mt6765-i2c` compatible; MT8183 is no longer advertised as a fallback.
 The MT6765 register table also records the stock global `MULTI_DMA` offset
-`0xf8c`, but no channel-routing operation is enabled by that table alone.
+`0xf8c`, which the channel setup passes to secure firmware.
 
 The vendor headers identify timeout (bit 5), DMA error (6), in-band interrupt
 (7), and bus error (8), in addition to ACK/NACK, arbitration and completion.
@@ -131,12 +132,56 @@ table; it is not a claimed physical ATF load address. The real EL3 exception
 entry, earlier caller/security checks, clock state and hardware are outside
 this test. No host SMC is executed.
 
-For the channel implementation, configure mode while the controller clocks are
-enabled, check the firmware return value, and keep the adapter unavailable if
-setup fails. Restore it before transfers after resume. I2C5 must not make this
-call. Transfer setup still needs the AP bank; shared reset and arbitration
-recovery must continue to use bank zero. The stock service alone does not
-implement those Linux-side operations.
+## AP channel implementation
+
+The SoC DT supplies `mediatek,secure-id` for controllers 2, 3, 4 and 6.
+The driver accepts that property only for MT6765 and those IDs, selects the
+`0x100` AP bank, and keeps DMA at the first channel in the existing resource.
+I2C0/1/5 keep bank-zero access and make no firmware call. The compiled DT
+validator checks each ID against its physical controller address.
+
+Probe and resume enable clocks, request `(secure_id, 0xf8c, 2)` through SiP,
+then initialize the controller. Any nonzero firmware result fails setup and
+balances the clocks; resume does not make the adapter available on failure.
+The driver tracks clock preparation so a suspend following failed resume does
+not unprepare the clocks twice. Earlier EL3 caller checks can still reject the
+request on real firmware; the Linux error path is exercised with stubs.
+
+Register accessors take the AP offset for transfers and IRQs. Shared reset,
+initial timing and arbitration recovery explicitly use bank zero. Each channel
+transfer programs its own timing, I/O mode and full DMA/control configuration,
+resets its AP DMA engine, clears FIFO with `0x5`, and clears all known status
+bits. Its event mask is `0x129`: completion, arbitration loss, timeout and bus
+error. ACK/NACK stays latched until an enabled event; the IRQ handler masks the
+channel before waking the waiter. Allocation failures leave interrupts masked.
+
+The channel adapter advertises single writes, single reads and same-address
+combined write/read transactions, with nonzero lengths. Combined transactions
+use the hardware WRRD mode; START is `1`. The generic driver's software-driven
+multi-restart bits are not used on the AP bank. Arbitrary multi-message
+repeated-start sequences are rejected by the adapter quirks until their channel
+semantics are established. The normal-bank path retains its existing restart
+support. All lengths currently use DMA, including the short touch transfers;
+the vendor uses FIFO for transfers of at most eight bytes. DMA for these short
+transfers needs hardware validation.
+
+After a completed channel error without BUS_ERR, recovery clears the channel
+FIFO and resets only AP DMA. It does not reset the shared controller and disrupt
+another owner's transfer. Incomplete or bus-error transfers use shared recovery;
+a hardware fault kicks arbitration in bank zero. A software timeout only kicks
+when the saved channel START reports ownership (bit 1), following the vendor
+path. DMA is reset before unmapping failed transfers, and failed reads do not
+copy bounce buffers back to callers. This models the stock recovery sequence;
+physical DMA quiescence and concurrent CCU behavior remain untested.
+
+The transfer harness now also executes 36 AP-bank read/write/WRRD cases, the
+adapter entry point, masked NACK followed by completion, allocation failures,
+arbitration recovery, secure-ID parsing, firmware refusal, clock failure and
+failed-resume recovery. It checks register addresses and untouched CCU bank
+bytes under ASan/UBSan. Mutations redirecting AP writes to bank zero, ignoring
+firmware errors, resetting shared state after a completed NACK, or omitting the
+channel FIFO bit are rejected. These are software/MMIO-model tests, not board
+acceptance results.
 
 ## Remaining controller work
 
@@ -146,12 +191,13 @@ driver has additional behavior that still needs review:
 * `cnt_constraint` changes the step encoding when the sample count is one.
   The inherited algorithm also adjusts counts, but its divider-dependent rules need to be
   compared with the MT6765 hardware before claiming equivalent timing.
-* Controllers 2, 3, 4 and 6 use additional channel offsets in the vendor DT.
-  I2C4's AP transactions use `0x100`, while initialization uses channel zero.
-  Its stock resume path asks ATF to restore shadow-register mode at `0xf8c`;
-  the mainline driver still lacks that channel selection and firmware handshake.
-  Channel FIFO clearing also uses bit 2, and the stock channel path masks direct
-  ACK/NACK IRQs until completion. These differences are not fixed by the AP gate.
+* The stock version-2 transfer also programs per-bank `HW_TIMEOUT` at `0x4c`
+  and ORs `TIMING` with `I2C_TIMEOUT_EN` (bit 0). The inherited timing path does
+  not implement that timeout setup. Counter encoding and timeout programming
+  need to be ported together; enabling a fault IRQ does not configure its timer.
+* Channel setup, firmware caller acceptance and transfer/recovery sequencing
+  need tests on a device, including short DMA transfers and CCU coexistence.
+  Arbitrary repeated-start sequences are not implemented for the AP bank.
   The [touch audit](TOUCH.md) records the board evidence.
 * Bus arbitration gates, reset behavior and 33-bit DMA need transfer tests.
 
@@ -162,7 +208,7 @@ defined. That inactive code is not evidence that the r1 needs this write, and
 it has not been copied into mainline.
 
 The r1 board enables I2C5 for the MT6370 power monitor at 100 kHz. It has no
-vendor channel-offset requirement. Other I2C controllers remain disabled.
+vendor channel-offset requirement. I2C4 is also enabled for experimental touch probing; the other buses remain disabled.
 Successful real transfers, DMA completion and IRQ delivery are still unproven.
 
 ## r1 power devices

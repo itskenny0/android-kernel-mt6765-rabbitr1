@@ -62,11 +62,16 @@ def check_mainline(dtb):
         assert struct.unpack('>I',clocks_prop[4:8])[0] == int(ids[name])
     assert nodes['/soc/mmc@11230000']['status'] == b'disabled\0', 'Default eMMC bring-up gate lost'
     assert nodes['/soc/usb@11200000']['dr_mode'] == b'peripheral\0'
+    secure_ids = {'11009000': 2, '1100f000': 3, '11011000': 4, '1100d000': 6}
     for addr in ['11007000', '11008000', '11009000', '1100f000', '11011000', '11016000', '1100d000']:
         assert nodes['/soc/i2c@'+addr]['compatible'] == b'mediatek,mt6765-i2c\0', \
             f'I2C {addr}: MT6765 interrupt handling requires its own compatible'
         assert nodes['/soc/i2c@'+addr]['clock-div'] == struct.pack('>I', 1), \
             f'I2C {addr}: unexpected fixed prescaler'
+        if addr in secure_ids:
+            assert nodes['/soc/i2c@'+addr]['mediatek,secure-id'] == struct.pack('>I', secure_ids[addr])
+        else:
+            assert 'mediatek,secure-id' not in nodes['/soc/i2c@'+addr]
     print('PASS: r1 identity, LK memory path, MMC clock providers/IDs, eMMC gate, USB role, I2C match/dividers')
 
 def main():

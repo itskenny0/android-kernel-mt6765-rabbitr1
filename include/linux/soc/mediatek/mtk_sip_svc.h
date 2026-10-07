@@ -25,6 +25,9 @@
 /* DVFSRC SMC calls */
 #define MTK_SIP_DVFSRC_VCOREFS_CONTROL	MTK_SIP_SMC_CMD(0x506)
 
+/* MT6765 I2C shared-register access */
+#define MTK_SIP_I2C_CONTROL		MTK_SIP_SMC_CMD(0x2a0)
+
 /* IOMMU related SMC call */
 #define MTK_SIP_KERNEL_IOMMU_CONTROL	MTK_SIP_SMC_CMD(0x514)
 

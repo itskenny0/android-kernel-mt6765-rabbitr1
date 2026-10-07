@@ -121,8 +121,8 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&r1_i2c4_pins>;
 	clock-frequency = <100000>;
-	/* Stock uses AP channel 0x100; the current host driver lacks routing. */
-	status = "disabled";
+	/* Experimental: stock AP channel and touch wiring, not board-tested. */
+	status = "okay";
 
 	touchscreen@15 {
 		/* Primary vendor configuration; CST328 variants need another driver. */

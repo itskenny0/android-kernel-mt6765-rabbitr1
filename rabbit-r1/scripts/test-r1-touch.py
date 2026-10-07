@@ -25,7 +25,8 @@ def cells(value):
 
 bus = nodes['/soc/i2c@11011000']
 old_bus = stock['/i2c4@11011000']
-assert bus['status'] == b'disabled\0', 'Do not enable I2C4 before channel routing is implemented'
+assert bus['status'] == b'okay\0', 'Experimental touch bus must be enabled'
+assert bus['mediatek,secure-id'] == old_bus['id'] == struct.pack('>I',4)
 assert bus['reg'] == old_bus['reg']
 assert bus['interrupts'] == old_bus['interrupts']
 assert 'mediatek,use-push-pull' not in bus
@@ -55,4 +56,4 @@ for node,child,pins in [(bus,'pins-bus',[105,106]),
         row = struct.unpack_from('>7I',table,pin*28)
         assert row[0] == pin and mux == (pin << 8) | row[1]
 print('PASS: r1 touch address, resolution, IRQ/reset and I2C4 pin muxes match stock')
-print('I2C4 remains disabled; no CST836 silicon or bus operation is proven by this check.')
+print('I2C4 enabled with firmware ID 4; no CST836 silicon or bus operation is proven by this check.')
