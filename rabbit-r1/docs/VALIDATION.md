@@ -5,10 +5,12 @@
 | Mainline Image.gz, r1 DTB and modules | PASS, Linux 7.1.0-rabbit-r1-bringup+ | `logs/mainline-build.log`, `dist/mainline/build.json` |
 | Official r1 Image.gz, DTB/overlay and modules | PASS, Linux 4.19.191-g8167c8c1087f | `logs/vendor-build.log`, `dist/vendor/build.json` |
 | AArch64 Image/ELF, gzip consistency and selected config | PASS | `logs/kernel-validation.log` |
-| r1 identity, loader memory path, MMC clock provider/IDs, storage gate and USB role in DTB | PASS | `scripts/validate-kernel.py` |
+| r1 identity, loader memory path, MMC clock provider/IDs, storage gate, USB role and I2C dividers in DTB | PASS | `scripts/validate-kernel.py` |
 | Original MMC source-clock regression | Rejected as expected | `logs/mmc-regression-before.log` |
 | MT6357 register mappings and new helpers | PASS | `logs/mt6357-tests.log` |
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
+| I2C programmable-divider calculation | PASS: 70 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
+| Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
 | Patch series on pristine affected files | PASS, all 8 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
@@ -26,7 +28,8 @@
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
 | r1 board-compatible schema | PASS | `logs/r1-board-schema.log` (empty diagnostics) |
 | Full r1 DT schema validation | **FAIL: 48 diagnostics remain** | `logs/r1-dt-validate.log` |
-| Kernel checkpatch on five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
+| Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
+| I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 
 The full schema failures are recorded, not inferred from the validator's exit
@@ -57,6 +60,7 @@ source scripts/env.sh
 python3 scripts/validate-kernel.py mainline
 python3 scripts/validate-kernel.py vendor
 python3 scripts/test-mt6357.py
+python3 scripts/test-i2c.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py
 toolchains/boot-tools/bin/python scripts/test-lk.py

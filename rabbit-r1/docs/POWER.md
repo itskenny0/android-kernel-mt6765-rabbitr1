@@ -86,6 +86,8 @@ MT6370 charger integration remains separate work: confirm the r1 I2C address,
 GPIO interrupt routing, ADC and USB/charger detection, battery limits and thermal
 policy. The stock config enables the MT6370 charger/backlight and MT6357 battery
 drivers. Copying generic nodes from another MT6765 handset is insufficient.
+The [I2C investigation](I2C.md) records the r1 wiring and fixes the inherited
+clock-divider mismatch. Actual bus transfers and charging remain untested.
 
 ## Persistent logs
 

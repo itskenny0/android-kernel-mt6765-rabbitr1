@@ -97,6 +97,7 @@ jobs:
           source scripts/env.sh
           python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
           python3 scripts/test-mt6357.py 2>&1 | tee logs/mt6357-tests.log
+          python3 scripts/test-i2c.py 2>&1 | tee logs/i2c-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
 
       - name: Build the kernel and modules

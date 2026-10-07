@@ -1,0 +1,75 @@
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+index a110f7ce0f..76c4862086 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+@@ -591,6 +591,7 @@ pwm0: pwm@11006000 {
+ 				      "pwm4", "pwm5", "pwm6";
+ 		};
+ 
++		/* No fixed prescaler: the driver programs CLOCK_DIV itself. */
+ 		i2c0: i2c@11007000 {
+ 			compatible = "mediatek,mt6765-i2c",
+ 				     "mediatek,mt8183-i2c";
+@@ -600,7 +601,7 @@ i2c0: i2c@11007000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -615,7 +616,7 @@ i2c1: i2c@11008000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -630,7 +631,7 @@ i2c2: i2c@11009000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -658,7 +659,7 @@ i2c3: i2c@1100f000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -687,7 +688,7 @@ i2c4: i2c@11011000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -755,7 +756,7 @@ i2c6: i2c@1100d000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -783,7 +784,7 @@ i2c5: i2c@11016000 {
+ 			clocks = <&infracfg CLK_IFR_I2C_AP>,
+ 				 <&infracfg CLK_IFR_AP_DMA>;
+ 			clock-names = "main", "dma";
+-			clock-div = <5>;
++			clock-div = <1>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";

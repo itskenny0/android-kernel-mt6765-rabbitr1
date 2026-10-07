@@ -591,6 +591,7 @@
 				      "pwm4", "pwm5", "pwm6";
 		};
 
+		/* No fixed prescaler: the driver programs CLOCK_DIV itself. */
 		i2c0: i2c@11007000 {
 			compatible = "mediatek,mt6765-i2c",
 				     "mediatek,mt8183-i2c";
@@ -600,7 +601,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -615,7 +616,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -630,7 +631,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -658,7 +659,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -687,7 +688,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -755,7 +756,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -783,7 +784,7 @@
 			clocks = <&infracfg CLK_IFR_I2C_AP>,
 				 <&infracfg CLK_IFR_AP_DMA>;
 			clock-names = "main", "dma";
-			clock-div = <5>;
+			clock-div = <1>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";

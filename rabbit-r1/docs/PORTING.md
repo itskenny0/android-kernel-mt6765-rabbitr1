@@ -65,7 +65,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | MT6357 | Driver corrections and mocked register tests; [details](POWER.md) | PMIC access/IRQ and measured rail behavior |
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
 | USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
-| I2C | Fork has controller nodes; reported support remains partial | Clock/DMA/IRQ validation and repeated transfers on actual peripherals |
+| I2C | Corrected fixed-divider mismatch; production timing/init tests pass; [details](I2C.md) | Clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | Stock uses MT6370 charger and MT6357 battery | Correct board binding, limits, gauge/thermal behavior and charger detection |
 | Display | Vendor active sequence uses ST7701-style commands despite its ili9883 filename | Panel identity, reset/power/backlight, DSI timings, then DRM scanout |
 | Touch | Stock Hynitron node uses address `0x15`, reset GPIO174, interrupt GPIO0 | Silicon/protocol identification and input events without firmware auto-update |
