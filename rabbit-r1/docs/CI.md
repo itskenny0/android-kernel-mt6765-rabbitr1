@@ -36,6 +36,12 @@ checksums. `rabbit-r1-logs-<commit>` is uploaded even when a later step fails.
 Both artifacts are retained for 14 days. Download them from the run's Actions
 page and follow [FLASHING.md](FLASHING.md) before using a boot image.
 
+The [first hosted run](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/actions/runs/37671533107)
+passed in 17m55s at `98375f81dbc0b060aa04b8480868833b96779311`. Both uploaded
+artifacts were downloaded and their file checksums verified. The record is in
+[ci-first-run.json](research/ci-first-run.json). Later boot-review documentation
+identifies an unresolved [LK/DTBO compatibility issue](BOOT-NOTES.md).
+
 A green run means the build and listed offline checks passed. It does not
 establish a working r1 boot, charging, eMMC persistence or panic recovery. The
 known full DT-schema failures remain documented in [VALIDATION.md](VALIDATION.md);

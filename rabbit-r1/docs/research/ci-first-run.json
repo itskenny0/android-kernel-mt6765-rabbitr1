@@ -1,0 +1,22 @@
+{
+  "run_url": "https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/actions/runs/37671533107",
+  "source_commit": "98375f81dbc0b060aa04b8480868833b96779311",
+  "conclusion": "success",
+  "job_duration": "17m55s",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "package_sha256": "6a669742a7fc871ed01619bd424d23d7e6475c59fb39f03c986780c645d85db4",
+  "downloaded_artifacts_verified": true,
+  "artifacts": [
+    {
+      "id": 11506855129,
+      "name": "rabbit-r1-mainline-98375f81dbc0b060aa04b8480868833b96779311",
+      "bytes": 72101648
+    },
+    {
+      "id": 11506115794,
+      "name": "rabbit-r1-logs-98375f81dbc0b060aa04b8480868833b96779311",
+      "bytes": 44453
+    }
+  ],
+  "scope": "Build and offline tests only. No hardware boot test. See BOOT-NOTES.md for unresolved LK/DTBO compatibility."
+}
