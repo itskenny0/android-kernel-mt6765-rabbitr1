@@ -31,7 +31,8 @@ assert bus['interrupts'] == old_bus['interrupts']
 assert 'mediatek,use-push-pull' in bus and 'mediatek,use-push-pull' in old_bus
 assert cells(bus['clock-frequency']) == (100000,)
 assert cells(old_bus['clock-frequency'])[0] >= cells(bus['clock-frequency'])[0]
-assert cells(bus['clock-div']) == (1,)
+# MT6765 programs this divider in the timing register, as the stock driver does.
+assert bus['clock-div'] == old_bus['clock-div'] == struct.pack('>I', 5)
 assert nodes['/aliases']['i2c5'] == b'/soc/i2c@11016000\0'
 
 gpio_table = stock['/gpio@10005000']['gpio_init_default']
