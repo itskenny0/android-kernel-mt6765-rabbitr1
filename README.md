@@ -39,3 +39,6 @@ See [validation](rabbit-r1/docs/VALIDATION.md),
 [power notes](rabbit-r1/docs/POWER.md) and the
 [LineageOS 24 porting plan](rabbit-r1/docs/PORTING.md).
 The original Linux build documentation remains in [README](README).
+
+GitHub Actions builds the kernel and experimental mtkclient package on pushes
+and pull requests. See [CI.md](rabbit-r1/docs/CI.md) for checks and artifacts.

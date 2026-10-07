@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fetch locked sources and archives, keeping all writable state in /rabbitr1."""
+import argparse
 import hashlib
 import json
 import os
@@ -9,6 +10,10 @@ import tarfile
 import urllib.request
 
 ROOT = Path('/rabbitr1')
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--profile', choices=['full', 'ci'], default='full',
+                    help='ci fetches only mainline build and packaging dependencies')
+args = parser.parse_args()
 if not Path(__file__).resolve().is_relative_to(ROOT):
     raise SystemExit('This workspace must stay in /rabbitr1')
 os.chdir(ROOT)
@@ -33,6 +38,8 @@ def sha(path):
 
 lock = json.loads((ROOT/'sources.lock.json').read_text())
 for name, repo in lock['repositories'].items():
+    if args.profile == 'ci' and name != 'mkbootimg':
+        continue
     dest = local('src/'+name)
     if (dest/'.git').exists():
         head = run('git','-C',str(dest),'rev-parse','HEAD')
@@ -53,6 +60,8 @@ for name, repo in lock['repositories'].items():
     print(name, repo['commit'], flush=True)
 
 for name, item in lock['archives'].items():
+    if args.profile == 'ci' and name not in ['busybox-1.37.0.tar.bz2', 'rabbit_OS_v0.8.293.zip']:
+        continue
     dest = local('downloads/'+name)
     if not dest.exists():
         partial = dest.with_suffix(dest.suffix+'.part')
@@ -83,6 +92,26 @@ for name, item in lock['archives'].items():
                 tar.extractall(directory, members=members, filter='data')
             marker.write_text(item['sha256']+'\n')
     print(name, 'SHA256 verified', flush=True)
+
+if args.profile == 'ci':
+    # The regulator harness needs one vendor header, not the whole 4.19 tree.
+    for name, item in lock['ci_files'].items():
+        dest = local(name)
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            partial = dest.with_suffix(dest.suffix+'.part')
+            with urllib.request.urlopen(item['url'], timeout=120) as response, partial.open('wb') as f:
+                while chunk := response.read(1024*1024):
+                    f.write(chunk)
+            if partial.stat().st_size != item['bytes'] or sha(partial) != item['sha256']:
+                raise SystemExit('Download checksum mismatch: '+name)
+            partial.rename(dest)
+        if dest.stat().st_size != item['bytes'] or sha(dest) != item['sha256']:
+            raise SystemExit('Reference checksum mismatch: '+name)
+        print(name, 'SHA256 verified', flush=True)
+    # Build exactly the checked-out commit. Applying patches here could hide a
+    # regression in a pull request; check-patches.py verifies them separately.
+    raise SystemExit(0)
 
 src = local('src/mainline')
 for patch in sorted((ROOT/'patches/mainline').glob('*.patch')):

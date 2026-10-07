@@ -1,0 +1,159 @@
+name: Rabbit r1
+
+on:
+  push:
+    branches:
+      - mt6765-devel
+      - 'rabbit-r1/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rabbit-r1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TMPDIR: /rabbitr1/.tmp
+  XDG_CACHE_HOME: /rabbitr1/.cache
+  XDG_CONFIG_HOME: /rabbitr1/.cache/config
+  XDG_DATA_HOME: /rabbitr1/.cache/data
+  GIT_CONFIG_GLOBAL: /rabbitr1/.gitconfig
+  GIT_CONFIG_NOSYSTEM: '1'
+  GIT_TERMINAL_PROMPT: '0'
+  PYTHONDONTWRITEBYTECODE: '1'
+  JOBS: '4'
+
+jobs:
+  build:
+    name: Mainline build and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: /rabbitr1
+    steps:
+      # Fetch directly into the fixed workspace used by the build scripts.
+      # GITHUB_SHA is the PR merge commit for pull_request events.
+      - name: Check out the tested commit
+        working-directory: ${{ github.workspace }}
+        run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /rabbitr1
+          mkdir -p /rabbitr1/src/mainline /rabbitr1/.tmp /rabbitr1/.cache /rabbitr1/logs
+          git -C /rabbitr1/src/mainline init
+          git -C /rabbitr1/src/mainline remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -C /rabbitr1/src/mainline fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git -C /rabbitr1/src/mainline checkout --detach FETCH_HEAD
+          test "$(git -C /rabbitr1/src/mainline rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 /rabbitr1/src/mainline/rabbit-r1/scripts/install-workspace.py
+
+      - name: Install runner dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bc bison build-essential device-tree-compiler flex \
+            gcc-aarch64-linux-gnu libc6-dev-arm64-cross libelf-dev libssl-dev \
+            python3 qemu-user zstd
+
+      - name: Read source pins
+        id: pins
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import hashlib, json
+          from pathlib import Path
+          data = Path('sources.lock.json').read_bytes()
+          print('cache-key=' + hashlib.sha256(data).hexdigest())
+          print('patch-base=' + json.loads(data)['repositories']['mainline']['commit'])
+          PY
+
+      - name: Cache verified source archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /rabbitr1/downloads/busybox-1.37.0.tar.bz2
+            /rabbitr1/downloads/rabbit_OS_v0.8.293.zip
+          key: r1-sources-v1-${{ runner.os }}-${{ steps.pins.outputs.cache-key }}
+
+      - name: Fetch build inputs
+        env:
+          PATCH_BASE: ${{ steps.pins.outputs.patch-base }}
+        run: |
+          source scripts/env.sh
+          git -C src/mainline fetch --no-tags --depth=1 origin "$PATCH_BASE"
+          python3 scripts/fetch-sources.py --profile ci 2>&1 | tee logs/fetch-ci.log
+
+      - name: Check source and logging helpers
+        run: |
+          source scripts/env.sh
+          python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
+          python3 scripts/test-mt6357.py 2>&1 | tee logs/mt6357-tests.log
+          python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
+
+      - name: Build the kernel and modules
+        run: bash scripts/build-mainline.sh
+
+      - name: Build the diagnostic initramfs
+        run: bash scripts/build-initramfs.sh
+
+      - name: Inspect stock boot metadata
+        run: |
+          source scripts/env.sh
+          python3 scripts/inspect-stock.py 2>&1 | tee logs/inspect-stock.log
+
+      - name: Build and check the mtkclient package
+        run: |
+          source scripts/env.sh
+          python3 scripts/package-mtkclient.py 2>&1 | tee logs/package-mtkclient.log
+          python3 scripts/test-flash-package.py 2>&1 | tee logs/flash-package-tests.log
+
+      - name: Verify checksums and repeat packaging
+        run: |
+          source scripts/env.sh
+          for directory in dist/mainline dist/bringup dist/mtkclient; do
+            (cd "$directory" && sha256sum -c SHA256SUMS)
+          done
+          (cd dist && sha256sum -c rabbit-r1-mainline-mtkclient.zip.sha256)
+          sha256sum dist/bringup/initramfs.cpio.gz dist/rabbit-r1-mainline-mtkclient.zip > logs/repeat.sha256
+          r1_build_time src/mainline
+          python3 scripts/make-initramfs.py
+          python3 scripts/package-mtkclient.py
+          sha256sum -c logs/repeat.sha256 | tee logs/reproducibility.log
+          test -z "$(git -C src/mainline status --porcelain)"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rabbit-r1-mainline-${{ github.sha }}
+          path: |
+            /rabbitr1/dist/mainline/
+            /rabbitr1/dist/bringup/
+            /rabbitr1/dist/rabbit-r1-mainline-mtkclient.zip
+            /rabbitr1/dist/rabbit-r1-mainline-mtkclient.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rabbit-r1-logs-${{ github.sha }}
+          path: /rabbitr1/logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Describe the result
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "Rabbit r1 build result: $RESULT"
+            echo
+            echo 'Successful builds include the kernel, modules, initramfs and experimental mtkclient package.'
+            echo 'The expdb profile enables persistent logging; the RAM profile disables eMMC.'
+            echo 'CI checks image formats and software behavior. Hardware boot and persistence remain untested.'
+          } >> "$GITHUB_STEP_SUMMARY"
