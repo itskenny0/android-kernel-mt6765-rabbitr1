@@ -1,0 +1,151 @@
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+index bdd2ebef13..6fc31a5352 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/iio/adc/mediatek,mt6370_adc.h>
+ #include <dt-bindings/pinctrl/mediatek,mt6765-pinfunc.h>
+ #include "mt6765.dtsi"
+ #include "mt6357.dtsi"
+@@ -23,9 +24,20 @@ / {
+ 	chassis-type = "handset";
+ 
+ 	aliases {
++		i2c5 = &i2c5;
+ 		mmc0 = &mmc0;
+ 	};
+ 
++	power-monitor {
++		compatible = "iio-hwmon";
++		io-channels = <&r1_mt6370_adc MT6370_CHAN_VBUSDIV5>,
++			      <&r1_mt6370_adc MT6370_CHAN_VSYS>,
++			      <&r1_mt6370_adc MT6370_CHAN_VBAT>,
++			      <&r1_mt6370_adc MT6370_CHAN_IBUS>,
++			      <&r1_mt6370_adc MT6370_CHAN_IBAT>,
++			      <&r1_mt6370_adc MT6370_CHAN_TEMP_JC>;
++	};
++
+ 	chosen {
+ 		stdout-path = "serial0:921600n8";
+ 		/* Single CPU until the r1's PSCI/firmware behavior is measured. */
+@@ -104,6 +116,75 @@ &mt6357_vdram_reg {
+ 	regulator-always-on;
+ };
+ 
++&i2c5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r1_i2c5_pins>;
++	/* Keep the stock electrical mode, at standard speed for bring-up. */
++	mediatek,use-push-pull;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	r1_mt6370: pmic@34 {
++		compatible = "mediatek,mt6370";
++		reg = <0x34>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&r1_mt6370_irq_pins>;
++		interrupts-extended = <&pio 11 IRQ_TYPE_EDGE_FALLING>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++
++		r1_mt6370_adc: adc {
++			compatible = "mediatek,mt6370-adc";
++			#io-channel-cells = <1>;
++		};
++
++		/* MFD creates absent children too: explicitly gate unfinished ones. */
++		charger {
++			compatible = "mediatek,mt6370-charger";
++			interrupts = <68>, <48>, <6>;
++			interrupt-names = "uvp_d_evt", "attach_i", "mivr";
++			io-channels = <&r1_mt6370_adc MT6370_CHAN_IBUS>;
++			/* Needs battery limits, temperature policy and USB detection. */
++			status = "disabled";
++		};
++
++		r1_backlight: backlight {
++			compatible = "mediatek,mt6370-backlight";
++			mediatek,bled-channel-use = /bits/ 8 <15>;
++			mediatek,bled-ovp-microvolt = <29000000>;
++			mediatek,bled-ocp-microamp = <1500000>;
++			max-brightness = <512>;
++			default-brightness = <0>;
++			/* Keep LK's display state until the panel handoff is ready. */
++			status = "disabled";
++		};
++
++		tcpc {
++			compatible = "mediatek,mt6370-tcpc";
++			interrupts-extended = <&pio 41 IRQ_TYPE_EDGE_FALLING>;
++			status = "disabled";
++		};
++
++		indicator {
++			compatible = "mediatek,mt6370-indicator";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		flashlight {
++			compatible = "mediatek,mt6370-flashlight";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		/* Register the rails without requesting voltage or enable changes. */
++		regulators {
++		};
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&r1_mmc0_pins>;
+@@ -133,6 +214,21 @@ &u2phy {
+ };
+ 
+ &pio {
++	r1_i2c5_pins: i2c5-pins {
++		pins-bus {
++			pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
++				 <PINMUX_GPIO49__FUNC_SDA5>;
++			input-enable;
++		};
++	};
++
++	r1_mt6370_irq_pins: mt6370-irq-pins {
++		pins-irq {
++			pinmux = <PINMUX_GPIO11__FUNC_GPIO11>;
++			input-enable;
++		};
++	};
++
+ 	r1_uart0_pins: uart0-pins {
+ 		pins {
+ 			pinmux = <PINMUX_GPIO95__FUNC_URXD0>,
+diff --git a/arch/arm64/configs/rabbit_r1_defconfig b/arch/arm64/configs/rabbit_r1_defconfig
+index ed3dcf3e43..a698f2319a 100644
+--- a/arch/arm64/configs/rabbit_r1_defconfig
++++ b/arch/arm64/configs/rabbit_r1_defconfig
+@@ -358,6 +358,7 @@ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_SYSCON_REBOOT_MODE=y
+ CONFIG_CHARGER_GPIO=y
+ CONFIG_CHARGER_MT6370=y
++CONFIG_SENSORS_IIO_HWMON=y
+ CONFIG_CHARGER_BQ25890=y
+ CONFIG_CHARGER_BQ25980=y
+ CONFIG_SENSORS_ARM_SCMI=y
+@@ -593,6 +594,7 @@ CONFIG_IIO=y
+ CONFIG_IIO_SW_TRIGGER=y
+ CONFIG_MAX9611=y
+ CONFIG_MEDIATEK_MT6577_AUXADC=y
++CONFIG_MEDIATEK_MT6370_ADC=y
+ CONFIG_QCOM_SPMI_VADC=y
+ CONFIG_QCOM_SPMI_ADC5=y
+ CONFIG_IIO_ST_LSM6DSX=y

@@ -51,8 +51,9 @@ reference build select `CONFIG_MACH_MT6765` instead; `CONFIG_ARCH_MT6765` is not
 defined. That inactive code is not evidence that the r1 needs this write, and
 it has not been copied into mainline.
 
-The r1 board still leaves its I2C controllers disabled while these differences
-are investigated. No charger settings are changed by the divider correction.
+The r1 board enables I2C5 for the MT6370 power monitor at 100 kHz. It has no
+vendor channel-offset requirement. Other I2C controllers remain disabled.
+Successful real transfers, DMA completion and IRQ delivery are still unproven.
 
 ## r1 power devices
 
@@ -60,6 +61,24 @@ The verified stock overlay places the MT6370 sub-PMIC at address `0x34` on
 I2C5, with SCL on GPIO48, SDA on GPIO49 and the PMIC interrupt on GPIO11.
 The Type-C controller at `0x4e` uses a separate GPIO41 interrupt. These are r1
 values; another MT6765 handset's interrupt assignments are not interchangeable.
+
+The stock bus is **push-pull**, running at 3.4 MHz with the vendor `hs_only`
+setting. The mainline board preserves push-pull mode and the GPIO48/49 function
+muxes, but requests standard 100 kHz timing. It does not copy the vendor's
+nonstandard high-speed transaction setting or overwrite the loader's pin bias.
+The PMIC and Type-C interrupt definitions preserve the stock falling-edge type.
+
+The MFD driver owns both I2C addresses, so there is no separate `0x4e` client
+node. Its ADC is enabled; `iio-hwmon` exposes voltage/current channels and PMIC
+junction temperature. The charger, Type-C, backlight and LED children are
+explicitly disabled. Simply omitting them would allow the MFD core to create
+devices without their board configuration. See [POWER.md](POWER.md) for the
+initialization effects and the remaining charging work.
+
+`test-r1-power.py` checks the compiled board against the extracted stock FDT:
+controller registers/IRQ, bus mode, GPIO table muxes, I2C address and both PMIC
+interrupt lines. It also checks the monitoring channels, disabled child gates
+and stock backlight limits. CI runs it after extracting the verified firmware.
 
 Before enabling the charger, map its ADC and interrupt dependencies, stock
 current/voltage limits, Type-C detection and battery-temperature policy to

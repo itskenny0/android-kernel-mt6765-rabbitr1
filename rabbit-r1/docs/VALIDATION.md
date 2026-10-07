@@ -12,6 +12,8 @@
 | I2C programmable-divider calculation | PASS: 70 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
+| Compiled r1 power-device wiring | PASS against stock FDT, including IRQs, pin muxes and child gates | `logs/r1-power-tests.log` |
+| MT6370 and hwmon schemas | PASS, zero diagnostics for the new power nodes | `logs/r1-power-schema.log`, `out/r1-power-schema.json` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
 | Patch series on pristine affected files | PASS, all 9 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
@@ -64,6 +66,7 @@ python3 scripts/validate-kernel.py mainline
 python3 scripts/validate-kernel.py vendor
 python3 scripts/test-mt6357.py
 python3 scripts/test-mt6370.py
+python3 scripts/test-r1-power.py
 python3 scripts/test-i2c.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py

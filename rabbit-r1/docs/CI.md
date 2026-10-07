@@ -15,7 +15,8 @@ The workflow:
 2. Checks the patch series, MT6357 mappings, MT6370 current measurement, I2C
    timing, bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-4. Inspects stock metadata, builds patched LK and the LineageOS splash with
+4. Inspects stock metadata, compares the r1 power-device wiring against the
+   stock FDT, builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and

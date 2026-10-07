@@ -26,6 +26,17 @@ echo '=== Power supplies ==='
 for file in /sys/class/power_supply/*/uevent; do
     [ ! -r "$file" ] || cat "$file"
 done
+echo '=== Power monitor (voltage mV, current mA, chip temperature milli-Celsius) ==='
+for monitor in /sys/class/hwmon/hwmon*; do
+    [ -d "$monitor" ] || continue
+    echo "$monitor"
+    for file in "$monitor"/name "$monitor"/*_label "$monitor"/*_input; do
+        if [ -r "$file" ]; then
+            printf '%s: ' "${file##*/}"
+            cat "$file"
+        fi
+    done
+done
 echo '=== USB device controllers ==='
 ls /sys/class/udc
 echo '=== Persistent kernel log ==='

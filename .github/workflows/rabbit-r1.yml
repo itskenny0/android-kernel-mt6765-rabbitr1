@@ -111,6 +111,7 @@ jobs:
         run: |
           source scripts/env.sh
           python3 scripts/inspect-stock.py 2>&1 | tee logs/inspect-stock.log
+          python3 scripts/test-r1-power.py 2>&1 | tee logs/r1-power-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

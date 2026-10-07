@@ -126,6 +126,34 @@ reference release are checked on every path. Restoring positional indexing or
 the old unscaled-reading behavior makes the test fail. These are host tests;
 the actual ADC calibration, IRQ delivery and charger operation remain untested.
 
+## r1 power monitor
+
+I2C5 and the MT6370 MFD/ADC are now enabled in the r1 board file. The bus uses
+the stock push-pull mode and pin muxes, at 100 kHz for initial transfers.
+GPIO11 carries the PMIC interrupt; GPIO41 is reserved in the disabled Type-C
+node. `MEDIATEK_MT6370_ADC` and `SENSORS_IIO_HWMON` are built into the kernel.
+
+`r1-report` reads the hwmon labels and values for VBUSDIV5, VSYS, VBAT, IBUS,
+IBAT and TEMP_JC. Voltage and current are reported in mV and mA; temperature
+is in milli-degrees Celsius. TEMP_JC is the **PMIC junction temperature**, not
+battery temperature. TS_BAT is not exposed as a thermometer, and this does not
+provide battery capacity, a fuel gauge or Android health data.
+
+Probing the MFD checks its vendor ID and initializes its interrupt controller;
+the ADC driver resets its conversion register. Reading a measurement starts an
+ADC conversion. These are normal driver operations, not a passive bus sniffer.
+The regulator child registers the four rails without board voltage/enable
+constraints; the bring-up `regulator_ignore_unused` parameter retains firmware
+state. The charger, Type-C, backlight, indicator and flashlight child nodes are
+explicitly disabled so those drivers do not change their hardware settings.
+This does not guarantee or manage whatever charging state LK left behind.
+
+The MT6370 and hwmon schemas pass for these nodes. A compiled-DTB test compares
+the wiring with the stock image and rejects a changed IRQ or enabled unfinished
+child. Full-board schema validation still has the previously recorded 48
+diagnostics. Actual bus transfers, interrupt routing and measured ADC accuracy
+require the device; none are inferred from a successful build.
+
 ## Persistent logs
 
 The stock log partition is `expdb` (20 MiB). The mainline expdb boot profile

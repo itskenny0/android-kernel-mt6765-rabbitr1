@@ -91,6 +91,8 @@ def main():
                     'USB_CONFIGFS_F_FS','USB_CONFIGFS_ACM','BLK_DEV_INITRD','DEVTMPFS',
                     'BLK_DEV_DM','PSTORE','PSTORE_CONSOLE','PSTORE_PMSG','MMC_MTK','EFI_PARTITION']:
             assert f'CONFIG_{key}=y\n' in config, f'Missing CONFIG_{key}'
+        for key in ['MFD_MT6370', 'MEDIATEK_MT6370_ADC', 'SENSORS_IIO_HWMON']:
+            assert f'CONFIG_{key}=y\n' in config, f'Missing power monitor CONFIG_{key}'
         for key in ['USB_ETH','USB_G_HID','CPU_FREQ','CPU_IDLE','SUSPEND','HIBERNATION']:
             assert f'CONFIG_{key}=y\n' not in config and f'CONFIG_{key}=m\n' not in config, f'Unexpected CONFIG_{key}'
         for key in ['PSTORE_ZONE', 'PSTORE_BLK']:
