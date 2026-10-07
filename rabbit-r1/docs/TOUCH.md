@@ -78,6 +78,13 @@ the previous MT8183 fallback's `0x8c`. It still has no instance channel offset
 or firmware handshake. Routing, reset/arbitration, DMA ownership and firmware
 state must be resolved before enabling this bus. See [I2C.md](I2C.md).
 
+The stock ATF audit now verifies the selected I2C service path: controller ID 4,
+offset `0xf8c`, value 2 writes a halfword to `0x11011f8c` and returns zero.
+The audit executes the original firmware instructions and checks rejection
+paths too. It does not establish the earlier SMC caller checks or physical
+channel routing. This removes uncertainty about the service's arguments and
+return convention; the Linux channel implementation is still outstanding.
+
 ## Validation and acceptance
 
 `scripts/test-cst836.py` compiles the production transport, decoder, reporting

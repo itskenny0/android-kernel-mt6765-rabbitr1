@@ -86,6 +86,58 @@ terminal handling, restoring the old cleanup order, or copying failed buffers
 are rejected. This proves software sequencing against the model, not interrupt
 delivery, DMA quiescence or bus operation on hardware.
 
+## Stock secure-firmware interface
+
+The supplied RabbitOS v0.8.293 `tee.img` contains the ATF I2C service used by
+the vendor resume callback. The image is 140944 bytes with SHA256
+`e6de1331346ea1df4a0b78106de5ec5886f6eda99270de5e23ac9e7ba7101b62`.
+`inspect-stock.py` extracts it from the checksummed official archive for analysis;
+it is not patched or added to the flashing package.
+
+The 64-bit service number is `0xc20002a0`; the 32-bit counterpart is
+`0x820002a0`. The arguments are controller ID, register offset and value.
+The selected dispatch arms at file offsets `0x5d08` and `0x5fc0` call the
+same helper at `0xfcc0`. That helper indexes seven 12-byte records at
+`0x1cc08` and uses their base-address and enable fields:
+
+| Controller ID | Allowed base | Stock AP channel |
+| --- | --- | --- |
+| 0, 1, 5 | Rejected by the firmware service | No channel offset |
+| 2 | `0x11009000` | `0x100` |
+| 3 | `0x1100f000` | `0x100` |
+| 4 | `0x11011000` | `0x100` |
+| 6 | `0x1100d000` | `0x100` |
+
+The IDs and offsets above agree with the verified merged stock DT. Earlier
+notes omitted I2C6 from the channel list. The helper uses the table index,
+not its first word: entry 3 actually contains 2 in that unused word.
+Linux adapter numbers or aliases must not substitute for the firmware ID.
+
+The helper takes the low 12 bits of the requested offset, permits `0xf00`
+through `0xfa0`, and writes the low 16 bits of the value after a `dsb sy`.
+It returns 0 after the write and -1 on rejection. The dispatcher sign-extends
+that result into the saved caller context. Thus the vendor request
+`(4, 0xf8c, 2)` writes a halfword to `0x11011f8c`. This establishes the
+firmware-side write and return contract; it does not establish that the mode
+became active on silicon or that nonsecure direct access is permitted.
+
+`test-i2c-firmware.py` executes the unmodified selected dispatch arms, helper
+and return path in Unicorn. Its 64 cases cover both SMC conventions at two
+synthetic load addresses, all controller IDs, invalid IDs, register boundaries,
+offset masking and halfword truncation. It checks exact memory writes, signed
+results, stack restoration and callee-saved registers. The synthetic image
+bias has low bits `0x3c0`, which resolves the helper's ADRP/ADD to the actual
+table; it is not a claimed physical ATF load address. The real EL3 exception
+entry, earlier caller/security checks, clock state and hardware are outside
+this test. No host SMC is executed.
+
+For the channel implementation, configure mode while the controller clocks are
+enabled, check the firmware return value, and keep the adapter unavailable if
+setup fails. Restore it before transfers after resume. I2C5 must not make this
+call. Transfer setup still needs the AP bank; shared reset and arbitration
+recovery must continue to use bank zero. The stock service alone does not
+implement those Linux-side operations.
+
 ## Remaining controller work
 
 The correction does not establish full MT6765/MT8183 compatibility. Rabbit's
@@ -94,7 +146,7 @@ driver has additional behavior that still needs review:
 * `cnt_constraint` changes the step encoding when the sample count is one.
   The inherited algorithm also adjusts counts, but its divider-dependent rules need to be
   compared with the MT6765 hardware before claiming equivalent timing.
-* Controllers 2, 3 and 4 use additional channel offsets in the vendor DT.
+* Controllers 2, 3, 4 and 6 use additional channel offsets in the vendor DT.
   I2C4's AP transactions use `0x100`, while initialization uses channel zero.
   Its stock resume path asks ATF to restore shadow-register mode at `0xf8c`;
   the mainline driver still lacks that channel selection and firmware handshake.

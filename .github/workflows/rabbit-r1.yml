@@ -115,6 +115,7 @@ jobs:
           python3 scripts/inspect-stock.py 2>&1 | tee logs/inspect-stock.log
           python3 scripts/test-r1-power.py 2>&1 | tee logs/r1-power-tests.log
           python3 scripts/test-r1-touch.py 2>&1 | tee logs/r1-touch-tests.log
+          toolchains/boot-tools/bin/python scripts/test-i2c-firmware.py 2>&1 | tee logs/i2c-firmware-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

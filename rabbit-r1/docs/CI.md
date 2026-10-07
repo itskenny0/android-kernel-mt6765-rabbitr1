@@ -17,7 +17,8 @@ The workflow:
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
-   stock FDT, checks the draft touch wiring and disabled I2C4 gate, builds patched LK and the LineageOS splash with
+   stock FDT, checks the draft touch wiring and disabled I2C4 gate, emulates the
+   stock ATF I2C service, builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and

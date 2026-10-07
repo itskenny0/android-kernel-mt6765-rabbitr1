@@ -11,6 +11,7 @@
 | Original SRAM selector-mask regression | Rejected as expected | `logs/mt6357-selector-regression-before.log` |
 | I2C programmable-divider calculation | PASS: 140 MT6765/MT8183 production timing/init cases with MMIO stubs | `logs/i2c-tests.log` |
 | MT6765 transfer/IRQ handling | PASS: AP gate, faults, DMA cleanup, repeated starts and allocation errors; MT8183 regression checks | `logs/i2c-irq-tests.log`; MMIO/DMA model only |
+| Stock ATF I2C service | PASS: 64 selected-dispatch cases, firmware/DT IDs, exact writes, rejected requests and signed return | `logs/i2c-firmware-tests.log`, `out/i2c-firmware-audit.json`; excludes EL3 entry/caller checks and hardware |
 | I2C gate, terminal IRQ, DMA cleanup and failed-copy regressions | All rejected | `logs/i2c-irq-regression-*.log` |
 | MT6370 ADC selection and MIVR workaround | PASS: compact/full ADC lists, current units and error cleanup | `logs/mt6370-tests.log` |
 | MT6370 positional-index and current-scale regressions | Both rejected | `logs/mt6370-regression-*.log` |
@@ -81,6 +82,7 @@ python3 scripts/test-r1-touch.py
 python3 scripts/check-patches.py
 python3 scripts/test-expdb.py
 toolchains/boot-tools/bin/python scripts/test-lk.py
+toolchains/boot-tools/bin/python scripts/test-i2c-firmware.py
 python3 scripts/test-flash-package.py
 ```
 
