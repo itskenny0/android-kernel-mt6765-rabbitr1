@@ -52,6 +52,11 @@ The workflow:
    watchdog expiration, reuse, plane-disable fallback and cancellation before
    power-off/destruction. MMIO, DMA, PM, scheduling and unrelated services remain
    modeled; a permanent reset failure intentionally blocks unsafe teardown.
+   A pthread harness races the production IRQ against forced system suspend at
+   five points, including between channels. It executes the core force-PM
+   helpers and checks the IRQ gate, drain, suspend failures and resume failures
+   with PM enabled, plus IRQ access with PM disabled. Clocks, MMIO, PM bookkeeping
+   and IRQ-core synchronization remain models.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for

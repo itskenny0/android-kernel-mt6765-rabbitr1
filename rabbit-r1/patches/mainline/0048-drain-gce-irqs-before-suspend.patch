@@ -1,0 +1,67 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Drain GCE IRQs before suspend
+
+Close the IRQ access gate and wait for in-flight handlers before forced
+suspend removes clocks. Restore the gate only when power transitions allow
+IRQ access, and publish initialized channel state before the first handler.
+
+diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+index cfe8ecf3aa..00e3b5dc5c 100644
+--- a/drivers/mailbox/mtk-cmdq-mailbox.c
++++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+@@ -367,7 +367,8 @@ static irqreturn_t cmdq_irq_handler(int irq, void *dev)
+ 	unsigned long irq_status, flags = 0L;
+ 	int bit;
+ 
+-	if (!READ_ONCE(cmdq->irq_ready))
++	/* Pair with gate publication after initialization and power transitions. */
++	if (!smp_load_acquire(&cmdq->irq_ready))
+ 		return IRQ_NONE;
+ 	if (IS_ENABLED(CONFIG_PM) && pm_runtime_get_if_active(cmdq->mbox.dev) <= 0)
+ 		return IRQ_NONE;
+@@ -437,9 +438,20 @@ static int cmdq_suspend(struct device *dev)
+ 			break;
+ 	}
+ 
+-	ret = task_running ? -EBUSY : pm_runtime_force_suspend(dev);
+-	if (ret)
++	if (task_running) {
+ 		WRITE_ONCE(cmdq->suspended, false);
++		return -EBUSY;
++	}
++
++	/* Forced suspend ignores an in-flight handler's runtime-PM reference. */
++	WRITE_ONCE(cmdq->irq_ready, false);
++	synchronize_irq(cmdq->irq);
++	ret = pm_runtime_force_suspend(dev);
++	if (ret) {
++		/* Publish the restored PM state before admitting another handler. */
++		smp_store_release(&cmdq->irq_ready, true);
++		WRITE_ONCE(cmdq->suspended, false);
++	}
+ 	return ret;
+ }
+ 
+@@ -449,8 +461,11 @@ static int cmdq_resume(struct device *dev)
+ 	int ret;
+ 
+ 	ret = pm_runtime_force_resume(dev);
+-	if (!ret)
++	if (!ret) {
++		/* Publish the resumed PM state before admitting another handler. */
++		smp_store_release(&cmdq->irq_ready, true);
+ 		WRITE_ONCE(cmdq->suspended, false);
++	}
+ 	return ret;
+ }
+ 
+@@ -865,7 +880,8 @@ static int cmdq_probe(struct platform_device *pdev)
+ 		dev_err(dev, "failed to register mailbox: %d\n", err);
+ 		return err;
+ 	}
+-	WRITE_ONCE(cmdq->irq_ready, true);
++	/* Publish the initialized mailbox channel locks to the IRQ handler. */
++	smp_store_release(&cmdq->irq_ready, true);
+ 
+ 	return 0;
+ }

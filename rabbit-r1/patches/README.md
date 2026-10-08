@@ -127,3 +127,8 @@ and drains before reuse, power-off or destruction. IRQ retirement, submission
 errors, suspend and managed clock cleanup follow the same lifetime rules.
 Permanent reset failure blocks teardown; hardware validation remains outstanding.
 See `docs/DISPLAY.md` for the integrated tests and their limits.
+
+Patch 0048 closes the GCE IRQ access gate and drains in-flight handlers before
+forced system suspend removes clocks. Failed suspend restores the gate; failed
+resume keeps it closed. Pthread tests execute the real controller callbacks and
+core force-PM helpers with modeled hardware and IRQ-core synchronization.

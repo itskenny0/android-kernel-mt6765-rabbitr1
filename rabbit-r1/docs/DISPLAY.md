@@ -395,6 +395,16 @@ new submissions; managed cleanup releases the mailbox, runtime PM and IRQ before
 disabling/unpreparing clocks. IRQ handling starts only after channel locks have
 been initialized by mailbox registration.
 
+System suspend also closes the IRQ access gate and calls `synchronize_irq()`
+before forced runtime suspend. Unlike ordinary runtime suspend, the forced
+helper can disable clocks despite a handler's usage reference. Checking empty
+task lists does not drain a handler between channel visits. The gate prevents
+new calls from a shared IRQ from accessing the controller while existing
+handlers finish. Failed suspend restores access; failed resume keeps it closed.
+Acquire/release publication also makes initialized channel locks visible before
+the first permitted IRQ. The shared interrupt line itself stays available to
+other devices.
+
 The existing `mbox_flush` retains balanced references, failed-stop ownership,
 reset-before-cancellation ordering and millisecond timeouts, but the display no
 longer uses it to infer ownership. The CPU/shadow display paths remain available.
@@ -418,6 +428,18 @@ clock removal or unmapping. DRM event helpers execute; core on/off, MMIO, DMA,
 scheduling, PM and unrelated component services remain models. Thirty compiled
 faulty variants fail at runtime under these ASan/UBSan harnesses. CRTC/controller
 objects compile for AArch64, and the 180-case DSI startup test still passes.
+
+`test-cmdq-power.py` runs the production IRQ, thread IRQ and system/runtime PM
+callbacks with the real `pm_runtime_force_suspend` and `pm_runtime_force_resume`
+helpers. Pthreads pause a live handler at five points, including between two
+channel visits, while a second thread suspends the controller. Sixteen PM-enabled
+cases cover those races, already-suspended hardware, busy channels and failed
+suspend/resume; two PM-disabled cases check powered IRQ access and the closed
+gate. MMIO, clocks, PM bookkeeping and IRQ-core synchronization are modeled.
+The previous implementation reads registers after modeled clock removal, both
+after its PM get and between channel visits. Eight compiled broken variants
+are also rejected. These ASan/UBSan checks establish software ordering, not
+physical clock-gating or DMA guarantees.
 
 These are software ownership checks, not physical DMA, frame-presentation or
 firmware-handoff validation. Display remains disabled pending the remaining

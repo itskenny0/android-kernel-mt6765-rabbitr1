@@ -60,6 +60,8 @@ typedef uint64_t dma_addr_t;
 #define dev_err_ratelimited(dev,...) ((void)(dev))
 #define READ_ONCE(x) (x)
 #define WRITE_ONCE(x,v) ((x)=(v))
+#define smp_load_acquire(p) (*(p))
+#define smp_store_release(p,v) (*(p)=(v))
 #define IS_ALIGNED(x,a) (!((x)&((a)-1)))
 #define EXPORT_SYMBOL_GPL(x)
 #define GFP_ATOMIC 0
@@ -141,6 +143,7 @@ static unsigned int clock_disables,clock_unprepares;
 static u64 elapsed_us,complete_at;
 static bool scheduled;
 static unsigned int stop_sleeps,reset_after_sleeps;
+static void synchronize_irq(unsigned int irq) { (void)irq;assert(!lock_count && !controller.irq_ready); }
 static void msleep(unsigned int ms) { assert(ms==20 && !lock_count && device.refs>0);stop_sleeps++;assert(stop_sleeps<4);if(stop_sleeps==reset_after_sleeps){device.fail=false;fail_reset=false;} }
 static void deliver_irq(void);
 struct platform_device { int unused; };
@@ -432,7 +435,7 @@ def build(source_path):
     probe = block(source, 'cmdq_probe')
     order = ['clk_bulk_prepare(', 'devm_add_action_or_reset(', 'cmdq_init(',
              'devm_request_irq(', 'devm_pm_runtime_enable(', 'devm_mbox_controller_register(',
-             'WRITE_ONCE(cmdq->irq_ready, true)']
+             'smp_store_release(&cmdq->irq_ready, true)']
     positions = [probe.index(call) for call in order]
     assert positions == sorted(positions), 'unsafe managed resource/IRQ publication order'
     core = (SRC/'drivers/mailbox/mailbox.c').read_text()
