@@ -128,7 +128,7 @@ the actual ADC calibration, IRQ delivery and charger operation remain untested.
 
 ## MT6357 battery-sense ADC
 
-The upstream `mt6359-auxadc` driver also supports MT6357, but its inherited
+The `mt6359-auxadc` driver in this fork supports MT6357, but its inherited
 tables and conversion code had several problems. The corrections use Rabbit's
 published `drivers/iio/adc/mt635x-auxadc.c`, its MT6357 register definitions, and
 the shipped v0.8.293 device tree:
@@ -189,11 +189,46 @@ probe and reset functions; allocation, registration and the bus are modeled.
 Eleven deliberately broken reset variants fail the runtime assertions; the
 13 conversion regressions still fail as well.
 
-MT6357 ADC and charging remain disabled in the diagnostic kernel. Impedance
-conversion, battery-current compensation and the temperature policy still
-need work before enabling battery management. An ADC voltage is not yet a
+MT6357 ADC and charging remain disabled in the diagnostic kernel. Battery-current
+compensation and the temperature policy still need work before enabling battery
+management. An ADC voltage is not yet a
 temperature or a fuel-gauge reading. Physical reset timing and interaction
 with firmware requesters remain untested.
+
+### Impedance voltage sampling and binding IDs
+
+MT6357 now has its own impedance-conversion callback. Rabbit's driver sets
+`IMP_CG0` software-mode bit 0, then enable bit 1, then `IMP1` auto-repeat bit
+15. It waits for `IMP0` bit 8 and reads ADC33 before stopping. The shutdown
+sequence pulses `IMP0` bits 14/7, clears auto-repeat, clears software mode,
+and leaves enable bit 1 set. The inherited MT6358 callback cleared both clock
+bits. The MT6358 and MT6359 callbacks remain separate.
+
+Every MT6357 start, poll, data-read and cleanup operation now checks the bus
+result. All five cleanup writes are attempted after a partial start or a
+failed read. A failed cleanup marks the ADC as needing reset, so later reads
+cannot start until reset succeeds. The caller receives the first failure and
+no output value. Successful results contain only the 15 data bits, excluding
+the ready flag. The hardware's impedance mode supplies a battery-voltage
+sample; it does not calculate battery current or resistance. Current requests
+are rejected instead of returning a fabricated zero.
+
+`test-mt6357-imp.py` compiles the actual MT6357 callback, registered callback
+selection, reset and IIO read functions with ASan/UBSan. It compares the start
+and stop operations with the pinned Rabbit driver and register fields. It
+covers 48 conversion cases, 71 bus-failure/timeout cases, 21 recovery cases,
+status-bit masking and preservation of unrelated fields. Clearing the modeled
+conversion destroys its data, which checks that the read happens first.
+Twelve faulty variants are rejected by runtime assertions. Regmap operations,
+locks and readiness are modeled; these results do not establish electrical
+accuracy or real PMIC timing.
+
+The common firmware-channel lookup now matches binding IDs to `channel`
+fields instead of using IDs as array indices. On MT6357, VBIF ID 13 would
+otherwise be rejected, while DCXO ID 9 would select VBIF. Reserved or absent
+channels and malformed specifiers return `-EINVAL`. The ADC harness covers
+440 lookups across all five PMIC tables, including reversed tables, wide IDs
+and incorrect cell counts. Six lookup regressions fail the runtime checks.
 
 ### Battery policy recovered from stock
 

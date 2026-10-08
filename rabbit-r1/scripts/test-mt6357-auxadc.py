@@ -111,9 +111,15 @@ struct iio_chan_spec {
 struct iio_dev {
     void *priv;
     const char *name;
-    const void *info;
+    const struct iio_info *info;
     int modes, num_channels;
     const struct iio_chan_spec *channels;
+};
+struct fwnode_reference_args { unsigned int nargs; uint64_t args[8]; };
+struct iio_info {
+    int (*fwnode_xlate)(struct iio_dev *, const struct fwnode_reference_args *);
+    int (*read_label)(struct iio_dev *, const struct iio_chan_spec *, char *);
+    int (*read_raw)(struct iio_dev *, const struct iio_chan_spec *, int *, int *, long);
 };
 static void *iio_priv(struct iio_dev *dev) { return dev->priv; }
 struct regmap { unsigned int regs[0x2000]; struct mutex *lock; };
@@ -177,16 +183,18 @@ static int regmap_update_bits(struct regmap *map, unsigned int reg,
     } rc; })
 static void fsleep(unsigned int delay) { assert(delay > 0); }
 '''
-prelude += f'#include "{SRC}/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h"\n'
-body = s[s.index('#define AUXADC_AVG_TIME_US'):s.index('static const struct iio_chan_spec mt6358_auxadc_channels')]
+for model in ('mt6357', 'mt6358', 'mt6359', 'mt6363'):
+    prelude += f'#include "{SRC}/include/dt-bindings/iio/adc/mediatek,{model}-auxadc.h"\n'
+body = s[s.index('#define AUXADC_AVG_TIME_US'):s.index('static int mt6357_stop_imp_conv')]
 # Compile the common production conversion and the MT6357-specific callback.
 for name in ('mt6357_auxadc_restore_requests', 'mt6359_auxadc_reset', 'mt6359_auxadc_sample_adc_val',
-             'mt6359_auxadc_read_adc', 'mt6357_auxadc_read_adc', 'mt6359_auxadc_read_raw'):
+             'mt6359_auxadc_read_adc', 'mt6357_auxadc_read_adc', 'mt6359_auxadc_read_raw',
+             'mt6359_auxadc_fwnode_xlate'):
     if name != 'mt6357_auxadc_read_adc' or 'static int mt6357_auxadc_read_adc(' in s:
         body += function(name)
 body += '''
 /* Impedance conversion is separate and is not exercised by this harness. */
-static int mt6358_read_imp(struct mt6359_auxadc *adc, const struct iio_chan_spec *c,
+static int mt6357_read_imp(struct mt6359_auxadc *adc, const struct iio_chan_spec *c,
                           int *vbat, int *ibat) { return -EOPNOTSUPP; }
 '''
 start = s.index('static const struct mtk_pmic_auxadc_info mt6357_chip_info = {')
@@ -196,11 +204,16 @@ body += 'static const struct expected expected[] = {\n'
 for name, req, mask, out, width, ratio in expected:
     body += f'{{MT6357_AUXADC_{name}, {req}, {mask}, {out}, {width}, {ratio}}},\n'
 body += '};\n'
+body += '''
+static int mt6359_auxadc_read_label(struct iio_dev *d, const struct iio_chan_spec *c, char *label)
+{ return -EOPNOTSUPP; }
+'''
+info_start = s.index('static const struct iio_info mt6359_auxadc_iio_info = {')
+body += s[info_start:s.index('\n};', info_start)+3]+'\n'
 body += r'''
 /* Probe runs before registration, so no user can race its initialization. */
 #define INDIO_DIRECT_MODE 1
 #define dev_err_probe(dev,err,...) (err)
-static const int mt6359_auxadc_iio_info;
 static struct regmap probe_map;
 static struct mt6359_auxadc probe_adc;
 static struct iio_dev probe_dev;
@@ -463,12 +476,59 @@ int main(void)
         assert(registrations == (fail ? 0U : 1U));
         if (!fail) {
             assert(probe_dev.channels == chip.channels && probe_dev.num_channels == chip.num_channels);
+            assert(probe_dev.info == &mt6359_auxadc_iio_info);
             assert(probe_map.regs[0x110e] == 0x80 && probe_map.regs[0x111a] == 0x400);
         }
         resets++;
     }
+    /* Exercise the registered translation callback on every PMIC's table.
+     * Reversing a table must not alter which binding ID selects a channel. */
+    struct { const struct iio_chan_spec *channels; int count; } tables[] = {
+        {mt6357_auxadc_channels,ARRAY_SIZE(mt6357_auxadc_channels)},
+        {mt6358_auxadc_channels,ARRAY_SIZE(mt6358_auxadc_channels)},
+        {mt6359_auxadc_channels,ARRAY_SIZE(mt6359_auxadc_channels)},
+        {mt6363_auxadc_channels,ARRAY_SIZE(mt6363_auxadc_channels)},
+        {mt6373_auxadc_channels,ARRAY_SIZE(mt6373_auxadc_channels)},
+    };
+    unsigned int translations=0;
+    const struct iio_info *info=&mt6359_auxadc_iio_info;
+    assert(info->fwnode_xlate);
+    for (unsigned int table=0; table<ARRAY_SIZE(tables); table++)
+    for (unsigned int reverse=0; reverse<2; reverse++) {
+        struct iio_chan_spec channels[32];
+        int count=tables[table].count;
+        assert(count <= 32);
+        for (int i=0; i<count; i++)
+            channels[i]=tables[table].channels[reverse ? count-1-i : i];
+        struct iio_dev translated={.channels=channels,.num_channels=count};
+        struct fwnode_reference_args args={.nargs=1};
+        for (uint64_t id=0; id<=32; id++) {
+            args.args[0]=id;
+            int want=-EINVAL;
+            for (int i=0; i<count; i++)
+                if ((uint64_t)channels[i].channel == id) {
+                    assert(want == -EINVAL); want=i;
+                }
+            assert(info->fwnode_xlate(&translated,&args) == want);
+            translations++;
+        }
+        const uint64_t invalid[]={UINT32_MAX,UINT64_C(0x100000000),UINT64_MAX};
+        for (unsigned int i=0; i<ARRAY_SIZE(invalid); i++) {
+            args.args[0]=invalid[i];
+            assert(info->fwnode_xlate(&translated,&args) == -EINVAL);
+            translations++;
+        }
+        args.args[0]=channels[0].channel;
+        for (unsigned int nargs=0; nargs<=8; nargs++) {
+            if (nargs == 1) continue;
+            args.nargs=nargs;
+            assert(info->fwnode_xlate(&translated,&args) == -EINVAL);
+            translations++;
+        }
+    }
     printf("PASS: %u ADC cases and %u injected mux-bus errors; 12 MT6357 mappings, voltage units, scale, mux restoration, external-input cleanup and locked timeout recovery\n",cases,errors);
     printf("PASS: %u reset/probe scenarios; stock restart sequence, keyed cleanup, repeated failures, conversion gating, timeout errors and failed-probe registration refusal\n",resets);
+    printf("PASS: %u binding lookups across five PMIC tables and reversed tables; reserved IDs, wide IDs and wrong cell counts rejected\n",translations);
     return 0;
 }
 '''

@@ -42,6 +42,8 @@
 #define MT6357_AUXADC_RQST1		0x111a
 #define MT6357_DCXO_CH4_MUX_AP_SEL	BIT(4)
 #define MT6357_BATON_TDET_EN		BIT(1)
+#define MT6357_IMP_CK_SW_MODE		BIT(0)
+#define MT6357_IMP_CK_SW_EN		BIT(1)
 #define MT6358_IMP_ADC_NUM		28
 
 #define MT6358_DCM_CK_SW_EN		GENMASK(1, 0)
@@ -464,6 +466,80 @@ static const struct mtk_pmic_auxadc_chan mt6373_auxadc_ch_desc[] = {
 			      PMIC_AUXADC_SDMADC_CON0, 5, MT6363_PULLUP_RES_OPEN, 32, 1, 1),
 };
 
+static int mt6357_stop_imp_conv(struct mt6359_auxadc *adc_dev)
+{
+	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
+	struct regmap *regmap = adc_dev->regmap;
+	int ret, err;
+
+	/* Attempt every cleanup write, even after an ambiguous bus failure. */
+	ret = regmap_set_bits(regmap, cinfo->regs[PMIC_AUXADC_IMP0], MT6358_IMP0_CLEAR);
+	err = regmap_clear_bits(regmap, cinfo->regs[PMIC_AUXADC_IMP0], MT6358_IMP0_CLEAR);
+	if (!ret)
+		ret = err;
+	err = regmap_clear_bits(regmap, cinfo->regs[PMIC_AUXADC_IMP1],
+				MT6358_IMP1_AUTOREPEAT_EN);
+	if (!ret)
+		ret = err;
+	/* MT6357 returns to hardware clock control with SW_EN left set. */
+	err = regmap_clear_bits(regmap, cinfo->regs[PMIC_AUXADC_DCM_CON],
+				MT6357_IMP_CK_SW_MODE);
+	if (!ret)
+		ret = err;
+	err = regmap_set_bits(regmap, cinfo->regs[PMIC_AUXADC_DCM_CON], MT6357_IMP_CK_SW_EN);
+	if (!ret)
+		ret = err;
+	if (ret)
+		adc_dev->needs_reset = true;
+
+	return ret;
+}
+
+static int mt6357_read_imp(struct mt6359_auxadc *adc_dev,
+			   const struct iio_chan_spec *chan, int *vbat, int *ibat)
+{
+	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
+	const struct mtk_pmic_auxadc_chan *desc = &cinfo->desc[chan->scan_index];
+	struct regmap *regmap = adc_dev->regmap;
+	u32 val;
+	int ret, stop_ret;
+
+	/* Battery current comes from the separate fuel gauge. */
+	if (ibat)
+		return -EOPNOTSUPP;
+	if (!vbat)
+		return -EINVAL;
+
+	ret = regmap_set_bits(regmap, cinfo->regs[PMIC_AUXADC_DCM_CON], MT6357_IMP_CK_SW_MODE);
+	if (ret)
+		goto stop;
+	ret = regmap_set_bits(regmap, cinfo->regs[PMIC_AUXADC_DCM_CON], MT6357_IMP_CK_SW_EN);
+	if (ret)
+		goto stop;
+	ret = regmap_set_bits(regmap, cinfo->regs[PMIC_AUXADC_IMP1], MT6358_IMP1_AUTOREPEAT_EN);
+	if (ret)
+		goto stop;
+
+	ret = regmap_read_poll_timeout(regmap, cinfo->regs[desc->rdy_idx],
+				       val, val & desc->rdy_mask,
+				       IMP_POLL_DELAY_US, AUXADC_TIMEOUT_US);
+	if (ret)
+		goto stop;
+
+	/* Read ADC33 before clearing the impedance conversion. */
+	ret = regmap_read(regmap, cinfo->regs[PMIC_AUXADC_ADC0] + (cinfo->imp_adc_num << 1),
+			  &val);
+stop:
+	stop_ret = mt6357_stop_imp_conv(adc_dev);
+	if (ret)
+		return ret;
+	if (stop_ret)
+		return stop_ret;
+
+	*vbat = val & GENMASK(chan->scan_type.realbits - 1, 0);
+	return 0;
+}
+
 static void mt6358_stop_imp_conv(struct mt6359_auxadc *adc_dev)
 {
 	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
@@ -588,7 +664,7 @@ static const struct mtk_pmic_auxadc_info mt6357_chip_info = {
 	.imp_adc_num = MT6357_IMP_ADC_NUM,
 	.restore_requests = mt6357_auxadc_restore_requests,
 	.read_adc = mt6357_auxadc_read_adc,
-	.read_imp = mt6358_read_imp,
+	.read_imp = mt6357_read_imp,
 	.vref_mV = 1800,
 };
 
@@ -919,7 +995,24 @@ static int mt6359_auxadc_read_raw(struct iio_dev *indio_dev,
 	return IIO_VAL_INT;
 }
 
+static int mt6359_auxadc_fwnode_xlate(struct iio_dev *indio_dev,
+				    const struct fwnode_reference_args *iiospec)
+{
+	int i;
+
+	if (iiospec->nargs != 1)
+		return -EINVAL;
+
+	/* Binding IDs are not array positions when a PMIC omits a channel. */
+	for (i = 0; i < indio_dev->num_channels; i++)
+		if ((unsigned int)indio_dev->channels[i].channel == iiospec->args[0])
+			return i;
+
+	return -EINVAL;
+}
+
 static const struct iio_info mt6359_auxadc_iio_info = {
+	.fwnode_xlate = mt6359_auxadc_fwnode_xlate,
 	.read_label = mt6359_auxadc_read_label,
 	.read_raw = mt6359_auxadc_read_raw,
 };
