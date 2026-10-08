@@ -847,8 +847,7 @@
 		};
 
 		dsi_phy: dsi-phy@11c80000 {
-			compatible = "mediatek,mt6765-mipi-tx",
-				     "mediatek,mt8183-mipi-tx";
+			compatible = "mediatek,mt6765-mipi-tx";
 			reg = <0 0x11c80000 0 0x1000>;
 			clocks = <&apmixed CLK_APMIXED_MIPID0_26M>;
 			power-domains = <&spm MT6765_POWER_DOMAIN_DISP>;

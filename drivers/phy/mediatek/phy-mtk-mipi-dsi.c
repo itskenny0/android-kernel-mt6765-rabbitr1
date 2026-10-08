@@ -35,13 +35,23 @@ static int mtk_mipi_tx_power_on(struct phy *phy)
 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
 	int ret;
 
+	if (mipi_tx->driver_data->mipi_tx_prepare_signal) {
+		ret = mipi_tx->driver_data->mipi_tx_prepare_signal(phy);
+		if (ret)
+			return ret;
+	}
+
 	/* Power up core and enable PLL */
 	ret = clk_prepare_enable(mipi_tx->pll_hw.clk);
-	if (ret < 0)
+	if (ret < 0) {
+		if (mipi_tx->driver_data->mipi_tx_unprepare_signal)
+			mipi_tx->driver_data->mipi_tx_unprepare_signal(phy);
 		return ret;
+	}
 
 	/* Enable DSI Lane LDO outputs, disable pad tie low */
-	mipi_tx->driver_data->mipi_tx_enable_signal(phy);
+	if (mipi_tx->driver_data->mipi_tx_enable_signal)
+		mipi_tx->driver_data->mipi_tx_enable_signal(phy);
 	return 0;
 }
 
@@ -50,10 +60,14 @@ static int mtk_mipi_tx_power_off(struct phy *phy)
 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
 
 	/* Enable pad tie low, disable DSI Lane LDO outputs */
-	mipi_tx->driver_data->mipi_tx_disable_signal(phy);
+	if (mipi_tx->driver_data->mipi_tx_disable_signal)
+		mipi_tx->driver_data->mipi_tx_disable_signal(phy);
 
 	/* Disable PLL and power down core */
 	clk_disable_unprepare(mipi_tx->pll_hw.clk);
+
+	if (mipi_tx->driver_data->mipi_tx_unprepare_signal)
+		mipi_tx->driver_data->mipi_tx_unprepare_signal(phy);
 
 	return 0;
 }
@@ -133,6 +147,7 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
 	if (IS_ERR(ref_clk))
 		return dev_err_probe(dev, PTR_ERR(ref_clk),
 				     "Failed to get reference clock\n");
+	mipi_tx->ref_clk = ref_clk;
 
 	ret = of_property_read_u32(dev->of_node, "drive-strength-microamp",
 				   &mipi_tx->mipitx_drive);
@@ -174,13 +189,15 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
 
 	mipi_tx->dev = dev;
 
-	mtk_mipi_tx_get_calibration_datal(mipi_tx);
+	if (!mipi_tx->driver_data->preserve_fw_calibration)
+		mtk_mipi_tx_get_calibration_datal(mipi_tx);
 
 	return devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get, &mipi_tx->pll_hw);
 }
 
 static const struct of_device_id mtk_mipi_tx_match[] = {
 	{ .compatible = "mediatek,mt2701-mipi-tx", .data = &mt2701_mipitx_data },
+	{ .compatible = "mediatek,mt6765-mipi-tx", .data = &mt6765_mipitx_data },
 	{ .compatible = "mediatek,mt8173-mipi-tx", .data = &mt8173_mipitx_data },
 	{ .compatible = "mediatek,mt8183-mipi-tx", .data = &mt8183_mipitx_data },
 	{ /* sentinel */ }

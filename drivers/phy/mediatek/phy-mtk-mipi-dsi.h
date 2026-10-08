@@ -19,8 +19,12 @@
 struct mtk_mipitx_data {
 	const u32 mppll_preserve;
 	const struct clk_ops *mipi_tx_clk_ops;
+	/* Optional sleepable setup before PLL enable and teardown after disable. */
+	int (*mipi_tx_prepare_signal)(struct phy *phy);
+	void (*mipi_tx_unprepare_signal)(struct phy *phy);
 	void (*mipi_tx_enable_signal)(struct phy *phy);
 	void (*mipi_tx_disable_signal)(struct phy *phy);
+	bool preserve_fw_calibration;
 };
 
 struct mtk_mipi_tx {
@@ -29,6 +33,8 @@ struct mtk_mipi_tx {
 	u32 data_rate;
 	u32 mipitx_drive;
 	u32 rt_code[5];
+	bool rt_code_saved;
+	struct clk *ref_clk;
 	const struct mtk_mipitx_data *driver_data;
 	struct clk_hw pll_hw;
 };
@@ -40,6 +46,7 @@ unsigned long mtk_mipi_tx_pll_recalc_rate(struct clk_hw *hw,
 					  unsigned long parent_rate);
 
 extern const struct mtk_mipitx_data mt2701_mipitx_data;
+extern const struct mtk_mipitx_data mt6765_mipitx_data;
 extern const struct mtk_mipitx_data mt8173_mipitx_data;
 extern const struct mtk_mipitx_data mt8183_mipitx_data;
 

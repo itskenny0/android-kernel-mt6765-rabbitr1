@@ -1,7 +1,8 @@
 # rabbit r1 display bring-up
 
 The kernel includes a board-specific `panel-rabbit-r1` driver and a disabled
-DSI graph. The panel callbacks and selected native MT6765 host setup registers
+DSI graph. The panel callbacks, selected native MT6765 host setup registers
+and native PHY setup/shutdown sequence
 match the shipped RabbitOS v0.8.293 code in offline tests.
 **There is no working display result yet.** DSI, its PHY and
 the MT6370 backlight stay disabled, and `CONFIG_DRM_MEDIATEK` stays unset.
@@ -125,7 +126,7 @@ handoff dependency; its reset value and cold-start behavior are not established.
 
 Mode validation rejects field overflow, packet-overhead underflow, invalid
 lane counts and unsupported formats. Bring-up is restricted to the audited
-125..1500 Mbit/s range, within the inherited PHY driver's software limits;
+125..1500 Mbit/s range covered by the digital timing audit;
 these are not established MT6765 silicon limits. Power-on checks the full
 64-bit rate before narrowing it and unwinds its reference count on format,
 clock or PHY errors. A failed PHY startup stops further host programming.
@@ -151,7 +152,7 @@ MT8183 setup. The recorded
 This audit covers selected setup writes, not all controller registers or
 startup sequencing. It excludes the stock `MEM_CONTI` setup at `0x90`, packet
 transmission, the analog PHY/PLL, clocks, MMSYS routing and complete DRM path.
-The PHY still inherits an MT8183 fallback and must be audited before activation.
+The separate native PHY audit is described below.
 
 An independent host API bug is fixed: successful writes now return `tx_len`
 instead of zero, as required by `mipi_dsi_host_ops.transfer`. Without this,
@@ -161,12 +162,64 @@ types, lengths 0..64 and all four host modes. It also checks mode restoration,
 command/switch failures and an unchanged one-byte read path. The MMIO, IRQ and
 transport operations are modeled, not hardware-tested.
 
+## Native PHY and PLL
+
+`mediatek,mt6765-mipi-tx` now selects a native backend. It follows the published
+`DSI_DPHY_clk_setting` and `DSI_DPHY_clk_switch` sequence, also recovered from
+the shipped Image. The stock compiler inlines setup into `_DSI_PHY_clk_setting`
+at raw offset `0x714ae4`; the on/off wrapper is at `0x715810`.
+
+The shared PHY driver now provides optional setup before PLL enable and teardown
+after PLL disable. Existing backends retain their original callback order.
+The MT6765 setup holds an extra reference-clock reference across both phases,
+so analog registers remain accessible before and after the PLL's own clock
+reference. The 500 us bandgap wait runs in the sleepable setup callback;
+the PLL enable callback uses atomic-safe register access and 2 us / 50 us delays.
+
+On first power-on, the backend saves the ten calibration bits in each of the
+five physical lane banks, as stock Linux does with LK's settings. It restores
+that snapshot on subsequent power-ons, including zero codes. It also stops an
+inherited active PLL and brings its lanes to LP00 before changing the analog
+setup. Stock shutdown clears the analog clock, isolates and powers down the
+PLL, sets the LP outputs, selects software lane control, and shuts down the
+bandgap. The new backend preserves that order.
+
+The PLL accepts 125..2500 Mbit/s with a 26 MHz reference, following the stock
+divider thresholds. The host's narrower audited range remains in force.
+At 260 Mbit/s, PCW is `0x50000000`; at the provisional DRM mode's 260.004 Mbit/s,
+it is `0x500050a8`. The fractional value is calculated in Hz with 64-bit
+arithmetic. Spread-spectrum modulation is disabled, as the shipped panel requests.
+Invalid rates and reference frequencies are rejected. Clock failures unwind
+the prepared analog state and reference count.
+
+`test-mt6765-phy.py` compares the production backend and shared power callbacks
+against the selected stock instructions. It checks 57 exact register-write
+and minimum-delay traces: 19 rates across all divider boundaries, each with
+three synthetic initial register patterns. Four repeated power-cycle fixtures
+check saved calibration after modeled register loss. Separate tests cover the
+fractional PCW, bad rates/reference clocks, clock failures, atomic context and
+legacy callback order. Eight deliberately broken variants are rejected at runtime.
+
+The reference emulator models DSI0 in normal display stage, D-PHY, no lane swap,
+SSC disabled and the non-idle shutdown path. Calibration codes and MMIO state
+are synthetic fixtures, not measurements from an r1. The clock framework,
+MMIO and delay calls are modeled; neither PLL lock nor analog timing or signal
+quality is verified. The delay comparison checks the requested minimum wait,
+not wall-clock execution time.
+
+This backend depends on firmware-established calibration, lane routing and
+voltage settings surviving until its first power-on. MT6765 eFuse decoding,
+cold-start supply programming, C-PHY, lane remapping and idle-only retention
+are not implemented. The binding disallows calibration cells and drive-strength
+overrides for this backend because it preserves firmware settings. The existing
+display power-domain association remains a board-validation item.
+
 ## Remaining acceptance work
 
-1. Audit the remaining host startup, analog PHY/PLL, clocks and display routing.
+1. Audit the remaining host startup, clock parents, MMSYS and display routing.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
-4. Measure link/frame timing, check an RGB test pattern and touch orientation,
+4. Verify calibration handoff and PLL lock, measure link/frame timing, check an RGB test pattern and touch orientation,
    then exercise blank/unblank and repeated modesets with error logging.
 5. Validate brightness, charging/thermal interaction and display recovery before
    treating the Android software-rendered UI as usable.

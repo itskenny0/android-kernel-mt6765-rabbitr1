@@ -67,7 +67,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
 | I2C | MT6765 interrupts, AP channels, native counters and hardware timeout; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | MT6370 MFD/ADC and hwmon bound; current-measurement bugs fixed; charger still disabled | Limits, battery gauge/temperature policy, charger detection and measured behavior |
-| Display | r1 panel commands/reset and selected native MT6765 DSI timing registers match stock offline; backlight settings corrected; [details](DISPLAY.md) | Remaining host startup, analog PHY/PLL, routing and panel power, then hardware scanout and brightness |
+| Display | r1 panel, selected native DSI timings and native PHY setup/shutdown match stock offline; backlight settings corrected; [details](DISPLAY.md) | Remaining host startup, clocks, routing and panel power, then measured PLL/link behavior, scanout and brightness |
 | Touch | CST836 driver compiled and host-tested; stock wiring and I2C4 enabled for experimental probing; [details](TOUCH.md) | Host transfer validation, fitted-controller identification and evdev events on hardware |
 | GPU | No working accelerated r1 stack established | Kernel/userspace compatibility and rendering tests; software rendering first |
 | Wi-Fi / Bluetooth / GNSS / modem | No r1 mainline implementation established | Connectivity power/firmware transport and appropriate Linux subsystems |
@@ -77,8 +77,9 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 The active vendor panel source specifies 480x640, two DSI lanes and RGB888.
 Its `PLL_CLOCK=130` is a vendor DSI setting, not automatically a DRM pixel clock.
 The board-specific panel driver preserves the shipped sequence, and the native
-host reproduces selected stock digital timing registers. The analog PHY/PLL,
-controller identity and board supplies still need confirmation. The
+host reproduces selected stock digital timing registers. A native PHY backend
+preserves LK calibration and reproduces stock setup/shutdown in instruction tests.
+Actual PLL/link behavior, controller identity and board supplies still need confirmation. The
 display graph remains disabled; see [DISPLAY.md](DISPLAY.md). The fork's added Chipone touch code is
 for another device and is not enabled as an r1 driver.
 

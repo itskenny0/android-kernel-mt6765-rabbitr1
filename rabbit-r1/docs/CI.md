@@ -28,6 +28,8 @@ The workflow:
    init/suspend instructions. Native DSI timing, pixel formats and lane/clock
    settings are compared with selected stock setup instructions; invalid modes,
    early power failures and MT8183 behavior are checked with host stubs.
+   The native MT6765 PHY is compared with stock setup/shutdown sequences,
+   including calibration restoration, PLL divider boundaries and clock cleanup.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.

@@ -1,0 +1,47 @@
+diff --git a/Documentation/devicetree/bindings/phy/mediatek,dsi-phy.yaml b/Documentation/devicetree/bindings/phy/mediatek,dsi-phy.yaml
+index c6d0bbdbe0..959853a5c6 100644
+--- a/Documentation/devicetree/bindings/phy/mediatek,dsi-phy.yaml
++++ b/Documentation/devicetree/bindings/phy/mediatek,dsi-phy.yaml
+@@ -37,12 +37,16 @@ properties:
+               - mediatek,mt8365-mipi-tx
+           - const: mediatek,mt8183-mipi-tx
+       - const: mediatek,mt2701-mipi-tx
++      - const: mediatek,mt6765-mipi-tx
+       - const: mediatek,mt8173-mipi-tx
+       - const: mediatek,mt8183-mipi-tx
+ 
+   reg:
+     maxItems: 1
+ 
++  power-domains:
++    maxItems: 1
++
+   clocks:
+     items:
+       - description: PLL reference clock
+@@ -72,6 +76,25 @@ properties:
+     maximum: 6000
+     default: 4600
+ 
++allOf:
++  - if:
++      properties:
++        compatible:
++          contains:
++            const: mediatek,mt6765-mipi-tx
++    then:
++      description:
++        The MT6765 driver preserves firmware calibration and voltage settings.
++        It currently supports the D-PHY lane mapping established by firmware,
++        with spread-spectrum modulation disabled.
++      properties:
++        nvmem-cells: false
++        nvmem-cell-names: false
++        drive-strength-microamp: false
++    else:
++      properties:
++        power-domains: false
++
+ required:
+   - compatible
+   - reg

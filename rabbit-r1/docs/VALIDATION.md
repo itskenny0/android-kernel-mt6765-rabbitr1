@@ -1,4 +1,4 @@
-# Offline validation — 2026-10-07
+# Offline validation — 2026-10-08
 
 | Check | Result | Evidence |
 | --- | --- | --- |
@@ -34,6 +34,11 @@
 | DSI mode validation and power errors | PASS: invalid fields/rates/formats/lanes, rate overflow, clock/PHY failure cleanup and unchanged MT8183 setup | `scripts/test-dsi-timing.py`; production callbacks with ASan/UBSan |
 | DSI timing, alignment, pixel format, clock-LP, field bound, overflow, PHY error and native-selection regressions | All eight rejected at runtime | `logs/dsi-timing-regression-*.log` |
 | Native MT6765 DSI host, DRM driver, r1 panel and DTB | AArch64 objects and DTB compiled | `logs/mt6765-dsi-build.log` |
+| Native MT6765 PHY vs shipped kernel | PASS: 57 exact setup/shutdown sequences, four repeated calibration fixtures and fractional PCW | `logs/mt6765-phy-tests.log`, `out/mt6765-phy-audit.json`; MMIO, clocks and delays modeled |
+| PHY error cleanup and shared power callback order | PASS: bad rates/reference clocks, failed clocks, atomic context and legacy ordering | `scripts/test-mt6765-phy.py`; production callbacks with ASan/UBSan |
+| PHY delays, analog clock, divider boundary, calibration, SSC, firmware handoff, clock cleanup and atomic-context regressions | All eight rejected at runtime | `logs/mt6765-phy-regression-*.log` |
+| Native PHY and shared driver | AArch64 objects compiled | `logs/mt6765-phy-build.log` |
+| Native PHY binding/example and compiled node | PASS, zero PHY-node diagnostics | `logs/mt6765-phy-binding.log`, `logs/mt6765-phy-schema.log`, `out/mt6765-phy-schema.json`; unrelated tphy warning and optional yamllint absence noted |
 | Native DSI binding/example and compiled host node | PASS, zero host diagnostics | `logs/mt6765-dsi-binding.log`, `logs/mt6765-dsi-schema.log`, `out/mt6765-dsi-schema.json`; inherited PHY warning and unavailable optional yamllint noted |
 | Panel driver and DSI host | AArch64 objects compiled | `logs/r1-panel-build.log`, `logs/dsi-transfer-build.log` |
 | Panel binding/example and compiled node | PASS, zero panel diagnostics | `logs/r1-panel-binding.log`, `logs/r1-panel-schema.log`, `out/r1-panel-schema.json`; unrelated inherited PHY warning and unavailable optional yamllint noted |
@@ -44,7 +49,7 @@
 | CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
 | CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 25 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, all 30 files match working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |
@@ -61,7 +66,7 @@
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
 | r1 board-compatible schema | PASS | `logs/r1-board-schema.log` (empty diagnostics) |
 | MT6765 I2C schema | PASS, all seven controller nodes | `logs/mt6765-i2c-schema.log`, `out/mt6765-i2c-schema.json` |
-| Full r1 DT schema validation | **FAIL: 40 diagnostics remain** | `logs/r1-dt-validate.log`, `out/mt6765-dsi-full-schema.json` |
+| Full r1 DT schema validation | **FAIL: 38 diagnostics remain** | `logs/r1-dt-validate.log`, `out/mt6765-phy-full-schema.json` |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
 | I2C native timing/binding patches checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-native-checkpatch.log` |
@@ -71,6 +76,7 @@
 | MT6370 backlight patch checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/mt6370-backlight-checkpatch.log` |
 | Panel patches checkpatch | No errors; two submission warnings (MAINTAINERS and combined binding/code patch) | `logs/r1-panel-checkpatch.log` |
 | Native DSI binding/timing patches checkpatch | No errors or warnings (`--no-signoff`) | `logs/dsi-timing-checkpatch.log` |
+| Native PHY binding/backend patches checkpatch | No errors; one generic new-file MAINTAINERS warning (existing wildcard covers it) | `logs/mt6765-phy-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 
 The full schema failures are recorded, not inferred from the validator's exit
@@ -108,6 +114,7 @@ python3 scripts/test-r1-power.py
 python3 scripts/test-dsi-transfer.py
 toolchains/boot-tools/bin/python scripts/test-r1-panel.py
 toolchains/boot-tools/bin/python scripts/test-dsi-timing.py
+toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py
 python3 scripts/test-i2c.py
 python3 scripts/test-i2c-irq.py
 toolchains/boot-tools/bin/python scripts/test-i2c-stock-timing.py

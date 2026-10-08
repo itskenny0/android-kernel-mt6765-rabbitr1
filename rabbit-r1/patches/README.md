@@ -44,3 +44,10 @@ and rate limits and stops host startup on PHY errors. The analog PHY/PLL,
 remaining startup sequence and display routing still need work; the graph
 remains disabled. See `docs/DISPLAY.md` for the selected-register comparison
 and its limits.
+
+Patch 0023 documents the native MT6765 PHY compatible and its firmware settings.
+Patch 0024 adds its D-PHY backend, preserving LK calibration and reproducing the
+stock PLL, bandgap and lane shutdown sequence. Shared hooks keep the reference
+clock enabled through analog setup/teardown, with failure cleanup and the
+existing backends' callback order retained. The r1 PHY stays disabled pending
+the remaining display pipeline work and hardware validation; see `docs/DISPLAY.md`.
