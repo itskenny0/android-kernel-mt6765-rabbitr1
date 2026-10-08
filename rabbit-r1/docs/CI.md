@@ -32,6 +32,9 @@ The workflow:
    shipped instructions. Native command encoding, response parsing, signal and
    timeout recovery, probe ordering, power references and IRQ/clock ownership
    run through production callbacks with modeled hardware and scheduling.
+   Native DSI sleep/wake/reset/mode writes are compared with complete shipped
+   routines; stock power callbacks check reserved-bit preservation and clock
+   calls. Native wake/shutdown failure cleanup and engine drain are exercised.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for

@@ -89,6 +89,9 @@
 | Address, bounds, async-state and YUV regressions | All twenty-three rejected at runtime or by register comparison | `logs/mt6765-plane-address-mutations.log` |
 | Plane, CRTC and native overlay objects | AArch64 objects compiled | `logs/mt6765-plane-address-build.log` |
 | Native PHY binding/example and compiled node | PASS, zero PHY-node diagnostics | `logs/mt6765-phy-binding.log`, `logs/mt6765-phy-schema.log`, `out/mt6765-phy-schema.json`; unrelated tphy warning and optional yamllint absence noted |
+| Native DSI sleep/wake, reset and mode controls | PASS: 240 native traces match complete shipped routines; 18 stock power calls preserve reserved bit 1 and order clock calls | `scripts/test-dsi-power.py`, `logs/dsi-power-tests.log`, `out/dsi-power-audit.json`; PHY/clocks, scheduler, completion delivery and delays modeled |
+| Native DSI power failure and drain handling | PASS: wake/shutdown timeouts, retries, stale state, fractional periods, register preservation, repeated references and premature frame interrupts | `scripts/test-dsi-power.py`; production lane/power/wait helpers under ASan/UBSan; no physical lane or firmware-handoff test |
+| DSI power-control regressions | 20 compiled variants rejected; AArch64 host object compiled | `logs/dsi-power-mutations.log`, `logs/dsi-power-compile.log` |
 | Native DSI binding/example and compiled host node | PASS, zero host diagnostics | `logs/mt6765-dsi-binding.log`, `logs/mt6765-dsi-schema.log`, `out/mt6765-dsi-schema.json`; inherited PHY warning and unavailable optional yamllint noted |
 | Panel driver and DSI host | AArch64 objects compiled | `logs/r1-panel-build.log`, `logs/dsi-transfer-build.log` |
 | Panel binding/example and compiled node | PASS, zero panel diagnostics | `logs/r1-panel-binding.log`, `logs/r1-panel-schema.log`, `out/r1-panel-schema.json`; unrelated inherited PHY warning and unavailable optional yamllint noted |

@@ -162,8 +162,9 @@ The test also executes the production lane-ready callback through power-on,
 checks that a second power reference or already-ready call does not repeat
 setup, and models lost controller state before another lane initialization.
 The memory command must be configured before the modeled D-PHY reset and
-lane-exit operations. Those operations and delays are stubs; this checks call
-ordering and register programming, not the physical startup waveform. Seven
+lane initialization. The timing test stubs the reset and sleep controller;
+this checks timing setup, not the physical startup waveform. The native sleep
+controller is exercised separately below. Seven
 compiled variants with missing/incorrect writes, a legacy write, stale state
 or missing/late lane setup are rejected.
 
@@ -234,8 +235,8 @@ Power-on enables IRQ delivery only after clocks, lanes and stale-state cleanup
 are ready. Final power-off masks the device interrupt and calls `disable_irq()`
 before removing clocks. A mutex serializes native commands, output enable and
 power references; software IRQ flags use atomic operations. A transfer while
-off returns `-EHOSTDOWN` without MMIO. Command-mode shutdown skips the video
-completion wait, and removal drops outstanding power references.
+off returns `-EHOSTDOWN` without MMIO. An idle command-mode controller skips the frame wait, and removal drops
+outstanding power references. A busy controller must drain before lane sleep.
 
 The ASan/UBSan harness compiles the production host dispatch, packet constructor,
 command helpers, ISR, waits, probe, output and power callbacks. It checks
@@ -258,6 +259,68 @@ a caller checking for short writes rejects every successful command.
 types, lengths 0..64 and all four host modes. It also checks mode restoration,
 command/switch failures and an unchanged one-byte read path. The MMIO, IRQ and
 transport operations are modeled, not hardware-tested.
+
+## Native host power sequencing
+
+MT6765 does not use `CON_CTRL` bit 1 as a DSI-enable control. The published
+`DSI_COM_CTRL_REG` marks it reserved, and the shipped power callbacks preserve
+it while pulsing the engine and D-PHY reset bits. Native enable/disable helpers
+now leave this bit untouched. MT8183 retains its existing enable control.
+Native mode changes update only the two mode bits, preserving the other
+`MODE_CTRL` fields as the shipped `DSI_SetMode` does.
+
+The inherited lane helpers were unsuitable for native power management: their
+sleep-entry path cleared the ULPM bits, and their wake path toggled individual
+lane wake bits. The MT6765 path now follows the shipped controller sequences:
+
+- Entry disables the high-speed clock, makes the other data lanes follow
+  lane 0, requests clock-lane sleep, waits at least 1 microsecond, then requests
+  data-lane sleep and waits for `SLEEPIN_DONE` (bit 15).
+- Exit sets lane-follow and lane-count fields, selects sleep-out mode, programs
+  the wake period, pulses `SLEEPOUT_START` (bit 2), and waits for
+  `SLEEPOUT_DONE` (bit 6). It then clears the start and sleep-mode controls.
+- The wake period is `floor(link_rate_Hz / 8192000) + 1`. Each unit is 1024
+  byte-clock cycles, so the configured interval exceeds 1 ms. At the provisional
+  r1 rate of 260.004 Mbit/s the field is 32. Other `TIME_CON0` fields survive.
+
+These transitions run with clocks on, the power mutex held and CPU IRQ delivery
+disabled. The relevant device completion source is temporarily enabled, its
+status is polled with a two-second bound, and only that source/status is
+cleared afterward. This intentionally replaces the stock IRQ/scheduler wait
+while preserving its controller writes. A failed wake resets the engine,
+cleans up sleep controls, leaves lanes unready and unwinds clocks, PHY and the
+power reference. Failed shutdown sleep is logged and reset before clocks and
+PHY are removed. Successful wake is followed by the stock engine reset; only
+then are lanes marked ready and normal IRQ delivery enabled.
+
+Before lane sleep or a temporary command transfer, the controller must become
+idle. Native mode switching therefore tests `BUSY`, as the stock stop path
+does, rather than treating a frame interrupt alone as sufficient. The wait
+still wakes on interrupts and propagates signal/timeout errors. An already-idle
+controller completes immediately. A shutdown drain failure resets the engine
+before attempting lane sleep, including when the controller was already in
+command mode.
+
+`test-dsi-power.py` runs 240 complete shipped sleep/wake, engine-reset and
+mode-setting calls against native register traces, covering dirty register
+seeds, lane counts, link rates, immediate/delayed completions and timeouts.
+The native path's additional write-zero-to-clear acknowledgements are checked
+separately. Another 18 complete stock power-on/off executions include the real
+sleep and reset routines and check clock-call order and preservation of reserved
+bit 1. Analog PHY and clock service calls, delays, scheduler functions and
+completion delivery are modeled; no physical lane state is measured.
+
+The native harness uses the actual power, lane, mode, IRQ and transfer helpers.
+It checks failed wake/shutdown, retries, repeated references, stale completion
+status, IRQ/clock ownership, reserved and unrelated fields, and premature frame
+interrupts while BUSY remains set. Fractional rates and exact counter boundaries
+must satisfy the wake-period calculation. Twenty compiled broken variants are
+rejected. The 205,116 transaction cases now also execute native lane sequencing;
+legacy timing, transfer and IRQ checks pass. The AArch64 host object builds.
+
+This does not establish a working display or a complete LK handoff. Panel
+rails, firmware DMA quiescence, cold startup and physical sleep/wake behavior
+still need validation before enabling the graph.
 
 ## Native PHY and PLL
 

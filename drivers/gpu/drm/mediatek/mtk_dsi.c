@@ -7,6 +7,7 @@
 #include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/delay.h>
 #include <linux/iopoll.h>
 #include <linux/irq.h>
 #include <linux/math64.h>
@@ -37,6 +38,7 @@
 #include "mtk_drm_drv.h"
 
 #define DSI_START		0x00
+#define SLEEPOUT_START			BIT(2)
 
 #define DSI_INTEN		0x08
 
@@ -46,6 +48,8 @@
 #define TE_RDY_INT_FLAG			BIT(2)
 #define VM_DONE_INT_FLAG		BIT(3)
 #define EXT_TE_RDY_INT_FLAG		BIT(4)
+#define SLEEPOUT_DONE_INT_FLAG		BIT(6)
+#define SLEEPIN_DONE_INT_FLAG		BIT(15)
 #define DSI_BUSY			BIT(31)
 
 #define DSI_CON_CTRL		0x10
@@ -61,6 +65,7 @@
 #define BURST_MODE			3
 #define FRM_MODE			BIT(16)
 #define MIX_MODE			BIT(17)
+#define SLEEP_MODE			BIT(20)
 
 #define DSI_TXRX_CTRL		0x18
 #define VC_NUM				BIT(1)
@@ -117,6 +122,9 @@
 
 #define DSI_MEM_CONTI		0x90
 
+#define DSI_TIME_CON0		0xa0
+#define ULPS_WAKEUP_PRD			GENMASK(15, 0)
+
 #define DSI_PHY_LCCON		0x104
 #define LC_HS_TX_EN			BIT(0)
 #define LC_ULPM_EN			BIT(1)
@@ -126,6 +134,7 @@
 #define LD0_HS_TX_EN			BIT(0)
 #define LD0_ULPM_EN			BIT(1)
 #define LD0_WAKEUP_EN			BIT(2)
+#define LX_ULPM_AS_L0			BIT(3)
 
 #define DSI_PHY_TIMECON0	0x110
 #define LPX				GENMASK(7, 0)
@@ -341,12 +350,15 @@ static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
 
 static void mtk_dsi_enable(struct mtk_dsi *dsi)
 {
-	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, DSI_EN);
+	/* CON_CTRL bit 1 is reserved on MT6765. */
+	if (!dsi->driver_data->mt6765_regs)
+		mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, DSI_EN);
 }
 
 static void mtk_dsi_disable(struct mtk_dsi *dsi)
 {
-	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, 0);
+	if (!dsi->driver_data->mt6765_regs)
+		mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, 0);
 }
 
 static void mtk_dsi_reset_engine(struct mtk_dsi *dsi)
@@ -413,7 +425,10 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
 			vid_mode = SYNC_EVENT_MODE;
 	}
 
-	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+	if (dsi->driver_data->mt6765_regs)
+		mtk_dsi_mask(dsi, DSI_MODE_CTRL, MODE, vid_mode);
+	else
+		writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
 }
 
 static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
@@ -682,7 +697,10 @@ static void mtk_dsi_stop(struct mtk_dsi *dsi)
 
 static void mtk_dsi_set_cmd_mode(struct mtk_dsi *dsi)
 {
-	writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
+	if (dsi->driver_data->mt6765_regs)
+		mtk_dsi_mask(dsi, DSI_MODE_CTRL, MODE, CMD_MODE);
+	else
+		writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
 }
 
 static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
@@ -702,6 +720,14 @@ static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
 	atomic_andnot(irq_bit, &dsi->irq_data);
 }
 
+static bool mtk_dsi_irq_done(struct mtk_dsi *dsi, u32 irq_flag)
+{
+	/* A frame interrupt can precede the native engine becoming idle. */
+	if (dsi->driver_data->mt6765_regs && irq_flag == VM_DONE_INT_FLAG)
+		return !(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY);
+	return atomic_read(&dsi->irq_data) & irq_flag;
+}
+
 static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
 				     unsigned int timeout)
 {
@@ -709,7 +735,7 @@ static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
 	unsigned long jiffies = msecs_to_jiffies(timeout);
 
 	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
-					       atomic_read(&dsi->irq_data) & irq_flag,
+					       mtk_dsi_irq_done(dsi, irq_flag),
 					       jiffies);
 	if (ret == 0) {
 		DRM_WARN("Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
@@ -774,17 +800,71 @@ static void mt6765_dsi_clear_irq(struct mtk_dsi *dsi, u32 flags)
 
 static int mt6765_dsi_enter_cmd_mode(struct mtk_dsi *dsi)
 {
-	if (!(readl(dsi->regs + DSI_MODE_CTRL) & MODE))
+	if (readl(dsi->regs + DSI_MODE_CTRL) & MODE) {
+		mt6765_dsi_clear_irq(dsi, VM_DONE_INT_FLAG);
+		mtk_dsi_stop(dsi);
+		mtk_dsi_set_cmd_mode(dsi);
+	} else if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY)) {
 		return 0;
-
-	mt6765_dsi_clear_irq(dsi, VM_DONE_INT_FLAG);
-	mtk_dsi_stop(dsi);
-	mtk_dsi_set_cmd_mode(dsi);
+	}
 	return mtk_dsi_wait_for_irq_done(dsi, VM_DONE_INT_FLAG, 500);
 }
 
-static void mtk_dsi_lane_ready(struct mtk_dsi *dsi)
+/* Clocks must be running, with the CPU IRQ disabled and the power mutex held. */
+static int mt6765_dsi_ulps(struct mtk_dsi *dsi, bool enter)
 {
+	u32 flag = enter ? SLEEPIN_DONE_INT_FLAG : SLEEPOUT_DONE_INT_FLAG;
+	u32 val, period;
+	int ret;
+
+	if (enter)
+		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+	writel(~flag, dsi->regs + DSI_INTSTA);
+	if (!enter)
+		mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LX_ULPM_AS_L0, LX_ULPM_AS_L0);
+	mtk_dsi_mask(dsi, DSI_INTEN, flag, flag);
+	if (enter) {
+		mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LX_ULPM_AS_L0, LX_ULPM_AS_L0);
+		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, LC_ULPM_EN);
+		udelay(1);
+		mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, LD0_ULPM_EN);
+	} else {
+		mtk_dsi_mask(dsi, DSI_TXRX_CTRL, LANE_NUM,
+			     FIELD_PREP(LANE_NUM, BIT(dsi->lanes) - 1));
+		mtk_dsi_mask(dsi, DSI_MODE_CTRL, SLEEP_MODE, SLEEP_MODE);
+		/* Each period is 1024 byte-clock cycles; wake-up must exceed 1 ms. */
+		period = dsi->data_rate / (1024 * 8 * 1000) + 1;
+		mtk_dsi_mask(dsi, DSI_TIME_CON0, ULPS_WAKEUP_PRD, period);
+		mtk_dsi_mask(dsi, DSI_START, SLEEPOUT_START, 0);
+		mtk_dsi_mask(dsi, DSI_START, SLEEPOUT_START, SLEEPOUT_START);
+	}
+
+	ret = readl_poll_timeout(dsi->regs + DSI_INTSTA, val, val & flag, 10, 2000000);
+	if (ret)
+		mtk_dsi_reset_engine(dsi);
+	mtk_dsi_mask(dsi, DSI_INTEN, flag, 0);
+	if (!enter) {
+		mtk_dsi_mask(dsi, DSI_START, SLEEPOUT_START, 0);
+		mtk_dsi_mask(dsi, DSI_MODE_CTRL, SLEEP_MODE, 0);
+	}
+	writel(~flag, dsi->regs + DSI_INTSTA);
+	return ret;
+}
+
+static int mtk_dsi_lane_ready(struct mtk_dsi *dsi)
+{
+	int ret;
+
+	if (dsi->driver_data->mt6765_regs && !dsi->lanes_ready) {
+		mtk_dsi_rxtx_control(dsi);
+		mtk_dsi_reset_dphy(dsi);
+		ret = mt6765_dsi_ulps(dsi, false);
+		if (ret)
+			return ret;
+		mtk_dsi_reset_engine(dsi);
+		mtk_dsi_clk_hs_mode(dsi, 0);
+		dsi->lanes_ready = true;
+	}
 	if (!dsi->lanes_ready) {
 		dsi->lanes_ready = true;
 		mtk_dsi_rxtx_control(dsi);
@@ -796,6 +876,7 @@ static void mtk_dsi_lane_ready(struct mtk_dsi *dsi)
 		usleep_range(1000, 3000);
 		/* The reaction time after pulling up the mipi signal for dsi_rx */
 	}
+	return 0;
 }
 
 static int mtk_dsi_poweron(struct mtk_dsi *dsi)
@@ -876,7 +957,11 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	mtk_dsi_config_vdo_timing(dsi);
 	if (!dsi->driver_data->mt6765_regs)
 		mtk_dsi_set_interrupt_enable(dsi);
-	mtk_dsi_lane_ready(dsi);
+	ret = mtk_dsi_lane_ready(dsi);
+	if (ret) {
+		dev_err(dev, "Failed to wake DSI lanes: %d\n", ret);
+		goto err_disable_digital_clk;
+	}
 	mtk_dsi_clk_hs_mode(dsi, 1);
 	if (dsi->driver_data->mt6765_regs) {
 		writel(~(u32)(LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG),
@@ -887,6 +972,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	}
 
 	goto out_unlock;
+err_disable_digital_clk:
+	clk_disable_unprepare(dsi->digital_clk);
 err_disable_engine_clk:
 	clk_disable_unprepare(dsi->engine_clk);
 err_phy_power_off:
@@ -917,19 +1004,22 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 	 * after dsi is fully set.
 	 */
 	if (dsi->driver_data->mt6765_regs) {
-		mt6765_dsi_enter_cmd_mode(dsi);
+		if (mt6765_dsi_enter_cmd_mode(dsi))
+			mtk_dsi_reset_engine(dsi);
 		mtk_dsi_stop(dsi);
 		writel(0, dsi->regs + DSI_INTEN);
 		/* Wait for any in-flight handler before disabling its clocks. */
 		disable_irq(dsi->irq);
 		atomic_set(&dsi->irq_data, 0);
+		if (mt6765_dsi_ulps(dsi, true))
+			dev_warn(dsi->host.dev, "DSI lane sleep timed out\n");
 	} else {
 		mtk_dsi_stop(dsi);
 		mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500);
+		mtk_dsi_reset_engine(dsi);
+		mtk_dsi_lane0_ulp_mode_enter(dsi);
+		mtk_dsi_clk_ulp_mode_enter(dsi);
 	}
-	mtk_dsi_reset_engine(dsi);
-	mtk_dsi_lane0_ulp_mode_enter(dsi);
-	mtk_dsi_clk_ulp_mode_enter(dsi);
 	/* set the lane number as 0 to pull down mipi */
 	writel(0, dsi->regs + DSI_TXRX_CTRL);
 
@@ -1465,7 +1555,7 @@ static ssize_t mt6765_dsi_transfer(struct mtk_dsi *dsi, const struct mipi_dsi_ms
 		return ret;
 
 	mutex_lock(&dsi->lock);
-	if (!dsi->refcount) {
+	if (!dsi->refcount || !dsi->lanes_ready) {
 		ret = -EHOSTDOWN;
 		goto out_unlock;
 	}
@@ -1479,7 +1569,6 @@ static ssize_t mt6765_dsi_transfer(struct mtk_dsi *dsi, const struct mipi_dsi_ms
 		goto restore_mode;
 
 	mt6765_dsi_clear_irq(dsi, LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG);
-	mtk_dsi_lane_ready(dsi);
 	mt6765_dsi_cmdq(dsi, msg, &packet);
 	mtk_dsi_start(dsi);
 	started = true;

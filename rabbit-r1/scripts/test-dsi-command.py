@@ -65,6 +65,7 @@ PRELUDE = r'''
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
 #include <sys/types.h>
@@ -81,6 +82,7 @@ typedef int irqreturn_t;
 #define IRQF_NO_AUTOEN 0x80000
 #define DRM_MODE_CONNECTOR_DSI 16
 #define BIT(n) (1U<<(n))
+#define FIELD_PREP(m,v) (((u32)(v)<<__builtin_ctz(m)) & (m))
 #define GENMASK(h,l) ((~0U<<(l)) & (~0U>>(31-(h))))
 #define DIV_ROUND_UP(n,d) (((n)+(d)-1)/(d))
 #define DIV_ROUND_UP_ULL(n,d) DIV_ROUND_UP(n,d)
@@ -90,6 +92,7 @@ typedef int irqreturn_t;
 #define DRM_ERROR(...) ((void)0)
 #define DRM_INFO(...) ((void)0)
 #define dev_err(dev,...) ((void)(dev))
+#define dev_warn(dev,...) ((void)(dev))
 #define WARN_ON(c) (c)
 #define IS_ERR(p) ((uintptr_t)(p)>(uintptr_t)-4096)
 #define PTR_ERR(p) ((int)(intptr_t)(p))
@@ -125,7 +128,7 @@ struct mtk_dsi {
     struct mutex lock;
     int irq,refcount,format;
     bool lanes_ready,enabled;
-    unsigned int lanes;
+    unsigned int lanes; unsigned long mode_flags;
     struct { u64 pixelclock; } vm;
     u32 data_rate;
     void *phy,*hs_clk,*engine_clk,*digital_clk;
@@ -137,7 +140,13 @@ static bool engine_on,digital_on,phy_on,irq_requested,in_irq;
 static unsigned int irq_depth,fail_clock,fail_phy,clock_calls,waits,polls,racks,rx_words;
 static unsigned int starts,resets,mmio_count,registers,irq_requests,wakes;
 static int fail_wait,wait_error,fail_poll,request_error,register_error;
-static bool stale,extra_cmd,permanent_busy;
+static bool stale,extra_cmd,extra_vm,permanent_busy,fail_ulps,recording;
+static u32 pending_sleep, sleep_reads, ulps_polls, ulps_delays;
+static u32 events[256][2];
+static unsigned int nevents;
+static void record(u32 offset,u32 value) {
+    if(recording) { assert(nevents<256);events[nevents][0]=offset;events[nevents++][1]=value; }
+}
 static u32 last_flags[8];
 static unsigned int last_steps[8];
 static const struct mtk_dsi_driver_data *platform_data;
@@ -165,20 +174,37 @@ static u32 readl(const void *p)
     access_ok(); unsigned int off=(const u8 *)p-regs;
     assert(off+4<=sizeof(regs));
     if (off>=0x74 && off<=0x80) { assert(!in_irq && !racks); rx_words++; }
+    if(off==0xc && pending_sleep && !fail_ulps && ++sleep_reads==3) {
+        assert(irq_depth && (load(8)&pending_sleep));
+        save(0xc,load(0xc)|pending_sleep);
+        if(pending_sleep==0x40) { save(0x104,load(0x104)&~2U);save(0x108,load(0x108)&~2U); }
+        pending_sleep=0;
+    }
     return load(off);
 }
 static void writel(u32 v,void *p)
 {
     access_ok(); unsigned int off=(u8 *)p-regs;
     assert(off+4<=sizeof(regs));
+    record(off,v);
     if (off==0xc) { save(off,load(off)&v); return; }
+    if(off==0 && (v&4) && !(load(0)&4)) {
+        assert(irq_depth && (load(0x14)&0x100000) && !(load(0xc)&0x40));
+        assert((load(0x18)&0x3c)==((1U<<dsi.lanes)-1)*4);
+        assert((load(0xa0)&0xffff)*8192000ULL>dsi.data_rate);
+        pending_sleep=0x40;sleep_reads=0;
+    }
+    if(off==0x108 && (v&2) && !(load(0x108)&2)) {
+        assert(irq_depth && (v&8) && (load(0x104)&3)==2 && ulps_delays);
+        assert(!(load(0xc)&0x8000));pending_sleep=0x8000;sleep_reads=0;
+    }
     if (off==0x84) {
         assert(!in_irq && (v&1)); racks++;
         assert(!rx_words || rx_words==4);
         if (!permanent_busy) save(0xc,load(0xc)&~0x80000000U);
     }
     if (off==0x10 && (v&1)) {
-        resets++; save(0xc,load(0xc)&~0x80000000U);
+        resets++; save(0xc,load(0xc)&~0x80000000U); pending_sleep=0;
     }
     if (off==0 && v==1 && !(load(0x14)&3)) {
         starts++; save(0xc,load(0xc)|0x80000000U);
@@ -203,24 +229,27 @@ static void step_wait(u32 flag,unsigned int step)
 {
     assert(dsi.lock.held && !irq_depth);
     if (flag==1 && extra_cmd && step==0) { fire(2); return; }
-    if (flag==2 && !permanent_busy) save(0xc,load(0xc)&~0x80000000U);
+    if (flag==8 && extra_vm && step==0) { fire(8);return; }
+    if ((flag==2 || flag==8) && !permanent_busy) save(0xc,load(0xc)&~0x80000000U);
     fire(flag);
 }
 #define wait_event_interruptible_timeout(q,condition,t) ({ \
     assert((q)==1 && (t)>0 && waits<8); \
     unsigned int slot=waits++; last_flags[slot]=irq_flag; long result=0; \
-    if ((int)waits==fail_wait) result=wait_error; \
+    if (condition) result=1; \
+    else if ((int)waits==fail_wait) result=wait_error; \
     else for(unsigned int step=0;step<4;step++) { \
         if (condition) { result=1; break; } \
         step_wait(irq_flag,step); last_steps[slot]++; \
         if (condition) { result=1; break; } \
     } result; })
 #define readl_poll_timeout(addr,val,condition,delay,timeout) ({ \
-    assert((delay)==4 && (timeout)==2000000); polls++; \
+    assert(((delay)==4 || (delay)==10) && (timeout)==2000000); \
+    if((delay)==4) polls++; else { ulps_polls++;assert(irq_depth); } \
     int result=-ETIMEDOUT; \
     for(unsigned int n=0;n<4;n++) { \
         val=readl(addr); \
-        if ((int)polls==fail_poll) val|=0x80000000U; \
+        if ((delay)==4 && (int)polls==fail_poll) val|=0x80000000U; \
         if (condition) { result=0; break; } \
     } result; })
 static int clk_set_rate(void *p,u32 rate) { assert(p==&hs && rate>=125000000); return fail_clock==1?-EIO:0; }
@@ -243,10 +272,10 @@ static void mtk_dsi_phy_timconfig(struct mtk_dsi *d) { assert(d==&dsi); access_o
 static void mtk_dsi_ps_control(struct mtk_dsi *d,bool v) { assert(d==&dsi && v); access_ok(); }
 static void mtk_dsi_set_vm_cmd(struct mtk_dsi *d) { assert(d==&dsi); access_ok(); }
 static void mtk_dsi_config_vdo_timing(struct mtk_dsi *d) { assert(d==&dsi); access_ok(); }
-static void mtk_dsi_lane_ready(struct mtk_dsi *d) { assert(d==&dsi); access_ok(); d->lanes_ready=true; }
-static void mtk_dsi_clk_hs_mode(struct mtk_dsi *d,int hs_mode) { assert(d==&dsi && hs_mode==1); access_ok(); }
-static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *d) { assert(d==&dsi && irq_depth); access_ok(); }
-static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *d) { assert(d==&dsi && irq_depth); access_ok(); }
+static void udelay(unsigned int us) { assert(us==1);ulps_delays++;record(0xffff,us); }
+static void usleep_range(unsigned int low,unsigned int high) {
+    assert((low==30 && high==100) || (low==1000 && high==3000));
+}
 static struct mtk_dsi *bridge_alloc(void) { return &dsi; }
 #define devm_drm_bridge_alloc(dev,type,member,funcs) bridge_alloc()
 static const void *of_device_get_match_data(struct device *dev) { (void)dev; return platform_data; }
@@ -275,7 +304,6 @@ static int mipi_dsi_host_register(struct mipi_dsi_host *h)
     registers++; return register_error;
 }
 static void mipi_dsi_host_unregister(struct mipi_dsi_host *h) { assert(h==&dsi.host && registers); registers--; }
-static void mtk_dsi_set_mode(struct mtk_dsi *d) { writel(1,d->regs+DSI_MODE_CTRL); }
 static struct mtk_dsi *host_to_dsi(struct mipi_dsi_host *h) { assert(h==&dsi.host); return &dsi; }
 static u8 readb(const void *p) { (void)p; assert(0); return 0; }
 static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *d,const struct mipi_dsi_msg *m,u8 flag)
@@ -291,14 +319,15 @@ static void setup(void)
     irq_depth=fail_clock=fail_phy=clock_calls=waits=polls=racks=rx_words=starts=resets=0;
     mmio_count=registers=irq_requests=wakes=0;
     fail_wait=wait_error=fail_poll=request_error=register_error=0;
-    stale=extra_cmd=permanent_busy=false;
+    stale=extra_cmd=extra_vm=permanent_busy=fail_ulps=recording=false;
+    pending_sleep=sleep_reads=ulps_polls=ulps_delays=nevents=0;
     memset(last_flags,0,sizeof(last_flags)); memset(last_steps,0,sizeof(last_steps));
     platform_data=&mt6765_dsi_driver_data;
 }
 static void probe(void)
 {
     setup(); assert(!mtk_dsi_probe(&pdev)); assert(!mmio_count && irq_depth==1);
-    dsi.lanes=2; dsi.vm.pixelclock=20000000;
+    dsi.lanes=2; dsi.vm.pixelclock=20000000;dsi.mode_flags=MIPI_DSI_MODE_VIDEO|MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
 }
 static void power(void)
 {
@@ -322,12 +351,13 @@ static void writes(void)
     for(unsigned int t=0;t<sizeof(types);t++) for(unsigned int ch=0;ch<4;ch++)
     for(unsigned int mode=0;mode<4;mode++) for(unsigned int lp=0;lp<2;lp++)
     for(size_t len=(t<6?lens[t]:0);len<=lens[t];len++) {
-        power(); save(0x14,mode|0x10000); save(0xc,3); atomic_set(&dsi.irq_data,3);
+        power(); save(0x14,mode|0x10000); save(0xc,3|(mode?0x80000000U:0));extra_vm=lp; atomic_set(&dsi.irq_data,3);
         struct mipi_dsi_msg m={.type=types[t],.channel=ch,.flags=lp?2:0,.tx_buf=len?tx:NULL,.tx_len=len};
         assert(mtk_dsi_host_transfer(&dsi.host,&m)==(ssize_t)len);
         assert(!dsi.lock.held && !irq_depth && !rx_words && !racks);
         assert(load(0x14)==(mode|0x10000) && starts==1 && !resets && polls==2);
         assert(waits==1+!!mode && last_flags[!!mode]==2 && last_steps[!!mode]==1);
+        if(mode) assert(last_steps[0]==(extra_vm?2U:1U));
         u32 hdr=(u32)(ch<<6|types[t])<<8 | (lp?0:8);
         if(t>=6) hdr|=(u32)len<<16 | 2;
         else { if(len) hdr|=(u32)tx[0]<<16; if(len>1) hdr|=(u32)tx[1]<<24; }
@@ -389,7 +419,7 @@ static void failures(void)
     }
     for(unsigned int mode=0;mode<4;mode++) for(unsigned int rd=0;rd<2;rd++)
     for(unsigned int point=1;point<=1+rd+!!mode;point++) for(unsigned int signal=0;signal<2;signal++) {
-        power(); save(0x14,mode); memset(rx,0xa5,sizeof(rx)); save(0x74,0x9c21);
+        power(); save(0x14,mode);if(mode) save(0xc,0x80000000U);memset(rx,0xa5,sizeof(rx)); save(0x74,0x9c21);
         m=good; if(!rd) { m.type=0x05;m.rx_len=0; }
         fail_wait=point;wait_error=signal?-ERESTARTSYS:0;
         assert(mtk_dsi_host_transfer(&dsi.host,&m)==(signal?-ERESTARTSYS:-ETIMEDOUT));
@@ -431,6 +461,10 @@ static void failures(void)
 }
 static void lifetime(void)
 {
+    power();dsi.lock.held=true;dsi.driver_data=&mt8183_dsi_driver_data;
+    mtk_dsi_enable(&dsi);assert(load(0x10)&2);
+    mtk_dsi_disable(&dsi);assert(!(load(0x10)&2));
+    dsi.driver_data=&mt6765_dsi_driver_data;dsi.lock.held=false;off();
     probe(); mtk_output_dsi_enable(&dsi); assert(!dsi.enabled && !mmio_count && !dsi.lock.held);
     power(); mtk_output_dsi_enable(&dsi); assert(dsi.enabled && load(0x14)==1 && !dsi.lock.held);
     unsigned int before=mmio_count; mtk_output_dsi_enable(&dsi); assert(mmio_count==before);
@@ -447,7 +481,7 @@ static void lifetime(void)
     }
     off();cases++;
     for(unsigned int mode=1;mode<4;mode++) for(unsigned int fail=0;fail<2;fail++) {
-        power();save(0x14,mode);if(fail) fail_wait=1;
+        power();save(0x14,mode);if(fail) { fail_wait=1;save(0xc,0x80000000U); }
         off();assert(waits==1 && last_flags[0]==8);cases++;
     }
 }
@@ -461,23 +495,30 @@ int main(void)
 '''
 
 
-def build_harness(source):
+def build_harness(source, extra_tests=''):
     s = source.read_text()
     macros = s[s.index('#define DSI_START'):s.index('struct mtk_phy_timing')]
-    code = PRELUDE+macros+block(s,'mtk_dsi_driver_data')+MODEL
+    header = (ROOT/'src/mainline/include/drm/drm_mipi_dsi.h').read_text()
+    modes = '\n'.join(re.findall(r'^#define MIPI_DSI_(?:MODE|CLOCK)[^\n]+', header, re.M))+'\n'
+    code = PRELUDE+modes+macros+block(s,'mtk_dsi_driver_data')+MODEL
     shared = (ROOT/'src/mainline/drivers/gpu/drm/drm_mipi_dsi.c').read_text()
     for name in ('mipi_dsi_packet_format_is_short','mipi_dsi_packet_format_is_long','mipi_dsi_create_packet'):
         code += block(shared,name)
     for name in ('mtk_dsi_mask','mtk_dsi_enable','mtk_dsi_disable','mtk_dsi_reset_engine',
+                 'mtk_dsi_reset_dphy','mtk_dsi_clk_ulp_mode_enter','mtk_dsi_clk_ulp_mode_leave',
+                 'mtk_dsi_lane0_ulp_mode_enter','mtk_dsi_lane0_ulp_mode_leave','mtk_dsi_clk_hs_state',
+                 'mtk_dsi_clk_hs_mode','mtk_dsi_set_mode','mtk_dsi_rxtx_control',
                  'mtk_dsi_start','mtk_dsi_stop','mtk_dsi_set_cmd_mode','mtk_dsi_set_interrupt_enable',
-                 'mtk_dsi_irq_data_set','mtk_dsi_irq_data_clear','mtk_dsi_wait_for_irq_done','mtk_dsi_irq',
+                 'mtk_dsi_irq_data_set','mtk_dsi_irq_data_clear','mtk_dsi_irq_done','mtk_dsi_wait_for_irq_done','mtk_dsi_irq',
                  'mtk_dsi_switch_to_cmd_mode','mt6765_dsi_clear_irq','mt6765_dsi_enter_cmd_mode',
-                 'mtk_dsi_poweron','mtk_dsi_poweroff','mtk_output_dsi_enable','mtk_output_dsi_disable','mt6765_dsi_validate_msg','mt6765_dsi_cmdq',
+                 'mt6765_dsi_ulps','mtk_dsi_lane_ready','mtk_dsi_poweron','mtk_dsi_poweroff','mtk_output_dsi_enable','mtk_output_dsi_disable','mt6765_dsi_validate_msg','mt6765_dsi_cmdq',
                  'mt6765_dsi_read_response','mt6765_dsi_transfer','mtk_dsi_host_transfer','mtk_dsi_probe','mtk_dsi_remove',
-                 'mt6765_dsi_driver_data'):
+                 'mt6765_dsi_driver_data','mt8183_dsi_driver_data'):
         code += block(s,name)
-    path = ROOT/'out/dsi-command-host.c'; path.write_text(code+TESTS)
-    binary = ROOT/'out/dsi-command-host'
+    tests = TESTS if not extra_tests else TESTS.replace('int main(void)', 'static int command_suite(void)')+extra_tests
+    stem = 'dsi-power-host' if extra_tests else 'dsi-command-host'
+    path = ROOT/'out'/f'{stem}.c'; path.write_text(code+tests)
+    binary = ROOT/'out'/stem
     subprocess.run(['cc','-std=gnu11','-Wall','-Wextra','-Werror','-Wno-sign-compare','-Wno-unused-parameter',
         '-fsanitize=address,undefined','-fno-pie','-no-pie','-O1','-g',str(path),'-o',str(binary)],check=True)
     return binary

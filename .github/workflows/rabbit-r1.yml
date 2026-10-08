@@ -137,6 +137,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-dsi-timing.py 2>&1 | tee logs/dsi-timing-tests.log
           toolchains/boot-tools/bin/python scripts/test-dsi-irq.py 2>&1 | tee logs/dsi-irq-tests.log
           toolchains/boot-tools/bin/python scripts/test-dsi-command.py 2>&1 | tee logs/dsi-command-tests.log
+          toolchains/boot-tools/bin/python scripts/test-dsi-power.py 2>&1 | tee logs/dsi-power-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py 2>&1 | tee logs/mt6765-phy-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py 2>&1 | tee logs/mt6765-display-path-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-smi.py 2>&1 | tee logs/mt6765-smi-tests.log

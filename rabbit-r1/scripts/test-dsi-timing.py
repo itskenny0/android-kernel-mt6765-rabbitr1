@@ -146,7 +146,7 @@ static void mutex_unlock(int *m) { assert(*m); *m=0; }
 static void atomic_set(int *p,int v) { *p=v; }
 static void enable_irq(int irq) { (void)irq; }
 static void mtk_dsi_reset_dphy(struct mtk_dsi *d) {
-    assert(d->lanes_ready);
+    assert(d->driver_data->mt6765_regs || d->lanes_ready);
     if (d->driver_data->mt6765_regs) assert(readl(regs+0x90)==0x3c);
     lane_resets++;
 }
@@ -155,6 +155,7 @@ static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *d) { assert(d->lanes_re
 static void usleep_range(unsigned int lo,unsigned int hi) {
     assert((lo==30 && hi==100) || (lo==1000 && hi==3000)); lane_delays++;
 }
+static int mt6765_dsi_ulps(struct mtk_dsi *d,bool enter) { assert(d->driver_data->mt6765_regs && !enter); return 0; }
 static void mtk_dsi_clk_hs_mode(struct mtk_dsi *d,int hs) { (void)d; assert(hs==0 || hs==1); }
 '''
 main=r'''
@@ -229,14 +230,14 @@ int main(int argc,char **argv)
         fail_phy=0; phy_ons=0;
         memcpy(regs+0x90,&conti_seed,4);
         assert(mtk_dsi_poweron(&d)==0 && d.refcount==1 && phy_ons==1 && clock_ons==2);
-        assert(conti_writes==1 && lane_resets==1 && lane_delays==2 && readl(regs+0x90)==0x3c);
+        assert(conti_writes==1 && lane_resets==1 && lane_delays==0 && readl(regs+0x90)==0x3c);
         unsigned int before=writes;
         assert(mtk_dsi_poweron(&d)==0 && d.refcount==2 && phy_ons==1 && clock_ons==2);
         mtk_dsi_lane_ready(&d);
-        assert(writes==before && conti_writes==1 && lane_resets==1 && lane_delays==2);
+        assert(writes==before && conti_writes==1 && lane_resets==1 && lane_delays==0);
         /* Model controller-state loss before a later lane initialization. */
         d.lanes_ready=false;memcpy(regs+0x90,&conti_seed,4);mtk_dsi_lane_ready(&d);
-        assert(conti_writes==2 && lane_resets==2 && lane_delays==4 && readl(regs+0x90)==0x3c);
+        assert(conti_writes==2 && lane_resets==2 && lane_delays==0 && readl(regs+0x90)==0x3c);
         puts("power:pass"); return 0;
     }
     printf("status:%d\n",mtk_dsi_bridge_mode_valid(&d.bridge,NULL,&dm));
