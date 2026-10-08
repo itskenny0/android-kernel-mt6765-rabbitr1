@@ -152,7 +152,7 @@ MT8183 setup. The recorded
 This audit covers selected setup writes, not all controller registers or
 startup sequencing. It excludes the stock `MEM_CONTI` setup at `0x90`, packet
 transmission, the analog PHY/PLL, clocks, MMSYS routing and complete DRM path.
-The separate native PHY audit is described below.
+The separate native PHY and display-path audits are described below.
 
 An independent host API bug is fixed: successful writes now return `tx_len`
 instead of zero, as required by `mipi_dsi_host_ops.transfer`. Without this,
@@ -214,9 +214,74 @@ are not implemented. The binding disallows calibration cells and drive-strength
 overrides for this backend because it preserves firmware settings. The existing
 display power-domain association remains a board-validation item.
 
+## Display routing, mutex and RDMA clock
+
+The DRM path shared with MT8183 is supported by the MT6765 routing tables:
+`OVL0 -> OVL0_2L -> RDMA0 -> COLOR0 -> CCORR0 -> AAL0 -> GAMMA0 -> DITHER0 -> DSI0`.
+Rabbit's default path additionally uses RSZ0 and places the overlays in a
+different order. The test passes the chosen mainline path to the shipped routing
+code, expanding its two virtual nodes between RDMA0 and COLOR0. It does not
+claim to reproduce the stock default path or its scaling behavior.
+
+The inherited routing table omitted three selector writes and used one-bit
+masks for two selectors with three inputs. The corrected route bypasses RSZ0,
+feeds COLOR0 into CCORR0, and clears both selector bits before choosing input 1.
+This prevents a previous selector value of 2 becoming invalid value 3.
+
+| MMSYS offset | Mask | Selected value | Purpose |
+| --- | --- | --- | --- |
+| `0xf3c` | `0x2` | `0x2` | OVL0 to OVL0_2L |
+| `0xf40` | `0x1` | `0x1` | OVL0_2L to RDMA0 |
+| `0xf54` | `0x3` | `0x1` | RDMA0 input from OVL0_2L |
+| `0xf48` | `0x1` | `0x0` | RDMA0 output bypasses RSZ0 |
+| `0xf60` | `0x1` | `0x0` | RDMA virtual input bypasses RSZ0 |
+| `0xf4c` | `0x3` | `0x1` | RDMA virtual output to COLOR0 |
+| `0xf30` | `0x1` | `0x0` | CCORR0 input from COLOR0 |
+| `0xf50` | `0x1` | `0x1` | DITHER0 to DSI0 |
+| `0xf68` | `0x1` | `0x1` | DSI0 input from DITHER0 |
+
+MT6765 also requires DSI0's module bit 16 in the display mutex. Previously the
+shared driver only selected DSI0 as the frame trigger. A native capability flag
+now adds and removes its module bit as well; other platforms retain their
+existing DSI behavior. The chosen path's MOD value is `0x1fb80`, with video
+SOF/EOF value `0x41`. The register offsets are `0x30` and `0x2c`, respectively,
+plus `0x20` per mutex ID.
+
+The RDMA0 DT node now requests `CLK_MM_DISP_RDMA0`, MMSYS gate bit 10. Its old
+`CLK_MM_MDP_RDMA0` reference selected bit 0, a different processing block.
+The compiled DT clock provider, ID and gate are checked against stock wiring.
+
+`test-mt6765-display-path.py` executes checksum-verified stock instructions:
+
+| Routine | Raw Image offset |
+| --- | --- |
+| `ddp_path_init` | `0x72d22c` |
+| `ddp_connect_path_l` | `0x72dae8` |
+| `ddp_disconnect_path_l` | `0x72e400` |
+| `ddp_mutex_set` | `0x7306d8` |
+| `ddp_mutex_remove_module` | `0x72f7b0` |
+
+The production mainline route table and shared connect/disconnect and mutex
+callbacks run in an ASan/UBSan host harness. Four synthetic register states
+exercise inherited selectors, unrelated-bit preservation, disconnect and
+reconnect. Stock writes whole selectors and clears only MOUT on disconnect;
+mainline uses masked updates and clears its selector fields on disconnect.
+The comparison accounts for those differences and checks the selected fields.
+It compares stock's four display mutex IDs and checks mainline add/remove for
+all ten handles. MT8183 DSI/OVL/RDMA and MT2712's second MOD register are covered
+as regressions. Nine deliberately broken route, mask, module and clock variants
+are rejected. Traces are saved in `out/mt6765-display-path-audit.json`.
+
+MMIO, module base addresses, logging and profiling are modeled. This does not
+emulate CMDQ, hardware frame synchronization, clock waveforms or pixel flow.
+It also does not establish that every route left active by LK has been shut
+down: masked MOUT writes preserve unrelated outputs. Firmware path teardown,
+OVL/RDMA configuration, IOMMU and complete startup sequencing remain to audit.
+
 ## Remaining acceptance work
 
-1. Audit the remaining host startup, clock parents, MMSYS and display routing.
+1. Audit remaining host startup, clock parents, firmware path teardown,
+   OVL/RDMA configuration and display IOMMU behavior.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
 4. Verify calibration handoff and PLL lock, measure link/frame timing, check an RGB test pattern and touch orientation,

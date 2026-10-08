@@ -1,0 +1,173 @@
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+index 523120c350..1d37e23b1f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+@@ -946,7 +946,7 @@ rdma0: dma-controller@1400d000 {
+ 				     "mediatek,mt8183-disp-rdma";
+ 			reg = <0 0x1400d000 0 0x1000>;
+ 			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_LOW>;
+-			clocks = <&mmsys CLK_MM_MDP_RDMA0>;
++			clocks = <&mmsys CLK_MM_DISP_RDMA0>;
+ 			power-domains = <&spm MT6765_POWER_DOMAIN_DISP>;
+ 			iommus = <&iommu M4U_PORT_DISP_RDMA0>;
+ 			mediatek,gce-client-reg = <&gce SUBSYS_1400XXXX 0xd000 0x1000>;
+diff --git a/drivers/soc/mediatek/mt6765-mmsys.h b/drivers/soc/mediatek/mt6765-mmsys.h
+index c0893b7752..7ebbd16d7e 100644
+--- a/drivers/soc/mediatek/mt6765-mmsys.h
++++ b/drivers/soc/mediatek/mt6765-mmsys.h
+@@ -3,11 +3,14 @@
+ #ifndef __SOC_MEDIATEK_MT6765_MMSYS_H
+ #define __SOC_MEDIATEK_MT6765_MMSYS_H
+ 
++#define MT6765_MDP_COLOR0_OUT_SEL_IN		0xf30
+ #define MT6765_DISP_OVL0_MOUT_EN		0xf3c
+ #define MT6765_DISP_OVL0_2L_MOUT_EN		0xf40
++#define MT6765_DISP_RDMA0_RSZ0_IN_SOUT_SEL	0xf48
+ #define MT6765_DISP_RDMA0_SOUT_SEL_IN		0xf4c
+ #define MT6765_DISP_DITHER0_MOUT_EN		0xf50
+ #define MT6765_DISP_PATH0_SEL_IN		0xf54
++#define MT6765_DISP_RDMA0_RSZ0_SEL_IN		0xf60
+ #define MT6765_DISP_DSI0_SEL_IN			0xf68
+ 
+ static const struct mtk_mmsys_routes mmsys_mt6765_routing_table[] = {
+@@ -21,15 +24,27 @@ static const struct mtk_mmsys_routes mmsys_mt6765_routing_table[] = {
+ 		BIT(0)
+ 	}, {
+ 		DDP_COMPONENT_RDMA0, DDP_COMPONENT_COLOR0,
+-		MT6765_DISP_RDMA0_SOUT_SEL_IN, BIT(0),
++		MT6765_DISP_RDMA0_RSZ0_IN_SOUT_SEL, BIT(0),
++		0 /* Bypass RSZ0 through the RDMA0 virtual path. */
++	}, {
++		DDP_COMPONENT_RDMA0, DDP_COMPONENT_COLOR0,
++		MT6765_DISP_RDMA0_RSZ0_SEL_IN, BIT(0),
++		0
++	}, {
++		DDP_COMPONENT_RDMA0, DDP_COMPONENT_COLOR0,
++		MT6765_DISP_RDMA0_SOUT_SEL_IN, GENMASK(1, 0),
+ 		BIT(0)
++	}, {
++		DDP_COMPONENT_COLOR0, DDP_COMPONENT_CCORR,
++		MT6765_MDP_COLOR0_OUT_SEL_IN, BIT(0),
++		0
+ 	}, {
+ 		DDP_COMPONENT_DITHER0, DDP_COMPONENT_DSI0,
+ 		MT6765_DISP_DITHER0_MOUT_EN, BIT(0),
+ 		BIT(0)
+ 	}, {
+ 		DDP_COMPONENT_OVL_2L0, DDP_COMPONENT_RDMA0,
+-		MT6765_DISP_PATH0_SEL_IN, BIT(0),
++		MT6765_DISP_PATH0_SEL_IN, GENMASK(1, 0),
+ 		BIT(0)
+ 	}, {
+ 		DDP_COMPONENT_DITHER0, DDP_COMPONENT_DSI0,
+diff --git a/drivers/soc/mediatek/mtk-mutex.c b/drivers/soc/mediatek/mtk-mutex.c
+index ef702f5861..329e6050c4 100644
+--- a/drivers/soc/mediatek/mtk-mutex.c
++++ b/drivers/soc/mediatek/mtk-mutex.c
+@@ -356,6 +356,7 @@ struct mtk_mutex_data {
+ 	const u16 mutex_mod1_reg;
+ 	const u16 mutex_sof_reg;
+ 	const bool no_clk;
++	const bool has_dsi0_mod;
+ };
+ 
+ struct mtk_mutex_ctx {
+@@ -402,6 +403,7 @@ static const u8 mt6765_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_CCORR] = 12,
+ 	[DDP_COMPONENT_COLOR0] = 11,
+ 	[DDP_COMPONENT_DITHER0] = 15,
++	[DDP_COMPONENT_DSI0] = 16,
+ 	[DDP_COMPONENT_GAMMA] = 14,
+ 	[DDP_COMPONENT_OVL0] = 7,
+ 	[DDP_COMPONENT_OVL_2L0] = 8,
+@@ -765,6 +767,7 @@ static const struct mtk_mutex_data mt6765_mutex_driver_data = {
+ 	.mutex_mod_reg = MT8183_MUTEX0_MOD0,
+ 	.mutex_sof_reg = MT8183_MUTEX0_SOF0,
+ 	.no_clk = true,
++	.has_dsi0_mod = true,
+ };
+ 
+ static const struct mtk_mutex_data mt6795_mutex_driver_data = {
+@@ -908,19 +911,35 @@ void mtk_mutex_unprepare(struct mtk_mutex *mutex)
+ }
+ EXPORT_SYMBOL_GPL(mtk_mutex_unprepare);
+ 
++static void mtk_mutex_update_mod(struct mtk_mutex_ctx *mtx, unsigned int mutex_id,
++				 enum mtk_ddp_comp_id id, bool enable)
++{
++	unsigned int mod_id = mtx->data->mutex_mod[id];
++	unsigned int offset = DISP_REG_MUTEX_MOD(mtx, mod_id, mutex_id);
++	unsigned int reg = readl_relaxed(mtx->regs + offset);
++
++	if (enable)
++		reg |= BIT(mod_id % 32);
++	else
++		reg &= ~BIT(mod_id % 32);
++
++	writel_relaxed(reg, mtx->regs + offset);
++}
++
+ void mtk_mutex_add_comp(struct mtk_mutex *mutex,
+ 			enum mtk_ddp_comp_id id)
+ {
+ 	struct mtk_mutex_ctx *mtx = container_of(mutex, struct mtk_mutex_ctx,
+ 						 mutex[mutex->id]);
+-	unsigned int reg;
+-	unsigned int sof_id, mod_id;
+-	unsigned int offset;
++	unsigned int sof_id;
+ 
+ 	WARN_ON(&mtx->mutex[mutex->id] != mutex);
+ 
+ 	switch (id) {
+ 	case DDP_COMPONENT_DSI0:
++		/* MT6765 needs DSI0 in MOD as well as the frame trigger. */
++		if (mtx->data->has_dsi0_mod)
++			mtk_mutex_update_mod(mtx, mutex->id, id, true);
+ 		sof_id = MUTEX_SOF_DSI0;
+ 		break;
+ 	case DDP_COMPONENT_DSI1:
+@@ -945,11 +964,7 @@ void mtk_mutex_add_comp(struct mtk_mutex *mutex,
+ 		sof_id = MUTEX_SOF_DP_INTF1;
+ 		break;
+ 	default:
+-		offset = DISP_REG_MUTEX_MOD(mtx, mtx->data->mutex_mod[id], mutex->id);
+-		mod_id = mtx->data->mutex_mod[id] % 32;
+-		reg = readl_relaxed(mtx->regs + offset);
+-		reg |= BIT(mod_id);
+-		writel_relaxed(reg, mtx->regs + offset);
++		mtk_mutex_update_mod(mtx, mutex->id, id, true);
+ 		return;
+ 	}
+ 
+@@ -964,14 +979,14 @@ void mtk_mutex_remove_comp(struct mtk_mutex *mutex,
+ {
+ 	struct mtk_mutex_ctx *mtx = container_of(mutex, struct mtk_mutex_ctx,
+ 						 mutex[mutex->id]);
+-	unsigned int reg;
+-	unsigned int mod_id;
+-	unsigned int offset;
+ 
+ 	WARN_ON(&mtx->mutex[mutex->id] != mutex);
+ 
+ 	switch (id) {
+ 	case DDP_COMPONENT_DSI0:
++		if (mtx->data->has_dsi0_mod)
++			mtk_mutex_update_mod(mtx, mutex->id, id, false);
++		fallthrough;
+ 	case DDP_COMPONENT_DSI1:
+ 	case DDP_COMPONENT_DSI2:
+ 	case DDP_COMPONENT_DSI3:
+@@ -985,11 +1000,7 @@ void mtk_mutex_remove_comp(struct mtk_mutex *mutex,
+ 						  mutex->id));
+ 		break;
+ 	default:
+-		offset = DISP_REG_MUTEX_MOD(mtx, mtx->data->mutex_mod[id], mutex->id);
+-		mod_id = mtx->data->mutex_mod[id] % 32;
+-		reg = readl_relaxed(mtx->regs + offset);
+-		reg &= ~BIT(mod_id);
+-		writel_relaxed(reg, mtx->regs + offset);
++		mtk_mutex_update_mod(mtx, mutex->id, id, false);
+ 		break;
+ 	}
+ }

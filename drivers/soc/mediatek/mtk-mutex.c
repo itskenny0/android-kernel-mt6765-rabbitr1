@@ -356,6 +356,7 @@ struct mtk_mutex_data {
 	const u16 mutex_mod1_reg;
 	const u16 mutex_sof_reg;
 	const bool no_clk;
+	const bool has_dsi0_mod;
 };
 
 struct mtk_mutex_ctx {
@@ -402,6 +403,7 @@ static const u8 mt6765_mutex_mod[DDP_COMPONENT_ID_MAX] = {
 	[DDP_COMPONENT_CCORR] = 12,
 	[DDP_COMPONENT_COLOR0] = 11,
 	[DDP_COMPONENT_DITHER0] = 15,
+	[DDP_COMPONENT_DSI0] = 16,
 	[DDP_COMPONENT_GAMMA] = 14,
 	[DDP_COMPONENT_OVL0] = 7,
 	[DDP_COMPONENT_OVL_2L0] = 8,
@@ -765,6 +767,7 @@ static const struct mtk_mutex_data mt6765_mutex_driver_data = {
 	.mutex_mod_reg = MT8183_MUTEX0_MOD0,
 	.mutex_sof_reg = MT8183_MUTEX0_SOF0,
 	.no_clk = true,
+	.has_dsi0_mod = true,
 };
 
 static const struct mtk_mutex_data mt6795_mutex_driver_data = {
@@ -908,19 +911,35 @@ void mtk_mutex_unprepare(struct mtk_mutex *mutex)
 }
 EXPORT_SYMBOL_GPL(mtk_mutex_unprepare);
 
+static void mtk_mutex_update_mod(struct mtk_mutex_ctx *mtx, unsigned int mutex_id,
+				 enum mtk_ddp_comp_id id, bool enable)
+{
+	unsigned int mod_id = mtx->data->mutex_mod[id];
+	unsigned int offset = DISP_REG_MUTEX_MOD(mtx, mod_id, mutex_id);
+	unsigned int reg = readl_relaxed(mtx->regs + offset);
+
+	if (enable)
+		reg |= BIT(mod_id % 32);
+	else
+		reg &= ~BIT(mod_id % 32);
+
+	writel_relaxed(reg, mtx->regs + offset);
+}
+
 void mtk_mutex_add_comp(struct mtk_mutex *mutex,
 			enum mtk_ddp_comp_id id)
 {
 	struct mtk_mutex_ctx *mtx = container_of(mutex, struct mtk_mutex_ctx,
 						 mutex[mutex->id]);
-	unsigned int reg;
-	unsigned int sof_id, mod_id;
-	unsigned int offset;
+	unsigned int sof_id;
 
 	WARN_ON(&mtx->mutex[mutex->id] != mutex);
 
 	switch (id) {
 	case DDP_COMPONENT_DSI0:
+		/* MT6765 needs DSI0 in MOD as well as the frame trigger. */
+		if (mtx->data->has_dsi0_mod)
+			mtk_mutex_update_mod(mtx, mutex->id, id, true);
 		sof_id = MUTEX_SOF_DSI0;
 		break;
 	case DDP_COMPONENT_DSI1:
@@ -945,11 +964,7 @@ void mtk_mutex_add_comp(struct mtk_mutex *mutex,
 		sof_id = MUTEX_SOF_DP_INTF1;
 		break;
 	default:
-		offset = DISP_REG_MUTEX_MOD(mtx, mtx->data->mutex_mod[id], mutex->id);
-		mod_id = mtx->data->mutex_mod[id] % 32;
-		reg = readl_relaxed(mtx->regs + offset);
-		reg |= BIT(mod_id);
-		writel_relaxed(reg, mtx->regs + offset);
+		mtk_mutex_update_mod(mtx, mutex->id, id, true);
 		return;
 	}
 
@@ -964,14 +979,14 @@ void mtk_mutex_remove_comp(struct mtk_mutex *mutex,
 {
 	struct mtk_mutex_ctx *mtx = container_of(mutex, struct mtk_mutex_ctx,
 						 mutex[mutex->id]);
-	unsigned int reg;
-	unsigned int mod_id;
-	unsigned int offset;
 
 	WARN_ON(&mtx->mutex[mutex->id] != mutex);
 
 	switch (id) {
 	case DDP_COMPONENT_DSI0:
+		if (mtx->data->has_dsi0_mod)
+			mtk_mutex_update_mod(mtx, mutex->id, id, false);
+		fallthrough;
 	case DDP_COMPONENT_DSI1:
 	case DDP_COMPONENT_DSI2:
 	case DDP_COMPONENT_DSI3:
@@ -985,11 +1000,7 @@ void mtk_mutex_remove_comp(struct mtk_mutex *mutex,
 						  mutex->id));
 		break;
 	default:
-		offset = DISP_REG_MUTEX_MOD(mtx, mtx->data->mutex_mod[id], mutex->id);
-		mod_id = mtx->data->mutex_mod[id] % 32;
-		reg = readl_relaxed(mtx->regs + offset);
-		reg &= ~BIT(mod_id);
-		writel_relaxed(reg, mtx->regs + offset);
+		mtk_mutex_update_mod(mtx, mutex->id, id, false);
 		break;
 	}
 }

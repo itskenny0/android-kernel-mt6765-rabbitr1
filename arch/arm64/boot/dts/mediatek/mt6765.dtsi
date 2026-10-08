@@ -946,7 +946,7 @@
 				     "mediatek,mt8183-disp-rdma";
 			reg = <0 0x1400d000 0 0x1000>;
 			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&mmsys CLK_MM_MDP_RDMA0>;
+			clocks = <&mmsys CLK_MM_DISP_RDMA0>;
 			power-domains = <&spm MT6765_POWER_DOMAIN_DISP>;
 			iommus = <&iommu M4U_PORT_DISP_RDMA0>;
 			mediatek,gce-client-reg = <&gce SUBSYS_1400XXXX 0xd000 0x1000>;

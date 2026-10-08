@@ -30,6 +30,9 @@ The workflow:
    early power failures and MT8183 behavior are checked with host stubs.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
+   MMSYS routing and mutex writes are compared with shipped instructions for
+   the chosen DRM path; cleanup, legacy platforms and the compiled RDMA clock
+   are checked as well.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
