@@ -115,6 +115,7 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- drivers/gpu/drm/mediatek/mtk_dsi.o \
             drivers/gpu/drm/mediatek/mtk_drm_drv.o \
             drivers/gpu/drm/mediatek/mtk_disp_rdma.o \
+            drivers/gpu/drm/mediatek/mtk_disp_ovl.o \
             2>&1 | tee logs/mt6765-dsi-build.log
 
       - name: Build the diagnostic initramfs
@@ -136,6 +137,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py 2>&1 | tee logs/mt6765-display-path-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-rdma.py 2>&1 | tee logs/mt6765-rdma-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-rdma-irq.py 2>&1 | tee logs/mt6765-rdma-irq-tests.log
+          toolchains/boot-tools/bin/python scripts/test-mt6765-ovl.py 2>&1 | tee logs/mt6765-ovl-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

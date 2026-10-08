@@ -18,7 +18,7 @@ The workflow:
    setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-   It also compiles the DSI host, RDMA and DRM driver objects, which are not enabled
+   It also compiles the DSI host, RDMA, OVL and DRM driver objects, which are not enabled
    in the boot profile.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
@@ -39,6 +39,10 @@ The workflow:
    The RDMA IRQ test compares event classification and selective acknowledgement
    with shipped instructions, then checks masked vblank, error diagnostics,
    clock-free probe, failure cleanup and synchronized IRQ shutdown with models.
+   Both native overlay blocks are checked against stock FIFO/request, ROI and
+   startup register values and stock IRQ classification. Mode bounds, inherited
+   layer cleanup, reset/clock failures, queued writes, IRQ lifetime and the
+   existing MT8192 behavior run under ASan/UBSan.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.

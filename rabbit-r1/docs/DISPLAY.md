@@ -276,12 +276,12 @@ MMIO, module base addresses, logging and profiling are modeled. This does not
 emulate CMDQ, hardware frame synchronization, clock waveforms or pixel flow.
 It also does not establish that every route left active by LK has been shut
 down: masked MOUT writes preserve unrelated outputs. Firmware path teardown,
-OVL configuration, IOMMU and complete startup sequencing remain to audit.
+OVL plane configuration, IOMMU and complete startup sequencing remain to audit.
 
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   OVL configuration and display IOMMU behavior. The native RDMA setup and
+   OVL plane configuration and display IOMMU behavior. The native RDMA/OVL setup and
    interrupt handling below still require hardware validation.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
@@ -415,3 +415,81 @@ MMIO model rejects access without a clock. Stock trace results are recorded in
 rejected, including premature IRQ enable, lost status, incorrect vblank and
 unsynchronized shutdown. These tests do not emulate the real GIC,
 power-domain hardware or electrical behavior; those remain unverified.
+
+## Native overlay engines
+
+The four-layer `mediatek,mt6765-disp-ovl` and two-layer
+`mediatek,mt6765-disp-ovl-2l` now have native data, bindings and DRM component
+matches. The MT8192 fallbacks have been removed. Both retain the existing
+eight-bit RGB/YUV format list and blending capabilities; neither advertises
+AFBC or ten-bit input. Native plane formatting and blending still need a
+separate audit and pixel-output tests.
+
+Probe makes no MMIO accesses and requests `IRQF_NO_AUTOEN`. After the CRTC
+powers the display domain, clock enable masks interrupts, stops the inherited
+engine and pulses reset. It polls the flow-control register at `0x240` every
+10 us for up to 20 ms. The shipped `ovl_reset` at Image offset `0x6f7854`
+reads that register only once before its delay loop; the new code re-reads it.
+A timeout drops the clock reference without enabling the IRQ or engine.
+
+Successful reset disables all physical and constant-color layers, clears
+extended-layer control and stops each physical layer's RDMA. It clears random
+background mode and the upstream background input; CRTC subsequently enables
+that input on the second overlay. This avoids inheriting the stock pipeline's
+different overlay order. It does not disconnect leftover MMSYS MOUT routes or
+quiesce an inherited RSZ engine; firmware-path teardown remains unfinished.
+
+Native configuration accepts nonzero dimensions up to the vendor's 4095 limit,
+sets opaque-black ROI and constant-layer dimensions, and programs the shipped
+real-time FIFO/request policy. It does not reset the engine from the atomic
+configuration callback. An invalid mode stops the engine while its clock is
+held and prevents startup.
+
+| Register | Four-layer OVL0 | Two-layer OVL0_2L |
+| --- | --- | --- |
+| Per-layer GMC | `0x03ff03ff` | `0x03ff03ff` |
+| Per-layer FIFO control | `0x00c00000` (192 words) | Same |
+| Per-layer GMC2 | `0x203f007f` | Same |
+| GREQ (`0x1f8`) | `0xf1ff7777` | `0xf1ff0077` |
+| Urgent GREQ (`0x1fc`) | `0x7777` | `0x777` |
+| Ultra source (`0x20c`) | `0x8040` | Same |
+| Per-layer low/high buffer thresholds | `0` / `0x80000000` | Same |
+| Functional DCM0/DCM1 | `0` / `0` | Same |
+
+The two-layer urgent value deliberately follows the shipped code, including
+its third request field. Layer enable preserves the native GMC value instead
+of replacing it with the fallback's `0x01000100`. Native configuration clears
+external-ultra blocking for the direct display path. Writeback/decoupled mode,
+extended layers and dynamic bandwidth policy are not implemented.
+
+Start establishes SMI IDs, rounding, GCLAST, clamping and the high-frequency
+overlay clock bit before enabling scanout. Frame underflow, abnormal SOF and
+per-layer abnormal EOF generate rate-limited logs with status, flow state and
+an event count. Vblank independently controls frame completion. IRQ handling
+uses write-zero-to-clear acknowledgement of the observed status and never
+reports an error-only IRQ as vblank. Clock disable masks sources and waits for
+running IRQ handlers before removing their clock. Error reporting does not
+attempt automatic display recovery.
+
+`test-mt6765-ovl.py` compares 18 native setup fixtures with the shipped
+`ovl_ioctl` golden-settings path (`0x6fffe4`), ROI (`0x6f7908`), reset and start
+(`0x6f71a4`). It compares final register values because the new code groups
+writes by layer and configures startup fields before enabling the engine.
+The interrupt mask deliberately follows the native vblank/error policy rather
+than stock's frame-start reporting. Fixtures cover both blocks, three initial
+register patterns, dimensions 1x1/480x640/4095x4095, and immediate/queued writes.
+
+Another 76 shipped IRQ executions verify classification and acknowledgement.
+The production handlers are checked across all 15 low status bits and callback
+presence (65,536 combinations per block), masked vblank and late events. Tests
+also cover six probe failures, clock/reset errors, repeated enable/disable,
+cleanup before engine start, interrupt completion during shutdown and unchanged
+MT8192 behavior. Compiled DT register ranges and interrupt specifiers match
+stock. Seventeen deliberately broken variants are rejected by assertions or
+comparison with the validated register traces. Results are recorded in
+`out/mt6765-ovl-audit.json`.
+
+MMIO side effects, reset latency, clocks, GIC/kernel services and CMDQ are models.
+No real reset, memory fetch, blending, underflow recovery or pixel output has
+been observed. Both the display graph and DRM driver remain disabled pending
+the remaining integration and hardware acceptance work.

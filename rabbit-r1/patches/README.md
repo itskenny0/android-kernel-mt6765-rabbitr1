@@ -58,3 +58,10 @@ reset sequence and input-mode configuration. Patch 0028 adds selective IRQ
 acknowledgement and error diagnostics, avoids unpowered probe accesses and
 synchronizes IRQ shutdown before clock disable. See `docs/DISPLAY.md` for the
 stock-instruction comparisons and remaining display acceptance work.
+
+Patch 0029 adds native bindings for the four-layer and two-layer MT6765 overlays.
+Patch 0030 replaces their MT8192 fallbacks, adds stock-derived FIFO/request and
+startup settings, clears inherited layers and background input, bounds reset
+polling and mode dimensions, and handles error/vblank IRQs with clock ownership.
+Plane formatting, firmware MMSYS teardown and physical display validation remain
+unfinished; see `docs/DISPLAY.md`.

@@ -9,6 +9,8 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/interrupt.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -85,6 +87,31 @@
 
 #define OVL_COLOR_ALPHA		GENMASK(31, 24)
 
+#define OVL_ENGINE_EN		BIT(0)
+#define OVL_HF_CLK_EN		BIT(10)
+#define OVL_BLOCK_EXT_ULTRA	BIT(18)
+#define OVL_BLOCK_EXT_PREULTRA	BIT(19)
+#define OVL_RANDOM_BGCLR_EN	BIT(1)
+#define OVL_OUTPUT_NO_RND		BIT(3)
+#define OVL_GCLAST_EN		BIT(24)
+#define OVL_OUTPUT_CLAMP		BIT(26)
+#define OVL_FRAME_UNDERFLOW	BIT(2)
+#define OVL_ABNORMAL_SOF		BIT(13)
+#define OVL_ABNORMAL_EOF(layers)	GENMASK((layers) + 4, 5)
+#define DISP_REG_OVL_FIFO_CTRL(n)	(0x00d0 + 0x20 * (n))
+#define DISP_REG_OVL_GMC_S2(n)	(0x01e0 + 4 * (n))
+#define DISP_REG_OVL_GREQ_NUM	0x01f8
+#define DISP_REG_OVL_GREQ_URG	0x01fc
+#define DISP_REG_OVL_ULTRA_SRC	0x020c
+#define DISP_REG_OVL_BUF_LOW(n)	(0x0210 + 4 * (n))
+#define DISP_REG_OVL_BUF_HIGH(n)	(0x0220 + 4 * (n))
+#define DISP_REG_OVL_FLOW_CTRL_DBG 0x0240
+#define DISP_REG_OVL_LC_SRC_SIZE	0x0288
+#define DISP_REG_OVL_FUNC_DCM0	0x02a0
+#define DISP_REG_OVL_FUNC_DCM1	0x02a4
+#define DISP_REG_OVL_EXT_CON	0x0324
+#define MT6765_OVL_GMC		0x03ff03ff
+
 static inline bool is_10bit_rgb(u32 fmt)
 {
 	switch (fmt) {
@@ -150,6 +177,7 @@ struct mtk_disp_ovl_data {
 	const u32 *formats;
 	size_t num_formats;
 	bool supports_clrfmt_ext;
+	bool mt6765;
 };
 
 /*
@@ -158,6 +186,7 @@ struct mtk_disp_ovl_data {
  * @data: platform data
  */
 struct mtk_disp_ovl {
+	struct device			*dev;
 	struct drm_crtc			*crtc;
 	struct clk			*clk;
 	void __iomem			*regs;
@@ -165,11 +194,45 @@ struct mtk_disp_ovl {
 	const struct mtk_disp_ovl_data	*data;
 	void				(*vblank_cb)(void *data);
 	void				*vblank_cb_data;
+	int				irq;
+	bool				clock_enabled, config_valid;
+	u32				error_count;
 };
+
+static u32 mt6765_ovl_error_mask(struct mtk_disp_ovl *ovl)
+{
+	return OVL_FRAME_UNDERFLOW | OVL_ABNORMAL_SOF |
+	       OVL_ABNORMAL_EOF(ovl->data->layer_nr);
+}
+
+static irqreturn_t mt6765_ovl_irq(struct mtk_disp_ovl *ovl)
+{
+	u32 status = readl(ovl->regs + DISP_REG_OVL_INTSTA);
+	u32 enabled;
+
+	if (!status)
+		return IRQ_NONE;
+
+	enabled = readl(ovl->regs + DISP_REG_OVL_INTEN);
+	writel(~status, ovl->regs + DISP_REG_OVL_INTSTA);
+	if (status & mt6765_ovl_error_mask(ovl)) {
+		ovl->error_count++;
+		dev_err_ratelimited(ovl->dev, "OVL error: count=%u status=%#x flow=%#x\n",
+				    ovl->error_count, status,
+				    readl(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG));
+	}
+	if ((status & enabled & OVL_FME_CPL_INT) && ovl->vblank_cb)
+		ovl->vblank_cb(ovl->vblank_cb_data);
+
+	return IRQ_HANDLED;
+}
 
 static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
 {
 	struct mtk_disp_ovl *priv = dev_id;
+
+	if (priv->data->mt6765)
+		return mt6765_ovl_irq(priv);
 
 	/* Clear frame completion interrupt */
 	writel(0x0, priv->regs + DISP_REG_OVL_INTSTA);
@@ -204,6 +267,12 @@ void mtk_ovl_enable_vblank(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		writel(~(u32)OVL_FME_CPL_INT, ovl->regs + DISP_REG_OVL_INTSTA);
+		writel(readl(ovl->regs + DISP_REG_OVL_INTEN) | OVL_FME_CPL_INT,
+		       ovl->regs + DISP_REG_OVL_INTEN);
+		return;
+	}
 	writel(0x0, ovl->regs + DISP_REG_OVL_INTSTA);
 	writel_relaxed(OVL_FME_CPL_INT, ovl->regs + DISP_REG_OVL_INTEN);
 }
@@ -212,6 +281,11 @@ void mtk_ovl_disable_vblank(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		writel(readl(ovl->regs + DISP_REG_OVL_INTEN) & ~OVL_FME_CPL_INT,
+		       ovl->regs + DISP_REG_OVL_INTEN);
+		return;
+	}
 	writel_relaxed(0x0, ovl->regs + DISP_REG_OVL_INTEN);
 }
 
@@ -246,14 +320,55 @@ bool mtk_ovl_is_afbc_supported(struct device *dev)
 int mtk_ovl_clk_enable(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
+	u32 value;
+	unsigned int i;
+	int ret;
 
-	return clk_prepare_enable(ovl->clk);
+	ret = clk_prepare_enable(ovl->clk);
+	if (ret || !ovl->data->mt6765)
+		return ret;
+
+	ovl->config_valid = false;
+	writel(0, ovl->regs + DISP_REG_OVL_INTEN);
+	writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
+	       ovl->regs + DISP_REG_OVL_EN);
+	writel(1, ovl->regs + DISP_REG_OVL_RST);
+	writel(0, ovl->regs + DISP_REG_OVL_RST);
+	/* Unlike the stock loop, re-read the state on every poll. */
+	ret = readl_poll_timeout(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG, value,
+				value & 3, 10, 20000);
+	if (ret) {
+		dev_err(dev, "OVL reset failed: %d\n", ret);
+		clk_disable_unprepare(ovl->clk);
+		return ret;
+	}
+
+	/* Drop inherited physical, constant-color and extended layers. */
+	writel(0, ovl->regs + DISP_REG_OVL_SRC_CON);
+	writel(0, ovl->regs + DISP_REG_OVL_EXT_CON);
+	/* CRTC will enable the upstream background input on the second overlay. */
+	writel(readl(ovl->regs + DISP_REG_OVL_DATAPATH_CON) &
+	       ~(OVL_BGCLR_SEL_IN | OVL_RANDOM_BGCLR_EN),
+	       ovl->regs + DISP_REG_OVL_DATAPATH_CON);
+	for (i = 0; i < ovl->data->layer_nr; i++)
+		writel(0, ovl->regs + DISP_REG_OVL_RDMA_CTRL(i));
+	writel(0, ovl->regs + DISP_REG_OVL_INTSTA);
+	ovl->clock_enabled = true;
+	enable_irq(ovl->irq);
+	return 0;
 }
 
 void mtk_ovl_clk_disable(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		writel(0, ovl->regs + DISP_REG_OVL_INTEN);
+		disable_irq(ovl->irq);
+		writel(0, ovl->regs + DISP_REG_OVL_INTSTA);
+		ovl->clock_enabled = false;
+		ovl->config_valid = false;
+	}
 	clk_disable_unprepare(ovl->clk);
 }
 
@@ -261,6 +376,21 @@ void mtk_ovl_start(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		u32 reg;
+
+		if (!ovl->config_valid)
+			return;
+		reg = readl(ovl->regs + DISP_REG_OVL_DATAPATH_CON);
+		reg &= ~OVL_OUTPUT_NO_RND;
+		reg |= OVL_LAYER_SMI_ID_EN | OVL_GCLAST_EN | OVL_OUTPUT_CLAMP;
+		writel(reg, ovl->regs + DISP_REG_OVL_DATAPATH_CON);
+		writel(readl(ovl->regs + DISP_REG_OVL_INTEN) | mt6765_ovl_error_mask(ovl),
+		       ovl->regs + DISP_REG_OVL_INTEN);
+		writel(readl(ovl->regs + DISP_REG_OVL_EN) | OVL_ENGINE_EN | OVL_HF_CLK_EN,
+		       ovl->regs + DISP_REG_OVL_EN);
+		return;
+	}
 	if (ovl->data->smi_id_en) {
 		unsigned int reg;
 
@@ -275,6 +405,14 @@ void mtk_ovl_stop(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		writel(0, ovl->regs + DISP_REG_OVL_INTEN);
+		writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
+		       ovl->regs + DISP_REG_OVL_EN);
+		writel(0, ovl->regs + DISP_REG_OVL_INTSTA);
+		ovl->config_valid = false;
+		return;
+	}
 	writel_relaxed(0x0, ovl->regs + DISP_REG_OVL_EN);
 	if (ovl->data->smi_id_en) {
 		unsigned int reg;
@@ -310,12 +448,59 @@ static void mtk_ovl_set_bit_depth(struct device *dev, int idx, u32 format,
 			   OVL_CON_CLRFMT_BIT_DEPTH_MASK(idx));
 }
 
+static void mt6765_ovl_config(struct mtk_disp_ovl *ovl, unsigned int w,
+			      unsigned int h, struct cmdq_pkt *pkt)
+{
+	u32 greq = ovl->data->layer_nr == 4 ? 0x7777 : 0x77;
+	unsigned int i;
+
+	if (!ovl->clock_enabled || !w || !h || w > 4095 || h > 4095) {
+		ovl->config_valid = false;
+		if (ovl->clock_enabled)
+			mtk_ddp_write_mask(pkt, 0, &ovl->cmdq_reg, ovl->regs,
+					   DISP_REG_OVL_EN, OVL_ENGINE_EN);
+		dev_err_ratelimited(ovl->dev, "Unsupported OVL mode %ux%u\n", w, h);
+		return;
+	}
+
+	mtk_ddp_write(pkt, h << 16 | w, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_ROI_SIZE);
+	mtk_ddp_write(pkt, OVL_COLOR_ALPHA, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_ROI_BGCLR);
+	mtk_ddp_write_mask(pkt, h << 16 | w, &ovl->cmdq_reg, ovl->regs,
+			   DISP_REG_OVL_LC_SRC_SIZE, GENMASK(28, 16) | GENMASK(12, 0));
+
+	/* Stock real-time FIFO/request policy; each FIFO has 192 words. */
+	for (i = 0; i < ovl->data->layer_nr; i++) {
+		mtk_ddp_write(pkt, MT6765_OVL_GMC, &ovl->cmdq_reg, ovl->regs,
+			      DISP_REG_OVL_RDMA_GMC(i));
+		mtk_ddp_write(pkt, 192 << 16, &ovl->cmdq_reg, ovl->regs,
+			      DISP_REG_OVL_FIFO_CTRL(i));
+		mtk_ddp_write(pkt, 0x203f007f, &ovl->cmdq_reg, ovl->regs,
+			      DISP_REG_OVL_GMC_S2(i));
+		mtk_ddp_write(pkt, 0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_BUF_LOW(i));
+		mtk_ddp_write(pkt, BIT(31), &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_BUF_HIGH(i));
+	}
+	mtk_ddp_write(pkt, 0xf1ff0000 | greq, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_GREQ_NUM);
+	/* The shipped two-layer urgent setting also programs the third field. */
+	mtk_ddp_write(pkt, ovl->data->layer_nr == 4 ? 0x7777 : 0x777,
+		      &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_GREQ_URG);
+	mtk_ddp_write(pkt, 0x8040, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_ULTRA_SRC);
+	mtk_ddp_write(pkt, 0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_FUNC_DCM0);
+	mtk_ddp_write(pkt, 0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_FUNC_DCM1);
+	mtk_ddp_write_mask(pkt, 0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_EN,
+			   OVL_BLOCK_EXT_ULTRA | OVL_BLOCK_EXT_PREULTRA);
+	ovl->config_valid = true;
+}
+
 void mtk_ovl_config(struct device *dev, unsigned int w,
 		    unsigned int h, unsigned int vrefresh,
 		    unsigned int bpc, struct cmdq_pkt *cmdq_pkt)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
+	if (ovl->data->mt6765) {
+		mt6765_ovl_config(ovl, w, h, cmdq_pkt);
+		return;
+	}
 	if (w != 0 && h != 0)
 		mtk_ddp_write_relaxed(cmdq_pkt, h << 16 | w, &ovl->cmdq_reg, ovl->regs,
 				      DISP_REG_OVL_ROI_SIZE);
@@ -379,7 +564,9 @@ void mtk_ovl_layer_on(struct device *dev, unsigned int idx,
 		      (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
 	gmc_thrshd_h = GMC_THRESHOLD_HIGH >>
 		      (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
-	if (ovl->data->gmc_bits == 10)
+	if (ovl->data->mt6765)
+		gmc_value = MT6765_OVL_GMC;
+	else if (ovl->data->gmc_bits == 10)
 		gmc_value = gmc_thrshd_h | gmc_thrshd_h << 16;
 	else
 		gmc_value = gmc_thrshd_l | gmc_thrshd_l << 8 |
@@ -611,6 +798,7 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mtk_disp_ovl *priv;
+	unsigned long irq_flags = IRQF_TRIGGER_NONE;
 	int irq;
 	int ret;
 
@@ -621,6 +809,8 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
+	priv->dev = dev;
+	priv->irq = irq;
 
 	priv->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(priv->clk))
@@ -639,9 +829,11 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
 
 	priv->data = of_device_get_match_data(dev);
 	platform_set_drvdata(pdev, priv);
+	if (priv->data->mt6765)
+		irq_flags |= IRQF_NO_AUTOEN;
 
 	ret = devm_request_irq(dev, irq, mtk_disp_ovl_irq_handler,
-			       IRQF_TRIGGER_NONE, dev_name(dev), priv);
+			       irq_flags, dev_name(dev), priv);
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "Failed to request irq %d\n", irq);
 
@@ -749,7 +941,39 @@ static const struct mtk_disp_ovl_data mt8195_ovl_driver_data = {
 	.supports_clrfmt_ext = true,
 };
 
+static const struct mtk_disp_ovl_data mt6765_ovl_driver_data = {
+	.addr = DISP_REG_OVL_ADDR_MT8173,
+	.gmc_bits = 10,
+	.layer_nr = 4,
+	.fmt_rgb565_is_0 = true,
+	.smi_id_en = true,
+	.blend_modes = BIT(DRM_MODE_BLEND_PREMULTI) |
+		       BIT(DRM_MODE_BLEND_COVERAGE) |
+		       BIT(DRM_MODE_BLEND_PIXEL_NONE),
+	.formats = mt8173_formats,
+	.num_formats = ARRAY_SIZE(mt8173_formats),
+	.mt6765 = true,
+};
+
+static const struct mtk_disp_ovl_data mt6765_ovl_2l_driver_data = {
+	.addr = DISP_REG_OVL_ADDR_MT8173,
+	.gmc_bits = 10,
+	.layer_nr = 2,
+	.fmt_rgb565_is_0 = true,
+	.smi_id_en = true,
+	.blend_modes = BIT(DRM_MODE_BLEND_PREMULTI) |
+		       BIT(DRM_MODE_BLEND_COVERAGE) |
+		       BIT(DRM_MODE_BLEND_PIXEL_NONE),
+	.formats = mt8173_formats,
+	.num_formats = ARRAY_SIZE(mt8173_formats),
+	.mt6765 = true,
+};
+
 static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
+	{ .compatible = "mediatek,mt6765-disp-ovl",
+	  .data = &mt6765_ovl_driver_data },
+	{ .compatible = "mediatek,mt6765-disp-ovl-2l",
+	  .data = &mt6765_ovl_2l_driver_data },
 	{ .compatible = "mediatek,mt2701-disp-ovl",
 	  .data = &mt2701_ovl_driver_data},
 	{ .compatible = "mediatek,mt8167-disp-ovl",

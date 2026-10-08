@@ -920,8 +920,7 @@
 		};
 
 		ovl0: ovl@1400b000 {
-			compatible = "mediatek,mt6765-disp-ovl",
-				     "mediatek,mt8192-disp-ovl";
+			compatible = "mediatek,mt6765-disp-ovl";
 			reg = <0 0x1400b000 0 0x1000>;
 			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&mmsys CLK_MM_DISP_OVL0>;
@@ -931,8 +930,7 @@
 		};
 
 		ovl_2l0: ovl@1400c000 {
-			compatible = "mediatek,mt6765-disp-ovl-2l",
-				     "mediatek,mt8192-disp-ovl-2l";
+			compatible = "mediatek,mt6765-disp-ovl-2l";
 			reg = <0 0x1400c000 0 0x1000>;
 			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&mmsys CLK_MM_DISP_OVL0_2L>;
