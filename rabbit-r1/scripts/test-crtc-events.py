@@ -112,8 +112,8 @@ struct mbox_client { int unused; };
 struct mbox_controller { struct device *dev; };
 struct mbox_chan { struct mbox_controller *mbox; };
 struct cmdq_client { struct mbox_client client;struct mbox_chan *chan; };
-struct cmdq_pkt { unsigned int cmd_buf_size;u64 pa_base; };
-struct cmdq_cb_data { int sta; };
+struct cmdq_pkt { unsigned int cmd_buf_size,buf_size;u64 pa_base; };
+struct cmdq_cb_data { int sta;struct cmdq_pkt *pkt; };
 struct mtk_mmsys_driver_data { bool shadow_register; };
 struct mtk_drm_private { struct mtk_mmsys_driver_data *data; };
 struct drm_atomic_state { struct drm_device *dev;struct drm_crtc_state *old_state,*new_state;
@@ -235,15 +235,23 @@ static void wake_up(unsigned int *q) { (*q)++; }
 static void pm_runtime_mark_last_busy(struct device *d) { assert(d==&gce_dev); }
 static void pm_runtime_put_autosuspend(struct device *d) { assert(d==&gce_dev && pm_refs);pm_refs--; }
 static int pm_runtime_resume_and_get(struct device *d) { assert(d==&gce_dev);if(queue_pm_fail)return -EIO;pm_refs++;return 0; }
-static void mbox_flush(struct mbox_chan *c,unsigned int ms) { assert(c==&channel && ms==2000);if(queue_pending && deliver)service(); }
+static void ddp_cmdq_cb(struct mbox_client *,void *);
+static void cmdq_mbox_stop(struct mbox_chan *c) {
+    assert(c==&channel);
+    if(queue_pending) {
+        struct cmdq_cb_data data={.sta=-ECONNABORTED,.pkt=&fixture.cmdq_handle};
+        queue_pending=0;ddp_cmdq_cb(&fixture.cmdq_client.client,&data);
+    }
+}
+static void dma_sync_single_for_cpu(struct device *d,u64 base,unsigned int len,int dir)
+{ assert(d==&gce_dev && !base && len==4096 && dir==DMA_TO_DEVICE && !queue_pending); }
 static void cmdq_pkt_clear_event(struct cmdq_pkt *q,u32 ev) { (void)q;(void)ev;hw(); }
 static void cmdq_pkt_wfe(struct cmdq_pkt *q,u32 ev,bool clear) { (void)q;(void)ev;assert(!clear);hw(); }
-static void cmdq_pkt_eoc(struct cmdq_pkt *q) { (void)q;hw(); }
+static int cmdq_pkt_eoc(struct cmdq_pkt *q) { q->cmd_buf_size=8;hw();return 0; }
 static void dma_sync_single_for_device(struct device *d,u64 base,unsigned int len,int dir)
-{ assert(d==&gce_dev && !base && !len && dir==DMA_TO_DEVICE); }
-static void mbox_send_message(struct mbox_chan *c,struct cmdq_pkt *q)
-{ assert(c==&channel && q==&fixture.cmdq_handle && !queue_pending);queue_pending++;queued++; }
-static void mbox_client_txdone(struct mbox_chan *c,int status) { assert(c==&channel && !status); }
+{ assert(d==&gce_dev && !base && len==8 && dir==DMA_TO_DEVICE); }
+static int cmdq_mbox_send(struct mbox_chan *c,struct cmdq_pkt *q)
+{ assert(c==&channel && q==&fixture.cmdq_handle && !queue_pending);queue_pending++;queued++;return 0; }
 #define wait_event_timeout(q,cond,time) ({ assert((time)==500);if(deliver)service();(void)(q);(cond)?1:0; })
 #endif
 '''
@@ -274,7 +282,7 @@ static void service(void)
     mtk_crtc_ddp_irq(&fixture.base);
 #if TEST_CMDQ
     if(queue_pending) {
-        struct cmdq_cb_data data={.sta=queue_fail?-EIO:0};queue_pending=0;
+        struct cmdq_cb_data data={.sta=queue_fail?-EIO:0,.pkt=&fixture.cmdq_handle};queue_pending=0;
         ddp_cmdq_cb(&fixture.cmdq_client.client,&data);
     }
 #endif
@@ -350,7 +358,7 @@ static void init(unsigned int path,int delay)
     current.base.active=current.base.color_mgmt_changed=true;current.pending_config=true;
     soc.shadow_register=path==1;vb.config.offdelay_ms=delay;
 #if TEST_CMDQ
-    fixture.cmdq_client.chan=path==2?&channel:NULL;
+    fixture.cmdq_client.chan=path==2?&channel:NULL;fixture.cmdq_handle.buf_size=4096;
 #else
     assert(path<2);
 #endif
@@ -366,14 +374,7 @@ static void stop(unsigned int id,bool user)
     previous.active=current.base.active;current.base.active=false;transaction.modeset=true;arm(id,user);
     drm_atomic_helper_commit_tail_rpm(&transaction);done(id);
 #if TEST_CMDQ
-    if(queue_pending) {
-        /* Transport cancellation is outside this test. Deliver a delayed error
-         * callback after shutdown and require no duplicate event or off-clock IO. */
-        assert(!deliver && !physical_on && pm_refs==1);
-        unsigned int before=hw_writes,events_before=sent,puts_before=put_refs;
-        queue_fail=true;deliver=true;service();
-        assert(hw_writes==before && sent==events_before && put_refs==puts_before);
-    }
+    assert(!queue_pending && !fixture.cmdq_pending && !fixture.cmdq_page_flip);
 #endif
     disabled();
 }
@@ -405,9 +406,14 @@ int main(void)
         }
         /* Lost vblank/failed CMDQ completion: shutdown must release private event. */
         init(path,delay);deliver=false;arm(0,user);drm_atomic_helper_commit_tail_rpm(&transaction);
-        assert(fixture.event==&events[0] && !completions[0].done && vb.refcount==1);
+        assert(!completions[0].done && vb.refcount==1);
 #if TEST_CMDQ
-        if(path==2) { queue_fail=true;deliver=true;service();deliver=false;assert(!pm_refs && fixture.event); }
+        assert(path==2 ? fixture.cmdq_page_flip==&events[0] : fixture.event==&events[0]);
+#else
+        assert(fixture.event==&events[0]);
+#endif
+#if TEST_CMDQ
+        if(path==2) { queue_fail=true;deliver=true;service();deliver=false;assert(!pm_refs && !fixture.cmdq_page_flip && completions[0].done); }
 #endif
         stop(1,!user);done(0);assert(sent==2 && put_refs>=1);cases++;
         /* vblank acquisition can fail even after hardware startup. */
@@ -448,11 +454,11 @@ def build(source, cmdq):
         code+=body
     code+=CORE_MODEL
     for name in ('to_mtk_crtc','to_mtk_crtc_state','mtk_crtc_finish_page_flip','mtk_drm_finish_page_flip',
-                 'ddp_cmdq_cb','mtk_crtc_ddp_hw_fini','mtk_crtc_ddp_config','mtk_crtc_update_config',
+                 'ddp_cmdq_cb','mtk_crtc_cmdq_clear_pending','mtk_crtc_ddp_hw_fini','mtk_crtc_ddp_config','mtk_crtc_update_config',
                  'mtk_crtc_ddp_irq','mtk_crtc_enable_vblank','mtk_crtc_disable_vblank','mtk_crtc_async_update',
                  'mtk_crtc_atomic_enable','mtk_crtc_atomic_disable','mtk_crtc_atomic_begin','mtk_crtc_atomic_flush'):
         body=command.block(s,name)
-        code+=('#if TEST_CMDQ\n'+body+'#endif\n') if name=='ddp_cmdq_cb' else body
+        code+=('#if TEST_CMDQ\n'+body+'#endif\n') if name in ('ddp_cmdq_cb','mtk_crtc_cmdq_clear_pending') else body
     code+=HELPERS
     for name in ('drm_atomic_helper_commit_planes','drm_atomic_helper_fake_vblank','drm_atomic_helper_commit_tail_rpm'):
         code+=command.block(helper,name)

@@ -120,3 +120,10 @@ See `docs/DISPLAY.md`.
 Patch 0046 fixes GCE controller flush power references, cancellation ordering,
 failed-stop ownership and timeout units. The CRTC and mailbox queue still need
 a complete ownership and shutdown contract; see `docs/DISPLAY.md`.
+
+Patch 0047 adds confirmed GCE submission and synchronous cancellation, assigns
+page-flip events to their packets, separates watchdog expiry from ownership,
+and drains before reuse, power-off or destruction. IRQ retirement, submission
+errors, suspend and managed clock cleanup follow the same lifetime rules.
+Permanent reset failure blocks teardown; hardware validation remains outstanding.
+See `docs/DISPLAY.md` for the integrated tests and their limits.

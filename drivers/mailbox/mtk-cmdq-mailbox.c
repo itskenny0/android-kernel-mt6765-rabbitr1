@@ -6,6 +6,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/dma-mapping.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -90,6 +91,8 @@ struct cmdq {
 	struct cmdq_thread	*thread;
 	struct clk_bulk_data	*clocks;
 	bool			suspended;
+	bool			clocks_enabled;
+	bool			irq_ready;
 };
 
 struct gce_plat {
@@ -208,11 +211,13 @@ static void cmdq_thread_resume(struct cmdq_thread *thread)
 	writel(CMDQ_THR_RESUME, thread->base + CMDQ_THR_SUSPEND_TASK);
 }
 
-static void cmdq_init(struct cmdq *cmdq)
+static int cmdq_init(struct cmdq *cmdq)
 {
-	int i;
+	int i, ret;
 
-	WARN_ON(clk_bulk_enable(cmdq->pdata->gce_num, cmdq->clocks));
+	ret = clk_bulk_enable(cmdq->pdata->gce_num, cmdq->clocks);
+	if (ret)
+		return ret;
 
 	cmdq_vm_init(cmdq);
 	cmdq_gctl_value_toggle(cmdq, true);
@@ -221,6 +226,7 @@ static void cmdq_init(struct cmdq *cmdq)
 	for (i = 0; i <= CMDQ_MAX_EVENT; i++)
 		writel(i, cmdq->base + CMDQ_SYNC_TOKEN_UPDATE);
 	clk_bulk_disable(cmdq->pdata->gce_num, cmdq->clocks);
+	return 0;
 }
 
 static int cmdq_thread_reset(struct cmdq *cmdq, struct cmdq_thread *thread)
@@ -231,8 +237,8 @@ static int cmdq_thread_reset(struct cmdq *cmdq, struct cmdq_thread *thread)
 	if (readl_poll_timeout_atomic(thread->base + CMDQ_THR_WARM_RESET,
 			warm_reset, !(warm_reset & CMDQ_THR_DO_WARM_RESET),
 			0, 10)) {
-		dev_err(cmdq->mbox.dev, "reset GCE thread 0x%x failed\n",
-			(u32)(thread->base - cmdq->base));
+		dev_err_ratelimited(cmdq->mbox.dev, "reset GCE thread 0x%x failed\n",
+				    (u32)(thread->base - cmdq->base));
 		return -EFAULT;
 	}
 
@@ -285,78 +291,74 @@ static void cmdq_task_exec_done(struct cmdq_task *task, int sta)
 
 	data.sta = sta;
 	data.pkt = task->pkt;
-	mbox_chan_received_data(task->thread->chan, &data);
-
 	list_del(&task->list_entry);
-}
-
-static void cmdq_task_handle_error(struct cmdq_task *task)
-{
-	struct cmdq_thread *thread = task->thread;
-	struct cmdq_task *next_task;
-	struct cmdq *cmdq = task->cmdq;
-
-	dev_err(cmdq->mbox.dev, "task 0x%p error\n", task);
-	WARN_ON(cmdq_thread_suspend(cmdq, thread) < 0);
-	next_task = list_first_entry_or_null(&thread->task_busy_list,
-			struct cmdq_task, list_entry);
-	if (next_task)
-		writel(next_task->pa_base >> cmdq->pdata->shift,
-		       thread->base + CMDQ_THR_CURR_ADDR);
-	cmdq_thread_resume(thread);
+	mbox_chan_received_data(task->thread->chan, &data);
 }
 
 static void cmdq_thread_irq_handler(struct cmdq *cmdq,
 				    struct cmdq_thread *thread)
 {
-	struct cmdq_task *task, *tmp, *curr_task = NULL;
+	struct cmdq_task *task, *tmp, *current_task = NULL, *next = NULL;
 	u32 irq_flag, gce_addr;
-	dma_addr_t curr_pa, task_end_pa;
-	bool err;
+	dma_addr_t curr_pa, end_pa = 0;
+	bool err, redirect = false;
 
 	irq_flag = readl(thread->base + CMDQ_THR_IRQ_STATUS);
 	writel(~irq_flag, thread->base + CMDQ_THR_IRQ_STATUS);
-
-	/*
-	 * When ISR call this function, another CPU core could run
-	 * "release task" right before we acquire the spin lock, and thus
-	 * reset / disable this GCE thread, so we need to check the enable
-	 * bit of this GCE thread.
-	 */
-	if (!(readl(thread->base + CMDQ_THR_ENABLE_TASK) & CMDQ_THR_ENABLED))
+	if (list_empty(&thread->task_busy_list) ||
+	    !(irq_flag & CMDQ_THR_IRQ_EN))
 		return;
 
-	if (irq_flag & CMDQ_THR_IRQ_ERROR)
-		err = true;
-	else if (irq_flag & CMDQ_THR_IRQ_DONE)
-		err = false;
-	else
+	/* Keep the PC and prefetched commands stable while retiring packets. */
+	if (cmdq_thread_suspend(cmdq, thread)) {
+		cmdq_thread_resume(thread);
 		return;
-
-	gce_addr = readl(thread->base + CMDQ_THR_CURR_ADDR);
-	curr_pa = cmdq_revert_gce_addr(gce_addr, cmdq->pdata);
-
-	list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
-				 list_entry) {
-		task_end_pa = task->pa_base + task->pkt->cmd_buf_size;
-		if (curr_pa >= task->pa_base && curr_pa < task_end_pa)
-			curr_task = task;
-
-		if (!curr_task || curr_pa == task_end_pa - CMDQ_INST_SIZE) {
-			cmdq_task_exec_done(task, 0);
-			kfree(task);
-		} else if (err) {
-			cmdq_task_exec_done(task, -ENOEXEC);
-			cmdq_task_handle_error(curr_task);
-			kfree(task);
-		}
-
-		if (curr_task)
-			break;
 	}
 
-	if (list_empty(&thread->task_busy_list))
-		cmdq_thread_disable(cmdq, thread);
+	err = irq_flag & CMDQ_THR_IRQ_ERROR;
+	gce_addr = readl(thread->base + CMDQ_THR_CURR_ADDR);
+	curr_pa = cmdq_revert_gce_addr(gce_addr, cmdq->pdata);
+	list_for_each_entry(task, &thread->task_busy_list, list_entry) {
+		end_pa = task->pa_base + task->pkt->cmd_buf_size;
+		if (curr_pa >= task->pa_base && curr_pa < end_pa) {
+			current_task = task;
+			if (err || curr_pa == end_pa - CMDQ_INST_SIZE) {
+				redirect = true;
+				if (!list_is_last(&task->list_entry, &thread->task_busy_list))
+					next = list_next_entry(task, list_entry);
+			} else {
+				next = task;
+			}
+			break;
+		}
+	}
+
+	/* An unknown PC is not evidence that every queued packet completed. */
+	if (!current_task && curr_pa != end_pa) {
+		dev_err(cmdq->mbox.dev, "GCE completion outside command buffers\n");
+		cmdq_thread_resume(thread);
+		return;
+	}
+
+	if (!next) {
+		/* Last completion may immediately free memory and drop the power ref. */
+		if (cmdq_thread_disable(cmdq, thread))
+			return;
+	} else {
+		if (redirect) {
+			gce_addr = cmdq_convert_gce_addr(next->pa_base, cmdq->pdata);
+			writel(gce_addr, thread->base + CMDQ_THR_CURR_ADDR);
+		}
+		cmdq_thread_resume(thread);
+	}
+
+	list_for_each_entry_safe(task, tmp, &thread->task_busy_list, list_entry) {
+		if (task == next)
+			break;
+		cmdq_task_exec_done(task, err && (!current_task || task == current_task) ?
+				   -ENOEXEC : 0);
+		kfree(task);
+	}
 }
 
 static irqreturn_t cmdq_irq_handler(int irq, void *dev)
@@ -365,21 +367,29 @@ static irqreturn_t cmdq_irq_handler(int irq, void *dev)
 	unsigned long irq_status, flags = 0L;
 	int bit;
 
+	if (!READ_ONCE(cmdq->irq_ready))
+		return IRQ_NONE;
+	if (IS_ENABLED(CONFIG_PM) && pm_runtime_get_if_active(cmdq->mbox.dev) <= 0)
+		return IRQ_NONE;
+
 	irq_status = readl(cmdq->base + CMDQ_CURR_IRQ_STATUS) & cmdq->irq_mask;
 	if (!(irq_status ^ cmdq->irq_mask))
-		return IRQ_NONE;
+		goto out;
 
 	for_each_clear_bit(bit, &irq_status, cmdq->pdata->thread_nr) {
 		struct cmdq_thread *thread = &cmdq->thread[bit];
 
-		spin_lock_irqsave(&thread->chan->lock, flags);
+		spin_lock_irqsave(&cmdq->mbox.chans[bit].lock, flags);
 		cmdq_thread_irq_handler(cmdq, thread);
-		spin_unlock_irqrestore(&thread->chan->lock, flags);
+		spin_unlock_irqrestore(&cmdq->mbox.chans[bit].lock, flags);
 	}
 
-	pm_runtime_mark_last_busy(cmdq->mbox.dev);
-
-	return IRQ_HANDLED;
+out:
+	if (IS_ENABLED(CONFIG_PM)) {
+		pm_runtime_mark_last_busy(cmdq->mbox.dev);
+		pm_runtime_put_autosuspend(cmdq->mbox.dev);
+	}
+	return irq_status == cmdq->irq_mask ? IRQ_NONE : IRQ_HANDLED;
 }
 
 static int cmdq_runtime_resume(struct device *dev)
@@ -392,6 +402,7 @@ static int cmdq_runtime_resume(struct device *dev)
 		return ret;
 
 	cmdq_gctl_value_toggle(cmdq, true);
+	cmdq->clocks_enabled = true;
 	return 0;
 }
 
@@ -401,6 +412,7 @@ static int cmdq_runtime_suspend(struct device *dev)
 
 	cmdq_gctl_value_toggle(cmdq, false);
 	clk_bulk_disable(cmdq->pdata->gce_num, cmdq->clocks);
+	cmdq->clocks_enabled = false;
 	return 0;
 }
 
@@ -408,43 +420,57 @@ static int cmdq_suspend(struct device *dev)
 {
 	struct cmdq *cmdq = dev_get_drvdata(dev);
 	struct cmdq_thread *thread;
-	int i;
+	unsigned long flags;
+	int i, ret;
 	bool task_running = false;
 
-	cmdq->suspended = true;
+	WRITE_ONCE(cmdq->suspended, true);
+	/* Publish the submission gate before inspecting each channel. */
+	smp_mb();
 
 	for (i = 0; i < cmdq->pdata->thread_nr; i++) {
 		thread = &cmdq->thread[i];
-		if (!list_empty(&thread->task_busy_list)) {
-			task_running = true;
+		spin_lock_irqsave(&cmdq->mbox.chans[i].lock, flags);
+		task_running = !list_empty(&thread->task_busy_list);
+		spin_unlock_irqrestore(&cmdq->mbox.chans[i].lock, flags);
+		if (task_running)
 			break;
-		}
 	}
 
-	if (task_running)
-		dev_warn(dev, "exist running task(s) in suspend\n");
-
-	return pm_runtime_force_suspend(dev);
+	ret = task_running ? -EBUSY : pm_runtime_force_suspend(dev);
+	if (ret)
+		WRITE_ONCE(cmdq->suspended, false);
+	return ret;
 }
 
 static int cmdq_resume(struct device *dev)
 {
 	struct cmdq *cmdq = dev_get_drvdata(dev);
+	int ret;
 
-	WARN_ON(pm_runtime_force_resume(dev));
-	cmdq->suspended = false;
+	ret = pm_runtime_force_resume(dev);
+	if (!ret)
+		WRITE_ONCE(cmdq->suspended, false);
+	return ret;
+}
 
-	return 0;
+static void cmdq_clock_cleanup(void *data)
+{
+	struct cmdq *cmdq = data;
+
+	/* Runs after mailbox shutdown, runtime-PM disable and IRQ release. */
+	if (cmdq->clocks_enabled)
+		cmdq_runtime_suspend(cmdq->mbox.dev);
+
+	clk_bulk_unprepare(cmdq->pdata->gce_num, cmdq->clocks);
 }
 
 static void cmdq_remove(struct platform_device *pdev)
 {
 	struct cmdq *cmdq = platform_get_drvdata(pdev);
 
-	if (!IS_ENABLED(CONFIG_PM))
-		cmdq_runtime_suspend(&pdev->dev);
-
-	clk_bulk_unprepare(cmdq->pdata->gce_num, cmdq->clocks);
+	/* Managed mailbox shutdown still needs the clocks and runtime PM. */
+	WRITE_ONCE(cmdq->suspended, true);
 }
 
 static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
@@ -455,9 +481,27 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 	struct cmdq_task *task;
 	u32 gce_addr;
 	dma_addr_t curr_pa, end_pa;
+	int ret;
 
-	/* Client should not flush new tasks if suspended. */
-	WARN_ON(cmdq->suspended);
+	if (READ_ONCE(cmdq->suspended))
+		return -EHOSTDOWN;
+	if (!pkt->va_base || !pkt->cmd_buf_size ||
+	    pkt->cmd_buf_size > pkt->buf_size ||
+	    !IS_ALIGNED(pkt->cmd_buf_size, CMDQ_INST_SIZE) ||
+	    !IS_ALIGNED(pkt->pa_base, CMDQ_INST_SIZE) ||
+	    pkt->pa_base + pkt->cmd_buf_size < pkt->pa_base ||
+	    cmdq_revert_gce_addr(cmdq_convert_gce_addr(pkt->pa_base, cmdq->pdata),
+				cmdq->pdata) != pkt->pa_base ||
+	    cmdq_revert_gce_addr(cmdq_convert_gce_addr(pkt->pa_base + pkt->cmd_buf_size,
+						    cmdq->pdata), cmdq->pdata) !=
+						    pkt->pa_base + pkt->cmd_buf_size)
+		return -EINVAL;
+
+	list_for_each_entry(task, &thread->task_busy_list, list_entry) {
+		if (pkt->pa_base < task->pa_base + task->pkt->cmd_buf_size &&
+		    task->pa_base < pkt->pa_base + pkt->cmd_buf_size)
+			return -EBUSY;
+	}
 
 	task = kzalloc_obj(*task, GFP_ATOMIC);
 	if (!task)
@@ -476,7 +520,9 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 		 * set CMDQ_THR_ENABLED to CMDQ_THR_ENABLE_TASK will enable
 		 * thread and make it running.
 		 */
-		WARN_ON(cmdq_thread_reset(cmdq, thread) < 0);
+		ret = cmdq_thread_reset(cmdq, thread);
+		if (ret)
+			goto free_task;
 
 		gce_addr = cmdq_convert_gce_addr(task->pa_base, cmdq->pdata);
 		writel(gce_addr, thread->base + CMDQ_THR_CURR_ADDR);
@@ -487,7 +533,11 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 		writel(CMDQ_THR_IRQ_EN, thread->base + CMDQ_THR_IRQ_ENABLE);
 		writel(CMDQ_THR_ENABLED, thread->base + CMDQ_THR_ENABLE_TASK);
 	} else {
-		WARN_ON(cmdq_thread_suspend(cmdq, thread) < 0);
+		ret = cmdq_thread_suspend(cmdq, thread);
+		if (ret) {
+			cmdq_thread_resume(thread);
+			goto free_task;
+		}
 		gce_addr = readl(thread->base + CMDQ_THR_CURR_ADDR);
 		curr_pa = cmdq_revert_gce_addr(gce_addr, cmdq->pdata);
 		gce_addr = readl(thread->base + CMDQ_THR_END_ADDR);
@@ -509,52 +559,80 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 	list_move_tail(&task->list_entry, &thread->task_busy_list);
 
 	return 0;
+
+free_task:
+	kfree(task);
+	return ret;
 }
+
+int cmdq_mbox_send(struct mbox_chan *chan, struct cmdq_pkt *pkt)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&chan->lock, flags);
+	/* Mixing this API with the mailbox core's deferred ring is unsupported. */
+	if (!chan->cl || chan->msg_count || chan->active_req != MBOX_NO_MSG)
+		ret = -EBUSY;
+	else
+		ret = cmdq_mbox_send_data(chan, pkt);
+	spin_unlock_irqrestore(&chan->lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cmdq_mbox_send);
 
 static int cmdq_mbox_startup(struct mbox_chan *chan)
 {
 	return 0;
 }
 
-static void cmdq_mbox_shutdown(struct mbox_chan *chan)
+void cmdq_mbox_stop(struct mbox_chan *chan)
 {
-	struct cmdq_thread *thread = (struct cmdq_thread *)chan->con_priv;
+	struct cmdq_thread *thread = chan->con_priv;
 	struct cmdq *cmdq = dev_get_drvdata(chan->mbox->dev);
 	struct cmdq_task *task, *tmp;
 	unsigned long flags;
+	int ret;
 
-	WARN_ON(pm_runtime_get_sync(cmdq->mbox.dev) < 0);
+	/* The caller must serialize producers against cancellation/release. */
+	for (;;) {
+		spin_lock_irqsave(&chan->lock, flags);
+		if (list_empty(&thread->task_busy_list)) {
+			spin_unlock_irqrestore(&chan->lock, flags);
+			return;
+		}
+		spin_unlock_irqrestore(&chan->lock, flags);
 
-	spin_lock_irqsave(&thread->chan->lock, flags);
-	if (list_empty(&thread->task_busy_list))
-		goto done;
+		ret = pm_runtime_resume_and_get(cmdq->mbox.dev);
+		if (ret >= 0) {
+			spin_lock_irqsave(&chan->lock, flags);
+			ret = list_empty(&thread->task_busy_list) ? 0 :
+				cmdq_thread_disable(cmdq, thread);
+			if (!ret) {
+				list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
+							 list_entry) {
+					cmdq_task_exec_done(task, -ECONNABORTED);
+					kfree(task);
+				}
+			}
+			spin_unlock_irqrestore(&chan->lock, flags);
+			pm_runtime_mark_last_busy(cmdq->mbox.dev);
+			pm_runtime_put_autosuspend(cmdq->mbox.dev);
+			if (!ret)
+				return;
+		}
 
-	WARN_ON(cmdq_thread_suspend(cmdq, thread) < 0);
-
-	/* make sure executed tasks have success callback */
-	cmdq_thread_irq_handler(cmdq, thread);
-	if (list_empty(&thread->task_busy_list))
-		goto done;
-
-	list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
-				 list_entry) {
-		cmdq_task_exec_done(task, -ECONNABORTED);
-		kfree(task);
+		/* Never give live DMA buffers back merely because a reset timed out. */
+		dev_err_ratelimited(cmdq->mbox.dev,
+				    "GCE stop failed (%d); retaining active buffers\n", ret);
+		msleep(20);
 	}
+}
+EXPORT_SYMBOL_GPL(cmdq_mbox_stop);
 
-	cmdq_thread_disable(cmdq, thread);
-
-done:
-	/*
-	 * The thread->task_busy_list empty means thread already disable. The
-	 * cmdq_mbox_send_data() always reset thread which clear disable and
-	 * suspend statue when first pkt send to channel, so there is no need
-	 * to do any operation here, only unlock and leave.
-	 */
-	spin_unlock_irqrestore(&thread->chan->lock, flags);
-
-	pm_runtime_mark_last_busy(cmdq->mbox.dev);
-	pm_runtime_put_autosuspend(cmdq->mbox.dev);
+static void cmdq_mbox_shutdown(struct mbox_chan *chan)
+{
+	cmdq_mbox_stop(chan);
 }
 
 static int cmdq_mbox_flush(struct mbox_chan *chan, unsigned long timeout)
@@ -750,9 +828,16 @@ static int cmdq_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, cmdq);
 
-	WARN_ON(clk_bulk_prepare(cmdq->pdata->gce_num, cmdq->clocks));
+	err = clk_bulk_prepare(cmdq->pdata->gce_num, cmdq->clocks);
+	if (err)
+		return err;
+	err = devm_add_action_or_reset(dev, cmdq_clock_cleanup, cmdq);
+	if (err)
+		return err;
 
-	cmdq_init(cmdq);
+	err = cmdq_init(cmdq);
+	if (err)
+		return err;
 
 	err = devm_request_irq(dev, cmdq->irq, cmdq_irq_handler, IRQF_SHARED,
 			       "mtk_cmdq", cmdq);
@@ -780,6 +865,7 @@ static int cmdq_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to register mailbox: %d\n", err);
 		return err;
 	}
+	WRITE_ONCE(cmdq->irq_ready, true);
 
 	return 0;
 }

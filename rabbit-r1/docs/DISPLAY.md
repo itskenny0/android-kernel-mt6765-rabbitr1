@@ -342,56 +342,87 @@ and hardware-init errors; active state after failed startup; explicit retries;
 vblank-reference errors; lost completions; shutdown; duplicate pending events;
 three vblank-off policies; and both internal and userspace events. They check
 single completion and fence release, balanced owned references, lock ordering,
-no off-state register access, and delayed error callbacks after shutdown.
-Eighteen compiled faulty variants and the previous callbacks fail in both builds.
+no off-state register access, and cancellation during shutdown. The original
+event-only milestone rejected eighteen faulty variants and previous callbacks;
+its transport was modeled. The integrated ownership tests below extend this.
 The existing 180-case native DSI acquisition test still passes.
 
-**Command-queue cancellation remains unresolved.** A shutdown timeout can leave
-transport work outstanding. The event test explicitly supplies a delayed error
-callback and proves only that it does not duplicate an event or access display
-registers after shutdown. It does not prove that the GCE task was stopped. The
-current mailbox flush can return an error while a task remains active, and its
-error paths need auditing before packet reuse or display power removal is safe.
-Full hardware synchronization and firmware handoff remain release gates.
+### GCE command ownership and shutdown
 
-### GCE flush ownership
+The CRTC now submits through `cmdq_mbox_send`, which returns the controller's
+acceptance result directly. A rejected packet is not left in the mailbox core's
+ring and receives no callback. Accepted packets receive one completion or
+cancellation callback; that callback can race the submission return. This API
+requires an exclusively owned channel and cannot be mixed with the mailbox
+core's deferred send/ACK interface. The caller holds a GCE power reference until
+completion, and receive callbacks must not resubmit while holding the channel
+lock.
 
-The controller's flush path now balances its runtime-PM reference on every
-return, including a failed resume and a running-thread timeout. A failed
-suspend clears the suspend request and returns an error with all tasks still
-owned by the controller. Cancelling a thread waiting for an event requires a
-successful reset and disable before any cancellation callback. A reset failure
-returns an error without releasing the tasks or their buffers. The existing
-disable-register write still runs on reset failure; it is not treated as proof
-that DMA has stopped. Clients must retain ownership until completion or a
-successful cancellation. Running-thread polling uses the mailbox API's
-millisecond timeout and preserves `-ETIMEDOUT`.
+This distinction matters: the real mailbox core can return a nonnegative send
+token while an allocation error leaves the request queued. Its flush-error
+handling can then submit that request. The tests retain this probe as evidence
+for why a token or a failed flush is not a buffer-reuse boundary. Other clients
+using that deferred interface still need to account for its queue semantics.
 
-`test-cmdq-flush.py` executes the production flush, submission, task and IRQ
-helpers together with the actual mailbox ring, submit, ACK and flush functions.
-It also uses the kernel's atomic polling macro. MMIO/reset behavior, runtime PM,
-locks, allocation and interrupt scheduling are models. Seventy-nine scenarios
-cover one to three packets, native unshifted addresses, shifted addresses and
-an address offset, callback-time buffer frees, failed stops and retries, PM
-failures, completion during polling and timeout units. ASan/UBSan check memory
-accesses. Thirteen faulty compiled variants and the previous production flush
-fail these checks. The controller also compiles for AArch64.
+Each accepted display packet owns its page-flip event and power reference. Its
+callback completes that captured event, including on errors, without modifying
+the current atomic state's pending flags. A later atomic begin can therefore
+queue a new event while the older packet completes. A separate `cmdq_pending`
+flag tracks ownership; expiration of the three-vblank watchdog only logs a
+warning. It no longer lets a waiter mistake a live packet for completed work.
+Rejected or oversized packets complete their event, balance acquired references
+and retain configuration for retry. Packet construction checks capacity before
+DMA synchronization, and reuse returns the streaming mapping to the CPU first.
 
-The core probe demonstrates two remaining ownership hazards with the real
-queue implementation. An allocation failure in `send_data` leaves the request
-in the core ring even though `mbox_send_message` returns a nonnegative token.
-With an empty controller task list, its flush can then report success while
-that request remains queued. Conversely, the core calls `tx_tick` on a flush
-error, and that call can submit the queued request. Neither a send token nor a
-failed flush is a safe buffer-reuse boundary.
+`cmdq_mbox_stop` synchronizes callbacks and returns only after a successful
+thread reset/disable has released all accepted packets. Reuse, display power-off
+and packet destruction pass through this operation. Channel shutdown uses the
+same path. Transient reset or PM failures retain the live resources and retry
+with a sleep. **A permanently unresponsive GCE blocks teardown and requires a
+device/system reset.** There is no timeout that silently gives live DMA buffers
+back to the caller. If a plane-disable packet fails, the driver applies the
+disable through the CPU after cancellation and waits for a vblank before
+returning to framebuffer cleanup.
 
-These changes cover controller flush only. The CRTC still ignores flush errors,
-can reuse its packet without accounting for the core ring, and can remove
-display power after an uncompleted task. Its error callback, normal IRQ task
-retirement, channel shutdown and packet destruction ordering still need a
-coherent ownership/recovery contract. The existing CRTC event tests model their
-transport separately; they do not establish that contract. Display remains
-disabled, and no physical DMA quiescence or frame presentation is claimed.
+The controller rejects invalid sizes, alignment, unrepresentable DMA addresses,
+overlapping buffers and submission during suspend. It propagates reset/suspend
+errors before accepting a new packet. IRQ retirement suspends the thread,
+validates its PC, moves it past any retired packet, and resets/disables it before
+the last callback. Error recovery uses the complete GCE address conversion,
+including the platform offset. An IRQ holds a power reference across all its
+register access and callbacks. System suspend refuses active work. Removal gates
+new submissions; managed cleanup releases the mailbox, runtime PM and IRQ before
+disabling/unpreparing clocks. IRQ handling starts only after channel locks have
+been initialized by mailbox registration.
+
+The existing `mbox_flush` retains balanced references, failed-stop ownership,
+reset-before-cancellation ordering and millisecond timeouts, but the display no
+longer uses it to infer ownership. The CPU/shadow display paths remain available.
+
+`test-cmdq-flush.py` runs 179 controller scenarios using production submission,
+stop, shutdown, IRQ and power/cleanup callbacks plus the real mailbox ring,
+submit, ACK, flush and atomic polling helpers. MMIO/reset, runtime PM, clocks,
+allocation, locks and scheduling are modeled. It covers one to three packets,
+native unshifted addresses, shifted/offset addresses, immediate buffer frees in
+callbacks, failed stops and retries, invalid/overlapping packets, error IRQs,
+unknown PCs, suspend rejection, clock cleanup and timeout units. Managed resource
+registration order is checked separately against the required cleanup order.
+
+`test-crtc-cmdq.py` connects the production CRTC producer, callback, plane disable,
+shutdown and destroy paths to the production GCE controller. It repeats 90 DRM
+commit/event scenarios and adds 16 ownership cases: completion before send
+returns, rejection/overflow, old/new event overlap, watchdog expiration, PM/reset
+retries, reuse, cancellation, CPU plane-disable fallback and destruction. It
+checks streaming DMA ownership, event/reference balance and cancellation before
+clock removal or unmapping. DRM event helpers execute; core on/off, MMIO, DMA,
+scheduling, PM and unrelated component services remain models. Thirty compiled
+faulty variants fail at runtime under these ASan/UBSan harnesses. CRTC/controller
+objects compile for AArch64, and the 180-case DSI startup test still passes.
+
+These are software ownership checks, not physical DMA, frame-presentation or
+firmware-handoff validation. Display remains disabled pending the remaining
+panel/firmware handoff work and hardware tests. No beta-readiness claim follows
+from these results.
 
 ## Native host power sequencing
 

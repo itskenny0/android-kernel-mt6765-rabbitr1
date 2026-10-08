@@ -84,6 +84,32 @@ struct cmdq_pkt {
 };
 
 /**
+ * cmdq_mbox_send() - submit directly to a GCE thread
+ * @chan: exclusively owned CMDQ mailbox channel
+ * @pkt: DMA-mapped, device-synchronized packet
+ *
+ * The caller holds the GCE runtime-PM reference until the receive callback.
+ * Zero means accepted; a negative result retains no packet and gives no
+ * callback. Completion can race the return. Do not mix this API with
+ * mbox_send_message() or mbox_client_txdone() on the same channel.
+ * Receive callbacks hold the channel lock and must not resubmit on that channel.
+ *
+ * Return: 0 on acceptance, or a negative error code.
+ */
+int cmdq_mbox_send(struct mbox_chan *chan, struct cmdq_pkt *pkt);
+
+/**
+ * cmdq_mbox_stop() - cancel accepted packets and synchronize their callbacks
+ * @chan: exclusively owned CMDQ mailbox channel
+ *
+ * Sleepable. The caller serializes submission against this operation. Returns
+ * only when the thread no longer owns any packets. A permanently failed reset
+ * blocks teardown instead of releasing live DMA buffers; recovery then requires
+ * a device/system reset. Does not drain the mailbox core's deferred TX ring.
+ */
+void cmdq_mbox_stop(struct mbox_chan *chan);
+
+/**
  * cmdq_get_mbox_priv() - get the private data of mailbox channel
  * @chan: mailbox channel
  * @priv: pointer to store the private data of mailbox channel

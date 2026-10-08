@@ -142,6 +142,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-dsi-pipeline.py 2>&1 | tee logs/dsi-pipeline-tests.log
           toolchains/boot-tools/bin/python scripts/test-crtc-events.py 2>&1 | tee logs/crtc-events-tests.log
           python3 scripts/test-cmdq-flush.py 2>&1 | tee logs/cmdq-flush-tests.log
+          toolchains/boot-tools/bin/python scripts/test-crtc-cmdq.py 2>&1 | tee logs/crtc-cmdq-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py 2>&1 | tee logs/mt6765-phy-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py 2>&1 | tee logs/mt6765-display-path-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-smi.py 2>&1 | tee logs/mt6765-smi-tests.log

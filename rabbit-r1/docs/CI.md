@@ -41,12 +41,17 @@ The workflow:
    CRTC events run through DRM commit ordering and vblank reference/completion
    helpers with CMDQ compiled both in and out. Failed startup, off-state guards,
    event ownership, explicit retries and shutdown are checked with models;
-   transport cancellation and hardware synchronization remain unverified.
+   physical synchronization remains unverified.
    GCE flush tests run the controller with the mailbox core and atomic polling
    helper. They cover callback-time buffer frees, failed suspend/reset, retry,
    runtime-PM balance and millisecond deadlines. A queue probe also checks that
    admission precedes controller acceptance and a failed flush can submit work.
-   MMIO and scheduling are modeled; this does not validate CRTC teardown.
+   Direct acceptance, packet validation, IRQ retirement, stop retries, suspend
+   refusal and managed clock cleanup are checked as well. The combined CRTC/GCE
+   harness checks captured events, completion racing submission, rejected work,
+   watchdog expiration, reuse, plane-disable fallback and cancellation before
+   power-off/destruction. MMIO, DMA, PM, scheduling and unrelated services remain
+   modeled; a permanent reset failure intentionally blocks unsafe teardown.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for

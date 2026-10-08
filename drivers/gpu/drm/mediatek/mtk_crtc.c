@@ -55,6 +55,9 @@ struct mtk_crtc {
 	struct cmdq_pkt			cmdq_handle;
 	u32				cmdq_event;
 	u32				cmdq_vblank_cnt;
+	bool				cmdq_pending;
+	int				cmdq_status;
+	struct drm_pending_vblank_event	*cmdq_page_flip;
 	wait_queue_head_t		cb_blocking_queue;
 #endif
 
@@ -130,14 +133,15 @@ static void mtk_crtc_destroy(struct drm_crtc *crtc)
 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	int i;
 
-	mtk_mutex_put(mtk_crtc->mutex);
 #if IS_REACHABLE(CONFIG_MTK_CMDQ)
 	if (mtk_crtc->cmdq_client.chan) {
+		cmdq_mbox_stop(mtk_crtc->cmdq_client.chan);
 		cmdq_pkt_destroy(&mtk_crtc->cmdq_client, &mtk_crtc->cmdq_handle);
 		mbox_free_channel(mtk_crtc->cmdq_client.chan);
 		mtk_crtc->cmdq_client.chan = NULL;
 	}
 #endif
+	mtk_mutex_put(mtk_crtc->mutex);
 
 	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
 		struct mtk_ddp_comp *comp;
@@ -280,61 +284,47 @@ static void ddp_cmdq_cb(struct mbox_client *cl, void *mssg)
 	struct cmdq_cb_data *data = mssg;
 	struct cmdq_client *cmdq_cl = container_of(cl, struct cmdq_client, client);
 	struct mtk_crtc *mtk_crtc = container_of(cmdq_cl, struct mtk_crtc, cmdq_client);
-	struct mtk_crtc_state *state;
-	unsigned int i;
+	struct drm_crtc *crtc = &mtk_crtc->base;
 	unsigned long flags;
 
-	/* release GCE HW usage and start autosuspend */
+	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+	if (WARN_ON(!mtk_crtc->cmdq_pending || data->pkt != &mtk_crtc->cmdq_handle)) {
+		spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+		return;
+	}
+
+	/* This event belongs to the submitted packet, not the current atomic state. */
+	if (mtk_crtc->cmdq_page_flip) {
+		spin_lock(&crtc->dev->event_lock);
+		drm_crtc_send_vblank_event(crtc, mtk_crtc->cmdq_page_flip);
+		drm_crtc_vblank_put(crtc);
+		mtk_crtc->cmdq_page_flip = NULL;
+		spin_unlock(&crtc->dev->event_lock);
+	}
+	mtk_crtc->cmdq_status = data->sta;
+	mtk_crtc->cmdq_vblank_cnt = 0;
+	WRITE_ONCE(mtk_crtc->cmdq_pending, false);
 	pm_runtime_mark_last_busy(cmdq_cl->chan->mbox->dev);
 	pm_runtime_put_autosuspend(cmdq_cl->chan->mbox->dev);
-
-	if (data->sta < 0)
-		return;
-
-	state = to_mtk_crtc_state(mtk_crtc->base.state);
-
-	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
-	if (mtk_crtc->config_updating)
-		goto ddp_cmdq_cb_out;
-
-	state->pending_config = false;
-
-	if (mtk_crtc->pending_planes) {
-		for (i = 0; i < mtk_crtc->layer_nr; i++) {
-			struct drm_plane *plane = &mtk_crtc->planes[i];
-			struct mtk_plane_state *plane_state;
-
-			plane_state = to_mtk_plane_state(plane->state);
-
-			plane_state->pending.config = false;
-		}
-		mtk_crtc->pending_planes = false;
-	}
-
-	if (mtk_crtc->pending_async_planes) {
-		for (i = 0; i < mtk_crtc->layer_nr; i++) {
-			struct drm_plane *plane = &mtk_crtc->planes[i];
-			struct mtk_plane_state *plane_state;
-
-			plane_state = to_mtk_plane_state(plane->state);
-
-			plane_state->pending.async_config = false;
-		}
-		mtk_crtc->pending_async_planes = false;
-	}
-
-ddp_cmdq_cb_out:
-
-	if (mtk_crtc->pending_needs_vblank) {
-		mtk_crtc_finish_page_flip(mtk_crtc);
-		mtk_crtc->pending_needs_vblank = false;
-	}
-
 	spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
-
-	mtk_crtc->cmdq_vblank_cnt = 0;
 	wake_up(&mtk_crtc->cb_blocking_queue);
 }
+
+static void mtk_crtc_cmdq_clear_pending(struct mtk_crtc *mtk_crtc)
+{
+	unsigned int i;
+
+	to_mtk_crtc_state(mtk_crtc->base.state)->pending_config = false;
+	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+		struct mtk_plane_state *state = to_mtk_plane_state(mtk_crtc->planes[i].state);
+
+		state->pending.config = false;
+		state->pending.async_config = false;
+	}
+	mtk_crtc->pending_planes = false;
+	mtk_crtc->pending_async_planes = false;
+}
+
 #endif
 
 static int mtk_crtc_ddp_hw_init(struct mtk_crtc *mtk_crtc)
@@ -549,6 +539,8 @@ static void mtk_crtc_update_config(struct mtk_crtc *mtk_crtc, bool needs_vblank)
 {
 #if IS_REACHABLE(CONFIG_MTK_CMDQ)
 	struct cmdq_pkt *cmdq_handle = &mtk_crtc->cmdq_handle;
+	struct mbox_chan *chan = mtk_crtc->cmdq_client.chan;
+	int ret;
 #endif
 	struct drm_crtc *crtc = &mtk_crtc->base;
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
@@ -560,6 +552,20 @@ static void mtk_crtc_update_config(struct mtk_crtc *mtk_crtc, bool needs_vblank)
 	if (!mtk_crtc->enabled)
 		goto out_unlock;
 
+#if IS_REACHABLE(CONFIG_MTK_CMDQ)
+	if (chan) {
+		cmdq_mbox_stop(chan);
+		if (mtk_crtc->cmdq_status < 0) {
+			to_mtk_crtc_state(crtc->state)->pending_config = true;
+			for (i = 0; i < mtk_crtc->layer_nr; i++) {
+				struct drm_plane *plane = &mtk_crtc->planes[i];
+
+				to_mtk_plane_state(plane->state)->pending.config = true;
+			}
+			mtk_crtc->pending_planes = true;
+		}
+	}
+#endif
 	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
 	mtk_crtc->config_updating = true;
 	spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
@@ -593,37 +599,60 @@ static void mtk_crtc_update_config(struct mtk_crtc *mtk_crtc, bool needs_vblank)
 		mtk_mutex_release(mtk_crtc->mutex);
 	}
 #if IS_REACHABLE(CONFIG_MTK_CMDQ)
-	if (mtk_crtc->cmdq_client.chan) {
-		mbox_flush(mtk_crtc->cmdq_client.chan, 2000);
+	if (chan) {
+		dma_sync_single_for_cpu(chan->mbox->dev, cmdq_handle->pa_base,
+					cmdq_handle->buf_size, DMA_TO_DEVICE);
 		cmdq_handle->cmd_buf_size = 0;
 		cmdq_pkt_clear_event(cmdq_handle, mtk_crtc->cmdq_event);
 		cmdq_pkt_wfe(cmdq_handle, mtk_crtc->cmdq_event, false);
 		mtk_crtc_ddp_config(crtc, cmdq_handle);
-		cmdq_pkt_eoc(cmdq_handle);
-		dma_sync_single_for_device(mtk_crtc->cmdq_client.chan->mbox->dev,
-					   cmdq_handle->pa_base,
-					   cmdq_handle->cmd_buf_size,
-					   DMA_TO_DEVICE);
-		/*
-		 * CMDQ command should execute in next 3 vblank.
-		 * One vblank interrupt before send message (occasionally)
-		 * and one vblank interrupt after cmdq done,
-		 * so it's timeout after 3 vblank interrupt.
-		 * If it fail to execute in next 3 vblank, timeout happen.
-		 */
-		mtk_crtc->cmdq_vblank_cnt = 3;
+		ret = cmdq_pkt_eoc(cmdq_handle);
+		if (ret || cmdq_handle->cmd_buf_size > cmdq_handle->buf_size) {
+			ret = -ENOSPC;
+			goto cmdq_failed;
+		}
+		dma_sync_single_for_device(chan->mbox->dev, cmdq_handle->pa_base,
+					   cmdq_handle->cmd_buf_size, DMA_TO_DEVICE);
+		ret = pm_runtime_resume_and_get(chan->mbox->dev);
+		if (ret < 0)
+			goto cmdq_failed;
 
 		spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+		mtk_crtc->cmdq_status = 0;
+		mtk_crtc->cmdq_vblank_cnt = 3;
+		WRITE_ONCE(mtk_crtc->cmdq_pending, true);
+		if (needs_vblank) {
+			mtk_crtc->cmdq_page_flip = mtk_crtc->event;
+			mtk_crtc->event = NULL;
+		}
+		mtk_crtc->pending_needs_vblank = false;
 		mtk_crtc->config_updating = false;
 		spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
 
-		if (pm_runtime_resume_and_get(mtk_crtc->cmdq_client.chan->mbox->dev) < 0)
-			goto out_unlock;
+		ret = cmdq_mbox_send(chan, cmdq_handle);
+		if (ret) {
+			struct cmdq_cb_data data = { .sta = ret, .pkt = cmdq_handle };
 
-		mbox_send_message(mtk_crtc->cmdq_client.chan, cmdq_handle);
-		mbox_client_txdone(mtk_crtc->cmdq_client.chan, 0);
+			/* Rejected submissions have no controller callback or retained buffer. */
+			ddp_cmdq_cb(&mtk_crtc->cmdq_client.client, &data);
+			drm_err(crtc->dev, "GCE submission failed: %d\n", ret);
+		} else {
+			spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+			if (!mtk_crtc->cmdq_status)
+				mtk_crtc_cmdq_clear_pending(mtk_crtc);
+			spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+		}
 		goto out_unlock;
+
+cmdq_failed:
+		drm_err(crtc->dev, "GCE packet preparation failed: %d\n", ret);
+		spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+		mtk_crtc->cmdq_status = ret;
+		mtk_crtc_finish_page_flip(mtk_crtc);
+		mtk_crtc->pending_needs_vblank = false;
+		spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
 	}
+
 #endif
 	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
 	mtk_crtc->config_updating = false;
@@ -641,6 +670,7 @@ static void mtk_crtc_ddp_irq(void *data)
 
 #if IS_REACHABLE(CONFIG_MTK_CMDQ)
 	struct drm_device *dev = mtk_crtc->base.dev;
+	unsigned long flags;
 #endif
 
 	if (!READ_ONCE(mtk_crtc->enabled))
@@ -649,9 +679,13 @@ static void mtk_crtc_ddp_irq(void *data)
 #if IS_REACHABLE(CONFIG_MTK_CMDQ)
 	if (!priv->data->shadow_register && !mtk_crtc->cmdq_client.chan)
 		mtk_crtc_ddp_config(crtc, NULL);
-	else if (mtk_crtc->cmdq_vblank_cnt > 0 && --mtk_crtc->cmdq_vblank_cnt == 0)
-		drm_err(dev, "mtk_crtc %d CMDQ execute command timeout!\n",
-			drm_crtc_index(&mtk_crtc->base));
+	else {
+		spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+		if (mtk_crtc->cmdq_vblank_cnt > 0 && --mtk_crtc->cmdq_vblank_cnt == 0)
+			drm_err(dev, "mtk_crtc %d CMDQ execute command timeout!\n",
+				drm_crtc_index(&mtk_crtc->base));
+		spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+	}
 #else
 	if (!priv->data->shadow_register)
 		mtk_crtc_ddp_config(crtc, NULL);
@@ -758,8 +792,25 @@ void mtk_crtc_plane_disable(struct drm_crtc *crtc, struct drm_plane *plane)
 
 	/* wait for planes to be disabled by CMDQ */
 	wait_event_timeout(mtk_crtc->cb_blocking_queue,
-			   mtk_crtc->cmdq_vblank_cnt == 0,
+			   !READ_ONCE(mtk_crtc->cmdq_pending),
 			   msecs_to_jiffies(500));
+	mutex_lock(&mtk_crtc->hw_lock);
+	cmdq_mbox_stop(mtk_crtc->cmdq_client.chan);
+	if (mtk_crtc->enabled && mtk_crtc->cmdq_status < 0) {
+		/* A cancelled disable must still stop scanout before framebuffer cleanup. */
+		for (i = 0; i < mtk_crtc->layer_nr; i++) {
+			struct drm_plane *mtk_plane = &mtk_crtc->planes[i];
+
+			if (mtk_plane->index == plane->index)
+				to_mtk_plane_state(mtk_plane->state)->pending.config = true;
+		}
+		mtk_crtc->pending_planes = true;
+		mtk_mutex_acquire(mtk_crtc->mutex);
+		mtk_crtc_ddp_config(crtc, NULL);
+		mtk_mutex_release(mtk_crtc->mutex);
+		drm_crtc_wait_one_vblank(crtc);
+	}
+	mutex_unlock(&mtk_crtc->hw_lock);
 #endif
 }
 
@@ -831,8 +882,13 @@ static void mtk_crtc_atomic_disable(struct drm_crtc *crtc,
 	/* Wait for planes to be disabled by cmdq */
 	if (mtk_crtc->cmdq_client.chan)
 		wait_event_timeout(mtk_crtc->cb_blocking_queue,
-				   mtk_crtc->cmdq_vblank_cnt == 0,
+				   !READ_ONCE(mtk_crtc->cmdq_pending),
 				   msecs_to_jiffies(500));
+#endif
+	mutex_lock(&mtk_crtc->hw_lock);
+#if IS_REACHABLE(CONFIG_MTK_CMDQ)
+	if (mtk_crtc->cmdq_client.chan)
+		cmdq_mbox_stop(mtk_crtc->cmdq_client.chan);
 #endif
 	/* Wait for planes to be disabled */
 	drm_crtc_wait_one_vblank(crtc);
@@ -842,6 +898,7 @@ static void mtk_crtc_atomic_disable(struct drm_crtc *crtc,
 	mtk_ddp_comp_power_off(comp);
 
 	WRITE_ONCE(mtk_crtc->enabled, false);
+	mutex_unlock(&mtk_crtc->hw_lock);
 
 complete_events:
 	/* Private events are not on the core's vblank event list. */
