@@ -92,9 +92,12 @@ The workflow:
    and require the patched Linux caller to preserve both boot profiles.
    Platform fixup tests reproduce the missing-SCP boot assertion, check the
    corrected call path, and exercise later reservation writers with controlled
-   boot arguments. Both packaging stages reject missing MMC/SCP fixes even if
+   boot arguments. Both packaging stages reject missing MMC/SCP/console fixes even if
    their metadata incorrectly claims the patch.
-5. Builds both mtkclient boot profiles.
+5. Builds both mtkclient boot profiles. Checks 40 console-rewrite fixtures and
+   executes successive Linux FDT updates on the packaged images through final
+   packing, with controlled firmware state. The resulting command line,
+   initramfs bounds, hardware bindings and reservations must be preserved.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
    backup validation, AVB flags, checksums and repeat packaging.
 

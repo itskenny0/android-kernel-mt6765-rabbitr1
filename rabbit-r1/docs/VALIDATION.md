@@ -130,6 +130,8 @@
 | LK MMC fix regression and package gates | Restored old call rejected by FDT preservation assertion; six stale-LK packaging/preparation fixtures rejected | `logs/lk-mmc-fixup-regression.log`, `logs/lk-mmc-fixup-flash-tests.log`; relock, overlay and splash checks still pass |
 | LK platform and selected memory fixups | PASS: 12 fixtures; missing-SCP assertion reproduced, remaining platform fixups run, five supplied reservations preserved | `logs/lk-platform-fixup-tests.log`, `out/lk-platform-fixup-audit.json`; real libfdt/libc, controlled boot arguments; no live RAM map or complete boot |
 | LK SCP regression and package gates | Restored old subcall rejected; twelve stale-LK MMC/SCP packaging/preparation cases rejected | `logs/lk-scp-regression.log`, `logs/lk-scp-flash-tests.log` |
+| LK console and successive Linux FDT updates | PASS: 40 console fixtures and both packaged profiles through final FDT packing | `logs/lk-linux-fdt-tests.log`, `out/lk-linux-fdt-audit.json`; controlled firmware state, no whole boot or physical handoff |
+| LK console regression and package gates | PASS: old console rewrite rejected; eighteen stale-LK MMC/SCP/console packaging/preparation cases | `logs/lk-console-regression.log`, `logs/lk-console-flash-tests-precommit.log` |
 | Stock LK board overlay and LineageOS splash | PASS, GPIO/charger tree retained; 58 logo slots unchanged | `logs/lk-tests.log` |
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
@@ -206,6 +208,7 @@ python3 scripts/test-expdb.py
 toolchains/boot-tools/bin/python scripts/test-lk.py
 toolchains/boot-tools/bin/python scripts/test-i2c-firmware.py
 python3 scripts/test-flash-package.py
+toolchains/boot-tools/bin/python scripts/test-lk-linux-fdt.py
 ```
 
 The schema tools live in `toolchains/dt-schema`, installed only within this

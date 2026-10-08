@@ -60,6 +60,7 @@ manifest = json.loads((PACKAGE/'manifest.json').read_text())
 assert manifest['lk_build']['relock_protection']['enabled'] is True
 assert manifest['lk_build']['kernel_mmc_pinctrl_preserved'] is True
 assert manifest['lk_build']['kernel_scp_fixup_bypassed'] is True
+assert manifest['lk_build']['kernel_console_preserved'] is True
 for profile in ['ram', 'expdb']:
     blob = (PACKAGE/f'boot-{profile}.img').read_bytes()
     assert len(blob) == 32*1024*1024 and blob[:8] == b'ANDROID!'
@@ -162,6 +163,8 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='lk-fixup-gate-') as tm
          'MMC pin-state fix', 'preserve the mainline MMC pin states'),
         ('kernel_scp_fixup_bypassed', 0x4a44, '10f0d0f8',
          'SCP node fix', 'skip the vendor SCP node requirement'),
+        ('kernel_console_preserved', 0x1cb70, '2df0defd',
+         'console fix', 'preserve the mainline console'),
     ]
     for feature, offset, old, prepare_error, package_error in features:
         stale = bytearray((PACKAGE/'lk.bin').read_bytes())
@@ -189,7 +192,7 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='lk-fixup-gate-') as tm
             else:
                 raise AssertionError('Stale LK packaged')
             assert not list(packager.DIST.iterdir())
-print('PASS: twelve stale-LK packaging/preparation cases rejected before producing flash files')
+print('PASS: eighteen stale-LK packaging/preparation cases rejected before producing flash files')
 
 gpt = fixture_gpt()
 assert flash.parse_gpt(gpt)['partitions']['expdb']['bytes'] == flash.SIZES['expdb']

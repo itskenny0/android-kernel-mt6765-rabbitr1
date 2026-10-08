@@ -141,6 +141,9 @@ def prepare(args):
     if manifest.get('lk_build', {}).get('kernel_scp_fixup_bypassed') is not True or \
             local(args.package/'lk.bin').read_bytes()[0x4a44:0x4a48] != bytes.fromhex('002000bf'):
         raise ValueError('Package lacks the LK SCP node fix; rebuild it')
+    if manifest.get('lk_build', {}).get('kernel_console_preserved') is not True or \
+            local(args.package/'lk.bin').read_bytes()[0x1cb70:0x1cb74] != bytes.fromhex('002000bf'):
+        raise ValueError('Package lacks the LK console fix; rebuild it')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')

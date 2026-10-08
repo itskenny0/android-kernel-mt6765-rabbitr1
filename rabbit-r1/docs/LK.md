@@ -169,6 +169,47 @@ Logging, verbosity and uncontended mutexes are modeled; the instructions that
 traverse and change the FDT execute. These checks do not establish the actual
 RAM map, firmware memory ownership, remote-processor state, or whole LK boot.
 
+## Preserve the Linux console
+
+The Linux caller at `0x1cb70` invokes `0x4a730`, which rewrites the first
+`ttyS` suffix in the kernel command line using LK's logging UART. With the
+preloader logging flag clear, it changes `console=ttyS0` to `console=ttyS1`.
+With logging enabled, the result depends on the preloader's UART address.
+That conflicts with the mainline package's explicit `ttyS0` console and
+`serial0`/UART0 device-tree selection. Earlycon uses a separate MMIO address,
+so early output alone would not establish that the normal console survives.
+
+The build changes only that Linux call:
+
+| Offset | Original | Replacement |
+| --- | --- | --- |
+| `0x1cb70` | `2d f0 de fd` (`bl 0x4a730`) | `00 20 00 bf` (`movs r0,#0; nop`) |
+
+The shared UART helpers and LK's own console initialization are unchanged.
+Build-record format 5 adds `kernel_console_preserved`; packaging and flash
+preparation require both this flag and the exact instruction bytes.
+
+`test-lk-linux-fdt.py` reproduces the stock rewrite and checks the patched
+caller in 40 fixtures: two packaged profiles, both LK images, logging on/off,
+and four UART addresses plus an unknown address. Restoring the old call fails
+the command-line preservation assertion.
+
+The same test runs the contiguous post-decompression path in `boot_linux_fdt`
+from `0x1bd6c` to `0x1d4a4` for both packaged boot images. Shipped FDT and libc
+instructions generate `/memory/reg`, serialize boot metadata, append the
+command line, check mblocks, write reservations and pack the final FDT. The
+result must retain the chosen console, profile parameters, initramfs bounds,
+hardware bindings, and all five controlled reservations, including one above
+4 GiB. The stock DTBO selector also executes to initialize the overlay index.
+
+Firmware state and the memory map are fixtures. Logging, mutexes, display
+queries, a read-only lock-state accessor and elapsed time are modeled; SRAM
+and security/SoC register reads use fixed inputs. Memory writes are restricted
+to the FDT, stack and reviewed data fields. The test stops before charging,
+secure-world and cache/MMU handoff. It does not validate physical RAM ownership,
+firmware allocation/free paths, display DMA or a complete LK boot. Final FDTs
+are saved as `out/lk-linux-fdt-{ram,expdb}.dtb` for inspection.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses

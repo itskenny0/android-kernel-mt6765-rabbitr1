@@ -31,11 +31,16 @@ RAM capacity. The loader must replace it with the actual layout. Dynamic stock
 SSPM/SCP/connectivity reservations are retained, but runtime TEE/modem/loader
 carve-outs cannot be recovered from a static image alone.
 
-LK also refers to `/gpio@10005000`, `mediatek,scp`, and `scp_sramSize`, whereas
-the mainline pin controller is beneath `/soc`. The Nokia example contains
-compatibility placeholders; their exact effect on the r1 loader is unverified.
-Capture the final FDT and a UART boot log before deciding on compatibility nodes
-or a loader shim. The current r1 tree does not pretend these gaps are resolved.
+LK uses its separate embedded vendor DT for the early `/gpio@10005000` lookup
+and charger initialization. The package preserves that tree. In the later Linux
+DT, the vendor SCP fixup requires `mediatek,scp` and aborts when it is absent.
+The patched LK skips that subcall while retaining the remaining platform fixups.
+It also skips the vendor MMC fixup that corrupts the mainline pin-state names.
+The Linux console remains the one selected by the boot image; LK's logging
+settings no longer rewrite it to a different `ttyS` port.
+Instruction tests reproduce these failures and verify the patches; see [LK.md](LK.md).
+These fixes do not require vendor-compatible placeholder devices in the mainline
+tree. The final FDT and UART log still need verification on hardware.
 
 The existing vendor overlay targets vendor nodes and phandles. Applying it to a
 mainline base may fail or misconfigure hardware. Packaging needs a deliberately

@@ -171,6 +171,7 @@ jobs:
           source scripts/env.sh
           python3 scripts/package-mtkclient.py 2>&1 | tee logs/package-mtkclient.log
           python3 scripts/test-flash-package.py 2>&1 | tee logs/flash-package-tests.log
+          toolchains/boot-tools/bin/python scripts/test-lk-linux-fdt.py 2>&1 | tee logs/lk-linux-fdt-tests.log
 
       - name: Verify checksums and repeat packaging
         run: |
