@@ -55,6 +55,10 @@ expected = []
 for name, request, shift, output in mapping:
     expected.append((name, value('MT6357_'+request), 1 << int(shift),
                      value('MT6357_'+output), bits[name], 3 if name in ('BATADC', 'ISENSE') else 1))
+reset_table = vendor.split('static const unsigned int mt6357_rst_setting[][3] = {', 1)[1].split('};', 1)[0]
+reset_sequence = [(value(reg), int(mask, 0), int(val, 0)) for reg, mask, val in re.findall(
+    r'(MT6357_\w+), (0x[0-9a-f]+), (0x[0-9a-f]+|0),', reset_table)]
+assert len(reset_sequence) == 4
 
 prelude = r'''
 #include <assert.h>
@@ -86,7 +90,8 @@ struct u8_fract { u8 numerator, denominator; };
 #define dev_dbg(...) ((void)0)
 #define dev_warn(...) ((void)0)
 #define dev_err(...) ((void)0)
-struct device { int unused; };
+struct device { struct device *parent; };
+struct platform_device { struct device dev; };
 struct mutex { bool locked; };
 struct lock_scope { struct mutex *m; bool once; };
 static struct lock_scope lock_acquire(struct mutex *m)
@@ -103,19 +108,26 @@ struct iio_chan_spec {
     const char *datasheet_name;
     struct { char sign; int realbits, storagebits, endianness; } scan_type;
 };
-struct iio_dev { void *priv; };
+struct iio_dev {
+    void *priv;
+    const char *name;
+    const void *info;
+    int modes, num_channels;
+    const struct iio_chan_spec *channels;
+};
 static void *iio_priv(struct iio_dev *dev) { return dev->priv; }
 struct regmap { unsigned int regs[0x2000]; struct mutex *lock; };
 struct event { unsigned int op, reg, mask, val; };
 static struct event events[64];
-static unsigned int num_events, fail_at, sample, polls, ready_after;
-static bool timeout, mutate_mux, external, write_on_error;
+static unsigned int num_events, fail_at, second_fail_at, sample, polls, ready_after;
+static bool timeout, mutate_mux, external, write_on_error, probing;
 static unsigned int want_request, want_mask, want_output, mux_reg, mux_mask, mux_select;
 static int record(struct regmap *map, unsigned int op, unsigned int reg,
                   unsigned int mask, unsigned int val)
 {
-    assert(map->lock->locked && num_events < ARRAY_SIZE(events));
+    assert((map->lock->locked || probing) && num_events < ARRAY_SIZE(events));
     events[num_events++] = (struct event){op, reg, mask, val};
+    if (second_fail_at == num_events) return -ENXIO;
     return fail_at == num_events ? -EIO : 0;
 }
 static int regmap_read(struct regmap *map, unsigned int reg, unsigned int *val)
@@ -138,8 +150,9 @@ static int regmap_read(struct regmap *map, unsigned int reg, unsigned int *val)
 static int regmap_write(struct regmap *map, unsigned int reg, unsigned int val)
 {
     int ret = record(map, 1, reg, 0xffff, val);
-    assert(reg == want_request && (val == want_mask || val == 0));
-    if (!ret) map->regs[reg] = val;
+    assert((reg == want_request && (val == want_mask || val == 0)) ||
+           (reg == 0xfb4 && (val == 0x6359 || val == 0)));
+    if (!ret || write_on_error) map->regs[reg] = val;
     return ret;
 }
 static int regmap_update_bits(struct regmap *map, unsigned int reg,
@@ -147,7 +160,8 @@ static int regmap_update_bits(struct regmap *map, unsigned int reg,
 {
     int ret = record(map, 2, reg, mask, val & mask);
     assert((reg == mux_reg && (mask == mux_mask || (external && mask == 0x18))) ||
-           (reg == 0xf90 && mask == 9));
+           (reg == 0xf90 && mask == 9) ||
+           (reg == 0x110e && mask == 0x80) || (reg == 0x111a && mask == 0x400));
     /* Model an ambiguous bus error after a write reached the PMIC. */
     if (!ret || write_on_error)
         map->regs[reg] = (map->regs[reg] & ~mask) | (val & mask);
@@ -166,7 +180,7 @@ static void fsleep(unsigned int delay) { assert(delay > 0); }
 prelude += f'#include "{SRC}/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h"\n'
 body = s[s.index('#define AUXADC_AVG_TIME_US'):s.index('static const struct iio_chan_spec mt6358_auxadc_channels')]
 # Compile the common production conversion and the MT6357-specific callback.
-for name in ('mt6359_auxadc_reset', 'mt6359_auxadc_sample_adc_val',
+for name in ('mt6357_auxadc_restore_requests', 'mt6359_auxadc_reset', 'mt6359_auxadc_sample_adc_val',
              'mt6359_auxadc_read_adc', 'mt6357_auxadc_read_adc', 'mt6359_auxadc_read_raw'):
     if name != 'mt6357_auxadc_read_adc' or 'static int mt6357_auxadc_read_adc(' in s:
         body += function(name)
@@ -181,6 +195,38 @@ body += 'struct expected { int id; unsigned int req, mask, out, bits, ratio; };\
 body += 'static const struct expected expected[] = {\n'
 for name, req, mask, out, width, ratio in expected:
     body += f'{{MT6357_AUXADC_{name}, {req}, {mask}, {out}, {width}, {ratio}}},\n'
+body += '};\n'
+body += r'''
+/* Probe runs before registration, so no user can race its initialization. */
+#define INDIO_DIRECT_MODE 1
+#define dev_err_probe(dev,err,...) (err)
+static const int mt6359_auxadc_iio_info;
+static struct regmap probe_map;
+static struct mt6359_auxadc probe_adc;
+static struct iio_dev probe_dev;
+static unsigned int registrations;
+static const void *device_get_match_data(struct device *dev) { return &chip; }
+static struct regmap *dev_get_regmap(struct device *dev, const char *name) { return &probe_map; }
+static void mutex_init(struct mutex *lock) { lock->locked=false; }
+static struct iio_dev *devm_iio_device_alloc(struct device *dev, size_t size)
+{
+    assert(size == sizeof(probe_adc));
+    memset(&probe_adc,0,sizeof(probe_adc));
+    memset(&probe_dev,0,sizeof(probe_dev));
+    probe_dev.priv=&probe_adc; probe_map.lock=&probe_adc.lock;
+    return &probe_dev;
+}
+static int devm_iio_device_register(struct device *dev, struct iio_dev *iio)
+{
+    assert(!probe_adc.needs_reset);
+    registrations++;
+    return 0;
+}
+'''
+body += function('mt6359_auxadc_probe')
+body += 'static const struct event stock_reset[] = {\n'
+for reg, mask, val in reset_sequence:
+    body += f'{{2, {reg}, {mask}, {val}}},\n'
 body += '};\n'
 
 checks = r'''
@@ -197,8 +243,8 @@ static void setup(const struct expected *e, unsigned int initial)
 {
     assert(!adc.lock.locked);
     memset(&map, 0, sizeof(map)); map.lock = &adc.lock;
-    adc.timed_out = false;
-    num_events=fail_at=polls=ready_after=0; timeout=mutate_mux=external=false;
+    adc.timed_out = adc.needs_reset = false;
+    num_events=fail_at=second_fail_at=polls=ready_after=0; timeout=mutate_mux=external=false;
     write_on_error=true;
     want_request=e->req; want_mask=e->mask; want_output=e->out;
     mux_reg=mux_mask=mux_select=0;
@@ -254,8 +300,10 @@ int main(void)
             num_events=polls=0;
             assert(mt6359_auxadc_read_raw(&dev,c,&out,NULL,IIO_CHAN_INFO_RAW) == -ETIMEDOUT);
             assert(map.regs[0xf90] == 0 && !adc.lock.locked);
-            assert(events[num_events-2].reg == 0xf90 && events[num_events-2].val == 9);
-            assert(events[num_events-1].reg == 0xf90 && events[num_events-1].val == 0);
+            assert(events[num_events-4].reg == 0xf90 && events[num_events-4].val == 9);
+            assert(events[num_events-3].reg == 0xf90 && events[num_events-3].val == 0);
+            assert(events[num_events-2].reg == 0x110e && events[num_events-2].val == 0x80);
+            assert(events[num_events-1].reg == 0x111a && events[num_events-1].val == 0x400);
             timeout=false; num_events=polls=0;
             assert(mt6359_auxadc_read_raw(&dev,c,&out,NULL,IIO_CHAN_INFO_RAW) == IIO_VAL_INT);
             assert(!adc.timed_out && out == (int)sample);
@@ -324,7 +372,103 @@ int main(void)
     assert(mt6359_auxadc_read_raw(&dev,&c,&numerator,&denominator,IIO_CHAN_INFO_SCALE) == IIO_VAL_FRACTIONAL);
     assert(numerator == 3680 && denominator == 3*4096);
     cases++;
+
+    /* Reset failure must not register usable conversions or publish a value.
+     * A keyed generic PMIC exercises the common protection-key cleanup too. */
+    unsigned int resets=0;
+    const struct expected *battery = &expected[0];
+    const struct iio_chan_spec *bat = channel(MT6357_AUXADC_BATADC);
+    for (unsigned int keyed=0; keyed<2; keyed++) {
+        generic=chip;
+        memcpy(regs,mt6357_auxadc_regs,sizeof(mt6357_auxadc_regs));
+        if (keyed) {
+            generic.sec_unlock_key=0x6359;
+            regs[PMIC_HK_TOP_WKEY]=0xfb4;
+            generic.restore_requests=NULL;
+        }
+        generic.regs=regs; adc.chip_info=&generic;
+        for (unsigned int mode=0; mode<2; mode++)
+        for (unsigned int fail=0; fail<=4; fail++) {
+            setup(battery,0); write_on_error=mode; fail_at=fail;
+            map.regs[0xf90]=0xa500;
+            map.regs[0x110e]=1; map.regs[0x111a]=2;
+            adc.lock.locked=true;
+            int result=mt6359_auxadc_reset(&adc);
+            adc.lock.locked=false;
+            assert(result == (fail ? -EIO : 0));
+            assert(adc.needs_reset == (fail != 0));
+            assert((map.regs[0xf90] & ~9U) == 0xa500);
+            if (keyed) {
+                assert(events[0].reg == 0xfb4 && events[0].val == 0x6359);
+                assert(events[num_events-1].reg == 0xfb4 && events[num_events-1].val == 0);
+                assert(num_events == (fail == 1 ? 2U : 4U));
+                if (fail != 1) {
+                    assert(events[1].reg == 0xf90 && events[1].val == 9);
+                    assert(events[2].reg == 0xf90 && events[2].val == 0);
+                }
+                assert(map.regs[0x110e] == 1 && map.regs[0x111a] == 2);
+            } else {
+                assert(num_events == (fail == 1 || fail == 2 ? 2U : 4U));
+                for (unsigned int j=0; j<num_events; j++)
+                    assert(!memcmp(&events[j],&stock_reset[j],sizeof(events[j])));
+                if (!fail) assert(map.regs[0x110e] == 0x81 && map.regs[0x111a] == 0x402);
+            }
+            if (fail) {
+                /* Another failed reset must prevent even the request write. */
+                num_events=0; fail_at=1;
+                int raw=-7;
+                assert(mt6359_auxadc_read_raw(&dev,bat,&raw,NULL,IIO_CHAN_INFO_RAW) == -EIO);
+                assert(raw == -7 && adc.needs_reset && !adc.lock.locked);
+                assert(num_events == 2 && events[0].op != 0 && events[1].op != 0);
+                /* Once recovery succeeds, the same read may sample again. */
+                num_events=fail_at=polls=0;
+                assert(mt6359_auxadc_read_raw(&dev,bat,&raw,NULL,IIO_CHAN_INFO_RAW) == IIO_VAL_INT);
+                assert(raw == (int)sample && !adc.needs_reset && !adc.lock.locked);
+                assert(num_events == 7 && events[4].reg == want_request);
+            }
+            resets++;
+        }
+        /* Report the original error even when release/relock fails as well. */
+        setup(battery,0); fail_at=1; second_fail_at=2;
+        adc.lock.locked=true;
+        assert(mt6359_auxadc_reset(&adc) == -EIO);
+        adc.lock.locked=false;
+        assert(adc.needs_reset && num_events == 2);
+        resets++;
+    }
+    /* The actual repeated-timeout path must propagate a failed reset. */
+    adc.chip_info=&chip;
+    for (unsigned int fail=1; fail<=4; fail++) {
+        setup(battery,0); timeout=true; adc.timed_out=true; fail_at=6+fail;
+        int raw=-7;
+        assert(mt6359_auxadc_read_raw(&dev,bat,&raw,NULL,IIO_CHAN_INFO_RAW) == -EIO);
+        assert(raw == -7 && adc.needs_reset && !adc.lock.locked);
+        resets++;
+    }
+    generic=chip; generic.no_reset=true; adc.chip_info=&generic;
+    setup(battery,0); adc.lock.locked=true;
+    assert(mt6359_auxadc_reset(&adc) == 0);
+    adc.lock.locked=false;
+    assert(num_events == 0 && !adc.needs_reset);
+    resets++;
+    struct device wrapper={0}, mfd={.parent=&wrapper};
+    struct platform_device platform={.dev={.parent=&mfd}};
+    for (unsigned int mode=0; mode<2; mode++)
+    for (unsigned int fail=0; fail<=4; fail++) {
+        setup(battery,0); write_on_error=mode; fail_at=fail;
+        memset(&probe_map,0,sizeof(probe_map));
+        registrations=0; probing=true;
+        assert(mt6359_auxadc_probe(&platform) == (fail ? -EIO : 0));
+        probing=false;
+        assert(registrations == (fail ? 0U : 1U));
+        if (!fail) {
+            assert(probe_dev.channels == chip.channels && probe_dev.num_channels == chip.num_channels);
+            assert(probe_map.regs[0x110e] == 0x80 && probe_map.regs[0x111a] == 0x400);
+        }
+        resets++;
+    }
     printf("PASS: %u ADC cases and %u injected mux-bus errors; 12 MT6357 mappings, voltage units, scale, mux restoration, external-input cleanup and locked timeout recovery\n",cases,errors);
+    printf("PASS: %u reset/probe scenarios; stock restart sequence, keyed cleanup, repeated failures, conversion gating, timeout errors and failed-probe registration refusal\n",resets);
     return 0;
 }
 '''
@@ -339,6 +483,7 @@ report = {'vendor_mappings': [dict(channel=n, request_reg=r, request_mask=m,
                                  output_reg=o, bits=b, ratio=ratio)
                               for n,r,m,o,b,ratio in expected],
           'hardware_tested': False,
+          'stock_reset_sequence': reset_sequence,
           'scope': 'compiled production tables/conversion code; modeled regmap, locks, polling and bus failures; no battery temperature conversion or electrical validation'}
 (ROOT/'out/mt6357-auxadc-audit.json').write_text(json.dumps(report, indent=2)+'\n')
 print('No PMIC or device was accessed; charger and MT6357 ADC remain disabled in the diagnostic config.')

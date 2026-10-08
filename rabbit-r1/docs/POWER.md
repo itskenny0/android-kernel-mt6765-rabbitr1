@@ -172,10 +172,28 @@ rejected by runtime assertions. Polling, regmap operations and locking are
 modeled; the impedance-conversion routine and electrical accuracy are not
 covered. CI separately compiles the AArch64 object.
 
-MT6357 ADC and charging remain disabled in the diagnostic kernel. Probe/reset
-error handling, firmware-owned ADC requests, battery-current compensation and
-the temperature policy still need work before enabling battery management.
-An ADC voltage is not yet a temperature or a fuel-gauge reading.
+Reset now checks each bus operation. It attempts to release reset after a
+failed assertion and to relock protected writes after a failed unlock or
+reset. The first failure is returned. MT6357 then repeats the two requests in
+Rabbit's reset table: AP channel 7 at `0x110e[7]` and GPS DCXO at `0x111a[10]`.
+The driver's common `RQST1` index denotes silicon `RQST2` on MT6357, so it
+cannot be used for the GPS request. Other PMIC models keep their existing
+request behavior.
+
+Probe refuses to register the ADC after a failed reset. A runtime reset
+failure also blocks conversions until a later reset succeeds, under the same
+mutex. These paths are covered by 37 additional reset/probe scenarios,
+including failed writes that do or do not reach the device, protection-key
+cleanup, multiple failures and recovery. The harness compiles the actual
+probe and reset functions; allocation, registration and the bus are modeled.
+Eleven deliberately broken reset variants fail the runtime assertions; the
+13 conversion regressions still fail as well.
+
+MT6357 ADC and charging remain disabled in the diagnostic kernel. Impedance
+conversion, battery-current compensation and the temperature policy still
+need work before enabling battery management. An ADC voltage is not yet a
+temperature or a fuel-gauge reading. Physical reset timing and interaction
+with firmware requesters remain untested.
 
 ### Battery policy recovered from stock
 

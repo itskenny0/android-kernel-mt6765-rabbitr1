@@ -39,6 +39,7 @@
 #define MT6357_IMP_ADC_NUM		30
 #define MT6357_AUXADC_DCXO_MDRT_2	0x1216
 #define MT6357_AUXADC_CHR_TOP_CON2	0x1236
+#define MT6357_AUXADC_RQST1		0x111a
 #define MT6357_DCXO_CH4_MUX_AP_SEL	BIT(4)
 #define MT6357_BATON_TDET_EN		BIT(1)
 #define MT6358_IMP_ADC_NUM		28
@@ -110,6 +111,7 @@ enum mtk_pmic_auxadc_channels {
  * @chip_info:     PMIC specific chip info
  * @lock:          Mutex to serialize AUXADC reading vs configuration
  * @timed_out:     Signals whether the last read timed out
+ * @needs_reset:   Blocks conversions until a failed reset has been retried
  */
 struct mt6359_auxadc {
 	struct device *dev;
@@ -117,6 +119,7 @@ struct mt6359_auxadc {
 	const struct mtk_pmic_auxadc_info *chip_info;
 	struct mutex lock;
 	bool timed_out;
+	bool needs_reset;
 };
 
 /**
@@ -155,6 +158,7 @@ struct mtk_pmic_auxadc_chan {
  * @imp_adc_num:    ADC channel for battery impedance readings
  * @is_spmi:        Defines whether this PMIC communicates over SPMI
  * @no_reset:       If true, this PMIC does not support ADC reset
+ * @restore_requests: Optional callback to restart requests lost during reset
  * @read_adc:       Optional callback for model-specific channel selection
  * @read_imp:       Callback to read impedance channels
  */
@@ -169,6 +173,7 @@ struct mtk_pmic_auxadc_info {
 	u8 imp_adc_num;
 	bool is_spmi;
 	bool no_reset;
+	int (*restore_requests)(struct mt6359_auxadc *adc_dev);
 	int (*read_adc)(struct mt6359_auxadc *adc_dev,
 			const struct iio_chan_spec *chan, int *out);
 	int (*read_imp)(struct mt6359_auxadc *adc_dev,
@@ -561,6 +566,19 @@ static int mt6359_read_imp(struct mt6359_auxadc *adc_dev,
 static int mt6357_auxadc_read_adc(struct mt6359_auxadc *adc_dev,
 				const struct iio_chan_spec *chan, int *out);
 
+static int mt6357_auxadc_restore_requests(struct mt6359_auxadc *adc_dev)
+{
+	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
+	int ret, gps_ret;
+
+	/* Restart the AP channel 7 and GPS DCXO requests, as in the stock driver. */
+	ret = regmap_set_bits(adc_dev->regmap, cinfo->regs[PMIC_AUXADC_RQST0], BIT(7));
+	/* The common RQST1 index maps to silicon RQST2 on MT6357. */
+	gps_ret = regmap_set_bits(adc_dev->regmap, MT6357_AUXADC_RQST1, BIT(10));
+
+	return ret ?: gps_ret;
+}
+
 static const struct mtk_pmic_auxadc_info mt6357_chip_info = {
 	.model_name = "MT6357",
 	.channels = mt6357_auxadc_channels,
@@ -568,6 +586,7 @@ static const struct mtk_pmic_auxadc_info mt6357_chip_info = {
 	.desc = mt6357_auxadc_ch_desc,
 	.regs = mt6357_auxadc_regs,
 	.imp_adc_num = MT6357_IMP_ADC_NUM,
+	.restore_requests = mt6357_auxadc_restore_requests,
 	.read_adc = mt6357_auxadc_read_adc,
 	.read_imp = mt6358_read_imp,
 	.vref_mV = 1800,
@@ -617,28 +636,53 @@ static const struct mtk_pmic_auxadc_info mt6373_chip_info = {
 	.vref_mV = 1840,
 };
 
-static void mt6359_auxadc_reset(struct mt6359_auxadc *adc_dev)
+static int mt6359_auxadc_reset(struct mt6359_auxadc *adc_dev)
 {
 	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
 	struct regmap *regmap = adc_dev->regmap;
+	int ret, cleanup_ret;
 
 	/* Some PMICs do not support reset */
 	if (cinfo->no_reset)
-		return;
+		return 0;
+
+	adc_dev->needs_reset = true;
 
 	/* Unlock HK_TOP writes */
-	if (cinfo->sec_unlock_key)
-		regmap_write(regmap, cinfo->regs[PMIC_HK_TOP_WKEY], cinfo->sec_unlock_key);
+	if (cinfo->sec_unlock_key) {
+		ret = regmap_write(regmap, cinfo->regs[PMIC_HK_TOP_WKEY],
+				   cinfo->sec_unlock_key);
+		if (ret)
+			goto relock;
+	}
 
 	/* Assert ADC reset */
-	regmap_set_bits(regmap, cinfo->regs[PMIC_HK_TOP_RST_CON0], PMIC_RG_RESET_VAL);
+	ret = regmap_set_bits(regmap, cinfo->regs[PMIC_HK_TOP_RST_CON0], PMIC_RG_RESET_VAL);
 
-	/* De-assert ADC reset. No wait required, as pwrap takes care of that for us. */
-	regmap_clear_bits(regmap, cinfo->regs[PMIC_HK_TOP_RST_CON0], PMIC_RG_RESET_VAL);
+	/* Also try to release reset if the assertion write reported an error. */
+	cleanup_ret = regmap_clear_bits(regmap, cinfo->regs[PMIC_HK_TOP_RST_CON0],
+					PMIC_RG_RESET_VAL);
+	if (!ret)
+		ret = cleanup_ret;
 
+relock:
 	/* Lock HK_TOP writes again */
-	if (cinfo->sec_unlock_key)
-		regmap_write(regmap, cinfo->regs[PMIC_HK_TOP_WKEY], 0);
+	if (cinfo->sec_unlock_key) {
+		cleanup_ret = regmap_write(regmap, cinfo->regs[PMIC_HK_TOP_WKEY], 0);
+		if (!ret)
+			ret = cleanup_ret;
+	}
+	if (ret)
+		return ret;
+
+	if (cinfo->restore_requests) {
+		ret = cinfo->restore_requests(adc_dev);
+		if (ret)
+			return ret;
+	}
+	adc_dev->needs_reset = false;
+
+	return 0;
 }
 
 /**
@@ -826,6 +870,11 @@ static int mt6359_auxadc_read_raw(struct iio_dev *indio_dev,
 		return -EINVAL;
 
 	guard(mutex)(&adc_dev->lock);
+	if (adc_dev->needs_reset) {
+		ret = mt6359_auxadc_reset(adc_dev);
+		if (ret)
+			return ret;
+	}
 
 	switch (chan->scan_index) {
 	case PMIC_AUXADC_CHAN_IBAT:
@@ -856,9 +905,12 @@ static int mt6359_auxadc_read_raw(struct iio_dev *indio_dev,
 		if (ret == -ETIMEDOUT) {
 			if (adc_dev->timed_out) {
 				dev_warn(adc_dev->dev, "Resetting stuck ADC!\r\n");
-				mt6359_auxadc_reset(adc_dev);
+				ret = mt6359_auxadc_reset(adc_dev);
+				if (ret)
+					return ret;
 			}
 			adc_dev->timed_out = true;
+			return -ETIMEDOUT;
 		}
 		return ret;
 	}
@@ -918,7 +970,9 @@ static int mt6359_auxadc_probe(struct platform_device *pdev)
 
 	mutex_init(&adc_dev->lock);
 
-	mt6359_auxadc_reset(adc_dev);
+	ret = mt6359_auxadc_reset(adc_dev);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to reset ADC\n");
 
 	indio_dev->name = adc_dev->chip_info->model_name;
 	indio_dev->info = &mt6359_auxadc_iio_info;
