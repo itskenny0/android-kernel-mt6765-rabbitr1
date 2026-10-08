@@ -65,3 +65,8 @@ startup settings, clears inherited layers and background input, bounds reset
 polling and mode dimensions, and handles error/vblank IRQs with clock ownership.
 Plane formatting, firmware MMSYS teardown and physical display validation remain
 unfinished; see `docs/DISPLAY.md`.
+
+Patch 0031 fixes native MT6765 RGB plane opacity, constant-alpha format selection
+and reflected crop addressing. It also clears stale RGB clipping/source-key state
+and programs stock layer color and nonsecure input. Packed-YUV cropping, complete
+plane validation and real pixel output still need work; see `docs/DISPLAY.md`.

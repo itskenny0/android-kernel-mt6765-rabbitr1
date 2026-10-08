@@ -276,12 +276,13 @@ MMIO, module base addresses, logging and profiling are modeled. This does not
 emulate CMDQ, hardware frame synchronization, clock waveforms or pixel flow.
 It also does not establish that every route left active by LK has been shut
 down: masked MOUT writes preserve unrelated outputs. Firmware path teardown,
-OVL plane configuration, IOMMU and complete startup sequencing remain to audit.
+the remaining OVL plane paths, IOMMU and complete startup sequencing remain to audit.
 
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   OVL plane configuration and display IOMMU behavior. The native RDMA/OVL setup and
+   packed-YUV cropping, framebuffer offsets, plane bounds and display IOMMU behavior.
+   The native RDMA/OVL setup and
    interrupt handling below still require hardware validation.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
@@ -493,3 +494,55 @@ MMIO side effects, reset latency, clocks, GIC/kernel services and CMDQ are model
 No real reset, memory fetch, blending, underflow recovery or pixel output has
 been observed. Both the display graph and DRM driver remain disabled pending
 the remaining integration and hardware acceptance work.
+
+## RGB planes, opacity and reflection
+
+The native MT6765 path converts [DRM's 16-bit plane opacity](https://docs.kernel.org/gpu/drm-kms.html#plane-composition-properties)
+to the overlay's
+eight-bit field using the upper byte. The previous low-byte mask mapped
+`0x8000` (half opacity) to zero and made opacity wrap every 256 steps.
+Native alpha blending stays enabled for RGB buffers without a pixel-alpha
+channel too; otherwise their plane opacity was ignored in premultiplied mode.
+Pixel-none blending and formats without pixel alpha select the unassociated
+RGB format and constant blending. Alpha-bearing formats retain their selected
+coverage or premultiplied format.
+
+Horizontal reflection now starts at the last byte of the selected source row:
+`cropped_addr + width * bytes_per_pixel - 1`. Using `pitch - 1` pointed into
+row padding or pixels beyond the crop. Vertical reflection advances by
+`(height - 1) * pitch`; rotate-180 composes with explicit reflections by XOR.
+RGB configuration also clears inherited packed-YUV clipping and source-key
+data, sets opaque-black layer color, and selects nonsecure input as stock does.
+All changes are limited to native MT6765 data; the MT8192 behavior is retained.
+
+`test-mt6765-ovl-plane.py` executes the shipped `ovl_layer_config` at raw Image
+offset `0x700d90` and its format helpers at `0x744ea0..0x745064`. The emulator
+models module base lookup, ftrace and disabled debug logging. It uses physical,
+nonsecure memory layers without scaling, partial-update ROI or CMDQ. Vendor
+format names describe memory byte order; they are mapped to DRM's little-endian
+word formats explicitly. The static function's unused return value is not part
+of the compiled ABI.
+
+All 162 fixtures match the shipped per-plane register values: nine RGB formats,
+three blend modes and six layers across both engines, with varied opacity,
+crop, pitch and inherited register contents. Native CMDQ writes are also
+checked through a queue model. The comparison allows native GMC programming
+and enables the source layer last; it does not require stock write ordering.
+Production callbacks run with ASan/UBSan.
+
+Separate checks cover every opacity value for each format/blend pair
+(1,769,472 combinations), 1,296 cropped rotation/reflection cases with padded
+rows, disabling a plane without a framebuffer, and the unchanged MT8192 path.
+The reflection oracle computes the selected rectangle's first fetched byte;
+rotation was compiled out of the shipped r1 function, so this is **not** a
+stock-instruction comparison for rotated buffers. Results are recorded in
+`out/mt6765-ovl-plane-audit.json`.
+Fifteen deliberately broken variants are rejected by the runtime assertions
+or the stock-validated register traces, covering opacity, formats, reflection,
+clipping, layer color, nonsecure state and constant blending.
+
+Packed UYVY/YUYV crops, inherited SBCH state, framebuffer offsets, complete
+plane bounds/atomic validation and real blending output remain unverified.
+The generic pending-address helper currently omits `fb->offsets[0]`; that is a
+separate issue to fix before allowing nonzero framebuffer offsets. No scanout,
+IOMMU access or resulting pixel colors are established by these register tests.

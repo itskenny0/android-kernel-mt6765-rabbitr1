@@ -1,0 +1,84 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MT6765 RGB planes
+
+Convert DRM opacity to the hardware field, apply it to RGB planes without
+pixel alpha and use straight formats when pixel alpha is ignored. Reflect
+within the cropped source width instead of the row pitch. Clear stale RGB
+clipping and restore the stock layer color, source key and nonsecure input.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index bed0d6154b..495f819e17 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -35,12 +35,16 @@
+ #define DISP_REG_OVL_ROI_BGCLR			0x0028
+ #define DISP_REG_OVL_SRC_CON			0x002c
+ #define DISP_REG_OVL_CON(n)			(0x0030 + 0x20 * (n))
++#define DISP_REG_OVL_SRCKEY(n)			(0x0034 + 0x20 * (n))
+ #define DISP_REG_OVL_SRC_SIZE(n)		(0x0038 + 0x20 * (n))
+ #define DISP_REG_OVL_OFFSET(n)			(0x003c + 0x20 * (n))
+ #define DISP_REG_OVL_PITCH_MSB(n)		(0x0040 + 0x20 * (n))
+ #define OVL_PITCH_MSB_2ND_SUBBUF			BIT(16)
+ #define DISP_REG_OVL_PITCH(n)			(0x0044 + 0x20 * (n))
+ #define OVL_CONST_BLEND					BIT(28)
++#define DISP_REG_OVL_CLIP(n)			(0x004c + 0x20 * (n))
++#define DISP_REG_OVL_CLR(n)			(0x025c + 4 * (n))
++#define DISP_REG_OVL_SECURE			0x0fc0
+ #define DISP_REG_OVL_RDMA_CTRL(n)		(0x00c0 + 0x20 * (n))
+ #define DISP_REG_OVL_RDMA_GMC(n)		(0x00c8 + 0x20 * (n))
+ #define DISP_REG_OVL_ADDR_MT2701		0x0040
+@@ -608,6 +612,11 @@ static unsigned int mtk_ovl_fmt_convert(struct mtk_disp_ovl *ovl,
+ 	 */
+ 	if (ovl->data->blend_modes & BIT(DRM_MODE_BLEND_PREMULTI))
+ 		blend_mode = state->base.pixel_blend_mode;
++	/* No pixel alpha means that the stored RGB values are unassociated. */
++	if (ovl->data->mt6765 &&
++	    (blend_mode == DRM_MODE_BLEND_PIXEL_NONE ||
++	     (state->base.fb && !state->base.fb->format->has_alpha)))
++		blend_mode = DRM_MODE_BLEND_COVERAGE;
+ 
+ 	switch (fmt) {
+ 	default:
+@@ -700,13 +709,15 @@ void mtk_ovl_layer_config(struct device *dev, unsigned int idx,
+ 
+ 	con = mtk_ovl_fmt_convert(ovl, state);
+ 	if (state->base.fb) {
+-		con |= state->base.alpha & OVL_CON_ALPHA;
++		/* DRM opacity is 16 bits; the native hardware field is eight. */
++		con |= ovl->data->mt6765 ? state->base.alpha >> 8 :
++			state->base.alpha & OVL_CON_ALPHA;
+ 
+ 		/*
+ 		 * For blend_modes supported SoCs, always enable alpha blending.
+ 		 * For blend_modes unsupported SoCs, enable alpha blending when has_alpha is set.
+ 		 */
+-		if (blend_mode || state->base.fb->format->has_alpha)
++		if (ovl->data->mt6765 || blend_mode || state->base.fb->format->has_alpha)
+ 			con |= OVL_CON_AEN;
+ 
+ 		/*
+@@ -733,7 +744,23 @@ void mtk_ovl_layer_config(struct device *dev, unsigned int idx,
+ 
+ 	if (rotation & DRM_MODE_REFLECT_X) {
+ 		con |= OVL_CON_HORZ_FLIP;
+-		addr += pending->pitch - 1;
++		if (ovl->data->mt6765 && state->base.fb)
++			addr += pending->width * state->base.fb->format->cpp[0] - 1;
++		else
++			addr += pending->pitch - 1;
++	}
++
++	if (ovl->data->mt6765) {
++		/* RGB has no packed-YUV edge pixels to clip. */
++		if (state->base.fb && !state->base.fb->format->is_yuv)
++			mtk_ddp_write_relaxed(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,
++					      DISP_REG_OVL_CLIP(idx));
++		mtk_ddp_write_relaxed(cmdq_pkt, OVL_COLOR_ALPHA, &ovl->cmdq_reg,
++				      ovl->regs, DISP_REG_OVL_CLR(idx));
++		mtk_ddp_write_relaxed(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,
++				      DISP_REG_OVL_SRCKEY(idx));
++		mtk_ddp_write_relaxed(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,
++				      DISP_REG_OVL_SECURE);
+ 	}
+ 
+ 	if (ovl->data->supports_afbc)

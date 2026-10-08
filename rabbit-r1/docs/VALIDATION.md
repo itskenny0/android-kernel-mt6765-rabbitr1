@@ -56,6 +56,10 @@
 | Native overlay binding examples and compiled nodes | PASS: zero overlay diagnostics; unrelated tphy warning and optional yamllint absence noted | `logs/mt6765-ovl-binding.log`, `logs/mt6765-ovl-schema.log`, `out/mt6765-ovl-schema.json` |
 | Native overlay, DRM lookup and DTB | AArch64 objects and DTB compiled | `logs/mt6765-ovl-build.log` |
 | Overlay FIFO/GREQ/GMC, clocks, reset, inherited layers, bounds and IRQ regressions | All seventeen rejected by runtime checks or register comparison | `logs/mt6765-ovl-regression-*.log` |
+| Native RGB plane setup vs shipped kernel | PASS: 162 register-value fixtures across nine formats, three blend modes and six layers | `logs/mt6765-ovl-plane-tests.log`, `out/mt6765-ovl-plane-audit.json` |
+| RGB opacity, rotation/reflection and legacy behavior | PASS: 1,769,472 alpha combinations, 1,296 cropped reflections, queued writes, disable and MT8192 regression | `scripts/test-mt6765-ovl-plane.py`; production callbacks with ASan/UBSan; no pixel-output emulation |
+| Native RGB plane object | AArch64 object compiled | `logs/mt6765-ovl-plane-build.log` |
+| RGB opacity, format, addressing and stale-state regressions | All fifteen rejected at runtime or by register comparison | `logs/mt6765-ovl-plane-mutations.log` |
 | Native PHY binding/example and compiled node | PASS, zero PHY-node diagnostics | `logs/mt6765-phy-binding.log`, `logs/mt6765-phy-schema.log`, `out/mt6765-phy-schema.json`; unrelated tphy warning and optional yamllint absence noted |
 | Native DSI binding/example and compiled host node | PASS, zero host diagnostics | `logs/mt6765-dsi-binding.log`, `logs/mt6765-dsi-schema.log`, `out/mt6765-dsi-schema.json`; inherited PHY warning and unavailable optional yamllint noted |
 | Panel driver and DSI host | AArch64 objects compiled | `logs/r1-panel-build.log`, `logs/dsi-transfer-build.log` |

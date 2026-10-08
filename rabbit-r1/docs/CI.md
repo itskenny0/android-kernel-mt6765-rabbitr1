@@ -43,6 +43,9 @@ The workflow:
    startup register values and stock IRQ classification. Mode bounds, inherited
    layer cleanup, reset/clock failures, queued writes, IRQ lifetime and the
    existing MT8192 behavior run under ASan/UBSan.
+   RGB plane setup is compared with shipped instructions for all six physical
+   layers, nine formats and three blend modes. A separate DRM address/opacity
+   check covers all 16-bit alpha values, cropped reflections and padded rows.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.
