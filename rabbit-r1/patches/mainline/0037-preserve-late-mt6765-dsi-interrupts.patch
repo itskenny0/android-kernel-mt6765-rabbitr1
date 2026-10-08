@@ -1,0 +1,24 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Preserve late MT6765 DSI interrupts
+
+Use a write-zero-to-clear acknowledgment instead of read/modify/write,
+so events arriving after the handled snapshot remain pending. Retain the
+other backends' existing interrupt behavior.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 2e9fba347c..8d764a670b 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -729,7 +729,11 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+ 			tmp = readl(dsi->regs + DSI_INTSTA);
+ 		} while (tmp & DSI_BUSY);
+ 
+-		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
++		if (dsi->driver_data->mt6765_regs)
++			/* W0C: preserve events arriving after the status snapshot. */
++			writel(~status, dsi->regs + DSI_INTSTA);
++		else
++			mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
+ 		mtk_dsi_irq_data_set(dsi, status);
+ 		wake_up_interruptible(&dsi->irq_wait_queue);
+ 	}

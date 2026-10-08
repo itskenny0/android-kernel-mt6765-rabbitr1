@@ -172,6 +172,38 @@ startup sequencing. It excludes packet transmission, the analog PHY/PLL,
 clocks, MMSYS routing and complete DRM path.
 The separate native PHY and display-path audits are described below.
 
+Native interrupt acknowledgement now writes the complement of the handled
+status snapshot to `DSI_INTSTA`. This register uses write-zero-to-clear
+latches. The inherited read/modify/write could clear an event arriving between
+its final read and write, losing a later command or video-mode completion.
+The native handler preserves unhandled and newly latched bits. Other backends
+retain their existing acknowledgement behavior.
+
+`test-dsi-irq.py` executes the DSI0 branch of the shipped `disp_irq_handler`
+at raw Image offset `0x742260`. Its acknowledgement at `0x742558` uses the
+complement of the observed low 16 bits. In the stock CMDQ/ESD mode, bit 0
+(`RD_RDY`) is excluded and left for the reader; CPU mode clears it. Mainline
+handles CPU transfers and owns only `RD_RDY`, `CMD_DONE` and `VM_DONE` here
+(`0x000b`), so it leaves the other status bits untouched. The test covers both
+stock policies, BUSY set/clear, late events and the real callback dispatch
+loop in 252 fixtures. IRQ-number/base lookup, logging, profiling and the final
+registered callback are modeled. The fixture does not execute a panel read.
+
+The production-handler harness checks all 65,536 low status combinations,
+six new-event masks and two arrival points, including the final write window.
+It verifies that preserved completions are delivered on the next invocation,
+keeps existing software IRQ flags, and covers 192 unchanged MT8183 cases.
+The old handler fails the late-VM_DONE case; seven compiled variants with
+incorrect acknowledgement or backend selection are rejected. These are
+ASan/UBSan tests with modeled W0C latches, finite BUSY delays and wakeups.
+Repeated occurrences of the same event can coalesce in one status latch.
+
+The shared handler still has an unbounded BUSY loop in hard IRQ context.
+DSI IRQ ownership across probe, power-on and power-off, stalled-controller
+recovery, and the complete read/RACK sequence remain acceptance work. Passing
+the acknowledgement tests does not establish those behaviors or justify
+enabling the display graph.
+
 An independent host API bug is fixed: successful writes now return `tx_len`
 instead of zero, as required by `mipi_dsi_host_ops.transfer`. Without this,
 a caller checking for short writes rejects every successful command.

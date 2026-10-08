@@ -729,7 +729,11 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
 			tmp = readl(dsi->regs + DSI_INTSTA);
 		} while (tmp & DSI_BUSY);
 
-		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
+		if (dsi->driver_data->mt6765_regs)
+			/* W0C: preserve events arriving after the status snapshot. */
+			writel(~status, dsi->regs + DSI_INTSTA);
+		else
+			mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
 		mtk_dsi_irq_data_set(dsi, status);
 		wake_up_interruptible(&dsi->irq_wait_queue);
 	}

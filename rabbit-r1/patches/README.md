@@ -90,3 +90,9 @@ Patch 0036 sets the native DSI write-memory-continue command during lane
 initialization. It follows the shipped RX/TX setup and removes another
 dependency on inherited controller state. See `docs/DISPLAY.md` for the
 dirty-register and lane-startup checks and their hardware limits.
+
+Patch 0037 uses write-zero-to-clear acknowledgement for native DSI status,
+preserving interrupts that arrive after the handled snapshot. The stock
+CPU/CMDQ acknowledgement paths and native late-event behavior are checked;
+IRQ lifetime, the unbounded BUSY loop and complete panel reads still need
+work. See `docs/DISPLAY.md`.

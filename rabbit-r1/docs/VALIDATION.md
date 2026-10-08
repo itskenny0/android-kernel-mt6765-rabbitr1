@@ -36,6 +36,8 @@
 | Native MT6765 DSI host, DRM driver, r1 panel and DTB | AArch64 objects and DTB compiled | `logs/mt6765-dsi-build.log` |
 | Native DSI memory-continue setup | PASS: 24 stock RX/TX fixtures with dirty-register seeds; actual lane-ready callback, repeat initialization and unchanged MT8183 behavior | `logs/mt6765-dsi-conti-tests.log`, `out/dsi-timing-audit.json`; lane reset/ULPS operations and delays modeled |
 | DSI memory-command and lane-setup regressions | Seven compiled variants rejected; native host object compiled | `logs/mt6765-dsi-conti-mutations.log`, `logs/mt6765-dsi-conti-build.log` |
+| Native DSI interrupt acknowledgement | PASS: 252 stock CPU/CMDQ traces; 786,432 native status/event cases, deferred completions and 192 unchanged MT8183 cases | `logs/dsi-irq-tests.log`, `out/dsi-irq-audit.json`; W0C latches, finite BUSY delays and wakeups modeled |
+| DSI acknowledgement and backend regressions | Seven compiled variants rejected; native host object compiled | `logs/dsi-irq-mutations.log`, `logs/dsi-irq-build.log`; permanent BUSY, IRQ lifetime and complete read/RACK flow remain unvalidated |
 | Native MT6765 PHY vs shipped kernel | PASS: 57 exact setup/shutdown sequences, four repeated calibration fixtures and fractional PCW | `logs/mt6765-phy-tests.log`, `out/mt6765-phy-audit.json`; MMIO, clocks and delays modeled |
 | PHY error cleanup and shared power callback order | PASS: bad rates/reference clocks, failed clocks, atomic context and legacy ordering | `scripts/test-mt6765-phy.py`; production callbacks with ASan/UBSan |
 | PHY delays, analog clock, divider boundary, calibration, SSC, firmware handoff, clock cleanup and atomic-context regressions | All eight rejected at runtime | `logs/mt6765-phy-regression-*.log` |
