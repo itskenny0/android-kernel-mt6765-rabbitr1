@@ -123,6 +123,7 @@ def main():
     if len(before) != 60 or len(after) != 60 or [i for i in range(60) if before[i] != after[i]] != [0,38]:
         raise ValueError('Unexpected logo slot changes')
     report = {
+        'project': 'haretic',
         'format': 6, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
         'mtklkzap_commit': revision, 'warning_bytes_changed': sum(a != b for a,b in zip(relock,warnings)),
         'handoff_patches': [{'file_offset': offset, 'before': before.hex(), 'after': after.hex()}

@@ -1,4 +1,4 @@
-name: Rabbit r1
+name: haretic
 
 on:
   push:
@@ -204,7 +204,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rabbit-r1-mainline-${{ github.sha }}
+          name: haretic-r1-mainline-${{ github.sha }}
           path: |
             /rabbitr1/dist/mainline/
             /rabbitr1/dist/bringup/
@@ -219,7 +219,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rabbit-r1-logs-${{ github.sha }}
+          name: haretic-r1-logs-${{ github.sha }}
           path: /rabbitr1/logs/
           if-no-files-found: warn
           retention-days: 14
@@ -230,7 +230,7 @@ jobs:
           RESULT: ${{ job.status }}
         run: |
           {
-            echo "Rabbit r1 build result: $RESULT"
+            echo "haretic build result: $RESULT"
             echo
             echo 'Successful builds include the kernel, modules, initramfs, patched LK, LineageOS splash and mtkclient package.'
             echo 'The expdb profile enables persistent logging; the RAM profile disables eMMC.'

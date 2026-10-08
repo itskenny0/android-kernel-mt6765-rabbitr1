@@ -1,6 +1,6 @@
-# Rabbit r1 Android device configuration
+# haretic Android device configuration
 
-This is the initial LineageOS 24 product for the mainline kernel in this
+This is haretic's initial LineageOS 24 product for the rabbit r1 mainline kernel in this
 workspace. It is not a tested Android image. The diagnostic kernel ZIP remains
 the only assembled boot package.
 

@@ -134,6 +134,7 @@ def main():
         shutil.copyfile(ROOT/'scripts'/name, DIST/name)
     shutil.copyfile(ROOT/'docs/FLASHING.md', DIST/'README.md')
     manifest = {
+        'project': 'haretic',
         'format': 2, 'device': 'rabbit r1', 'status': 'experimental; not boot-tested',
         'source_commit': record['source_commit'], 'kernel_release': record['kernel_release'],
         'kernel_build': record, 'profiles': profiles, 'lk_build': lk_record,

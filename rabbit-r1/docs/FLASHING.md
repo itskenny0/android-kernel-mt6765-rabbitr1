@@ -1,4 +1,4 @@
-# rabbit r1 mainline with mtkclient
+# haretic for rabbit r1 with mtkclient
 
 This package contains experimental Linux boot images, a matched DTBO image and
 an offline flashing preparer. It is not an Android or LineageOS image. No r1 has

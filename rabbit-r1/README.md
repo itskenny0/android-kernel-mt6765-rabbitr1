@@ -1,11 +1,15 @@
-# rabbit r1 kernel workspace
+# haretic
 
-Mainline-first development for the rabbit r1, confined to `/rabbitr1`.
+haretic is a mainline-based firmware project for the rabbit r1, targeting
+LineageOS 24. Development stays in `/rabbitr1`.
 The development tree is [haretic/android-kernel-mt6765-rabbitr1](https://github.com/haretic/android-kernel-mt6765-rabbitr1),
 based on [fenolftalein-mamir/linux-mt6765](https://github.com/fenolftalein-mamir/linux-mt6765).
 The pinned base is `cceb223d0c2d7ce52fade7bb6b9ef679c560bea7` on `mt6765-devel`.
 Work is committed on `rabbit-r1/bringup`. GitHub authentication is required to
 push this branch from the workspace.
+
+[mtklkzap](https://github.com/itskenny0/mtklkzap) is an independent project by
+itskenny0, used here to patch LK. It is maintained outside the haretic organization.
 
 **Status: kernel builds and offline checks, not a completed hardware port.**
 The official 4.19.191 kernel and an experimental 7.1.0 mainline r1 kernel compile.

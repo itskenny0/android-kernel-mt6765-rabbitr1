@@ -48,6 +48,7 @@ with (dist / 'modules.tar.gz').open('wb') as f:
                     tar.addfile(info, source)
 
 record = {
+    'project': 'haretic',
     'target': target,
     'status': 'compiled; not boot-tested; not a flashable firmware release',
     'kernel_release': (out / 'include/config/kernel.release').read_text().strip(),

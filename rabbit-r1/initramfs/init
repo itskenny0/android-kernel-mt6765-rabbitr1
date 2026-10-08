@@ -9,7 +9,7 @@ mount -t sysfs sysfs /sys
 mount -t tmpfs tmpfs /run
 mount -t debugfs debugfs /sys/kernel/debug
 
-echo 'rabbit r1 mainline bring-up; hardware support is experimental'
+echo 'haretic for rabbit r1; hardware support is experimental'
 uname -a
 echo 'Run r1-report for diagnostics. The expdb profile enables storage logging.'
 (r1-log-start > /run/expdb-start.log 2>&1) &

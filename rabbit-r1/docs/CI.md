@@ -1,6 +1,6 @@
 # GitHub Actions
 
-The [Rabbit r1 workflow](../../.github/workflows/rabbit-r1.yml) runs on pushes to
+The [haretic workflow](../../.github/workflows/rabbit-r1.yml) runs on pushes to
 `rabbit-r1/**` and `mt6765-devel`, on pull requests, and on manual dispatch.
 It builds the exact event commit, including GitHub's test merge commit for a PR.
 An active run finishes when the branch is updated. GitHub retains the newest
@@ -161,7 +161,7 @@ Build outputs are not cached. The cache and artifact actions are pinned to full
 commit IDs. The workflow uses a read-only repository token and no stored secrets;
 the public source checkout itself needs no credentials.
 
-[mtklkzap's relock workflow](https://github.com/haretic/mtklkzap/actions/workflows/relock.yml)
+[mtklkzap's relock workflow](https://github.com/itskenny0/mtklkzap/actions/workflows/relock.yml)
 also tests the pinned tool independently. It checks the official stock LK,
 executes its Fastboot registration and refusal path, tests command-line write
 protection, and confirms relock refusal survives the warning patches. These
@@ -169,10 +169,10 @@ checks run here as part of `test-lk.py` as well.
 
 ## Artifacts
 
-Successful runs upload `rabbit-r1-mainline-<commit>` with the kernel, DTB,
+Successful runs upload `haretic-r1-mainline-<commit>` with the kernel, DTB,
 modules, configuration, symbols, build record, initramfs, patched LK, logo,
 splash preview, mtkclient ZIP and
-checksums. `rabbit-r1-logs-<commit>` is uploaded even when a later step fails.
+checksums. `haretic-r1-logs-<commit>` is uploaded even when a later step fails.
 Both artifacts are retained for 14 days. Download them from the run's Actions
 page and follow [FLASHING.md](FLASHING.md) before using a boot image.
 
