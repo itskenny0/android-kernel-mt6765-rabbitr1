@@ -116,3 +116,7 @@ native fault addresses without treating status/reserved bits as address extensio
 The stock mapping/IRQ instructions and actual ARM v7s software page-table
 operations are checked; physical DMA and IRQ ownership remain unverified.
 See `docs/DISPLAY.md`.
+
+Patch 0046 fixes GCE controller flush power references, cancellation ordering,
+failed-stop ownership and timeout units. The CRTC and mailbox queue still need
+a complete ownership and shutdown contract; see `docs/DISPLAY.md`.

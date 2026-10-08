@@ -354,6 +354,45 @@ current mailbox flush can return an error while a task remains active, and its
 error paths need auditing before packet reuse or display power removal is safe.
 Full hardware synchronization and firmware handoff remain release gates.
 
+### GCE flush ownership
+
+The controller's flush path now balances its runtime-PM reference on every
+return, including a failed resume and a running-thread timeout. A failed
+suspend clears the suspend request and returns an error with all tasks still
+owned by the controller. Cancelling a thread waiting for an event requires a
+successful reset and disable before any cancellation callback. A reset failure
+returns an error without releasing the tasks or their buffers. The existing
+disable-register write still runs on reset failure; it is not treated as proof
+that DMA has stopped. Clients must retain ownership until completion or a
+successful cancellation. Running-thread polling uses the mailbox API's
+millisecond timeout and preserves `-ETIMEDOUT`.
+
+`test-cmdq-flush.py` executes the production flush, submission, task and IRQ
+helpers together with the actual mailbox ring, submit, ACK and flush functions.
+It also uses the kernel's atomic polling macro. MMIO/reset behavior, runtime PM,
+locks, allocation and interrupt scheduling are models. Seventy-nine scenarios
+cover one to three packets, native unshifted addresses, shifted addresses and
+an address offset, callback-time buffer frees, failed stops and retries, PM
+failures, completion during polling and timeout units. ASan/UBSan check memory
+accesses. Thirteen faulty compiled variants and the previous production flush
+fail these checks. The controller also compiles for AArch64.
+
+The core probe demonstrates two remaining ownership hazards with the real
+queue implementation. An allocation failure in `send_data` leaves the request
+in the core ring even though `mbox_send_message` returns a nonnegative token.
+With an empty controller task list, its flush can then report success while
+that request remains queued. Conversely, the core calls `tx_tick` on a flush
+error, and that call can submit the queued request. Neither a send token nor a
+failed flush is a safe buffer-reuse boundary.
+
+These changes cover controller flush only. The CRTC still ignores flush errors,
+can reuse its packet without accounting for the core ring, and can remove
+display power after an uncompleted task. Its error callback, normal IRQ task
+retirement, channel shutdown and packet destruction ordering still need a
+coherent ownership/recovery contract. The existing CRTC event tests model their
+transport separately; they do not establish that contract. Display remains
+disabled, and no physical DMA quiescence or frame presentation is claimed.
+
 ## Native host power sequencing
 
 MT6765 does not use `CON_CTRL` bit 1 as a DSI-enable control. The published

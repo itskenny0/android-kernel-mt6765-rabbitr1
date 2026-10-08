@@ -1,0 +1,104 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix GCE flush lifetime
+
+Balance flush power references, retain tasks on failed stops and cancel
+waiting tasks only after a completed reset. Honor millisecond timeouts.
+
+diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+index 362b7e3810..e622a08a8c 100644
+--- a/drivers/mailbox/mtk-cmdq-mailbox.c
++++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+@@ -239,10 +239,13 @@ static int cmdq_thread_reset(struct cmdq *cmdq, struct cmdq_thread *thread)
+ 	return 0;
+ }
+ 
+-static void cmdq_thread_disable(struct cmdq *cmdq, struct cmdq_thread *thread)
++static int cmdq_thread_disable(struct cmdq *cmdq, struct cmdq_thread *thread)
+ {
+-	cmdq_thread_reset(cmdq, thread);
++	int ret;
++
++	ret = cmdq_thread_reset(cmdq, thread);
+ 	writel(CMDQ_THR_DISABLED, thread->base + CMDQ_THR_ENABLE_TASK);
++	return ret;
+ }
+ 
+ /* notify GCE to re-fetch commands by setting GCE thread PC */
+@@ -557,57 +560,58 @@ static void cmdq_mbox_shutdown(struct mbox_chan *chan)
+ static int cmdq_mbox_flush(struct mbox_chan *chan, unsigned long timeout)
+ {
+ 	struct cmdq_thread *thread = (struct cmdq_thread *)chan->con_priv;
+-	struct cmdq_cb_data data;
+ 	struct cmdq *cmdq = dev_get_drvdata(chan->mbox->dev);
+ 	struct cmdq_task *task, *tmp;
+ 	unsigned long flags;
+ 	u32 enable;
+ 	int ret;
+ 
+-	ret = pm_runtime_get_sync(cmdq->mbox.dev);
++	ret = pm_runtime_resume_and_get(cmdq->mbox.dev);
+ 	if (ret < 0)
+ 		return ret;
++	ret = 0;
+ 
+ 	spin_lock_irqsave(&thread->chan->lock, flags);
+ 	if (list_empty(&thread->task_busy_list))
+ 		goto out;
+ 
+-	WARN_ON(cmdq_thread_suspend(cmdq, thread) < 0);
++	ret = cmdq_thread_suspend(cmdq, thread);
++	if (ret) {
++		cmdq_thread_resume(thread);
++		goto out;
++	}
+ 	if (!cmdq_thread_is_in_wfe(thread))
+ 		goto wait;
+ 
++	/* Callbacks may immediately unmap or reuse their command buffers. */
++	ret = cmdq_thread_disable(cmdq, thread);
++	if (ret)
++		goto out;
++
+ 	list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
+ 				 list_entry) {
+-		data.sta = -ECONNABORTED;
+-		data.pkt = task->pkt;
+-		mbox_chan_received_data(task->thread->chan, &data);
+-		list_del(&task->list_entry);
++		cmdq_task_exec_done(task, -ECONNABORTED);
+ 		kfree(task);
+ 	}
+ 
+-	cmdq_thread_resume(thread);
+-	cmdq_thread_disable(cmdq, thread);
+-
+ out:
+ 	spin_unlock_irqrestore(&thread->chan->lock, flags);
++out_pm:
+ 	pm_runtime_mark_last_busy(cmdq->mbox.dev);
+ 	pm_runtime_put_autosuspend(cmdq->mbox.dev);
+ 
+-	return 0;
++	return ret;
+ 
+ wait:
+ 	cmdq_thread_resume(thread);
+ 	spin_unlock_irqrestore(&thread->chan->lock, flags);
+-	if (readl_poll_timeout_atomic(thread->base + CMDQ_THR_ENABLE_TASK,
+-				      enable, enable == 0, 1, timeout)) {
++	ret = readl_poll_timeout_atomic(thread->base + CMDQ_THR_ENABLE_TASK,
++					enable, enable == 0, 1,
++					(u64)timeout * USEC_PER_MSEC);
++	if (ret)
+ 		dev_err(cmdq->mbox.dev, "Fail to wait GCE thread 0x%x done\n",
+ 			(u32)(thread->base - cmdq->base));
+-
+-		return -EFAULT;
+-	}
+-	pm_runtime_mark_last_busy(cmdq->mbox.dev);
+-	pm_runtime_put_autosuspend(cmdq->mbox.dev);
+-	return 0;
++	goto out_pm;
+ }
+ 
+ static const struct mbox_chan_ops cmdq_mbox_chan_ops = {
