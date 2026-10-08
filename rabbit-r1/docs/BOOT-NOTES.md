@@ -52,3 +52,15 @@ our diagnostic initramfs.
 
 These sources improve the boot investigation; they do not provide mainline
 charger, GPU, wireless or other missing peripheral drivers.
+
+## Panel power readings
+
+The same [UART capture](https://github.com/DavidBuchanan314/rabbit_r1_boot_notes/blob/b1b35b1ea9023d7b38df407afb5911fd54287c2f/uart_boot_logs_with_patch.txt#L801-L812)
+records MT6370 display-bias reads `B0=00`, `B1=32` and `B3=5e`, followed by a
+DSI `0x0a` response of `0x9c`. Both software bias-enable bits in `B1` and the
+external-control bit in `B0` are clear at the recorded read. Those observations
+do not identify the panel supplies or establish v0.8.293 hardware state.
+The [panel power audit](DISPLAY.md#power-inherited-from-firmware) independently
+executes v0.8.293's matching read-only LK callback and the shipped kernel's
+no-op bias helpers. Generic MT6370 DSV nodes are therefore insufficient evidence
+for assigning panel supplies.

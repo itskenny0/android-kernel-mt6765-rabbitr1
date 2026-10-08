@@ -90,8 +90,9 @@ Thumb callbacks:
 The init callback calls `lcm_mt6370_i2c_read_byte` at `0x29094`. It requests a
 one-byte register-address write followed by a one-byte read, with no register
 value write. `b0`, `b1` and `b3` are the MT6370 display-bias control 1,
-control 2 and positive-voltage selector registers. Their observed read values
-are unknown: the test supplies synthetic values, not a hardware dump.
+control 2 and positive-voltage selector registers. Their read values on
+v0.8.293 hardware are unknown: the test supplies synthetic values, not a
+hardware dump.
 All seven failed reads are logged and ignored; the callback still returns.
 No reset operation occurs in init-power itself.
 
@@ -111,6 +112,15 @@ and `display_bias_disable` at `0x6eecbc`. The test executes each helper and
 confirms a zero return with only the modeled ftrace call and stack writes.
 Consequently, neither these calls nor the generic DSV nodes in the stock DT
 justify adding 5.4 V panel supplies. Cold power-on remains an open board task.
+
+An [older r1 UART capture](https://github.com/DavidBuchanan314/rabbit_r1_boot_notes/blob/b1b35b1ea9023d7b38df407afb5911fd54287c2f/uart_boot_logs_with_patch.txt#L801-L812)
+records the same seven reads as `B0=00`, `B1=32`, `B1=32`, then four `B3=5e`
+reads. Using the [MT6370 register masks](../../drivers/regulator/mt6370-regulator.c),
+`B0[0]` (external control), `B1[6]` (positive enable) and `B1[3]` (negative
+enable) are all clear at that point. The later DSI `0x0a` read returns `0x9c`.
+This is evidence from an older firmware capture, not a measurement of this
+build. It supports leaving the generic bias supplies unassigned; it does not
+identify the actual rails, prove their voltage, or exclude later power changes.
 
 ## Timing and host work
 
