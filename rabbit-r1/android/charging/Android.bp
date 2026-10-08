@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+soong_namespace {}
+
+cc_defaults {
+    name: "r1_charging_defaults",
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+    shared_libs: ["libbase", "liblog"],
+    system_ext_specific: true,
+}
+
+cc_binary {
+    name: "r1-charging",
+    defaults: ["r1_charging_defaults"],
+    srcs: ["native/service.cpp"],
+    init_rc: ["r1-charging.rc"],
+}
+
+cc_library_shared {
+    name: "libr1_charging_jni",
+    defaults: ["r1_charging_defaults"],
+    srcs: ["native/jni.cpp"],
+    header_libs: ["jni_headers"],
+}
+
+android_app {
+    name: "R1ChargingSettings",
+    system_ext_specific: true,
+    certificate: "platform",
+    privileged: true,
+    sdk_version: "current",
+    min_sdk_version: "35",
+    srcs: ["app/src/**/*.java"],
+    resource_dirs: ["app/res"],
+    manifest: "app/AndroidManifest.xml",
+    jni_libs: ["libr1_charging_jni"],
+    jni_uses_platform_apis: true,
+    use_embedded_native_libs: true,
+    optimize: { enabled: false },
+}

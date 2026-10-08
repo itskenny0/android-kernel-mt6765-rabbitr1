@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/power/supply/rabbit,r1-charging-policy.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Rabbit r1 charging policy
+
+maintainers:
+  - itskenny0 <0@kenny.cat>
+
+description: |
+  Board policy for the MT6357 gauge and MT6370 charger. Combines a user cap,
+  battery measurements, charger protection and USB budgets. The charger must
+  enable richtek,managed-charging. The optional Type-C supply must report
+  sink ONLINE, USB_TYPE, CURRENT_MAX and VOLTAGE_NOW. The gadget supply is a
+  constraint for SDP enumeration and suspend, not evidence of cable attachment.
+
+properties:
+  compatible:
+    const: rabbit,r1-charging-policy
+
+  charger-supply:
+    description: MT6370 charger with managed charging enabled.
+
+  battery-supply:
+    description: Gauge providing presence, current, voltage and temperature.
+
+  usb-gadget-supply:
+    description: MediaTek USB gadget current-budget supply.
+
+  typec-supply:
+    description: Optional TCPM sink power-budget supply.
+
+required:
+  - compatible
+  - charger-supply
+  - battery-supply
+  - usb-gadget-supply
+
+additionalProperties: false

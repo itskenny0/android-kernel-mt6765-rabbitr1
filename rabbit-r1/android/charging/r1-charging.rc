@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+service r1-charging /system_ext/bin/r1-charging
+    class late_start
+    user root
+    group root
+    disabled
+
+# Restore the saved choice only after persistent properties have been loaded.
+on property:ro.persistent_properties.ready=true
+    start r1-charging

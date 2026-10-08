@@ -123,10 +123,16 @@ for index, channel in enumerate([0, 2, 3, 5, 6, 8]):
 assert nodes['/power-monitor']['compatible'] == b'iio-hwmon\0'
 
 # Explicit disabled children prevent the MFD core from creating live devices.
-for child in ['charger', 'backlight', 'tcpc', 'indicator', 'flashlight']:
+for child in ['backlight', 'tcpc', 'indicator', 'flashlight']:
     assert nodes[pmic_path+'/'+child]['status'] == b'disabled\0', child
 assert nodes[pmic_path+'/regulators'] == {}, 'Unexpected rail constraints during power bring-up'
 charger = nodes[pmic_path+'/charger']
+assert charger['status'] == b'okay\0'
+assert 'richtek,managed-charging' in charger
+policy = nodes['/charging-policy']
+assert policy['charger-supply'] == charger['phandle']
+assert policy['usb-gadget-supply'] == nodes['/soc/usb@11200000']['phandle']
+assert policy['battery-supply'] == nodes['/soc/pwrap@1000d000/pmic/gauge']['phandle']
 assert charger['io-channels'] == adc['phandle'] + struct.pack('>I', 5)
 assert cells(charger['interrupts']) == (68, 48, 6)
 assert charger['interrupt-names'].split(b'\0')[:-1] == [b'uvp_d_evt', b'attach_i', b'mivr']

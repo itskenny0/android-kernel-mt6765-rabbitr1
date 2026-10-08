@@ -727,6 +727,15 @@ config CHARGER_MT6360
 	  Average Input Current Regulation, Battery Temperature Sensing,
 	  Over-Temperature Protection, DPDM Detection for BC1.2.
 
+config CHARGER_RABBIT_R1
+	tristate "Rabbit r1 charging policy"
+	depends on OF && CHARGER_MT6370 && BATTERY_MT6357
+	help
+	  Combine battery measurements, USB budgets and a userspace current cap
+	  for the rabbit r1. Requires the MT6370 managed-charging safety lease.
+	  Invalid measurements, faults and stale policy isolate the charger input.
+	  The cap is exposed through sysfs for the Android charging-speed control.
+
 config CHARGER_MT6370
 	tristate "MediaTek MT6370 Charger Driver"
 	depends on MFD_MT6370

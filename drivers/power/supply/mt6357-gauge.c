@@ -219,6 +219,23 @@ static int mt6357_gauge_read_temperature(struct mt6357_gauge *gauge, int *temper
 	return mt6357_gauge_temperature(gauge, voltage_mv, reference_mv, current_ua, temperature);
 }
 
+static int mt6357_gauge_read_present(struct mt6357_gauge *gauge, int *present)
+{
+	unsigned int value;
+	int ret;
+
+	guard(mutex)(&gauge->lock);
+
+	ret = regmap_read(gauge->regmap, MT6357_BATON_ANA_CON0, &value);
+	if (ret)
+		return ret;
+	/* Stock initializes BATON_EN. A disabled detector is not evidence. */
+	if (!(value & BIT(0)))
+		return -EAGAIN;
+	*present = !(value & BIT(1));
+	return 0;
+}
+
 static int mt6357_gauge_get_property(struct power_supply *psy,
 				     enum power_supply_property psp,
 				     union power_supply_propval *val)
@@ -226,6 +243,8 @@ static int mt6357_gauge_get_property(struct power_supply *psy,
 	struct mt6357_gauge *gauge = power_supply_get_drvdata(psy);
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+		return mt6357_gauge_read_present(gauge, &val->intval);
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		return mt6357_gauge_read_current(gauge, &val->intval);
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
@@ -238,6 +257,7 @@ static int mt6357_gauge_get_property(struct power_supply *psy,
 }
 
 static const enum power_supply_property mt6357_gauge_properties[] = {
+	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_TEMP,
@@ -248,7 +268,7 @@ static const struct power_supply_desc mt6357_gauge_desc = {
 	.type = POWER_SUPPLY_TYPE_BATTERY,
 	.properties = mt6357_gauge_properties,
 	/* The ADC properties are added only when all their inputs are supplied. */
-	.num_properties = 1,
+	.num_properties = 2,
 	.get_property = mt6357_gauge_get_property,
 };
 

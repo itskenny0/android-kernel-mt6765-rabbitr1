@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Charging speed</string>
+    <string name="tile_summary">Choose a charging current limit</string>
+    <string name="explanation">A lower limit may reduce heat. Battery temperature, the USB connection and charger protection can reduce charging below your choice.</string>
+    <string name="automatic">Automatic (up to 1,000 mA)</string>
+    <string name="milliamps">%1$d mA</string>
+    <string name="requested">Requested: %1$s</string>
+    <string name="applied">Applied charge limit: %1$d mA</string>
+    <string name="unavailable">Saved choice: %1$s\nCharging control is unavailable. Your choice will be applied when it becomes available.</string>
+    <string name="pending">Saved choice: %1$s\nWaiting for charging control to apply it.</string>
+    <string name="io_error">Charger state could not be confirmed. Charging control is trying to stop charging.</string>
+    <string name="save_failed">Could not save the charging limit</string>
+    <string name="ready">Board charging limit</string>
+    <string name="user_limit">Your chosen limit</string>
+    <string name="thermal_limit">Reduced for battery temperature</string>
+    <string name="usb_budget">Limited by the USB connection</string>
+    <string name="temperature">Paused for battery temperature</string>
+    <string name="voltage">Paused for battery voltage</string>
+    <string name="unplugged">USB power disconnected</string>
+    <string name="no_battery">Battery not detected</string>
+    <string name="sensor_error">Waiting for valid battery readings</string>
+    <string name="charger_fault">Paused by charger protection</string>
+    <string name="safety_timer">Paused by the charging safety timer</string>
+    <string name="stale">Waiting for fresh power readings</string>
+    <string name="stopped">Charging control stopped</string>
+    <string name="waiting">Waiting for charging control</string>
+</resources>

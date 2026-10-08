@@ -31,13 +31,15 @@ echo '=== Regulator consumers and deferred probes ==='
 for file in /sys/kernel/debug/regulator/regulator_summary /sys/kernel/debug/devices_deferred; do
     [ ! -r "$file" ] || cat "$file"
 done
+echo '=== Charging policy (limits are unconfirmed when error is nonzero) ==='
+[ ! -r /sys/devices/platform/charging-policy/status ] || cat /sys/devices/platform/charging-policy/status
 echo '=== Power supplies (current uA, voltage uV, temperature deci-Celsius) ==='
 for supply in /sys/class/power_supply/*; do
     [ -d "$supply" ] || continue
     echo "$supply"
     if ! cat "$supply/uevent"; then
         # A failed property can abort the complete uevent. Keep other readings.
-        for name in type current_now voltage_now temp; do
+        for name in type present health current_now voltage_now temp; do
             [ -r "$supply/$name" ] || continue
             printf '%s: ' "$name"
             cat "$supply/$name" || echo 'unavailable'

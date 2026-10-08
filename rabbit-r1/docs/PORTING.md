@@ -1,5 +1,10 @@
 # Mainline and LineageOS 24 porting status
 
+Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
+policy are now enabled experimentally; earlier driver-only stages below record
+their previous disabled state. Android control sources, persistence and build
+hooks are implemented, but no full Android image or physical charging test exists.
+
 As of the inspected sources on 2026-10-07, the mainline fork reports Linux 7.1.0.
 This is a development fork with downstream MT6765 changes, not an upstream Linux
 release that already supports the rabbit r1. The board has no hardware test in

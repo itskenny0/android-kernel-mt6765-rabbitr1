@@ -21,6 +21,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
 #include <linux/units.h>
@@ -40,6 +41,11 @@
 #define MT6370_REG_CHG_CTRL8		0x118
 #define MT6370_REG_CHG_CTRL9		0x119
 #define MT6370_REG_CHG_CTRL10		0x11A
+#define MT6370_REG_CHG_CTRL12		0x11c
+#define MT6370_REG_CHG_CTRL13		0x11d
+#define MT6370_REG_CHG_STAT2		0x1d1
+#define MT6370_REG_CHG_STAT4		0x1d3
+#define MT6370_POLICY_LEASE		(10 * HZ)
 #define MT6370_REG_DEVICE_TYPE		0x122
 #define MT6370_REG_USB_STATUS1		0x127
 #define MT6370_REG_CHG_HIDDEN_CTRL7	0x136
@@ -124,6 +130,9 @@ struct mt6370_priv {
 	bool input_suspended;
 	bool mivr_irq_paused;
 	unsigned int mivr_request;
+	bool managed_charging;
+	unsigned long policy_deadline;
+	struct delayed_work policy_watchdog;
 };
 
 enum mt6370_usb_status {
@@ -873,11 +882,71 @@ static int mt6370_chg_set_online(struct mt6370_priv *priv,
 	}
 
 	priv->attach = pwr_rdy;
+	priv->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 	mutex_unlock(&priv->attach_lock);
 
 	if (!queue_work(priv->wq, &priv->bc12_work))
 		dev_err(priv->dev, "bc12 work has already queued\n");
 
+	return 0;
+}
+
+static int mt6370_chg_get_health(struct mt6370_priv *priv, int *health)
+{
+	unsigned int state, flags;
+	int ret;
+
+	if (priv->managed_charging) {
+		ret = regmap_read(priv->regmap, MT6370_REG_CHG_CTRL12, &flags);
+		if (ret)
+			return ret;
+		if ((flags & (GENMASK(7, 5) | BIT(1))) != ((4 << 5) | BIT(1))) {
+			*health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			return 0;
+		}
+	}
+	/* Live status registers, not read-to-clear interrupt latches. */
+	ret = regmap_read(priv->regmap, MT6370_REG_CHG_STAT4, &flags);
+	if (ret)
+		return ret;
+	if (flags & BIT(3)) {
+		*health = POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE;
+		return 0;
+	}
+	ret = regmap_read(priv->regmap, MT6370_REG_CHG_STAT2, &flags);
+	if (ret)
+		return ret;
+	if (flags & BIT(7)) {
+		*health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+		return 0;
+	}
+	ret = regmap_read(priv->regmap, MT6370_REG_CHG_STAT1, &flags);
+	if (ret)
+		return ret;
+	if (flags & BIT(4)) {
+		*health = POWER_SUPPLY_HEALTH_OVERHEAT;
+		return 0;
+	}
+	ret = mt6370_chg_field_get(priv, F_CHG_STAT, &state);
+	if (ret)
+		return ret;
+	*health = state == MT6370_CHG_STAT_FAULT ? POWER_SUPPLY_HEALTH_UNSPEC_FAILURE :
+						POWER_SUPPLY_HEALTH_GOOD;
+	return 0;
+}
+
+static int mt6370_chg_get_present(struct mt6370_priv *priv, int *present)
+{
+	unsigned int boost, absent;
+	int ret;
+
+	ret = mt6370_chg_field_get(priv, F_BOOST_STAT, &boost);
+	if (ret)
+		return ret;
+	ret = mt6370_chg_field_get(priv, F_UVP_D_STAT, &absent);
+	if (ret)
+		return ret;
+	*present = !boost && !absent;
 	return 0;
 }
 
@@ -895,6 +964,10 @@ static int mt6370_chg_get_property(struct power_supply *psy,
 		return -ESHUTDOWN;
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_HEALTH:
+		return mt6370_chg_get_health(priv, &val->intval);
+	case POWER_SUPPLY_PROP_PRESENT:
+		return mt6370_chg_get_present(priv, &val->intval);
 	case POWER_SUPPLY_PROP_ONLINE:
 		return mt6370_chg_get_online(priv, val);
 	case POWER_SUPPLY_PROP_STATUS:
@@ -950,6 +1023,34 @@ static int mt6370_chg_get_property(struct power_supply *psy,
 	return ret;
 }
 
+/* Only a successful policy enable renews this software lease. Telemetry does not. */
+static void mt6370_chg_policy_watchdog(struct work_struct *work)
+{
+	struct mt6370_priv *priv = container_of(to_delayed_work(work),
+					      struct mt6370_priv, policy_watchdog);
+	struct power_supply *psy;
+	unsigned long now;
+	int ret;
+
+	guard(mutex)(&priv->psy_lock);
+	if (priv->stopping)
+		return;
+	now = jiffies;
+	if (time_before(now, priv->policy_deadline)) {
+		mod_delayed_work(system_highpri_wq, &priv->policy_watchdog,
+				 priv->policy_deadline - now);
+		return;
+	}
+	ret = mt6370_chg_suspend_input(priv);
+	if (ret) {
+		dev_err_ratelimited(priv->dev, "Policy timeout isolation failed: %d\n", ret);
+		mod_delayed_work(system_highpri_wq, &priv->policy_watchdog, HZ);
+	}
+	psy = READ_ONCE(priv->psy);
+	if (psy)
+		power_supply_changed(psy);
+}
+
 static int mt6370_chg_set_property(struct power_supply *psy,
 				   enum power_supply_property psp,
 				   const union power_supply_propval *val)
@@ -970,6 +1071,12 @@ static int mt6370_chg_set_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
 		ret = mt6370_chg_set_behaviour(priv, val->intval);
+		if (!ret && priv->managed_charging &&
+		    val->intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) {
+			priv->policy_deadline = jiffies + MT6370_POLICY_LEASE;
+			mod_delayed_work(system_highpri_wq, &priv->policy_watchdog,
+					 MT6370_POLICY_LEASE);
+		}
 		if (priv->ichg_workaround &&
 		    (val->intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO ||
 		     val->intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE))
@@ -1053,6 +1160,8 @@ static int mt6370_chg_property_is_writeable(struct power_supply *psy,
 }
 
 static enum power_supply_property mt6370_chg_properties[] = {
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_CHARGE_TYPE,
@@ -1363,6 +1472,8 @@ static void mt6370_chg_quiesce(void *data)
 	for (i = 0; i < priv->num_irqs; i++)
 		disable_irq(priv->irq_nums[i]);
 	mt6370_chg_cancel_work(priv);
+	if (priv->managed_charging)
+		cancel_delayed_work_sync(&priv->policy_watchdog);
 	if (priv->ichg_workaround)
 		mt6370_chg_inhibit(priv);
 }
@@ -1370,6 +1481,31 @@ static void mt6370_chg_quiesce(void *data)
 static void mt6370_chg_shutdown(struct platform_device *pdev)
 {
 	mt6370_chg_quiesce(platform_get_drvdata(pdev));
+}
+
+static int mt6370_chg_init_policy_guard(struct mt6370_priv *priv)
+{
+	int ret;
+
+	guard(mutex)(&priv->psy_lock);
+
+	priv->managed_charging = device_property_read_bool(priv->dev,
+							 "richtek,managed-charging");
+	if (!priv->managed_charging)
+		return 0;
+	if (!priv->ichg_workaround)
+		return -ENODEV;
+	/* Isolate input until a policy supplies validated limits. */
+	ret = mt6370_chg_suspend_input(priv);
+	if (ret)
+		return ret;
+	/* Stock fast-charge safety timer: 12 hours, enable bit 1. */
+	ret = regmap_update_bits(priv->regmap, MT6370_REG_CHG_CTRL12,
+				 GENMASK(7, 5) | BIT(1), (4 << 5) | BIT(1));
+	if (ret)
+		return ret;
+	/* Stock disables this watchdog; arbitrary I2C traffic feeds it. */
+	return regmap_update_bits(priv->regmap, MT6370_REG_CHG_CTRL13, BIT(7), 0);
 }
 
 static int mt6370_chg_probe(struct platform_device *pdev)
@@ -1423,6 +1559,7 @@ static int mt6370_chg_probe(struct platform_device *pdev)
 	if (!priv->wq)
 		return -ENOMEM;
 
+	INIT_DELAYED_WORK(&priv->policy_watchdog, mt6370_chg_policy_watchdog);
 	INIT_WORK(&priv->bc12_work, mt6370_chg_bc12_work_func);
 	INIT_DELAYED_WORK(&priv->mivr_dwork, mt6370_chg_mivr_dwork_func);
 
@@ -1436,6 +1573,10 @@ static int mt6370_chg_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 	}
+
+	ret = mt6370_chg_init_policy_guard(priv);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to establish charging guards\n");
 
 	ret = mt6370_chg_init_otg_regulator(priv);
 	if (ret)

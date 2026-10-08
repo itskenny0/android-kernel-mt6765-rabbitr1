@@ -73,6 +73,7 @@ static int regmap_update_bits(struct regmap *map, unsigned int reg, unsigned int
 static bool queue_work(struct workqueue_struct *q, struct work_struct *w)
 { queues++; return true; }
 union power_supply_propval { int intval; };
+enum { POWER_SUPPLY_USB_TYPE_UNKNOWN };
 enum power_supply_property {
     POWER_SUPPLY_PROP_ONLINE, POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
     POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
@@ -93,7 +94,13 @@ for name in ('linear_range_get_max_value', 'linear_range_get_value',
     body += function(name, linear)
 body += s[s.index('#define MT6370_REG_'):s.index('struct mt6370_priv {')]
 body += r'''
+struct delayed_work { int unused; };
+#define HZ 100
+static unsigned long jiffies;
+static void *system_highpri_wq;
+static bool mod_delayed_work(void *q, struct delayed_work *w, unsigned long d) { assert(false); return false; }
 struct mt6370_priv {
+    bool managed_charging; unsigned long policy_deadline; struct delayed_work policy_watchdog;
     struct regmap_field *rmap_fields[F_MAX];
     struct mutex attach_lock;
     struct mutex ichg_lock;
@@ -103,7 +110,7 @@ struct mt6370_priv {
     bool ichg_workaround;
     unsigned int ichg_min, ichg_request;
     bool ichg_valid, input_suspended;
-    int attach;
+    int attach, psy_usb_type;
     struct workqueue_struct *wq;
     struct work_struct bc12_work;
 };

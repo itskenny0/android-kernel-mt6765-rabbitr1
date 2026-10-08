@@ -134,6 +134,56 @@
       "sha256": "9a0a18613be721cfb16f2a0a2e0d9159e1939a1fc96fbd0624736f9b4ec228f3",
       "bytes": 107954,
       "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mtk_battery_table.h"
+    },
+    "downloads/android-public.jar.base64": {
+      "url": "https://android.googlesource.com/platform/prebuilts/sdk/+/refs/tags/android-17.0.0_r1/current/public/android.jar?format=TEXT",
+      "bytes": 57277744,
+      "sha256": "7e6bff23dfe7651647d4f17cebad9b0a2a7496422d8264eda95f0093b74f2c5b"
+    },
+    "downloads/aapt2.base64": {
+      "url": "https://android.googlesource.com/platform/prebuilts/sdk/+/refs/tags/android-17.0.0_r1/tools/linux/bin/aapt2?format=TEXT",
+      "bytes": 8288568,
+      "sha256": "5a6430702d50908444d373878b9529d939a12f03bd87ea0950b88fa609489e4f"
+    },
+    "downloads/android-base-properties.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/properties.h?format=TEXT",
+      "bytes": 9260,
+      "sha256": "0fbcdbd835e2852f2947f33eba31cefa4931266e74cd5118c72aba398e9785a8"
+    },
+    "downloads/android-base-file.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/file.h?format=TEXT",
+      "bytes": 5380,
+      "sha256": "3179ba520e89c5aeb962c786f389508d5ae470fab42c6e93b6072a95bf025d94"
+    },
+    "downloads/android-base-logging.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/logging.h?format=TEXT",
+      "bytes": 28728,
+      "sha256": "6d0411c3bb0589c7121683614681987e65a71a5fad1e060cf54500a1edc8f243"
+    },
+    "downloads/android-base-macros.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/macros.h?format=TEXT",
+      "bytes": 7260,
+      "sha256": "b9e09aa6d3106f0a260542774c0de09dcbb126100b4cd95eef5d851cc3bce332"
+    },
+    "downloads/android-base-unique_fd.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/unique_fd.h?format=TEXT",
+      "bytes": 14216,
+      "sha256": "f4898f688fc3fec81d7c96fe2b9105d57a3ee3f85be3673fed20192b9a70dfbd"
+    },
+    "downloads/android-base-off64_t.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/off64_t.h?format=TEXT",
+      "bytes": 1016,
+      "sha256": "c51faca6ae2f5590de315ec485159b215f1ebba072d76b1a09ba96e99f5186b3"
+    },
+    "downloads/android-jni.h.base64": {
+      "url": "https://android.googlesource.com/platform/libnativehelper/+/refs/tags/android-17.0.0_r1/include_jni/jni.h?format=TEXT",
+      "bytes": 69848,
+      "sha256": "476dd9a9f8f47f1ac7273a786b919001ec50179dca37445bc685d7244a9a4639"
+    },
+    "downloads/android-base-errno_restorer.h.base64": {
+      "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/errno_restorer.h?format=TEXT",
+      "bytes": 1452,
+      "sha256": "5909ddecf2342f11cb6dde67fb6dc64e57c2dfeb1193d34e99d9582d8288b0c6"
     }
   }
 }

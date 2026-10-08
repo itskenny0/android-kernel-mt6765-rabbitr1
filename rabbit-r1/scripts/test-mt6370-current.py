@@ -125,10 +125,20 @@ struct iio_channel { int unused; };
 struct work_struct { bool initialized, pending; };
 struct delayed_work { struct work_struct work; };
 struct workqueue_struct { bool active; };
+#define dev_err_ratelimited(...) ((void)0)
+#define time_before(a,b) ((long)((a)-(b)) < 0)
+#define to_delayed_work(p) container_of(p,struct delayed_work,work)
+#define HZ 100
+static unsigned long jiffies, watchdog_delay;
+static bool managed_property;
+static void *system_highpri_wq;
+static bool device_property_read_bool(struct device *d, const char *name) { return managed_property; }
+static bool mod_delayed_work(void *q, struct delayed_work *w, unsigned long delay)
+{ assert(w->work.initialized); w->work.pending=true; watchdog_delay=delay; return false; }
 #define INIT_WORK(w,f) ((w)->initialized=true)
 #define INIT_DELAYED_WORK(w,f) INIT_WORK(&(w)->work,f)
 union power_supply_propval { int intval; };
-enum power_supply_property {
+enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_HEALTH,
     POWER_SUPPLY_PROP_ONLINE, POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
     POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
     POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT, POWER_SUPPLY_PROP_PRECHARGE_CURRENT,
@@ -138,6 +148,7 @@ enum power_supply_property {
 };
 enum { POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE,
     POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE_AWAKE, POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE };
+enum { POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE, POWER_SUPPLY_HEALTH_OVERVOLTAGE, POWER_SUPPLY_HEALTH_OVERHEAT, POWER_SUPPLY_HEALTH_UNSPEC_FAILURE, POWER_SUPPLY_HEALTH_GOOD };
 enum { POWER_SUPPLY_TYPE_USB, POWER_SUPPLY_USB_TYPE_SDP, POWER_SUPPLY_USB_TYPE_CDP,
     POWER_SUPPLY_USB_TYPE_DCP, POWER_SUPPLY_USB_TYPE_UNKNOWN };
 enum { POWER_SUPPLY_STATUS_DISCHARGING, POWER_SUPPLY_STATUS_NOT_CHARGING,
@@ -295,7 +306,7 @@ for name in ('mt6370_chg_field_get', 'mt6370_chg_field_set', 'mt6370_chg_init_ic
              'mt6370_chg_set_behaviour', 'mt6370_chg_get_behaviour',
              'mt6370_chg_cancel_mivr', 'mt6370_chg_pause_mivr', 'mt6370_chg_suspend_input',
              'mt6370_chg_set_input', 'mt6370_chg_get_input', 'mt6370_chg_set_mivr',
-             'mt6370_chg_set_online', 'mt6370_chg_set_property', 'mt6370_chg_init_setting',
+             'mt6370_chg_set_online', 'mt6370_chg_policy_watchdog', 'mt6370_chg_set_property', 'mt6370_chg_init_setting',
              'mt6370_chg_bc12_work_func'):
     body += function(name)
 body += r'''
@@ -354,7 +365,7 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
     struct mt6370_priv *p=cfg->drv_data;
     assert(p == &priv && cfg->fwnode == dev && desc == &p->psy_desc);
     assert(!strcmp(desc->name,"mt6370-charger") && desc->type == POWER_SUPPLY_TYPE_USB);
-    assert(desc->num_properties == (p->ichg_workaround ? 13U : 12U));
+    assert(desc->num_properties == (p->ichg_workaround ? 15U : 14U));
     assert(desc->charge_behaviours == (p->ichg_workaround ? 3U : 0U));
     bool found=false;
     for (unsigned int i=0; i<desc->num_properties; i++) found |= desc->properties[i] == POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR;
@@ -400,6 +411,7 @@ static void pm_relax(struct device *dev) { assert(wake_refs); wake_refs--; }
 static bool cancel_delayed_work_sync(struct delayed_work *w)
 {
     assert(published && wq.active && w->work.initialized);
+    if (w == &priv.policy_watchdog) { assert(priv.stopping); bool pending=w->work.pending; w->work.pending=false; return pending; }
     if (priv.stopping) {
         assert(!priv.psy_lock.owner);
         for (unsigned int i=0; i<irq_live; i++) assert(irq_depth[i]);
@@ -470,6 +482,8 @@ status_start = s.index('enum {\n\tMT6370_CHG_STAT_READY')
 body += s[status_start:s.index('};', status_start)+2]+'\n'
 for name in ('mt6370_chg_get_online', 'mt6370_chg_get_status', 'mt6370_chg_get_charge_type'):
     body += function(name)
+body += function('mt6370_chg_get_health')
+body += function('mt6370_chg_get_present')
 body += function('mt6370_chg_get_property')
 body += function('mt6370_chg_property_is_writeable')
 body += s[s.index('static enum power_supply_property mt6370_chg_properties'):s.index('static const struct regulator_ops')]
@@ -478,6 +492,7 @@ body += function('mt6370_chg_cancel_work')
 body += function('mt6370_chg_inhibit')
 body += function('mt6370_chg_quiesce')
 body += function('mt6370_chg_shutdown')
+body += function('mt6370_chg_init_policy_guard')
 body += function('mt6370_chg_probe')
 body += s[s.index('static const struct of_device_id mt6370_chg_of_match'):s.index('module_platform_driver(mt6370_chg_driver)')]
 # Compile the stock stop routine as an independent write/delay oracle. Its
@@ -524,6 +539,7 @@ static void reset_bus(unsigned int vendor, bool open, unsigned int current, unsi
 {
     nops=unlocks=closes=stops=slept_us=0; notifications=0; memset(errors,0,sizeof(errors));
     apply_failed_write=false; partial_key=0;
+    priv.managed_charging=false; managed_property=false;
     priv.stopping=false; priv.input_suspended=false; priv.mivr_irq_paused=false;
     priv.mivr_request=4400000; run_mivr_on_cancel=inject_irq_callback=false;
     irq_disables=0;
@@ -1161,6 +1177,65 @@ static void check_shutdown(void)
     printf("PASS: %u shutdown/model/work cases, %u stopped API requests, %u shutdown I/O faults, %u property/shutdown races; actual driver callback and partial IRQ unwind checked\n",stops_checked,rejects,failures,races);
 }
 
+
+static void check_policy_guard(void)
+{
+    struct platform_device pdev={0};
+    shutdown_probe(&pdev,0xe0);
+    managed_property=true;
+    assert(!mt6370_chg_init_policy_guard(&priv));
+    assert(priv.managed_charging && priv.input_suspended && !(regs[0x112]&1));
+    assert((regs[0x11c]&0xe2)==0x82 && !(regs[0x11d]&0x80));
+    regs[0x1d3]=regs[0x1d1]=regs[0x1d0]=regs[0x14a]=0;
+    union power_supply_propval v;
+    assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_HEALTH,&v) && v.intval==POWER_SUPPLY_HEALTH_GOOD);
+    const unsigned int fault_regs[]={0x1d3,0x1d1,0x1d0,0x14a,0x11c};
+    const unsigned int fault_bits[]={8,128,16,192,2};
+    const int healths[]={POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE,POWER_SUPPLY_HEALTH_OVERVOLTAGE,
+        POWER_SUPPLY_HEALTH_OVERHEAT,POWER_SUPPLY_HEALTH_UNSPEC_FAILURE,POWER_SUPPLY_HEALTH_UNSPEC_FAILURE};
+    for (unsigned int i=0;i<5;i++) {
+        regs[fault_regs[i]]^=fault_bits[i];
+        assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_HEALTH,&v) && v.intval==healths[i]);
+        regs[fault_regs[i]]^=fault_bits[i];
+    }
+    nops=0; assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_HEALTH,&v));
+    unsigned int health_ops=nops;
+    for (unsigned int i=0;i<health_ops;i++) {
+        nops=0; errors[i]=EIO; v.intval=123;
+        assert(mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_HEALTH,&v)==-EIO && v.intval==123);
+        errors[i]=0;
+    }
+    regs[0x14a]=regs[0x1d8]=0;
+    assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_PRESENT,&v) && v.intval==1);
+    regs[0x14a]=8; assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_PRESENT,&v) && !v.intval);
+    regs[0x14a]=0; regs[0x1d8]=16;
+    assert(!mt6370_chg_get_property(&psy,POWER_SUPPLY_PROP_PRESENT,&v) && !v.intval);
+    assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+    assert(!set_current(500000)); jiffies=100;
+    assert(!set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO));
+    assert(priv.policy_deadline==100+10*HZ && watchdog_delay==10*HZ);
+    jiffies=priv.policy_deadline-1; unsigned int before=nops;
+    mt6370_chg_policy_watchdog(&priv.policy_watchdog.work);
+    assert(nops==before && watchdog_delay==1);
+    jiffies++; priv.psy=NULL;
+    mt6370_chg_policy_watchdog(&priv.policy_watchdog.work); // Early publication: no handle yet.
+    priv.psy=&psy;
+    assert(priv.input_suspended && (regs[0x111]&8) && !(regs[0x112]&1));
+    /* A failed timeout write still attempts stop and schedules another isolation. */
+    assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+    assert(!set_current(500000)); assert(!set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO));
+    jiffies=priv.policy_deadline; errors[nops]=EIO;
+    mt6370_chg_policy_watchdog(&priv.policy_watchdog.work);
+    assert(watchdog_delay==HZ && !(regs[0x112]&1)); memset(errors,0,sizeof(errors));
+    mt6370_chg_policy_watchdog(&priv.policy_watchdog.work);
+    assert(priv.input_suspended && (regs[0x111]&8));
+    mt6370_chg_shutdown(&pdev); before=nops;
+    mt6370_chg_policy_watchdog(&priv.policy_watchdog.work);
+    assert(nops==before && !priv.policy_watchdog.work.pending);
+    release_probe(); managed_property=false;
+    puts("PASS: managed input isolation, 12-hour timer, live faults/presence, lease renewal/expiry/retry and shutdown");
+}
+
 int main(void)
 {
     unsigned int models=0, valid=0, failures=0, rejects=0, probes=0;
@@ -1308,6 +1383,7 @@ int main(void)
     check_controls();
     check_shutdown();
     check_powerpath();
+    check_policy_guard();
     printf("PASS: %u model cases, %u current transitions, %u rejected requests, %u fault/recovery cases, 400 threaded transitions and %u probe/unwind cases\n",models,valid,rejects,failures,probes);
     return 0;
 }

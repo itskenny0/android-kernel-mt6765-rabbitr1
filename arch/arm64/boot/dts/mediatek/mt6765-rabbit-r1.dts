@@ -30,6 +30,14 @@
 		mmc0 = &mmc0;
 	};
 
+	charging-policy {
+		compatible = "rabbit,r1-charging-policy";
+		charger-supply = <&r1_charger>;
+		battery-supply = <&r1_battery>;
+		usb-gadget-supply = <&usb2>;
+		/* Experimental, source-backed policy; physical charging is untested. */
+	};
+
 	power-monitor {
 		compatible = "iio-hwmon";
 		io-channels = <&r1_mt6370_adc MT6370_CHAN_VBUSDIV5>,
@@ -135,7 +143,7 @@
 	interrupts = <144 IRQ_TYPE_LEVEL_HIGH>;
 	#interrupt-cells = <2>;
 
-	gauge {
+	r1_battery: gauge {
 		compatible = "mediatek,mt6357-gauge";
 		/* Stock R_FG_VALUE=10 mOhm, CAR_TUNE_VALUE=100 percent. */
 		shunt-resistor-micro-ohms = <10000>;
@@ -207,13 +215,13 @@
 		};
 
 		/* MFD creates absent children too: explicitly gate unfinished ones. */
-		charger {
+		r1_charger: charger {
 			compatible = "mediatek,mt6370-charger";
 			interrupts = <68>, <48>, <6>;
 			interrupt-names = "uvp_d_evt", "attach_i", "mivr";
 			io-channels = <&r1_mt6370_adc MT6370_CHAN_IBUS>;
-			/* Needs battery limits, temperature policy and USB detection. */
-			status = "disabled";
+			richtek,managed-charging;
+			status = "okay";
 		};
 
 		r1_backlight: backlight {

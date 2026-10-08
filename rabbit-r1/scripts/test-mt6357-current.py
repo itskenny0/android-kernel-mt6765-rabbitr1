@@ -110,7 +110,7 @@ struct mutex { pthread_mutex_t raw; unsigned int owner; bool initialized; };
 struct regmap { int unused; };
 struct power_supply { void *drvdata; };
 union power_supply_propval { int intval; };
-enum power_supply_property { POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY };
+enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY };
 #define POWER_SUPPLY_TYPE_BATTERY 1
 struct power_supply_desc {
     const char *name; int type;
@@ -167,7 +167,7 @@ static int record(char op, unsigned int reg, unsigned int val)
 static int regmap_read(struct regmap *m, unsigned int reg, unsigned int *val)
 {
     assert(m == &map);
-    assert(reg == STOCK_ON_REG || reg == STOCK_DIG_PD_REG || reg == STOCK_CTRL_REG || reg == STOCK_DATA_REG);
+    assert(reg == MT6357_BATON_ANA_CON0 || reg == STOCK_ON_REG || reg == STOCK_DIG_PD_REG || reg == STOCK_CTRL_REG || reg == STOCK_DATA_REG);
     int ret=record('r',reg,0);
     if (reg == STOCK_CTRL_REG) {
         if (start_pending && !stall_start && now>=latch_at) {
@@ -298,9 +298,9 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
     assert(config->drv_data == &gauge && config->fwnode == dev);
     assert(!strcmp(desc->name,"mt6357-battery") && desc->type == POWER_SUPPLY_TYPE_BATTERY);
     assert(desc == &gauge.desc);
-    assert(desc->num_properties == (adc_present ? 3U : 1U) && desc->properties[0] == POWER_SUPPLY_PROP_CURRENT_NOW);
+    assert(desc->num_properties == (adc_present ? 4U : 2U) && desc->properties[0] == POWER_SUPPLY_PROP_PRESENT);
     if (adc_present) {
-        assert(desc->properties[1] == POWER_SUPPLY_PROP_VOLTAGE_NOW && desc->properties[2] == POWER_SUPPLY_PROP_TEMP);
+        assert(desc->properties[2] == POWER_SUPPLY_PROP_VOLTAGE_NOW && desc->properties[3] == POWER_SUPPLY_PROP_TEMP);
         assert(gauge.voltage == &channels[channel_order[0]] && gauge.thermistor == &channels[channel_order[1]]);
         assert(gauge.reference == &channels[channel_order[2]] && gauge.table == table_storage);
         assert(gauge.num_points == (unsigned int)table_count/2 && gauge.pullup_ohms);
@@ -727,6 +727,19 @@ int main(void)
     setup(false,0); regs[STOCK_ON_REG]=0; stage=0; property_shunt=10000;
     shunt_present=true; malformed_gain=fail_registration=gain_present=false;
     assert(!mt6357_gauge_probe(&pdev) && gauge.gain_permille == 1000); destroy_lock(); probes++;
+    init_lock(); setup(false,0);
+    for (unsigned int bits=0; bits<256; bits++) {
+        regs[MT6357_BATON_ANA_CON0]=bits; nops=0;
+        union power_supply_propval v={.intval=123};
+        int ret=mt6357_gauge_get_property(&psy,POWER_SUPPLY_PROP_PRESENT,&v);
+        assert(ret == (bits&1 ? 0 : -EAGAIN));
+        assert(v.intval == (bits&1 ? !(bits&2) : 123));
+        nops=0; errors[0]=EIO; v.intval=123;
+        assert(mt6357_gauge_get_property(&psy,POWER_SUPPLY_PROP_PRESENT,&v)==-EIO && v.intval==123);
+        errors[0]=0;
+    }
+    destroy_lock();
+    puts("PASS: 256 battery-presence states and 256 detection read failures");
     check_temperature();
     printf("PASS: %u stock conversion comparisons, %u sample/readiness cases, %u fault/recovery/timeout cases, 200 threaded reads and %u probe cases\n",conversions,samples,failures,probes);
     return 0;

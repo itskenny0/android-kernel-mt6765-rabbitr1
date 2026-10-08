@@ -100,7 +100,7 @@ def main():
                     'BLK_DEV_DM','PSTORE','PSTORE_CONSOLE','PSTORE_PMSG','MMC_MTK','EFI_PARTITION']:
             assert f'CONFIG_{key}=y\n' in config, f'Missing CONFIG_{key}'
         for key in ['MFD_MT6370', 'MEDIATEK_MT6370_ADC', 'SENSORS_IIO_HWMON',
-                    'BATTERY_MT6357', 'MEDIATEK_MT6359_AUXADC']:
+                    'BATTERY_MT6357', 'CHARGER_RABBIT_R1', 'MEDIATEK_MT6359_AUXADC']:
             assert f'CONFIG_{key}=y\n' in config, f'Missing power monitor CONFIG_{key}'
         assert 'CONFIG_DRM_PANEL_RABBIT_R1=y\n' in config, 'Missing r1 panel driver'
         for key in ['USB_ETH','USB_G_HID','CPU_FREQ','CPU_IDLE','SUSPEND','HIBERNATION']:

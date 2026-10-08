@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Only this app changes the saved choice; only this daemon writes the policy cap.
+type r1_charging, domain, coredomain;
+type r1_charging_exec, exec_type, system_file_type, file_type;
+init_daemon_domain(r1_charging)
+
+type r1_charging_app, domain, coredomain;
+app_domain(r1_charging_app)
+
+type sysfs_r1_charging, fs_type, sysfs_type;
+system_internal_prop(r1_charging_prop)
+
+set_prop(r1_charging_app, r1_charging_prop)
+get_prop(r1_charging, r1_charging_prop)
+allow r1_charging sysfs_r1_charging:dir search;
+allow r1_charging sysfs_r1_charging:file rw_file_perms;
+allow r1_charging_app sysfs_r1_charging:dir search;
+allow r1_charging_app sysfs_r1_charging:file r_file_perms;
+allow r1_charging sysfs:dir search;
+allow r1_charging_app sysfs:dir search;

@@ -1,5 +1,10 @@
 # Offline validation — 2026-10-08
 
+Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
+policy are now enabled experimentally; earlier driver-only stages below record
+their previous disabled state. Android control sources, persistence and build
+hooks are implemented, but no full Android image or physical charging test exists.
+
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Mainline Image.gz, r1 DTB and modules | PASS, Linux 7.1.0-rabbit-r1-bringup+ | `logs/mainline-build.log`, `dist/mainline/build.json` |

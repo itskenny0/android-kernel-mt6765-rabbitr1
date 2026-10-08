@@ -75,6 +75,14 @@ properties:
       - const: chg_vddp
       - const: temp_jc
 
+  richtek,managed-charging:
+    type: boolean
+    description: |
+      Require an external charging policy on MT6370/RT5081. Initially isolate
+      input, enable the 12-hour safety timer and require charge_behaviour AUTO
+      renewal within ten seconds. Expiry isolates input and inhibits charging.
+      This software lease does not protect against a stalled kernel or I2C bus.
+
   usb-otg-vbus-regulator:
     type: object
     description: OTG boost regulator.

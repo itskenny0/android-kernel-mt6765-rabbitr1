@@ -1,0 +1,26 @@
+What:           /sys/devices/platform/charging-policy/charge_control_limit
+Date:           October 2026
+Contact:        itskenny0 <0@kenny.cat>
+Description:
+                Battery charging current cap in microamps. Read/write, accepts
+                500000 through 1000000 in 100000 increments. Initially 500000;
+                Android restores its saved preference after persistent storage
+                is ready. Automatic is a userspace choice mapped to 1000000.
+                Zero is not Automatic. Policy may reduce or inhibit charging.
+                This controls battery charge current, not total USB input draw.
+
+What:           /sys/devices/platform/charging-policy/status
+Date:           October 2026
+Contact:        itskenny0 <0@kenny.cat>
+Description:
+                Read-only, coherent newline-separated key=value snapshot:
+                requested_ua, applied_ua, input_ua, voltage_uv, measured_ua,
+                reason, error. The applied fields are successfully commanded
+                limits, not measured current. On error they are zero requests
+                and MUST NOT be interpreted as proof of electrical isolation.
+                measured_ua is the last sampled battery current, meaningful only
+                with error=0. error is a negative errno or zero. Reasons are:
+                waiting, unplugged, no-battery, sensor-error, charger-fault,
+                safety-timer, temperature, voltage, usb-budget, user-limit,
+                thermal-limit, ready, io-error, stale, stopped.
+                No battery capacity or health HAL is synthesized by this driver.

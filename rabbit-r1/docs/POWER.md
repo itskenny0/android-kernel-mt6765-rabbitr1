@@ -1,5 +1,10 @@
 # Power driver investigation
 
+Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
+policy are now enabled experimentally; earlier driver-only stages below record
+their previous disabled state. Android control sources, persistence and build
+hooks are implemented, but no full Android image or physical charging test exists.
+
 The supplied MT6765 support table marks **MT6357 regulators partial** and
 **MT6370 charging working**. These are different devices. The table describes
 community testing on MT6765 devices; it is not proof that either works on an r1.
@@ -404,32 +409,8 @@ uevent once the controller probes.
 
 ### Android charging-speed setting
 
-The requested Android UI is **Settings → Battery → Charging speed**. This is
-an integration design for the future Android port, not an installed Settings
-entry in the current diagnostic image.
-
-* **Automatic** is the default. Manual choices are 500, 600, 700, 800, 900 and
-  1,000 mA, matching the charger's 100 mA steps and stock 1 A normal limit.
-* A manual choice caps battery charge current. Battery temperature, voltage,
-  charger capability and fault handling retain priority and can reduce current
-  or stop charging. For example, a 1,000 mA selection still becomes at most
-  500 mA in the stock warm-temperature region, and a stop condition remains off.
-* Input-current limits remain independent. Changing this setting must not
-  increase the USB input budget or imply support for a faster USB charging mode.
-* The UI sends the preference to the charging-policy service, which is the
-  sole writer of charger limits. It must not write the charger's generic sysfs
-  current range directly; that range extends beyond the r1 battery policy.
-* Persist the preference across reboot and recompute the effective limit when
-  it changes. Automatic means no additional user cap, never a zero-current
-  register write. On startup, charging policy must validate its inputs before
-  applying a saved preference.
-* Show the requested cap separately from the effective limit and the reason
-  for a reduction or pause. A current cap is not a promised charging time or
-  measured current. Keep the entry unavailable if the policy service is absent.
-
-The UI, service interface and persistence are still to be implemented with the
-Android device tree. Enabling this feature also depends on validated battery measurements,
-charging-policy integration and hardware testing.
+The implemented Settings entry, persistence service, kernel policy, build hooks
+and remaining device tests are described in [CHARGING.md](CHARGING.md).
 
 ## MT6357 battery-sense ADC
 

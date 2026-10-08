@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="cat.kenny.r1.charging">
+    <application android:label="@string/app_name" android:allowBackup="false"
+        android:directBootAware="true" android:theme="@android:style/Theme.DeviceDefault.Settings">
+        <activity android:name=".ChargingActivity" android:exported="true"
+            android:permission="android.permission.DEVICE_POWER">
+            <intent-filter>
+                <action android:name="com.android.settings.action.IA_SETTINGS" />
+            </intent-filter>
+            <meta-data android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.battery" />
+            <meta-data android:name="com.android.settings.title" android:resource="@string/app_name" />
+            <meta-data android:name="com.android.settings.summary" android:resource="@string/tile_summary" />
+            <meta-data android:name="com.android.settings.keyhint" android:value="r1_charging_speed" />
+            <meta-data android:name="com.android.settings.profile" android:value="primary_profile_only" />
+        </activity>
+    </application>
+</manifest>
