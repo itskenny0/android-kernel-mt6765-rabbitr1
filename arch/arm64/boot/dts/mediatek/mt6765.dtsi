@@ -941,9 +941,8 @@
 			mediatek,gce-client-reg = <&gce SUBSYS_1400XXXX 0xc000 0x1000>;
 		};
 
-		rdma0: dma-controller@1400d000 {
-			compatible = "mediatek,mt6765-disp-rdma",
-				     "mediatek,mt8183-disp-rdma";
+		rdma0: rdma@1400d000 {
+			compatible = "mediatek,mt6765-disp-rdma";
 			reg = <0 0x1400d000 0 0x1000>;
 			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&mmsys CLK_MM_DISP_RDMA0>;

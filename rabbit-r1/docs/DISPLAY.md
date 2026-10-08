@@ -281,7 +281,8 @@ OVL/RDMA configuration, IOMMU and complete startup sequencing remain to audit.
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   OVL/RDMA configuration and display IOMMU behavior.
+   powered RDMA probe accesses and IRQ reporting, OVL configuration and display
+   IOMMU behavior. The native RDMA setup below does not complete that audit.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
 4. Verify calibration handoff and PLL lock, measure link/frame timing, check an RGB test pattern and touch orientation,
@@ -290,3 +291,84 @@ OVL/RDMA configuration, IOMMU and complete startup sequencing remain to audit.
    treating the Android software-rendered UI as usable.
 
 The existing MT6370 backlight corrections and limits are in [BACKLIGHT.md](BACKLIGHT.md).
+
+## Native RDMA0
+
+`mediatek,mt6765-disp-rdma` now selects native platform data and a DRM component
+entry. The MT8183 fallback has been removed. MT6765's unshared RDMA0 FIFO holds
+384 sixteen-byte words (6 KiB); the fallback used 5 KiB and a 70% output-valid
+threshold. Stock video mode uses a zero output-valid threshold. The native
+setup uses the full unshared FIFO and explicitly selects no borrowed RSZ/WROT
+SRAM. Arbitrary FIFO-size properties are rejected by both binding and probe.
+The node is named `rdma@1400d000`: it is a display component, not a generic DMA
+provider requiring `#dma-cells`.
+
+Native clock enable stops the inherited engine, disables/clears its interrupts,
+asserts reset and waits for it to leave idle, then deasserts reset and waits for
+idle. Each phase is bounded to 100 ms. A failure releases reset and the clock
+reference, prevents startup and logs the error. This follows `rdma_reset` in the
+shipped Image at raw offset `0x7034a4`; the register state machine in the test is
+modeled. No real reset completion has been observed.
+
+The clock rate is sampled in the sleepable clock-enable callback. Configuration
+can run from the CRTC interrupt callback, so it performs no clock queries or
+sleeping operations. The sampled rate is used until clock disable. Dynamic
+clock-rate changes while the display is active are not supported by this port.
+
+Configuration establishes direct-link RGB input, clears the inherited matrix
+selection, memory address/pitch and background, and writes the native 13-bit
+width and 20-bit height fields. Memory-plane configuration selects memory
+input afterward and recomputes its thresholds without overwriting them with
+the shared driver's legacy `0x40402020` GMC value. A subsequent direct-link
+configuration clears that memory state again. The CRTC's later `bpc = 0`
+callback preserves the established output depth, defaulting to eight bits if
+none has been established.
+
+The native FIFO setup programs all 13 registers written by the active vendor
+`rdma_set_ultra_l` implementation. The older implementation above it in the
+published source is inside `#if 0`. The shipped routine is at raw Image offset
+`0x7037bc`; the same Image checksum used by the panel tests is enforced.
+The port retains its integer rounding and 25% consumption margin, uses the
+requested refresh rate and sampled engine clock, and rejects arithmetic
+overflow, insufficient fill rate or thresholds outside the unshared FIFO.
+Invalid configuration stops the engine while its clock is held and prevents
+startup. Mode parameters and clock rate are included in the error log.
+
+For 480x640 RGB888 at the provisional mode's rounded 59 Hz, with a synthetic
+230 MHz engine clock, the values are:
+
+| Register offset | Value |
+| --- | --- |
+| GMC0 / GMC1 / GMC2 (`0x30`, `0x34`, `0x3c`) | `0x8023001e` / `0x801e0014` / `0xff` |
+| FIFO (`0x40`) | `0x81800000` |
+| SODI / DVFS (`0xa8`, `0xac`) | `0x00c7002d` / `0x001e001e` |
+| DRAM (`0xc0`) | `0x00010000` |
+| DVFS pre / ultra (`0xd0`, `0xd4`) | `0x002d0028` / `0x0028001e` |
+| DRS leave / enter / urgent (`0xd8`, `0xdc`, `0xe8`) | `0x0012000f` each |
+| SRAM selection (`0xb0`) | `0x0` |
+
+`test-mt6765-rdma.py` compares 108 FIFO-write traces with the shipped
+instructions, covering direct-link and memory video input, both vendor clock
+states (230/457 MHz), six geometry/depth cases and zero/all-one inherited
+register patterns. It additionally checks 30, 59 and 120 Hz requests. Stock
+hardcodes 60 Hz in this calculation, so the non-60-Hz comparisons use a scaled
+reference width with exactly the same pixel rate. That is an arithmetic test
+fixture, not a stock panel mode or a measured clock. The reference dimensions
+are recorded in `out/mt6765-rdma-audit.json`.
+
+The production callbacks run under ASan/UBSan with clock, MMIO and CMDQ models.
+Tests check reset transitions, both reset timeouts, clock failures, no startup
+without valid configuration, invalid geometry/rates/depths, overflow, short
+fill capacity, pending depth preservation, and memory-to-direct transitions.
+Queued writes must leave MMIO unchanged until the modeled queue executes.
+The MT8183 setup remains unchanged. Twelve deliberately broken variants are
+rejected, including a clock query from IRQ context and leaked clock/reset state.
+The native binding and compiled node pass validation; a FIFO override fixture
+is rejected.
+
+This work covers RDMA0 video operation with unshared SRAM. It does not implement
+command-mode FIFO policy, shared-SRAM arbitration, display DVFS/SODI, secure
+buffers or full interrupt/error reporting. Programming the vendor's threshold
+registers does not establish that those power-saving modes are safe to enable.
+Hardware reset, FIFO occupancy, pixel output and underflow behavior remain
+untested. The display graph and DRM driver remain disabled.

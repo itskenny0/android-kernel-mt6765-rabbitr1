@@ -249,7 +249,7 @@ def compiled_clocks():
     names = stock['/dispsys']['clock-names'].split(b'\0')[:-1]
     old = cells(stock['/dispsys']['clocks'])
     selected = old[names.index(b'MMSYS_DISP_RDMA0')*2:][:2]
-    new = cells(nodes['/soc/dma-controller@1400d000']['clocks'])
+    new = cells(nodes['/soc/rdma@1400d000']['clocks'])
     assert len(new) == 2 and new[1] == selected[1] == 10, (new, selected)
     for tree, clock, compatible in [(nodes, new, b'mediatek,mt6765-mmsys'),
                                     (stock, selected, b'mediatek,mt6765-mmsys_config')]:

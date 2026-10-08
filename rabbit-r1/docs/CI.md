@@ -18,7 +18,7 @@ The workflow:
    setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-   It also compiles the DSI host and DRM driver objects, which are not enabled
+   It also compiles the DSI host, RDMA and DRM driver objects, which are not enabled
    in the boot profile.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
@@ -33,6 +33,9 @@ The workflow:
    MMSYS routing and mutex writes are compared with shipped instructions for
    the chosen DRM path; cleanup, legacy platforms and the compiled RDMA clock
    are checked as well.
+   Native RDMA FIFO/QoS writes and reset transitions are compared with stock
+   instructions. Clock/reset failures, IRQ-safe configuration, queued writes,
+   input-mode changes and the native component/DT lookup are covered.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.

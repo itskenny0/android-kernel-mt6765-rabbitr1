@@ -1,0 +1,29 @@
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,rdma.yaml b/Documentation/devicetree/bindings/display/mediatek/mediatek,rdma.yaml
+index cb187a95c1..a91cc34624 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,rdma.yaml
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,rdma.yaml
+@@ -25,6 +25,7 @@ properties:
+     oneOf:
+       - enum:
+           - mediatek,mt2701-disp-rdma
++          - mediatek,mt6765-disp-rdma
+           - mediatek,mt8173-disp-rdma
+           - mediatek,mt8183-disp-rdma
+           - mediatek,mt8195-disp-rdma
+@@ -110,6 +111,16 @@ properties:
+       - port@0
+       - port@1
+ 
++allOf:
++  - if:
++      properties:
++        compatible:
++          contains:
++            const: mediatek,mt6765-disp-rdma
++    then:
++      properties:
++        mediatek,rdma-fifo-size: false
++
+ required:
+   - compatible
+   - reg
