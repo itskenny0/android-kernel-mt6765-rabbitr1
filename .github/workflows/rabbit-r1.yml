@@ -126,13 +126,6 @@ jobs:
             drivers/gpu/drm/mediatek/mtk_ddp_comp.o \
             2>&1 | tee logs/mt6765-dsi-build.log
 
-      - name: Compile the inactive PMIC ADC driver
-        run: |
-          source scripts/env.sh
-          make -C src/mainline O=/rabbitr1/out/mainline ARCH=arm64 \
-            CROSS_COMPILE=aarch64-linux-gnu- drivers/iio/adc/mt6359-auxadc.o \
-            2>&1 | tee logs/mt6357-auxadc-build.log
-
       - name: Build the diagnostic initramfs
         run: bash scripts/build-initramfs.sh
 

@@ -1,0 +1,119 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Describe MT6357 battery ADC inputs
+
+Describe optional voltage inputs and board thermistor calibration.
+Allow the existing MT6357 ADC child in the PMIC binding.
+
+---
+ .../devicetree/bindings/mfd/mediatek,mt6357.yaml   |    6 ++
+ .../power/supply/mediatek,mt6357-gauge.yaml        |   63 +++++++++++++++++++-
+ 2 files changed, 65 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+index eb821b1931..5ec2be83f0 100644
+--- a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+@@ -20,6 +20,7 @@ description: |
+   - RTC
+   - Keys
+   - Battery gauge
++  - ADC
+ 
+   It is interfaced to host controller using SPI interface by a proprietary hardware
+   called PMIC wrapper or pwrap. This MFD is a child device of pwrap.
+@@ -56,6 +57,11 @@ properties:
+            2100000, 2500000, 2600000, 2700000]
+     default: 1700000
+ 
++  adc:
++    type: object
++    $ref: /schemas/iio/adc/mediatek,mt6359-auxadc.yaml
++    unevaluatedProperties: false
++
+   gauge:
+     type: object
+     $ref: /schemas/power/supply/mediatek,mt6357-gauge.yaml
+diff --git a/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml b/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
+index b78b8b1f0c..a31d4cb479 100644
+--- a/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
++++ b/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
+@@ -10,13 +10,25 @@ maintainers:
+   - itskenny0 <0@kenny.cat>
+ 
+ description:
+-  Battery current sensing in the MT6357 PMIC. The gauge is a child of the
+-  PMIC MFD and uses its regmap. Positive current means charging. Current
+-  measurements use the firmware-initialized gauge engine; this binding does
+-  not establish support for capacity estimation or charging policy.
++  Battery measurements in the MT6357 PMIC. The gauge is a child of the PMIC
++  MFD and uses its regmap. Positive current means charging. Optional voltage
++  inputs provide battery voltage and an NTC thermistor measurement. Both the
++  thermistor and its measured pull-up reference are corrected for the voltage
++  drop across the specified return-path resistance, using gauge current.
++  Current measurements use the firmware-initialized gauge engine; this binding
++  does not establish support for capacity estimation or charging policy.
+ 
+ allOf:
+   - $ref: power-supply.yaml#
++  - if:
++      required:
++        - io-channels
++    then:
++      required:
++        - io-channel-names
++        - mediatek,thermistor-pullup-ohms
++        - mediatek,thermistor-series-micro-ohms
++        - mediatek,thermistor-resistance-table
+ 
+ properties:
+   compatible:
+@@ -35,6 +47,49 @@ properties:
+     minimum: 1
+     default: 1000
+ 
++  io-channels:
++    items:
++      - description: Battery voltage
++      - description: Thermistor voltage
++      - description: Thermistor pull-up reference voltage
++
++  io-channel-names:
++    items:
++      - const: battery-voltage
++      - const: battery-thermistor
++      - const: thermistor-reference
++
++  mediatek,thermistor-pullup-ohms:
++    description: Resistance of the thermistor pull-up resistor.
++    minimum: 1
++
++  mediatek,thermistor-series-micro-ohms:
++    description:
++      Total resistance of the battery current return path whose voltage drop
++      appears in both thermistor and reference measurements. Zero disables
++      compensation. This need not equal the current sense resistor alone.
++
++  mediatek,thermistor-resistance-table:
++    $ref: /schemas/types.yaml#/definitions/int32-matrix
++    description:
++      NTC temperature and resistance pairs, ordered by strictly increasing
++      temperature and strictly decreasing resistance. Interpolate linearly
++      in resistance and clamp readings outside the table to its endpoints.
++      This describes the thermistor, not the battery's internal resistance.
++    minItems: 2
++    maxItems: 64
++    items:
++      items:
++        - description: Temperature in milliCelsius
++        - description: Thermistor resistance in ohms
++          minimum: 1
++
++dependencies:
++  io-channel-names: [io-channels]
++  mediatek,thermistor-pullup-ohms: [io-channels]
++  mediatek,thermistor-series-micro-ohms: [io-channels]
++  mediatek,thermistor-resistance-table: [io-channels]
++
+ required:
+   - compatible
+   - shunt-resistor-micro-ohms

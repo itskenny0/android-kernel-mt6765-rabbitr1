@@ -1,0 +1,345 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Read MT6357 battery voltage and temperature
+
+Add named IIO voltage inputs, measured-reference NTC conversion and
+stock current compensation. Reject invalid or failed measurements and
+validate calibration before publishing callbacks. Wire the r1 inputs
+and enable the ADC without enabling charger control.
+
+---
+ arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts |   17 ++
+ arch/arm64/configs/rabbit_r1_defconfig            |    1 
+ drivers/power/supply/Kconfig                      |   11 +
+ drivers/power/supply/mt6357-gauge.c               |  189 ++++++++++++++++++++-
+ 4 files changed, 206 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+index b02cb0dce1..1ef08cb51f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/iio/adc/mediatek,mt6357-auxadc.h>
+ #include <dt-bindings/iio/adc/mediatek,mt6370_adc.h>
+ #include <dt-bindings/pinctrl/mediatek,mt6765-pinfunc.h>
+ #include "mt6765.dtsi"
+@@ -139,6 +140,22 @@ gauge {
+ 		/* Stock R_FG_VALUE=10 mOhm, CAR_TUNE_VALUE=100 percent. */
+ 		shunt-resistor-micro-ohms = <10000>;
+ 		mediatek,current-gain-permille = <1000>;
++		/* Stock battery voltage is ISENSE, not BATADC. */
++		io-channels = <&pmic_adc MT6357_AUXADC_ISENSE>,
++			      <&pmic_adc MT6357_AUXADC_BAT_TEMP>,
++			      <&pmic_adc MT6357_AUXADC_VBIF>;
++		io-channel-names = "battery-voltage", "battery-thermistor", "thermistor-reference";
++		mediatek,thermistor-pullup-ohms = <16900>;
++		mediatek,thermistor-series-micro-ohms = <10000>;
++		/* Active stock 10 kOhm NTC table, also present in v0.8.293's kernel. */
++		mediatek,thermistor-resistance-table =
++			<(-40000) 195652>, <(-35000) 148171>, <(-30000) 113347>,
++			<(-25000) 87559>, <(-20000) 68237>, <(-15000) 53650>,
++			<(-10000) 42506>, <(-5000) 33892>, <0 27219>,
++			<5000 22021>, <10000 17926>, <15000 14674>,
++			<20000 12081>, <25000 10000>, <30000 8315>,
++			<35000 6948>, <40000 5834>, <45000 4917>,
++			<50000 4161>, <55000 3535>, <60000 3014>;
+ 	};
+ };
+ 
+diff --git a/arch/arm64/configs/rabbit_r1_defconfig b/arch/arm64/configs/rabbit_r1_defconfig
+index 4928173118..0990ae2ff4 100644
+--- a/arch/arm64/configs/rabbit_r1_defconfig
++++ b/arch/arm64/configs/rabbit_r1_defconfig
+@@ -594,6 +594,7 @@ CONFIG_EXTCON_GPIO=y
+ CONFIG_EXTCON_PTN5150=y
+ CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_IIO=y
++CONFIG_MEDIATEK_MT6359_AUXADC=y
+ CONFIG_IIO_SW_TRIGGER=y
+ CONFIG_MAX9611=y
+ CONFIG_MEDIATEK_MT6577_AUXADC=y
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+index 7138dc5cb8..c1f2fb9198 100644
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -430,12 +430,13 @@ config AXP288_FUEL_GAUGE
+ 	  over/under temperature.
+ 
+ config BATTERY_MT6357
+-	tristate "MediaTek MT6357 battery current sensing"
+-	depends on MFD_MT6397
++	tristate "MediaTek MT6357 battery measurements"
++	depends on MFD_MT6397 && IIO
+ 	help
+-	  Read signed battery current from the MT6357 gauge. The firmware must
+-	  have started the measurement engine. This driver does not yet report
+-	  state of charge or control charging.
++	  Read signed battery current from the MT6357 gauge, with optional ADC
++	  voltage and current-compensated thermistor readings. The firmware must
++	  have started the gauge engine. This driver does not yet report state
++	  of charge or control charging.
+ 
+ 	  This driver can also be built as a module, called mt6357-gauge.
+ 
+diff --git a/drivers/power/supply/mt6357-gauge.c b/drivers/power/supply/mt6357-gauge.c
+index 24d1e01633..45af505f49 100644
+--- a/drivers/power/supply/mt6357-gauge.c
++++ b/drivers/power/supply/mt6357-gauge.c
+@@ -1,8 +1,9 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+-/* MT6357 battery current sensing. */
++/* MT6357 battery current, voltage and thermistor sensing. */
+ 
+ #include <linux/bitfield.h>
+ #include <linux/cleanup.h>
++#include <linux/iio/consumer.h>
+ #include <linux/math64.h>
+ #include <linux/mfd/mt6357/registers.h>
+ #include <linux/mfd/mt6397/core.h>
+@@ -22,6 +23,12 @@
+ #define MT6357_FG_CURRENT_MASK	GENMASK(15, 0)
+ #define MT6357_FG_POLL_US	100
+ #define MT6357_FG_TIMEOUT_US	20000
++#define MT6357_THERMISTOR_MAX_POINTS 64
++
++struct mt6357_thermistor_point {
++	s32 temperature_mc;
++	u32 resistance;
++};
+ 
+ struct mt6357_gauge {
+ 	struct device *dev;
+@@ -30,6 +37,14 @@ struct mt6357_gauge {
+ 	u32 shunt_uohms;
+ 	u32 gain_permille;
+ 	bool needs_release;
++	struct power_supply_desc desc;
++	struct iio_channel *voltage;
++	struct iio_channel *thermistor;
++	struct iio_channel *reference;
++	struct mt6357_thermistor_point *table;
++	unsigned int num_points;
++	u32 pullup_ohms;
++	u32 series_uohms;
+ };
+ 
+ static int mt6357_gauge_convert(struct mt6357_gauge *gauge, unsigned int raw,
+@@ -129,30 +144,186 @@ static int mt6357_gauge_read_current(struct mt6357_gauge *gauge, int *current_ua
+ 	return mt6357_gauge_convert(gauge, raw, current_ua);
+ }
+ 
++static int mt6357_gauge_read_voltage(struct mt6357_gauge *gauge, int *voltage_uv)
++{
++	int ret, voltage_mv;
++
++	if (!gauge->voltage)
++		return -ENODATA;
++	ret = iio_read_channel_processed(gauge->voltage, &voltage_mv);
++	if (ret < 0)
++		return ret;
++	if (voltage_mv <= 0 || voltage_mv > INT_MAX / 1000)
++		return -ERANGE;
++
++	*voltage_uv = voltage_mv * 1000;
++	return 0;
++}
++
++static int mt6357_gauge_temperature(struct mt6357_gauge *gauge, int voltage_mv,
++				    int reference_mv, int current_ua, int *temperature)
++{
++	const struct mt6357_thermistor_point *cold, *hot;
++	s64 correction, voltage, reference, weighted;
++	u64 resistance;
++	unsigned int i;
++
++	if (voltage_mv <= 0 || reference_mv <= voltage_mv)
++		return -ERANGE;
++
++	/* Match the stock integer-mA and then integer-mV compensation steps. */
++	correction = -div_s64((s64)(current_ua / 1000) * gauge->series_uohms, 1000000);
++	voltage = voltage_mv + correction;
++	reference = reference_mv + correction;
++	if (voltage <= 0 || reference > INT_MAX)
++		return -ERANGE;
++
++	/* Both voltages include the same return-path drop. It cancels here. */
++	resistance = div_u64((u64)gauge->pullup_ohms * voltage, reference - voltage);
++	if (resistance >= gauge->table[0].resistance) {
++		*temperature = gauge->table[0].temperature_mc / 100;
++		return 0;
++	}
++	for (i = 1; i < gauge->num_points; i++) {
++		cold = &gauge->table[i - 1];
++		hot = &gauge->table[i];
++		if (resistance < hot->resistance)
++			continue;
++
++		weighted = (s64)(resistance - hot->resistance) * cold->temperature_mc +
++			   (s64)(cold->resistance - resistance) * hot->temperature_mc;
++		*temperature = div64_s64(weighted,
++					(s64)(cold->resistance - hot->resistance) * 100);
++		return 0;
++	}
++	*temperature = gauge->table[gauge->num_points - 1].temperature_mc / 100;
++	return 0;
++}
++
++static int mt6357_gauge_read_temperature(struct mt6357_gauge *gauge, int *temperature)
++{
++	int ret, voltage_mv, reference_mv, current_ua;
++
++	if (!gauge->thermistor)
++		return -ENODATA;
++	ret = iio_read_channel_processed(gauge->thermistor, &voltage_mv);
++	if (ret < 0)
++		return ret;
++	ret = mt6357_gauge_read_current(gauge, &current_ua);
++	if (ret)
++		return ret;
++	ret = iio_read_channel_processed(gauge->reference, &reference_mv);
++	if (ret < 0)
++		return ret;
++
++	return mt6357_gauge_temperature(gauge, voltage_mv, reference_mv, current_ua, temperature);
++}
++
+ static int mt6357_gauge_get_property(struct power_supply *psy,
+ 				     enum power_supply_property psp,
+ 				     union power_supply_propval *val)
+ {
+ 	struct mt6357_gauge *gauge = power_supply_get_drvdata(psy);
+ 
+-	if (psp != POWER_SUPPLY_PROP_CURRENT_NOW)
++	switch (psp) {
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++		return mt6357_gauge_read_current(gauge, &val->intval);
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		return mt6357_gauge_read_voltage(gauge, &val->intval);
++	case POWER_SUPPLY_PROP_TEMP:
++		return mt6357_gauge_read_temperature(gauge, &val->intval);
++	default:
+ 		return -EINVAL;
+-
+-	return mt6357_gauge_read_current(gauge, &val->intval);
++	}
+ }
+ 
+ static const enum power_supply_property mt6357_gauge_properties[] = {
+ 	POWER_SUPPLY_PROP_CURRENT_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_TEMP,
+ };
+ 
+ static const struct power_supply_desc mt6357_gauge_desc = {
+ 	.name = "mt6357-battery",
+ 	.type = POWER_SUPPLY_TYPE_BATTERY,
+ 	.properties = mt6357_gauge_properties,
+-	.num_properties = ARRAY_SIZE(mt6357_gauge_properties),
++	/* The ADC properties are added only when all their inputs are supplied. */
++	.num_properties = 1,
+ 	.get_property = mt6357_gauge_get_property,
+ };
+ 
++static int mt6357_gauge_get_channel(struct device *dev, const char *name,
++				   struct iio_channel **channel)
++{
++	struct iio_channel *chan;
++	enum iio_chan_type type;
++	int ret;
++
++	chan = devm_iio_channel_get(dev, name);
++	if (IS_ERR(chan))
++		return PTR_ERR(chan);
++	ret = iio_get_channel_type(chan, &type);
++	if (ret)
++		return ret;
++	if (type != IIO_VOLTAGE)
++		return -EINVAL;
++	*channel = chan;
++	return 0;
++}
++
++static int mt6357_gauge_init_adc(struct mt6357_gauge *gauge)
++{
++	const char *table_name = "mediatek,thermistor-resistance-table";
++	struct device *dev = gauge->dev;
++	unsigned int i;
++	int ret, count;
++
++	if (!device_property_present(dev, "io-channels"))
++		return 0;
++	ret = mt6357_gauge_get_channel(dev, "battery-voltage", &gauge->voltage);
++	if (ret)
++		return ret;
++	ret = mt6357_gauge_get_channel(dev, "battery-thermistor", &gauge->thermistor);
++	if (ret)
++		return ret;
++	ret = mt6357_gauge_get_channel(dev, "thermistor-reference", &gauge->reference);
++	if (ret)
++		return ret;
++	ret = device_property_read_u32(dev, "mediatek,thermistor-pullup-ohms", &gauge->pullup_ohms);
++	if (ret)
++		return ret;
++	ret = device_property_read_u32(dev, "mediatek,thermistor-series-micro-ohms",
++				       &gauge->series_uohms);
++	if (ret)
++		return ret;
++	if (!gauge->pullup_ohms)
++		return -EINVAL;
++
++	count = device_property_count_u32(dev, table_name);
++	if (count < 0)
++		return count;
++	if (count < 4 || count > MT6357_THERMISTOR_MAX_POINTS * 2 || count % 2)
++		return -EINVAL;
++	gauge->num_points = count / 2;
++	gauge->table = devm_kmalloc_array(dev, gauge->num_points, sizeof(*gauge->table),
++					 GFP_KERNEL);
++	if (!gauge->table)
++		return -ENOMEM;
++	ret = device_property_read_u32_array(dev, table_name, (u32 *)gauge->table, count);
++	if (ret)
++		return ret;
++	for (i = 0; i < gauge->num_points; i++) {
++		if (!gauge->table[i].resistance || gauge->table[i].resistance > INT_MAX)
++			return -EINVAL;
++		if (i && (gauge->table[i].temperature_mc <= gauge->table[i - 1].temperature_mc ||
++			  gauge->table[i].resistance >= gauge->table[i - 1].resistance))
++			return -EINVAL;
++	}
++
++	gauge->desc.num_properties = ARRAY_SIZE(mt6357_gauge_properties);
++	return 0;
++}
++
+ static int mt6357_gauge_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -189,13 +360,17 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
+ 	if (!full_scale)
+ 		return dev_err_probe(dev, -EINVAL, "Current calibration loses all resolution\n");
+ 
++	gauge->desc = mt6357_gauge_desc;
++	ret = mt6357_gauge_init_adc(gauge);
++	if (ret)
++		return dev_err_probe(dev, ret, "Invalid battery ADC inputs\n");
+ 	ret = devm_mutex_init(dev, &gauge->lock);
+ 	if (ret)
+ 		return ret;
+ 	gauge->needs_release = true;
+ 	config.drv_data = gauge;
+ 	config.fwnode = dev_fwnode(dev);
+-	psy = devm_power_supply_register(dev, &mt6357_gauge_desc, &config);
++	psy = devm_power_supply_register(dev, &gauge->desc, &config);
+ 	return PTR_ERR_OR_ZERO(psy);
+ }
+ 
+@@ -214,5 +389,5 @@ static struct platform_driver mt6357_gauge_driver = {
+ };
+ module_platform_driver(mt6357_gauge_driver);
+ 
+-MODULE_DESCRIPTION("MediaTek MT6357 battery current sensing");
++MODULE_DESCRIPTION("MediaTek MT6357 battery measurements");
+ MODULE_LICENSE("GPL");

@@ -10,13 +10,25 @@ maintainers:
   - itskenny0 <0@kenny.cat>
 
 description:
-  Battery current sensing in the MT6357 PMIC. The gauge is a child of the
-  PMIC MFD and uses its regmap. Positive current means charging. Current
-  measurements use the firmware-initialized gauge engine; this binding does
-  not establish support for capacity estimation or charging policy.
+  Battery measurements in the MT6357 PMIC. The gauge is a child of the PMIC
+  MFD and uses its regmap. Positive current means charging. Optional voltage
+  inputs provide battery voltage and an NTC thermistor measurement. Both the
+  thermistor and its measured pull-up reference are corrected for the voltage
+  drop across the specified return-path resistance, using gauge current.
+  Current measurements use the firmware-initialized gauge engine; this binding
+  does not establish support for capacity estimation or charging policy.
 
 allOf:
   - $ref: power-supply.yaml#
+  - if:
+      required:
+        - io-channels
+    then:
+      required:
+        - io-channel-names
+        - mediatek,thermistor-pullup-ohms
+        - mediatek,thermistor-series-micro-ohms
+        - mediatek,thermistor-resistance-table
 
 properties:
   compatible:
@@ -34,6 +46,49 @@ properties:
       applied gain, not the stock firmware's CAR_TUNE_VALUE percentage.
     minimum: 1
     default: 1000
+
+  io-channels:
+    items:
+      - description: Battery voltage
+      - description: Thermistor voltage
+      - description: Thermistor pull-up reference voltage
+
+  io-channel-names:
+    items:
+      - const: battery-voltage
+      - const: battery-thermistor
+      - const: thermistor-reference
+
+  mediatek,thermistor-pullup-ohms:
+    description: Resistance of the thermistor pull-up resistor.
+    minimum: 1
+
+  mediatek,thermistor-series-micro-ohms:
+    description:
+      Total resistance of the battery current return path whose voltage drop
+      appears in both thermistor and reference measurements. Zero disables
+      compensation. This need not equal the current sense resistor alone.
+
+  mediatek,thermistor-resistance-table:
+    $ref: /schemas/types.yaml#/definitions/int32-matrix
+    description:
+      NTC temperature and resistance pairs, ordered by strictly increasing
+      temperature and strictly decreasing resistance. Interpolate linearly
+      in resistance and clamp readings outside the table to its endpoints.
+      This describes the thermistor, not the battery's internal resistance.
+    minItems: 2
+    maxItems: 64
+    items:
+      items:
+        - description: Temperature in milliCelsius
+        - description: Thermistor resistance in ohms
+          minimum: 1
+
+dependencies:
+  io-channel-names: [io-channels]
+  mediatek,thermistor-pullup-ohms: [io-channels]
+  mediatek,thermistor-series-micro-ohms: [io-channels]
+  mediatek,thermistor-resistance-table: [io-channels]
 
 required:
   - compatible

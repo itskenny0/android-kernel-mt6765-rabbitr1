@@ -117,8 +117,8 @@ The workflow:
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
 archive, mtklkzap, the mtklogo binary and checksummed MT6357 register/ADC/gauge source
 references. The ADC harness checks voltage units, channel requests, mux cleanup,
-scaling, reset/probe errors and timeout locking; its inactive driver is also
-compiled for AArch64. The impedance harness checks MT6357 start/stop ordering,
+scaling, reset/probe errors and timeout locking; the driver is now linked into
+the AArch64 kernel for battery measurements. The impedance harness checks MT6357 start/stop ordering,
 data masking, bus failures and reset gating. The ADC harness also checks
 binding-ID translation for all supported PMIC tables. The MT6370 limit harness
 compiles the property setter and kernel range helpers to check rejected inputs,
@@ -133,7 +133,11 @@ at several calibrations. It runs the production read, latch cleanup, property
 and probe code with the kernel's polling macros, a modeled clock/regmap and
 pthread locks. Failed reads, partial writes, repeated recovery, timeout bounds,
 concurrent callers and invalid probe settings are checked. The board wiring
-test compares the new shunt/gain properties with the stock DT units.
+test compares shunt/gain and thermistor calibration with stock DT units and
+checks named ADC wiring, including the changed VBIF binding ID. The gauge harness
+also compares temperature with compiled stock arithmetic, checks voltage units
+and tests missing ADC inputs, positive IIO success returns, conversion errors,
+malformed thermistor tables and registration-time callbacks.
 It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.

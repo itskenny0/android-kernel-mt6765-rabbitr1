@@ -219,8 +219,8 @@ entry in the current diagnostic image.
   measured current. Keep the entry unavailable if the policy service is absent.
 
 The UI, service interface and persistence are still to be implemented with the
-Android device tree. Enabling this feature also depends on battery-temperature
-conversion, charge-enable control, policy enforcement and hardware validation.
+Android device tree. Enabling this feature also depends on validated battery measurements,
+charge-enable control, policy enforcement and hardware testing.
 
 ## MT6357 battery-sense ADC
 
@@ -285,10 +285,9 @@ probe and reset functions; allocation, registration and the bus are modeled.
 Eleven deliberately broken reset variants fail the runtime assertions; the
 13 conversion regressions still fail as well.
 
-MT6357 ADC and charging remain disabled in the diagnostic kernel. Battery-current
-compensation and the temperature policy still need work before enabling battery
-management. An ADC voltage is not yet a
-temperature or a fuel-gauge reading. Physical reset timing and interaction
+MT6357 ADC is now enabled for the battery measurements described below. Charging
+control remains disabled pending policy integration. Raw ADC voltages remain
+distinct from converted battery temperature. Physical reset timing and interaction
 with firmware requesters remain untested.
 
 ### Impedance voltage sampling and binding IDs
@@ -367,8 +366,56 @@ arithmetic, 60 sampling/readiness cases, 3,903 fault/recovery/timeout cases,
 It compiles the production callbacks and actual kernel polling macros with
 ASan/UBSan; bus behavior, registration, time and hardware readiness are modeled.
 Electrical accuracy, retained firmware calibration and boot-time engine state
-still require a device. MT6357 auxiliary ADC and charger control remain disabled
-pending battery-temperature and charging-policy integration.
+still require a device. The auxiliary ADC now supplies voltage and temperature
+inputs; charger control remains disabled pending policy integration.
+
+### Battery voltage and temperature
+
+The gauge now exposes `voltage_now` in microvolts and `temp` in tenths of a
+Celsius degree. `MEDIATEK_MT6359_AUXADC` is built in for the MT6357 ADC node.
+These are experimental measurements; they do not enable the charger or
+establish a working Android health service. `r1-report` falls back to individual
+power-supply readings if one failed property prevents a complete uevent.
+
+The board's named inputs follow the shipped DT: **ISENSE** for battery voltage,
+BAT_TEMP for thermistor voltage, and VBIF for its measured pull-up reference.
+ISENSE is a voltage channel, despite its name. VBIF uses binding ID 13 in
+mainline, whereas Rabbit's driver used 14. The gauge resolves channels by name
+and requires voltage type; it propagates deferred probe and missing-input
+errors before publishing any power-supply callbacks. The old current-only
+configuration still works when no ADC inputs are specified.
+
+Temperature uses the stock 16,900-ohm pull-up and 10 mOhm return-path correction.
+Signed current is truncated to integer milliamps, multiplied by the return-path
+resistance and truncated to integer millivolts. That drop is subtracted from
+**both** measured voltages. The corrected thermistor voltage is then converted
+to resistance using the corrected reference. The board supplies the active
+21-point, 10 kOhm NTC table from Rabbit's `mtk_battery_table.h`; its exact bytes
+also occur in the shipped v0.8.293 kernel. Interpolation is linear in resistance,
+with the stock -40/60 °C endpoint clamps. The generic driver validates table
+length, increasing temperatures, decreasing positive resistances and pull-up
+parameters rather than embedding the r1's thermistor curve.
+
+Every property obtains fresh measurements. Failed thermistor, reference or
+current reads return their error without changing the caller's value. Zero,
+negative, reversed or unrepresentable voltages are rejected; there is no
+nominal-reference or zero-current fallback. Temperature acquisition includes
+current-latch cleanup errors. Samples are sequential, not simultaneous, and
+neither electrical calibration nor accuracy during current transients has
+been established. The vendor ADC's diagnostic filter/reset path is not copied;
+it does not supply an independently validated temperature sample.
+
+The current harness also compiles the actual voltage/temperature acquisition,
+conversion and ADC probe code. It checks 589,127 temperature/boundary results,
+including every 12-bit thermistor code at five references and 19 signed currents,
+plus every ohm across the stock curve. Expected temperatures come from compiled
+stock conversion routines and their compensation block. Another 32 sample
+cases, 41 fault/input cases and 51 ADC probe cases cover positive IIO success
+returns, failed reads that overwrite private buffers, channel types, deferred
+probe, malformed calibration, immediate registration callbacks and integer
+extremes. Twenty-four temperature/ADC regressions and the existing 16 current
+regressions are rejected. ASan/UBSan and modeled IIO/regmap interfaces check
+software behavior; these are not hardware measurements.
 
 ### Battery policy recovered from stock
 

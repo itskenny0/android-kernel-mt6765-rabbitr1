@@ -129,6 +129,11 @@
       "bytes": 6331,
       "sha256": "85737cc77388fad11b6411b31eb96facc6a3830f1dcbbc8a0edd4e082e89a19d",
       "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/Makefile"
+    },
+    "src/kernel/drivers/power/supply/mtk_battery_table.h": {
+      "sha256": "9a0a18613be721cfb16f2a0a2e0d9159e1939a1fc96fbd0624736f9b4ec228f3",
+      "bytes": 107954,
+      "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mtk_battery_table.h"
     }
   }
 }

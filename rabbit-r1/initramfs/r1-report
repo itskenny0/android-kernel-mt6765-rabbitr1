@@ -31,9 +31,18 @@ echo '=== Regulator consumers and deferred probes ==='
 for file in /sys/kernel/debug/regulator/regulator_summary /sys/kernel/debug/devices_deferred; do
     [ ! -r "$file" ] || cat "$file"
 done
-echo '=== Power supplies ==='
-for file in /sys/class/power_supply/*/uevent; do
-    [ ! -r "$file" ] || cat "$file"
+echo '=== Power supplies (current uA, voltage uV, temperature deci-Celsius) ==='
+for supply in /sys/class/power_supply/*; do
+    [ -d "$supply" ] || continue
+    echo "$supply"
+    if ! cat "$supply/uevent"; then
+        # A failed property can abort the complete uevent. Keep other readings.
+        for name in type current_now voltage_now temp; do
+            [ -r "$supply/$name" ] || continue
+            printf '%s: ' "$name"
+            cat "$supply/$name" || echo 'unavailable'
+        done
+    fi
 done
 echo '=== Power monitor (voltage mV, current mA, chip temperature milli-Celsius) ==='
 for monitor in /sys/class/hwmon/hwmon*; do

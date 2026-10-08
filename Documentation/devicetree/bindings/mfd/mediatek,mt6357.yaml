@@ -20,6 +20,7 @@ description: |
   - RTC
   - Keys
   - Battery gauge
+  - ADC
 
   It is interfaced to host controller using SPI interface by a proprietary hardware
   called PMIC wrapper or pwrap. This MFD is a child device of pwrap.
@@ -55,6 +56,11 @@ properties:
     enum: [1700000, 1800000, 1900000, 2000000,
            2100000, 2500000, 2600000, 2700000]
     default: 1700000
+
+  adc:
+    type: object
+    $ref: /schemas/iio/adc/mediatek,mt6359-auxadc.yaml
+    unevaluatedProperties: false
 
   gauge:
     type: object

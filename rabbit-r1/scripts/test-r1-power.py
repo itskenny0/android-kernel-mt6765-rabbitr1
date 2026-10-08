@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Compare compiled r1 power-device wiring with the verified stock device tree."""
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
+import re
 import struct
 import sys
 
@@ -31,6 +34,43 @@ assert gauge.get('status', b'okay\0') == b'okay\0'
 # parser multiplies each by ten for its internal units; do not copy the raw cells.
 assert cells(gauge['shunt-resistor-micro-ohms']) == (cells(old_gauge['R_FG_VALUE'])[0] * 1000,)
 assert cells(gauge['mediatek,current-gain-permille']) == (cells(old_gauge['CAR_TUNE_VALUE'])[0] * 10,)
+assert cells(gauge['mediatek,thermistor-pullup-ohms']) == cells(old_gauge['RBAT_PULL_UP_R'])
+# Stock compensation uses 0.1 mOhm units internally, with COM_R_FG_VALUE
+# multiplied by ten in the parser. Both measured voltages get the correction.
+series = cells(old_gauge['COM_FG_METER_RESISTANCE'])[0] * 100
+series += cells(old_gauge['COM_R_FG_VALUE'])[0] * 1000
+assert cells(gauge['mediatek,thermistor-series-micro-ohms']) == (series,)
+assert cells(old_gauge.get('NO_BAT_TEMP_COMPENSATE', b'\0\0\0\0')) == (0,)
+pmic_adc = nodes['/soc/pwrap@1000d000/pmic/adc']
+old_adc = stock['/pwrap@1000d000/main_pmic/pmic_auxadc']
+assert pmic_adc['compatible'] == b'mediatek,mt6357-auxadc\0'
+assert pmic_adc.get('status', b'okay\0') == b'okay\0'
+assert cells(pmic_adc['#io-channel-cells']) == (1,)
+assert gauge['io-channel-names'].split(b'\0')[:-1] == [
+    b'battery-voltage', b'battery-thermistor', b'thermistor-reference']
+assert cells(gauge['io-channels']) == tuple(
+    v for channel in (1, 3, 13) for v in (cells(pmic_adc['phandle'])[0], channel))
+old_names = old_gauge['io-channel-names'].split(b'\0')[:-1]
+old_inputs = cells(old_gauge['io-channels'])
+old_channels = dict(zip(old_names, zip(old_inputs[::2], old_inputs[1::2]), strict=True))
+for name, channel in ((b'pmic_battery_voltage', 1), (b'pmic_battery_temp', 3), (b'pmic_bif_voltage', 14)):
+    assert old_channels[name] == (cells(old_adc['phandle'])[0], channel)
+# VBIF's binding ID changed from vendor 14 to mainline 13. ISENSE and
+# BAT_TEMP retain their IDs. Never copy vendor IDs by array position.
+table_path = 'src/kernel/drivers/power/supply/mtk_battery_table.h'
+table_data = (ROOT/table_path).read_bytes()
+pin = json.loads((ROOT/'sources.lock.json').read_text())['ci_files'][table_path]
+assert len(table_data) == pin['bytes'] and hashlib.sha256(table_data).hexdigest() == pin['sha256']
+table_header = table_data.decode()
+assert re.search(r'^#define BAT_NTC_10\s+1$', table_header, re.M)
+table_body = re.search(r'Fg_Temperature_Table\[21\] = \{(.*?)\n};', table_header, re.S)[1]
+points = [tuple(map(int, row)) for row in re.findall(r'\{(-?\d+),\s*(\d+)\}', table_body)]
+assert len(points) == 21
+expected = b''.join(struct.pack('>iI', temperature * 1000, ohms) for temperature, ohms in points)
+assert gauge['mediatek,thermistor-resistance-table'] == expected
+stock_table = b''.join(struct.pack('<ii', temperature, ohms) for temperature, ohms in points)
+stock_image = (ROOT/'firmware/stock-v0.8.293/boot-unpacked/Image').read_bytes()
+assert stock_image.count(stock_table) == 1, 'Stock NTC table does not match the shipped kernel'
 
 bus = nodes['/soc/i2c@11016000']
 old_bus = stock['/i2c5@11016000']
@@ -101,5 +141,5 @@ assert cells(backlight['default-brightness']) == (0,)
 assert cells(backlight['mediatek,bled-ovp-microvolt']) == (17000000 + 4000000 * cells(old_backlight['mt,bl_ovp_level'])[0],)
 assert cells(backlight['mediatek,bled-ocp-microamp']) == (900000 + 300000 * cells(old_backlight['mt,bl_ocp_level'])[0],)
 print('PASS: r1 I2C5 pins/mode/address/IRQs match stock; ADC/hwmon channels and child gates checked')
-print('PASS: MT6357 current-shunt resistance and gain units match the stock gauge configuration')
-print('No bus transfers performed; this does not establish charging or battery-temperature support.')
+print('PASS: MT6357 gauge current/temperature calibration, ADC wiring and NTC table match stock')
+print('No bus transfers performed; charging and physical measurement accuracy remain untested.')

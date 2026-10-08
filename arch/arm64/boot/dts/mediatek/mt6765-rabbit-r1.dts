@@ -13,6 +13,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/iio/adc/mediatek,mt6357-auxadc.h>
 #include <dt-bindings/iio/adc/mediatek,mt6370_adc.h>
 #include <dt-bindings/pinctrl/mediatek,mt6765-pinfunc.h>
 #include "mt6765.dtsi"
@@ -139,6 +140,22 @@
 		/* Stock R_FG_VALUE=10 mOhm, CAR_TUNE_VALUE=100 percent. */
 		shunt-resistor-micro-ohms = <10000>;
 		mediatek,current-gain-permille = <1000>;
+		/* Stock battery voltage is ISENSE, not BATADC. */
+		io-channels = <&pmic_adc MT6357_AUXADC_ISENSE>,
+			      <&pmic_adc MT6357_AUXADC_BAT_TEMP>,
+			      <&pmic_adc MT6357_AUXADC_VBIF>;
+		io-channel-names = "battery-voltage", "battery-thermistor", "thermistor-reference";
+		mediatek,thermistor-pullup-ohms = <16900>;
+		mediatek,thermistor-series-micro-ohms = <10000>;
+		/* Active stock 10 kOhm NTC table, also present in v0.8.293's kernel. */
+		mediatek,thermistor-resistance-table =
+			<(-40000) 195652>, <(-35000) 148171>, <(-30000) 113347>,
+			<(-25000) 87559>, <(-20000) 68237>, <(-15000) 53650>,
+			<(-10000) 42506>, <(-5000) 33892>, <0 27219>,
+			<5000 22021>, <10000 17926>, <15000 14674>,
+			<20000 12081>, <25000 10000>, <30000 8315>,
+			<35000 6948>, <40000 5834>, <45000 4917>,
+			<50000 4161>, <55000 3535>, <60000 3014>;
 	};
 };
 
