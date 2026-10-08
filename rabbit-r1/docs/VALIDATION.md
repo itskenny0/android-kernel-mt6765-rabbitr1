@@ -126,6 +126,8 @@
 | LK warning patches and instruction verification | PASS, 102 warning bytes changed | `logs/build-lk.log` |
 | LK relock guard | PASS: real Fastboot registration, FAIL response, no memory writes; unknown/tampered images rejected | `logs/lk-tests.log` |
 | Linux DT handoff and memory ownership | PASS, actual Thumb instructions with modeled external calls | `logs/lk-tests.log` |
+| LK MMC pin-state fixup | PASS: 34 FDT/instruction fixtures; original empty/stale rename reproduced, both patched profiles preserved byte-for-byte | `logs/lk-mmc-fixup-tests.log`, `out/lk-mmc-fixup-audit.json`; shipped libfdt/libc run, logging and MMIO read modeled; no full boot or eMMC test |
+| LK MMC fix regression and package gates | Restored old call rejected by FDT preservation assertion; six stale-LK packaging/preparation fixtures rejected | `logs/lk-mmc-fixup-regression.log`, `logs/lk-mmc-fixup-flash-tests.log`; relock, overlay and splash checks still pass |
 | Stock LK board overlay and LineageOS splash | PASS, GPIO/charger tree retained; 58 logo slots unchanged | `logs/lk-tests.log` |
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
@@ -183,6 +185,7 @@ python3 scripts/test-r1-power.py
 python3 scripts/test-dsi-transfer.py
 toolchains/boot-tools/bin/python scripts/test-r1-panel.py
 toolchains/boot-tools/bin/python scripts/test-panel-power.py
+toolchains/boot-tools/bin/python scripts/test-lk-mmc-fixup.py
 toolchains/boot-tools/bin/python scripts/test-dsi-timing.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py

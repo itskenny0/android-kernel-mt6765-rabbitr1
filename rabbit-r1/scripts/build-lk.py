@@ -14,8 +14,11 @@ OUT = ROOT/'out/lk'
 DIST = ROOT/'dist/lk'
 STOCK_SHA = '534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e'
 # File offsets, valid ONLY for STOCK_SHA. The shared dtb_overlay() and its
-# early LK caller remain untouched. See docs/LK.md for the calling convention.
+# early LK caller remain untouched. Skip the later vendor MMC pin-name swap
+# too: it assumes six states and corrupts the mainline node's single state.
+# See docs/LK.md for both calling conventions.
 HANDOFF_PATCHES = [
+    (0x1c290, bytes.fromhex('eaf7b4fc'), bytes.fromhex('002000bf')),
     (0x2138e, bytes.fromhex('fff715ff044650bb'), bytes.fromhex('cdf80880002400bf')),
     (0x213da, bytes.fromhex('0298'), bytes.fromhex('0020')),
 ]
@@ -91,7 +94,7 @@ def main():
     if len(before) != 60 or len(after) != 60 or [i for i in range(60) if before[i] != after[i]] != [0,38]:
         raise ValueError('Unexpected logo slot changes')
     report = {
-        'format': 2, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
+        'format': 3, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
         'mtklkzap_commit': revision, 'warning_bytes_changed': sum(a != b for a,b in zip(relock,warnings)),
         'handoff_patches': [{'file_offset': offset, 'before': before.hex(), 'after': after.hex()}
                             for offset,before,after in HANDOFF_PATCHES],
@@ -103,6 +106,7 @@ def main():
             'scope': 'patched LK handler; other loaders and direct seccfg writes unaffected',
         },
         'kernel_overlay': 'bypassed; mainline base copied with original bounds and later fixups',
+        'kernel_mmc_pinctrl_preserved': True,
         'lk_overlay': 'stock DTBO; shared overlay function and early caller unchanged',
         'logo': {'width': 480, 'height': 640, 'color_model': 'bgrabe', 'changed_slots': [0,38]},
         'verified_boot': 'warnings suppressed; unlocking and vbmeta policy remain separate',

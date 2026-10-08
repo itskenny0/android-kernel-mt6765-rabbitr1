@@ -135,6 +135,9 @@ def prepare(args):
         raise ValueError('Requires the LK-aware package format 2')
     if manifest.get('lk_build', {}).get('relock_protection', {}).get('enabled') is not True:
         raise ValueError('Package lacks LK relock protection; rebuild it')
+    if manifest.get('lk_build', {}).get('kernel_mmc_pinctrl_preserved') is not True or \
+            local(args.package/'lk.bin').read_bytes()[0x1c290:0x1c294] != bytes.fromhex('002000bf'):
+        raise ValueError('Package lacks the LK MMC pin-state fix; rebuild it')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')

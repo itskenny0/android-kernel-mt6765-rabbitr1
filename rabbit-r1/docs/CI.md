@@ -87,6 +87,9 @@ The workflow:
    allocation bounds, and normal/async validation and visibility are checked.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
+   The later MMC pin-name fixup runs with shipped libfdt/libc instructions on
+   real mainline/vendor FDTs. Tests reproduce the original stale-stack rename
+   and require the patched Linux caller to preserve both boot profiles.
 5. Builds both mtkclient boot profiles.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
    backup validation, AVB flags, checksums and repeat packaging.

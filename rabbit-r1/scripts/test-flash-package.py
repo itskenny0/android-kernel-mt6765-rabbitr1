@@ -9,6 +9,7 @@ from pathlib import Path
 import struct
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import zlib
 
 ROOT = Path('/rabbitr1')
@@ -57,6 +58,7 @@ def cpio(blob):
 
 manifest = json.loads((PACKAGE/'manifest.json').read_text())
 assert manifest['lk_build']['relock_protection']['enabled'] is True
+assert manifest['lk_build']['kernel_mmc_pinctrl_preserved'] is True
 for profile in ['ram', 'expdb']:
     blob = (PACKAGE/f'boot-{profile}.img').read_bytes()
     assert len(blob) == 32*1024*1024 and blob[:8] == b'ANDROID!'
@@ -140,6 +142,46 @@ def rejects(fn):
         return
     raise AssertionError('Invalid input accepted')
 
+
+# Reject stale LK even if its build record claims the new fix. These failures
+# must occur before requesting any device backup or creating a flash script.
+with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='lk-mmc-gate-') as tmp:
+    directory = Path(tmp)
+    packager = load('packager', 'package-mtkclient.py')
+    packager.ROOT = directory
+    packager.OUT = directory/'output'
+    packager.DIST = directory/'package'
+    (directory/'out').mkdir()
+    (directory/'out/mainline').symlink_to(ROOT/'out/mainline', target_is_directory=True)
+    (directory/'scripts').symlink_to(ROOT/'scripts', target_is_directory=True)
+    (directory/'dist/lk').mkdir(parents=True)
+    (directory/'dist/bringup').symlink_to(ROOT/'dist/bringup', target_is_directory=True)
+    stale = bytearray((PACKAGE/'lk.bin').read_bytes())
+    stale[0x1c290:0x1c294] = bytes.fromhex('eaf7b4fc')
+    (directory/'lk.bin').write_bytes(stale)
+    (directory/'dist/lk/lk.bin').write_bytes(stale)
+    for value in (None, False, True):
+        fixture = json.loads(json.dumps(manifest))
+        if value is None:
+            del fixture['lk_build']['kernel_mmc_pinctrl_preserved']
+        else:
+            fixture['lk_build']['kernel_mmc_pinctrl_preserved'] = value
+        (directory/'manifest.json').write_text(json.dumps(fixture))
+        try:
+            flash.prepare(SimpleNamespace(package=directory))
+        except ValueError as error:
+            assert 'MMC pin-state fix' in str(error), str(error)
+        else:
+            raise AssertionError('Stale LK accepted')
+        (directory/'dist/lk/build.json').write_text(json.dumps(fixture['lk_build']))
+        try:
+            packager.main()
+        except ValueError as error:
+            assert 'preserve the mainline MMC pin states' in str(error), str(error)
+        else:
+            raise AssertionError('Stale LK packaged')
+        assert not list(packager.DIST.iterdir())
+print('PASS: six stale-LK packaging/preparation cases rejected before producing flash files')
 
 gpt = fixture_gpt()
 assert flash.parse_gpt(gpt)['partitions']['expdb']['bytes'] == flash.SIZES['expdb']

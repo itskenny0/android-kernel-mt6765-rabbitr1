@@ -85,6 +85,45 @@ applies if given a stock boot image. **Restore stock LK together with stock boot
 DTBO and vbmeta when returning that slot to RabbitOS.** The generated restore
 script includes all of them and the shared logo.
 
+## Preserve Linux MMC pin states
+
+The later Linux FDT path calls `update_mmc_status()` at raw offset `0x1c290`,
+after the overlay/copy step. Despite its name, this function does not change
+the MMC node's `status`. It finds the first `mediatek,mt6765-mmc` node, copies
+its `pinctrl-names` into 14-byte stack slots, then unconditionally swaps slots
+0/3, 1/4 and 2/5. When `readl(0x100056f0) & 0x6000` is zero, it writes the
+swapped names back. The actual register value on the r1 has not been measured.
+
+Our mainline node has one state, `default`. The unused slots contain prior
+stack data, so LK can rename that state to an empty or stale string. Linux
+then cannot select the intended default state by name. The vendor DT avoids
+this path because its MMC compatible is `mediatek,msdc`; the historical UART
+capture logs the failed lookup. Adding dummy states to mainline would merely
+accommodate this vendor assumption.
+
+The build replaces **only the call in the Linux FDT path**:
+
+| Offset | Original | Replacement |
+| --- | --- | --- |
+| `0x1c290` | `ea f7 b4 fc` (`bl 0x6bfc`) | `00 20 00 bf` (`movs r0,#0; nop`) |
+
+The result is unused by the following instructions. This preserves the
+kernel-provided pin names, references and RAM/expdb storage gate. It changes
+neither LK's own eMMC initialization nor the shared fixup routine. The patch
+uses the same exact-stock checksum and before-byte checks as the overlay fix.
+The LK build record marks `kernel_mmc_pinctrl_preserved`; packaging and flash
+preparation require that mark and check the four instruction bytes, rejecting
+older LK output even if a record incorrectly claims the fix.
+
+`test-lk-mmc-fixup.py` executes the caller at `0x1c28e..0x1c294`, the complete
+stock fixup at `0x6bfc`, its string-swap helper and the shipped libfdt/libc
+instructions. Only logging and the MMIO-register read are modeled. The 34
+fixtures include both compiled boot profiles, four register patterns, zero
+and named prior stack contents, the actual vendor FDT and a synthetic six-state
+node. The original code reproduces the bad rename; the patched caller leaves
+the expanded FDT byte-identical. An image with the old call restored fails
+the preservation check. This is not a full LK boot or a physical eMMC test.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses
