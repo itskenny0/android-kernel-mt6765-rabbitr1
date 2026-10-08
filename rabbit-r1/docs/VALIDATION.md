@@ -138,8 +138,9 @@
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |
 | r1 board-compatible schema | PASS | `logs/r1-board-schema.log` (empty diagnostics) |
+| Unit-addressed memory node and root schema | PASS: both profiles before and after LK updates, exactly one memory node with the supplied RAM layout | `logs/memory-node-{ram,expdb}-root-schema.log`, `out/memory-node-{ram,expdb}-root-schema.json`, `logs/memory-node-fdt-tests.log`; controlled boot arguments, no physical RAM measurement |
 | MT6765 I2C schema | PASS, all seven controller nodes | `logs/mt6765-i2c-schema.log`, `out/mt6765-i2c-schema.json` |
-| Full r1 DT schema validation | **FAIL: 34 diagnostics remain** | `logs/mt6765-ovl-full-schema.log`, `out/mt6765-ovl-full-schema.json` |
+| Full r1 DT schema validation | **FAIL: 28 diagnostics remain** | `logs/memory-node-full-schema.log`, `out/memory-node-full-schema.json`; refreshed schemas include the earlier LARB fixes |
 | Kernel checkpatch on initial five patches | No errors; style/submission warnings | `logs/checkpatch.log` |
 | I2C divider patch checkpatch | No errors or warnings | `logs/i2c-checkpatch.log` |
 | I2C native timing/binding patches checkpatch | No code/style errors or warnings (`--no-signoff`) | `logs/i2c-native-checkpatch.log` |
@@ -158,8 +159,7 @@
 
 The full schema failures are recorded, not inferred from the validator's exit
 code (the tool can return success while printing failures). Most concern the
-fork's incomplete MT6765 bindings. The r1 `/memory` name is an explicit
-stock-loader compatibility exception, and its conservative MMC pin-state draft
+fork's incomplete MT6765 bindings. The conservative MMC pin-state draft
 also needs binding work. See [PORTING.md](PORTING.md). Schema conformance is not
 hardware verification.
 

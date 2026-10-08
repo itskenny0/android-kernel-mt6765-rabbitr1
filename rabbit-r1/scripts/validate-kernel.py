@@ -51,8 +51,8 @@ def fdt_nodes(blob):
 def check_mainline(dtb):
     nodes = fdt_nodes(dtb.read_bytes())
     assert nodes['/']['compatible'].split(b'\0')[:2] == [b'rabbit,r1', b'mediatek,mt6765']
-    assert nodes['/memory']['device_type'] == b'memory\0', 'Stock LK /memory fixup target missing'
-    assert len([n for n in nodes.values() if n.get('device_type') == b'memory\0']) == 1
+    memory = {name for name, props in nodes.items() if props.get('device_type') == b'memory\0'}
+    assert memory == {'/memory@40000000'}, 'Expected one unit-addressed LK memory fixup target'
     clocks = ROOT/'src/mainline/include/dt-bindings/clock/mt6765-clk.h'
     ids = dict(re.findall(r'^#define\s+(CLK_\w+)\s+(\d+)\s*$', clocks.read_text(), re.M))
     provider = nodes['/soc/clock-controller@10000000']['phandle']

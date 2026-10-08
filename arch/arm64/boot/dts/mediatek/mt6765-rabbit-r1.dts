@@ -45,10 +45,8 @@
 		bootargs = "earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused";
 	};
 
-	/* RabbitOS v0.8.293 LK looks up the exact path /memory. Keep that
-	 * name so its RAM fixup cannot leave a second, stale memory bank.
-	 */
-	memory {
+	/* LK's /memory lookup accepts this unit address and updates the reg. */
+	memory@40000000 {
 		device_type = "memory";
 		reg = <0 0x40000000 0 0x20000000>;
 	};

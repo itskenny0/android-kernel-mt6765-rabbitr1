@@ -25,9 +25,11 @@ DT tables (`0xd7b7ab1e`), each with one FDT entry. `inspect-stock.py` verifies
 bounds, extracts the entries and applies the stock overlay to the **stock** base.
 The mainline DTB is a raw FDT. It is not a drop-in replacement for the stock table.
 
-The LK image contains an exact `/memory` lookup. The r1 DTS preserves this path
-and the stock 512 MiB placeholder. That placeholder does not describe the full
-RAM capacity. The loader must replace it with the actual layout. Dynamic stock
+LK looks up `/memory`; its shipped libfdt accepts the unit address in the r1
+node's name, `memory@40000000`. Instruction tests run the Linux FDT updates
+through final packing and verify that LK replaces the stock 512 MiB placeholder
+with the supplied RAM layout without creating a duplicate memory node. The
+placeholder does not describe the full RAM capacity. Dynamic stock
 SSPM/SCP/connectivity reservations are retained, but runtime TEE/modem/loader
 carve-outs cannot be recovered from a static image alone.
 
@@ -95,14 +97,13 @@ selects topckgen and the validator checks the actual DTB phandles and IDs. This
 does not resolve every reported eMMC problem. The inferred VIO18 I/O supply is
 marked in the DTS and still needs board verification.
 
-Full DT schema validation is **not clean**. The log at
-`logs/r1-dt-validate.log` identifies incomplete MT6765 bindings and inherited
-node/property mismatches (MMC, USB, display and other blocks). The board's
-intentional `/memory` loader-compatibility name also violates the current root
-schema's address-suffixed memory convention; the conservative MMC draft lacks
-the schema's second timing pin state. These are recorded porting work, not
-silenced checks. The board-compatible schema and binary DT consistency checks
-pass, but neither substitutes for full schema conformance or a boot test.
+Full DT schema validation is **not clean**. The refreshed report at
+`logs/memory-node-full-schema.log` records 28 diagnostics for incomplete MT6765
+bindings and inherited node/property mismatches (MMC, USB, display and other
+blocks). The conservative MMC draft lacks the schema's second timing pin state.
+These are recorded porting work, not silenced checks. The board-compatible
+schema, root-node schema and binary DT consistency checks pass, but they do
+not substitute for full schema conformance or a boot test.
 
 ## LineageOS 24.0
 

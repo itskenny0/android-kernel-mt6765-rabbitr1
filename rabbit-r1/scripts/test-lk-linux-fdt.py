@@ -240,8 +240,10 @@ def check_pipeline(image, profile, inputs, overlay):
     assert chosen['linux,initrd-end'] == struct.pack('>I', RAMDISK+len(ramdisk))
     assert chosen['ram_console'] == struct.pack('<4I', 0x10ea00, 0x540, 1, 0x7c0)
     assert chosen['log_store'] == struct.pack('<2I', 0x10f200, 0x100)
-    assert nodes['/memory']['reg'] == struct.pack('>QQ', 0x40000000, 0x100000000)
-    assert nodes['/memory']['mblock_info'] == before[0x48:0x5860]
+    memory = {name for name, props in nodes.items() if props.get('device_type') == b'memory\0'}
+    assert memory == {'/memory@40000000'}, 'LK duplicated or lost the memory node'
+    assert nodes['/memory@40000000']['reg'] == struct.pack('>QQ', 0x40000000, 0x100000000)
+    assert nodes['/memory@40000000']['mblock_info'] == before[0x48:0x5860]
     for i, (name, base, size, mapping) in enumerate(p.REGIONS, 1):
         node = nodes[f'/reserved-memory/mblock-{i}-{name}']
         assert node['reg'] == struct.pack('>QQ', base, size)
@@ -257,7 +259,7 @@ def check_pipeline(image, profile, inputs, overlay):
                                                  'model-part-name': b'MT6765V/XBA\0'})
         elif node == p.SSPM:
             expected['status'] = b'okay\0'
-        elif node == '/memory':
+        elif node == '/memory@40000000':
             assert all(nodes[node][k] == v for k, v in props.items() if k != 'reg')
             continue
         elif node == '/chosen':

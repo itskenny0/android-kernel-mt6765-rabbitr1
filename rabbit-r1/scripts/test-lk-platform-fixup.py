@@ -194,13 +194,15 @@ def main():
             assert nodes['/debug-kinfo']['memory-region'] == debug
             handles = [struct.unpack('>I', p['phandle'])[0] for p in nodes.values() if 'phandle' in p]
             assert len(handles) == len(set(handles)) and 0 not in handles and 0xffffffff not in handles
-            assert nodes['/memory']['mblock_info'] == args_before[0x48:0x5860]
+            memory = {name for name, props in nodes.items() if props.get('device_type') == b'memory\0'}
+            assert memory == {'/memory@40000000'}, 'LK duplicated or lost the memory node'
+            assert nodes['/memory@40000000']['mblock_info'] == args_before[0x48:0x5860]
             # Only memory/chosen additions and SSPM status may affect existing
             # nodes. In particular keep all hardware status/pin/clock bindings.
             expected = {k: dict(v) for k, v in original.items()}
             expected[SSPM]['status'] = b'okay\0'
             for node, props in expected.items():
-                if node in ('/memory', '/chosen'):
+                if node in ('/memory@40000000', '/chosen'):
                     assert all(nodes[node][k] == v for k, v in props.items())
                 else:
                     assert nodes[node] == props

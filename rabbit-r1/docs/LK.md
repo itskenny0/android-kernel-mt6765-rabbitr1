@@ -196,11 +196,14 @@ the command-line preservation assertion.
 
 The same test runs the contiguous post-decompression path in `boot_linux_fdt`
 from `0x1bd6c` to `0x1d4a4` for both packaged boot images. Shipped FDT and libc
-instructions generate `/memory/reg`, serialize boot metadata, append the
+instructions update `/memory@40000000/reg`, serialize boot metadata, append the
 command line, check mblocks, write reservations and pack the final FDT. The
 result must retain the chosen console, profile parameters, initramfs bounds,
 hardware bindings, and all five controlled reservations, including one above
-4 GiB. The stock DTBO selector also executes to initialize the overlay index.
+4 GiB. LK's `/memory` lookup accepts the unit-addressed node: the test requires
+exactly one memory node and checks its rewritten address and size. This lets
+the board follow the root-node schema without changing LK's memory helpers.
+The stock DTBO selector also executes to initialize the overlay index.
 
 Firmware state and the memory map are fixtures. Logging, mutexes, display
 queries, a read-only lock-state accessor and elapsed time are modeled; SRAM
