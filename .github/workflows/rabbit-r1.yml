@@ -118,6 +118,7 @@ jobs:
             drivers/gpu/drm/mediatek/mtk_disp_ovl.o \
             drivers/gpu/drm/mediatek/mtk_plane.o \
             drivers/gpu/drm/mediatek/mtk_crtc.o \
+            drivers/gpu/drm/mediatek/mtk_ddp_comp.o \
             2>&1 | tee logs/mt6765-dsi-build.log
 
       - name: Build the diagnostic initramfs
@@ -138,6 +139,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-dsi-irq.py 2>&1 | tee logs/dsi-irq-tests.log
           toolchains/boot-tools/bin/python scripts/test-dsi-command.py 2>&1 | tee logs/dsi-command-tests.log
           toolchains/boot-tools/bin/python scripts/test-dsi-power.py 2>&1 | tee logs/dsi-power-tests.log
+          toolchains/boot-tools/bin/python scripts/test-dsi-pipeline.py 2>&1 | tee logs/dsi-pipeline-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py 2>&1 | tee logs/mt6765-phy-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py 2>&1 | tee logs/mt6765-display-path-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-smi.py 2>&1 | tee logs/mt6765-smi-tests.log

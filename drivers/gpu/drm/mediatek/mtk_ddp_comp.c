@@ -317,6 +317,8 @@ static const struct mtk_ddp_comp_funcs ddp_dsc = {
 };
 
 static const struct mtk_ddp_comp_funcs ddp_dsi = {
+	.clk_enable = mtk_dsi_ddp_clk_enable,
+	.clk_disable = mtk_dsi_ddp_clk_disable,
 	.start = mtk_dsi_ddp_start,
 	.stop = mtk_dsi_ddp_stop,
 	.encoder_index = mtk_dsi_encoder_index,

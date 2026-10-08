@@ -18,7 +18,7 @@ The workflow:
    setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-   It also compiles the DSI host, RDMA, OVL, plane, CRTC and DRM driver objects, which are not enabled
+   It also compiles the DSI host, RDMA, OVL, plane, CRTC, DDP dispatch and DRM driver objects, which are not enabled
    in the boot profile.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
@@ -35,6 +35,9 @@ The workflow:
    Native DSI sleep/wake/reset/mode writes are compared with complete shipped
    routines; stock power callbacks check reserved-bit preservation and clock
    calls. Native wake/shutdown failure cleanup and engine drain are exercised.
+   Native DSI acquisition also runs through the production CRTC startup path:
+   component/clock/PHY failures, reverse unwind, bridge gating, power-reference
+   ownership, panel-unprepare access and successful retries are checked.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for

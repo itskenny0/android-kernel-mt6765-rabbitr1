@@ -93,7 +93,7 @@ typedef int irqreturn_t;
 #define DRM_INFO(...) ((void)0)
 #define dev_err(dev,...) ((void)(dev))
 #define dev_warn(dev,...) ((void)(dev))
-#define WARN_ON(c) (c)
+#define WARN_ON(c) ({ bool bad=(c);warnings+=bad;bad; })
 #define IS_ERR(p) ((uintptr_t)(p)>(uintptr_t)-4096)
 #define PTR_ERR(p) ((int)(intptr_t)(p))
 #define MIPI_DSI_MSG_USE_LPM BIT(1)
@@ -127,7 +127,7 @@ struct mtk_dsi {
     unsigned int irq_wait_queue;
     struct mutex lock;
     int irq,refcount,format;
-    bool lanes_ready,enabled;
+    bool lanes_ready,enabled,ddp_powered,ddp_started,bridge_powered;
     unsigned int lanes; unsigned long mode_flags;
     struct { u64 pixelclock; } vm;
     u32 data_rate;
@@ -138,7 +138,7 @@ static u8 regs[0x1000];
 static int hs,engine,digital,phy;
 static bool engine_on,digital_on,phy_on,irq_requested,in_irq;
 static unsigned int irq_depth,fail_clock,fail_phy,clock_calls,waits,polls,racks,rx_words;
-static unsigned int starts,resets,mmio_count,registers,irq_requests,wakes;
+static unsigned int starts,resets,mmio_count,registers,irq_requests,wakes,warnings;
 static int fail_wait,wait_error,fail_poll,request_error,register_error;
 static bool stale,extra_cmd,extra_vm,permanent_busy,fail_ulps,recording;
 static u32 pending_sleep, sleep_reads, ulps_polls, ulps_delays;
@@ -317,7 +317,7 @@ static void setup(void)
     memset(&dsi,0,sizeof(dsi)); memset(regs,0,sizeof(regs));
     engine_on=digital_on=phy_on=irq_requested=in_irq=false;
     irq_depth=fail_clock=fail_phy=clock_calls=waits=polls=racks=rx_words=starts=resets=0;
-    mmio_count=registers=irq_requests=wakes=0;
+    mmio_count=registers=irq_requests=wakes=warnings=0;
     fail_wait=wait_error=fail_poll=request_error=register_error=0;
     stale=extra_cmd=extra_vm=permanent_busy=fail_ulps=recording=false;
     pending_sleep=sleep_reads=ulps_polls=ulps_delays=nevents=0;
@@ -466,7 +466,7 @@ static void lifetime(void)
     mtk_dsi_disable(&dsi);assert(!(load(0x10)&2));
     dsi.driver_data=&mt6765_dsi_driver_data;dsi.lock.held=false;off();
     probe(); mtk_output_dsi_enable(&dsi); assert(!dsi.enabled && !mmio_count && !dsi.lock.held);
-    power(); mtk_output_dsi_enable(&dsi); assert(dsi.enabled && load(0x14)==1 && !dsi.lock.held);
+    power(); dsi.ddp_started=dsi.bridge_powered=true; mtk_output_dsi_enable(&dsi); assert(dsi.enabled && load(0x14)==1 && !dsi.lock.held);
     unsigned int before=mmio_count; mtk_output_dsi_enable(&dsi); assert(mmio_count==before);
     mtk_output_dsi_disable(&dsi); assert(!dsi.enabled && !dsi.lock.held); off();cases++;
     power();unsigned int clocks=clock_calls;
@@ -495,7 +495,7 @@ int main(void)
 '''
 
 
-def build_harness(source, extra_tests=''):
+def build_harness(source, extra_tests='', stem=None):
     s = source.read_text()
     macros = s[s.index('#define DSI_START'):s.index('struct mtk_phy_timing')]
     header = (ROOT/'src/mainline/include/drm/drm_mipi_dsi.h').read_text()
@@ -516,7 +516,7 @@ def build_harness(source, extra_tests=''):
                  'mt6765_dsi_driver_data','mt8183_dsi_driver_data'):
         code += block(s,name)
     tests = TESTS if not extra_tests else TESTS.replace('int main(void)', 'static int command_suite(void)')+extra_tests
-    stem = 'dsi-power-host' if extra_tests else 'dsi-command-host'
+    stem = stem or ('dsi-power-host' if extra_tests else 'dsi-command-host')
     path = ROOT/'out'/f'{stem}.c'; path.write_text(code+tests)
     binary = ROOT/'out'/stem
     subprocess.run(['cc','-std=gnu11','-Wall','-Wextra','-Werror','-Wno-sign-compare','-Wno-unused-parameter',

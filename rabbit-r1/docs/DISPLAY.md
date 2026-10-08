@@ -260,6 +260,47 @@ types, lengths 0..64 and all four host modes. It also checks mode restoration,
 command/switch failures and an unchanged one-byte read path. The MMIO, IRQ and
 transport operations are modeled, not hardware-tested.
 
+## Native pipeline power ownership
+
+MT6765 acquires its DSI power reference during the DDP clock stage. This stage
+returns errors to `mtk_crtc_ddp_hw_init()`, which unwinds earlier component
+clocks, the mutex clock and runtime PM before connecting or starting the path.
+The CRTC stays disabled and does not enable vblank after a failed acquisition.
+Previously the void DDP start callback discarded DSI failures, after the path
+was already connected and other components had started.
+
+The DDP start callback now marks the successfully acquired native host as part
+of the running pipeline. Bridge pre-enable requires this state before taking
+its own reference. It cannot retry an incomplete CRTC startup independently.
+Output enable requires both the running DDP state and the bridge reference.
+Ownership changes are serialized by DRM commit callbacks; the existing native
+mutex continues to protect hardware, transfers and the reference count.
+
+Each owner releases only its own successful acquisition. DDP stop drops its
+reference before upstream component clocks disappear. Clock-stage unwind also
+releases that reference if a later component fails; the eventual clock-disable
+callback is harmless after a normal stop. The bridge keeps DSI powered through
+panel unprepare and releases it in post-disable. Duplicate acquisition/release
+callbacks do not leak references or drop another owner's reference. Other SoCs
+retain their start/stop power ordering; the new clock callbacks do nothing there.
+
+`test-dsi-pipeline.py` compiles the actual CRTC clock loop, hardware-init and
+atomic-enable functions, the DDP DSI descriptor and native DSI/bridge callbacks.
+It exercises 180 failures followed by successful retries, placing DSI at each
+of ten positions in a modeled component array. Failures cover the component
+power domain, main runtime PM, mutex clock, native rate/clock/PHY/lane startup,
+and every other component before and after DSI. It checks reverse clock unwind,
+absence of path connection/start/vblank on failure, bridge gating, balanced
+references, repeated callbacks and a panel command after DDP stop. Legacy
+callback reference ordering is checked with an existing power reference.
+Fifteen compiled faulty variants and the previous production callbacks are
+rejected by the runtime checks.
+
+Other display components, DRM services, clocks, PHY, MMIO and interrupt delivery
+remain models. Full atomic-commit event delivery, page-flip recovery after a
+failed modeset, panel rails and firmware DMA handoff still need validation.
+The display graph remains disabled.
+
 ## Native host power sequencing
 
 MT6765 does not use `CON_CTRL` bit 1 as a DSI-enable control. The published
