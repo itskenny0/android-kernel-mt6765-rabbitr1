@@ -55,6 +55,15 @@ assert setter.index('#if 0') < setter.index('/* Workaround to make IEOC accurate
 keys = re.search(r'mt6370_val_en_hidden_mode\[\] = \{([^}]+)', vendor)[1]
 keys = [int(v, 16) for v in re.findall(r'0x[0-9a-fA-F]+', keys)]
 assert keys == [0x96, 0x69, 0xc3, 0x3c]
+# Input register definitions and the selection-to-ILIM settling interval are pinned too.
+assert value('MT6370_AICR_MIN') == 100000 and value('MT6370_AICR_STEP') == 50000
+assert value('MT6370_MASK_AICR') == 0xfc and value('MT6370_SHIFT_AICR') == 2
+assert value('MT6370_SHIFT_AICR_EN') == 1 and value('MT6370_SHIFT_ILIM_EN') == 0
+initial = function('mt6370_chg_init_setting', vendor)
+select = initial.index('MT6370_IINLMTSEL_AICR')
+settle = initial.index('mdelay(5);')
+ilim = initial.index('mt6370_enable_ilim(chg_data, false)')
+assert select < settle < ilim
 expected = f'''
 #define STOCK_KEY_REG {0x100+value('MT6370_PMU_REG_HIDDENPASCODE1')}
 #define STOCK_HIDDEN_REG {0x100+value('MT6370_PMU_REG_CHGHIDDENCTRL7')}
@@ -255,7 +264,8 @@ static int regmap_update_bits(struct regmap *m, unsigned int reg, unsigned int m
 }
 static void usleep_range(unsigned int lo, unsigned int hi)
 {
-    assert(lo && hi == lo+1000 && priv.ichg_lock.owner == thread_id);
+    assert(lo && hi == lo+1000);
+    assert(priv.ichg_lock.owner == thread_id || (!settings_done && lo == 5000));
     record('d',0,lo); slept_us+=lo;
 }
 static int regmap_field_read(struct regmap_field *f, unsigned int *val)
@@ -324,6 +334,7 @@ static int mt6370_chg_init_otg_regulator(struct mt6370_priv *p)
 {
     assert(p->ichg_lock.initialized && p->attach_lock.initialized);
     assert(!gate && (regs[STOCK_CURRENT_REG]&STOCK_CURRENT_MASK) == (8U << STOCK_CURRENT_SHIFT));
+    assert(regs[0x113] == 2 && (regs[0x112]&12) == 8);
     settings_done=true;
     int ret=step(); if (!ret) add(RES_OTG); return ret;
 }
@@ -773,6 +784,69 @@ static unsigned int check_stopped_api(void)
     return checks;
 }
 static int raced_property, raced_result, raced_value;
+static void check_input_trace(unsigned int initial_ctrl2, unsigned int initial_ctrl3)
+{
+    unsigned int ctrl2=initial_ctrl2, ctrl3=initial_ctrl3;
+    bool settled=false;
+    for (unsigned int i=0; i<nops; i++) {
+        struct bus_op op=trace[i];
+        if (op.type == 'd' && op.value == 5000) {
+            assert((ctrl2&12) == 8 && (ctrl3&0xfe) == 2);
+            settled=true;
+        }
+        if (op.type != 'w') continue;
+        if (op.reg == 0x112) {
+            /* Any change to the source selector must select an enabled 100mA budget. */
+            if ((ctrl2^op.value)&12) assert((op.value&12) == 8 && (ctrl3&0xfe) == 2);
+            assert((ctrl2&~12U) == (op.value&~12U));
+            if (!errors[i] || apply_failed_write) ctrl2=op.value;
+        } else if (op.reg == 0x113) {
+            /* Never drop the pin constraint before the replacement has settled. */
+            if ((ctrl3&1) && !(op.value&1))
+                assert(settled && (ctrl2&12) == 8 && op.value == 2);
+            if (!errors[i] || apply_failed_write) ctrl3=op.value;
+        }
+    }
+    assert(ctrl2 == regs[0x112] && ctrl3 == regs[0x113]);
+}
+static void check_initial_input(void)
+{
+    const unsigned int ids[]={0x80,0xe0,0x90,0xa0,0xb0,0xf0};
+    unsigned int cases=0, faults=0;
+    for (unsigned int m=0; m<ARRAY_SIZE(ids); m++)
+    for (unsigned int input=0; input<256; input++)
+    for (unsigned int select=0; select<4; select++) {
+        setup(ids[m],false,1000000,0x60); settings_done=false;
+        unsigned int ctrl2=0x52|(select<<2);
+        regs[0x112]=ctrl2; regs[0x113]=input;
+        assert(!mt6370_chg_init_setting(&priv));
+        assert(regs[0x113] == 2 && regs[0x112] == ((ctrl2&~12U)|8));
+        assert(current_value() == 900000 && slept_us == 5000 && !notifications);
+        check_input_trace(ctrl2,input); cases++;
+    }
+    for (unsigned int model=0; model<2; model++) {
+        setup(ids[model],false,1000000,0x60); settings_done=false;
+        regs[0x112]=0x52; regs[0x113]=0xfd;
+        assert(!mt6370_chg_init_setting(&priv));
+        unsigned int count=nops;
+        struct bus_op sequence[256]; memcpy(sequence,trace,count*sizeof(*trace));
+        /* The first operation belongs to the separately tested charge-stop helper. */
+        for (unsigned int failure=1; failure<count; failure++) {
+            /* Current-workaround cleanup has separate exhaustive fault coverage. */
+            if (sequence[failure].type == 'd' || sequence[failure].reg == STOCK_KEY_REG) continue;
+            if (sequence[failure].reg == STOCK_HIDDEN_REG || sequence[failure].reg == STOCK_CURRENT_REG) continue;
+            for (unsigned int effect=0; effect<2; effect++) {
+                setup(ids[model],false,1000000,0x60); settings_done=false;
+                regs[0x112]=0x52; regs[0x113]=0xfd;
+                errors[failure]=EIO; apply_failed_write=effect;
+                assert(mt6370_chg_init_setting(&priv) == -EIO);
+                assert(nops == failure+1 && !(regs[0x112]&1) && !notifications);
+                check_input_trace(0x52,0xfd); faults++;
+            }
+        }
+    }
+    printf("PASS: %u inherited input-limit states and %u input initialization faults; selector, loop, pin limit and settling order checked\n",cases,faults);
+}
 static unsigned int shutdown_started;
 static void *property_racer(void *unused)
 {
@@ -973,6 +1047,7 @@ int main(void)
         transactions++;
     }
     assert(transactions == 400);
+    check_initial_input();
     destroy_mutex(&priv.ichg_lock); destroy_mutex(&priv.attach_lock); destroy_mutex(&priv.psy_lock);
     struct platform_device pdev={0};
     settings_done=false; reset_bus(0xe0,true,500000,0);
@@ -991,8 +1066,11 @@ int main(void)
     /* DEV_INFO plus each bus operation during initial settings, before callback exposure. */
     settings_done=false; stage=0; reset_bus(0xe0,true,500000,0);
     assert(!mt6370_chg_probe(&pdev)); unsigned int init_ops=publication_io_start;
+    bool init_bus_ops[256]={0};
+    for (unsigned int i=0; i<init_ops; i++) init_bus_ops[i]=trace[i].type != 'd';
     release_probe();
     for (unsigned int f=0; f<init_ops; f++) {
+        if (!init_bus_ops[f]) continue;
         settings_done=false; stage=0; reset_bus(0xe0,true,500000,0); errors[f]=EIO;
         unsigned int previous=publication_calls;
         assert(mt6370_chg_probe(&pdev) == -EIO && publication_calls == previous);
@@ -1023,5 +1101,5 @@ subprocess.run(['gcc','-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror',
 subprocess.run([str(OUT/'host')],check=True,timeout=30)
 (ROOT/'out/mt6370-current-audit.json').write_text(json.dumps(dict(
     hardware_tested=False, source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-    scope='production current/control helpers, properties, descriptor, probe, IRQ registration and registered shutdown callback; compiled Rabbit stop oracle; modeled I/O/time/IRQ/work/devres and pthread API/shutdown races; no electrical or battery-policy validation'
+    scope='production input initialization, current/control helpers, properties, descriptor, probe, IRQ registration and registered shutdown callback; compiled Rabbit stop oracle; modeled I/O/time/IRQ/work/devres and pthread API/shutdown races; no electrical or battery-policy validation'
 ),indent=2)+'\n')

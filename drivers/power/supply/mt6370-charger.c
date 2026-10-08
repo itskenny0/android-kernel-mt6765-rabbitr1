@@ -991,7 +991,22 @@ static int mt6370_chg_init_setting(struct mt6370_priv *priv)
 		return ret;
 	}
 
-	/* Disable input current limit */
+	/* Establish the minimum input budget before releasing the ILIM pin. */
+	ret = mt6370_chg_field_set(priv, F_IAICR, 100000);
+	if (ret)
+		return dev_err_probe(priv->dev, ret, "Failed to set initial input current\n");
+
+	ret = mt6370_chg_field_set(priv, F_AICR_EN, 1);
+	if (ret)
+		return dev_err_probe(priv->dev, ret, "Failed to enable AICR\n");
+
+	ret = mt6370_chg_field_set(priv, F_IINLMTSEL, 2);
+	if (ret)
+		return dev_err_probe(priv->dev, ret, "Failed to select IAICR\n");
+
+	/* Match the stock settling interval before disabling hardware ILIM. */
+	usleep_range(5000, 6000);
+
 	ret = mt6370_chg_field_set(priv, F_ILIM_EN, 0);
 	if (ret) {
 		dev_err(priv->dev, "Failed to disable input current limit\n");
@@ -1002,13 +1017,6 @@ static int mt6370_chg_init_setting(struct mt6370_priv *priv)
 	ret = mt6370_chg_set_ichg(priv, 900000);
 	if (ret) {
 		dev_err(priv->dev, "Failed to set ICHG to 900mA");
-		return ret;
-	}
-
-	/* Change input current limit selection to using IAICR results */
-	ret = mt6370_chg_field_set(priv, F_IINLMTSEL, 2);
-	if (ret) {
-		dev_err(priv->dev, "Failed to set IINLMTSEL\n");
 		return ret;
 	}
 

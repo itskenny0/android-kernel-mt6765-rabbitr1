@@ -188,7 +188,7 @@ the power supply and workqueue.
 `test-mt6370-current.py` compiles the production helpers, setter, initialization
 and probe with the kernel's range helpers. It checks 257 identification cases,
 816 current transitions, 66 invalid requests, 246 fault/recovery cases, 400
-threaded transitions and 54 probe/unwind cases. The bus model covers partial
+threaded transitions and 58 probe/unwind cases. The bus model covers partial
 passcodes, failed writes that take effect, failed cleanup, stale protection and
 an inherited open gate. Fifteen faulty variants fail runtime assertions.
 ASan/UBSan and pthread locks check the host model; physical protection behavior,
@@ -274,8 +274,39 @@ They cover 18 model/work cases, 858 rejected property calls after shutdown,
 IRQ registration code is exercised through partial lookup/request failures.
 IRQ synchronization, running work and managed resources are modeled; these
 checks reject 21 faulty variants but do not establish behavior during a physical
-reboot. Initial input-limit
-selection and USB enumeration/suspend budget integration remain unfinished.
+reboot. USB enumeration/suspend budget integration remains unfinished.
+
+### Initial USB input limit
+
+Probe programs IAICR to 100 mA and enables its regulation loop before selecting
+it as the input limit. It then waits at least 5 ms before disabling the external
+ILIM pin constraint. The interval follows Rabbit's stock initialization; the
+order ensures the replacement limit exists before the pin constraint is removed.
+Every failed transaction stops initialization before callbacks are published.
+This replaces reliance on inherited firmware settings, including an AICR loop
+that may have been disabled.
+
+The [RT5081 register table](https://www.richtek.com/assets/product_file/RT5081/DS5081-00.pdf),
+page 72, describes IAICR, its loop-enable bit and the input selector. Their
+locations agree with the pinned Rabbit MT6370 headers. The manufacturer PDF is
+currently indexed but its download returns 404; the stock sources remain the
+reproducible local reference.
+
+The production initialization runs against all 256 inherited input-register
+values and all four selector values on six supported models: 6,144 cases.
+Another 40 fault cases check error propagation and ensure the pin constraint
+is not removed early, including failed writes that take effect. Probe tests
+also inject initialization failures before callback publication. These are
+register and timing models, not measured input-current limits. Twelve faulty
+variants fail runtime assertions; the pre-fix driver reproduces the missing
+initial limit.
+
+This 100 mA starting point does not handle USB suspend or authorize charging.
+The gadget requests budgets below the charger's 100 mA minimum, including 2 mA
+at suspend; those requests must not be rounded upward. Connecting the USB budget
+to the charger and establishing input-path isolation remain required before
+enabling the r1 charger node. Battery-current preferences cannot override that
+input budget.
 
 ### Android charging-speed setting
 
