@@ -67,12 +67,50 @@ errors and short transfers.
 The enable callback also requires the panel core's prepared state. This prevents
 the core from turning on the backlight after initialization failed.
 
-No panel supply mapping has been established. The stock callbacks only drive
-reset and send commands; they do not identify a regulator. The current driver
+No panel supply mapping has been established. The stock kernel panel callbacks
+only drive reset and send commands; they do not identify a regulator. The current driver
 relies on firmware-established rails, as does the diagnostic configuration's
 `regulator_ignore_unused`. It cannot cold-power the panel or implement complete
 suspend power management. No guessed supply or dummy fixed regulator was added.
 The unused physical-size constants in the vendor source are not copied.
+
+### Power inherited from firmware
+
+The shipped LK has an additional `lcm_init_power` callback, but it does not
+enable a supply. `test-panel-power.py` checks the exact v0.8.293 LK checksum,
+its panel driver object at raw offset `0x99f5c`, and executes these complete
+Thumb callbacks:
+
+| Callback | Raw LK offset | Observed operations |
+| --- | --- | --- |
+| `lcm_init_power` | `0x290fc` | Wait 50 ms; read `b0,b1,b1,b3,b3`; wait 20 ms; read `b3`; wait 20 ms; read `b3` |
+| `lcm_suspend_power` | `0x28fbc` | Reset low, wait 10 ms |
+| `lcm_resume_power` | `0x28f00` | Reset low, wait 15 ms |
+
+The init callback calls `lcm_mt6370_i2c_read_byte` at `0x29094`. It requests a
+one-byte register-address write followed by a one-byte read, with no register
+value write. `b0`, `b1` and `b3` are the MT6370 display-bias control 1,
+control 2 and positive-voltage selector registers. Their observed read values
+are unknown: the test supplies synthetic values, not a hardware dump.
+All seven failed reads are logged and ignored; the callback still returns.
+No reset operation occurs in init-power itself.
+
+The 643 LK fixtures include every byte value and every subset of failed reads
+with three error codes. They check the read helper's successful copy and
+unchanged output after failure, the ordered delays, normal return, preserved
+registers, and absence of writes outside the callback stack. I2C transport,
+GPIO, delays and logging are modeled. This does not execute other LK power
+initialization or establish physical supply wiring.
+
+The published kernel's `disp_late` calls `display_bias_regulator_init` and
+`display_bias_enable`, but their implementation depends on the disabled
+`CONFIG_MT6370_PMU_DSV` option. More decisively, the shipped Image contains
+four no-op helpers: `display_bias_regulator_init` at `0x6eec74`,
+`display_bias_enable` at `0x6eec8c`, `disp_late_bias_enable` at `0x6eeca4`,
+and `display_bias_disable` at `0x6eecbc`. The test executes each helper and
+confirms a zero return with only the modeled ftrace call and stack writes.
+Consequently, neither these calls nor the generic DSV nodes in the stock DT
+justify adding 5.4 V panel supplies. Cold power-on remains an open board task.
 
 ## Timing and host work
 

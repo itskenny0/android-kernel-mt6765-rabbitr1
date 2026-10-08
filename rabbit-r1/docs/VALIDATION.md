@@ -28,6 +28,7 @@
 | Panel init/suspend vs shipped kernel | PASS: 39 command payloads, delays, reset waveform, mode fields and DT wiring | `logs/r1-panel-tests.log`, `out/r1-panel-audit.json`; selected stock instructions and modeled transport |
 | Panel transport errors and enable gate | PASS: 82 failed/short commands, GPIO failure, reset cleanup, prepare/unprepare cycle and prepared-state gate | `scripts/test-r1-panel.py`; production callbacks with ASan/UBSan |
 | Panel payload, packet type, reset, short-write and sleep-error regressions | All five rejected | `logs/r1-panel-regression-*.log` |
+| Stock panel power callbacks | PASS: 643 LK traces, all read-failure subsets and four shipped kernel no-op bias helpers | `scripts/test-panel-power.py`, `logs/panel-power-tests.log`, `out/panel-power-audit.json`; I2C/GPIO/delay/log/ftrace modeled; no supply mapping or cold-power proof |
 | MediaTek DSI transfer return | PASS: seven packet types, lengths 0..64, four modes, errors and one-byte read regression | `logs/dsi-transfer-tests.log`; host callback with modeled MMIO/IRQ/transport |
 | Zero-byte DSI write regression | Rejected | `logs/dsi-transfer-regression.log` |
 | Native MT6765 DSI timing vs shipped kernel | PASS: 12 D-PHY rates, 24 video/pixel combinations, eight lane/clock combinations and fractional r1 mode | `logs/dsi-timing-tests.log`, `out/dsi-timing-audit.json`; selected setup instructions with modeled MMIO |
@@ -181,6 +182,7 @@ toolchains/boot-tools/bin/python scripts/test-stock-backlight.py
 python3 scripts/test-r1-power.py
 python3 scripts/test-dsi-transfer.py
 toolchains/boot-tools/bin/python scripts/test-r1-panel.py
+toolchains/boot-tools/bin/python scripts/test-panel-power.py
 toolchains/boot-tools/bin/python scripts/test-dsi-timing.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py

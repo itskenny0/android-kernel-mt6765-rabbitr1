@@ -25,7 +25,10 @@ The workflow:
    stock ATF I2C service, compares timing registers with the shipped kernel,
    audits the shipped FIFO setup, eight/nine-byte DMA selection and stock
    backlight setup instructions, and compares the panel driver with shipped
-   init/suspend instructions. Native DSI timing, pixel formats and lane/clock
+   init/suspend instructions. Stock LK power callbacks are checked across
+   register values and failed reads, and the shipped kernel's display-bias
+   stubs are executed; neither establishes panel supply wiring.
+   Native DSI timing, pixel formats and lane/clock
    settings are compared with selected stock setup instructions; invalid modes,
    early power failures and MT8183 behavior are checked with host stubs.
    DSI IRQ acknowledgements and the CPU RX/RACK sequence are compared with
