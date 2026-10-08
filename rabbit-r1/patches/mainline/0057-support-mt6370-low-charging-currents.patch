@@ -1,0 +1,255 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Support MT6370 low charging currents
+
+Apply the stock VSYS protection workaround on MT6370 and RT5081 before
+programming currents below 900 mA. Serialize hidden access, close the gate
+on errors and attempt charge disable after an incomplete transition.
+Keep the previous minimum for other variants and initialize callback state
+before publishing the power supply.
+
+diff --git a/drivers/power/supply/mt6370-charger.c b/drivers/power/supply/mt6370-charger.c
+index 8e7bdb926f..40f4faf65d 100644
+--- a/drivers/power/supply/mt6370-charger.c
++++ b/drivers/power/supply/mt6370-charger.c
+@@ -7,6 +7,7 @@
+ 
+ #include <linux/bitfield.h>
+ #include <linux/bits.h>
++#include <linux/cleanup.h>
+ #include <linux/devm-helpers.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/iio/consumer.h>
+@@ -26,6 +27,8 @@
+ 
+ #include <dt-bindings/iio/adc/mediatek,mt6370_adc.h>
+ 
++#define MT6370_REG_DEV_INFO		0x100
++#define MT6370_REG_HIDDEN_PASSCODE	0x107
+ #define MT6370_REG_CHG_CTRL1		0x111
+ #define MT6370_REG_CHG_CTRL2		0x112
+ #define MT6370_REG_CHG_CTRL3		0x113
+@@ -38,6 +41,7 @@
+ #define MT6370_REG_CHG_CTRL10		0x11A
+ #define MT6370_REG_DEVICE_TYPE		0x122
+ #define MT6370_REG_USB_STATUS1		0x127
++#define MT6370_REG_CHG_HIDDEN_CTRL7	0x136
+ #define MT6370_REG_CHG_STAT		0x14A
+ #define MT6370_REG_FLED_EN		0x17E
+ #define MT6370_REG_CHG_STAT1		0X1D0
+@@ -49,6 +53,9 @@
+ #define MT6370_OTG_OC_MASK		GENMASK(2, 0)
+ 
+ #define MT6370_MIVR_IBUS_THRESHOLD_UA	100000
++#define MT6370_VENID_MASK		GENMASK(7, 4)
++#define MT6370_VSYS_SHORT_MASK		GENMASK(6, 5)
++#define MT6370_VSYS_SHORT_ENABLE		BIT(6)
+ 
+ enum mt6370_chg_reg_field {
+ 	/* MT6370_REG_CHG_CTRL2 */
+@@ -91,6 +98,7 @@ struct mt6370_priv {
+ 	struct device *dev;
+ 	struct iio_channel *iio_ibus;
+ 	struct mutex attach_lock;
++	struct mutex ichg_lock;
+ 	struct power_supply *psy;
+ 	struct regmap *regmap;
+ 	struct regmap_field *rmap_fields[F_MAX];
+@@ -102,6 +110,8 @@ struct mt6370_priv {
+ 	int attach;
+ 	int psy_usb_type;
+ 	bool pwr_rdy;
++	bool ichg_workaround;
++	unsigned int ichg_min;
+ };
+ 
+ enum mt6370_usb_status {
+@@ -134,7 +144,7 @@ static const struct linear_range mt6370_chg_ranges[MT6370_RANGE_F_MAX] = {
+ 	LINEAR_RANGE_IDX(MT6370_RANGE_F_IAICR, 100000, 0x0, 0x3F, 50000),
+ 	LINEAR_RANGE_IDX(MT6370_RANGE_F_VOREG, 3900000, 0x0, 0x51, 10000),
+ 	LINEAR_RANGE_IDX(MT6370_RANGE_F_VMIVR, 3900000, 0x0, 0x5F, 100000),
+-	LINEAR_RANGE_IDX(MT6370_RANGE_F_ICHG, 900000, 0x08, 0x31, 100000),
++	LINEAR_RANGE_IDX(MT6370_RANGE_F_ICHG, 500000, 0x04, 0x31, 100000),
+ 	LINEAR_RANGE_IDX(MT6370_RANGE_F_IPREC, 100000, 0x0, 0x0F, 50000),
+ 	LINEAR_RANGE_IDX(MT6370_RANGE_F_IEOC, 100000, 0x0, 0x0F, 50000),
+ };
+@@ -218,6 +228,84 @@ static inline int mt6370_chg_field_set(struct mt6370_priv *priv,
+ 	return regmap_field_write(priv->rmap_fields[fd], val);
+ }
+ 
++static int mt6370_chg_init_ichg(struct mt6370_priv *priv)
++{
++	unsigned int info;
++	int ret;
++
++	priv->ichg_min = 900000;
++	priv->ichg_workaround = false;
++	ret = regmap_read(priv->regmap, MT6370_REG_DEV_INFO, &info);
++	if (ret)
++		return ret;
++
++	switch (FIELD_GET(MT6370_VENID_MASK, info)) {
++	case 0x8: /* RT5081 */
++	case 0xe: /* MT6370 */
++		priv->ichg_min = 500000;
++		priv->ichg_workaround = true;
++		break;
++	case 0xa: /* RT5081A */
++	case 0xf: /* MT6371 */
++	case 0x9: /* MT6372P */
++	case 0xb: /* MT6372CP */
++		/* Keep the previous minimum until low-current behavior is verified. */
++		break;
++	default:
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
++{
++	static const u8 passcode[] = { 0x96, 0x69, 0xc3, 0x3c };
++	unsigned int protection;
++	int ret, lock_ret, stop_ret;
++
++	if (ua < priv->ichg_min ||
++	    ua > linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_ICHG]))
++		return -ERANGE;
++
++	guard(mutex)(&priv->ichg_lock);
++	if (!priv->ichg_workaround)
++		return mt6370_chg_field_set(priv, F_ICHG, ua);
++
++	/* Establish a closed gate even if firmware or a failed write left it open. */
++	ret = regmap_write(priv->regmap, MT6370_REG_HIDDEN_PASSCODE, 0);
++	if (ret)
++		goto lock;
++	ret = regmap_bulk_write(priv->regmap, MT6370_REG_HIDDEN_PASSCODE,
++				passcode, ARRAY_SIZE(passcode));
++	if (ret)
++		goto lock;
++
++	/* Set the target state every time; a cached current can be stale after I/O errors. */
++	protection = ua < 900000 ? 0 : MT6370_VSYS_SHORT_ENABLE;
++	ret = regmap_update_bits(priv->regmap, MT6370_REG_CHG_HIDDEN_CTRL7,
++				 MT6370_VSYS_SHORT_MASK, protection);
++lock:
++	/* Attempt to close the gate even after a partial passcode write. */
++	lock_ret = regmap_write(priv->regmap, MT6370_REG_HIDDEN_PASSCODE, 0);
++	if (lock_ret)
++		dev_err(priv->dev, "Failed to close hidden register gate: %d\n", lock_ret);
++	if (!ret)
++		ret = lock_ret;
++	if (!ret)
++		ret = mt6370_chg_field_set(priv, F_ICHG, ua);
++	if (!ret)
++		return 0;
++
++	/* A failed transition may leave current and protection settings mismatched. */
++	stop_ret = mt6370_chg_field_set(priv, F_CHG_EN, 0);
++	if (stop_ret)
++		dev_err(priv->dev, "Failed to disable charging after current error: %d\n",
++			stop_ret);
++
++	return ret;
++}
++
+ enum {
+ 	MT6370_CHG_STAT_READY = 0,
+ 	MT6370_CHG_STAT_CHARGE_IN_PROGRESS,
+@@ -613,6 +701,9 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ 	if (setting < range->min || setting > linear_range_get_max_value(range))
+ 		return -ERANGE;
+ 
++	if (fd == F_ICHG)
++		return mt6370_chg_set_ichg(priv, setting);
++
+ 	return mt6370_chg_field_set(priv, fd, setting);
+ }
+ 
+@@ -734,8 +825,8 @@ static int mt6370_chg_init_setting(struct mt6370_priv *priv)
+ 		return ret;
+ 	}
+ 
+-	/* ICHG/IEOC Workaround, ICHG can not be set less than 900mA */
+-	ret = mt6370_chg_field_set(priv, F_ICHG, 900000);
++	/* Initialize current together with its model-specific protection setting. */
++	ret = mt6370_chg_set_ichg(priv, 900000);
+ 	if (ret) {
+ 		dev_err(priv->dev, "Failed to set ICHG to 900mA");
+ 		return ret;
+@@ -869,6 +960,14 @@ static int mt6370_chg_init_irq(struct mt6370_priv *priv)
+ 	return 0;
+ }
+ 
++static void mt6370_chg_cancel_work(void *data)
++{
++	struct mt6370_priv *priv = data;
++
++	cancel_delayed_work_sync(&priv->mivr_dwork);
++	cancel_work_sync(&priv->bc12_work);
++}
++
+ static int mt6370_chg_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -900,17 +999,16 @@ static int mt6370_chg_probe(struct platform_device *pdev)
+ 	if (!priv->iio_ibus)
+ 		return dev_err_probe(dev, -EINVAL, "Missing MT6370 IBUS channel\n");
+ 
+-	ret = mt6370_chg_init_otg_regulator(priv);
++	ret = devm_mutex_init(dev, &priv->attach_lock);
+ 	if (ret)
+-		return dev_err_probe(dev, ret, "Failed to init OTG regulator\n");
+-
+-	ret = mt6370_chg_init_psy(priv);
++		return ret;
++	ret = devm_mutex_init(dev, &priv->ichg_lock);
+ 	if (ret)
+-		return dev_err_probe(dev, ret, "Failed to init psy\n");
++		return ret;
+ 
+-	ret = devm_mutex_init(dev, &priv->attach_lock);
++	ret = mt6370_chg_init_ichg(priv);
+ 	if (ret)
+-		return ret;
++		return dev_err_probe(dev, ret, "Failed to identify charger current limits\n");
+ 
+ 	priv->attach = MT6370_ATTACH_STAT_DETACH;
+ 
+@@ -918,19 +1016,28 @@ static int mt6370_chg_probe(struct platform_device *pdev)
+ 	if (!priv->wq)
+ 		return -ENOMEM;
+ 
+-	ret = devm_work_autocancel(dev, &priv->bc12_work, mt6370_chg_bc12_work_func);
+-	if (ret)
+-		return dev_err_probe(dev, ret, "Failed to init bc12 work\n");
+-
+-	ret = devm_delayed_work_autocancel(dev, &priv->mivr_dwork, mt6370_chg_mivr_dwork_func);
+-	if (ret)
+-		return dev_err_probe(dev, ret, "Failed to init mivr delayed work\n");
++	INIT_WORK(&priv->bc12_work, mt6370_chg_bc12_work_func);
++	INIT_DELAYED_WORK(&priv->mivr_dwork, mt6370_chg_mivr_dwork_func);
+ 
+ 	ret = mt6370_chg_init_setting(priv);
+ 	if (ret)
+ 		return dev_err_probe(dev, ret,
+ 				     "Failed to init mt6370 charger setting\n");
+ 
++	ret = mt6370_chg_init_otg_regulator(priv);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to init OTG regulator\n");
++
++	/* Publish callbacks only after their locks, work items and limits exist. */
++	ret = mt6370_chg_init_psy(priv);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to init psy\n");
++
++	/* Drain work before managed power-supply and workqueue teardown. */
++	ret = devm_add_action_or_reset(dev, mt6370_chg_cancel_work, priv);
++	if (ret)
++		return ret;
++
+ 	ret = mt6370_chg_init_irq(priv);
+ 	if (ret)
+ 		return ret;

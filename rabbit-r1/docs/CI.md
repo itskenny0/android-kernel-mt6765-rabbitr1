@@ -123,6 +123,11 @@ data masking, bus failures and reset gating. The ADC harness also checks
 binding-ID translation for all supported PMIC tables. The MT6370 limit harness
 compiles the property setter and kernel range helpers to check rejected inputs,
 rounding, register fields and bus-error propagation.
+The current-transition harness checks the stock low-current workaround against
+pinned Rabbit sources, both threshold directions, partial writes and cleanup
+failures, concurrent setters, immediate callbacks during registration and failed
+probe cleanup. Regmap, workqueue and device-resource behavior are modeled;
+these checks do not validate physical charging.
 It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.

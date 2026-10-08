@@ -145,11 +145,10 @@ propagate to callers. Zero is rejected for these six limits; it is not a
 charge-disable operation.
 
 These are generic driver bounds, not the r1 battery's approved charging limits.
-The driver's existing 900 mA charge-current minimum remains in place pending
-the stock low-current workaround. The r1's warm JEITA setting of 500 mA will
-now fail explicitly instead of increasing the requested current. Charging
+MT6370 and RT5081 now support 500 mA using the stock workaround described below.
+The other supported variants retain their existing 900 mA minimum. Charging
 remains disabled in the device tree while charge-enable control, battery
-constraints, low-current behavior and temperature policy are unfinished.
+constraints and temperature policy are unfinished.
 
 `test-mt6370-limits.py` compiles the production property setter, ONLINE handler,
 register/range tables and kernel range helpers with ASan/UBSan. It checks
@@ -158,6 +157,70 @@ transitions, including range endpoints, adjacent values, field mapping,
 rounding and preservation of neighboring bits. Ten regression variants fail
 the runtime assertions. Regmap writes, locking and work queuing are modeled;
 these checks do not establish charger operation or electrical safety.
+
+### MT6370 low-current workaround
+
+Rabbit's active `mt6370_pmu_charger.c` disables VSYS short protection below
+900 mA on MT6370/RT5081 and restores it at 900 mA or above. It enters hidden
+mode with the four-byte key `96 69 c3 3c`, changes bits 6:5 of register 0x36
+to 0x00 or 0x40, then closes hidden mode. Mainline's banked regmap addresses
+are 0x107 for the key and 0x136 for that register. The vendor source, PMU
+header and charger header are pinned in `sources.lock.json`. The nearby IEOC
+adjustment is inside `#if 0` in the active stock driver and is not copied.
+
+The mainline driver checks the model before selecting its minimum current.
+On MT6370/RT5081 it serializes the entire transition, first closes any inherited
+hidden gate, then opens it, sets the target protection state, closes it and
+programs current. It programs the target protection on every request; the
+stock cached-current assumption would be unreliable after LK or a bus error.
+There are no other hidden-mode users in the current mainline MT6370 drivers.
+Any future user must share serialization at the MFD level.
+
+After an error it attempts to close the gate and disable charging, retaining
+the first error and logging cleanup failures. A failed bus transaction can
+leave hardware unchanged or partially changed, so charging cannot be guaranteed
+off when that disable fails. Successful current writes never re-enable it.
+Probe initializes locks, work items, model limits and hardware settings before
+publishing power-supply callbacks; managed cleanup drains work before releasing
+the power supply and workqueue.
+
+`test-mt6370-current.py` compiles the production helpers, setter, initialization
+and probe with the kernel's range helpers. It checks 257 identification cases,
+816 current transitions, 66 invalid requests, 176 fault/recovery cases, 400
+threaded transitions and 43 probe/unwind cases. The bus model covers partial
+passcodes, failed writes that take effect, failed cleanup, stale protection and
+an inherited open gate. Fifteen faulty variants fail runtime assertions.
+ASan/UBSan and pthread locks check the host model; physical protection behavior,
+charging current and thermal response still require a device.
+
+### Android charging-speed setting
+
+The requested Android UI is **Settings → Battery → Charging speed**. This is
+an integration design for the future Android port, not an installed Settings
+entry in the current diagnostic image.
+
+* **Automatic** is the default. Manual choices are 500, 600, 700, 800, 900 and
+  1,000 mA, matching the charger's 100 mA steps and stock 1 A normal limit.
+* A manual choice caps battery charge current. Battery temperature, voltage,
+  charger capability and fault handling retain priority and can reduce current
+  or stop charging. For example, a 1,000 mA selection still becomes at most
+  500 mA in the stock warm-temperature region, and a stop condition remains off.
+* Input-current limits remain independent. Changing this setting must not
+  increase the USB input budget or imply support for a faster USB charging mode.
+* The UI sends the preference to the charging-policy service, which is the
+  sole writer of charger limits. It must not write the charger's generic sysfs
+  current range directly; that range extends beyond the r1 battery policy.
+* Persist the preference across reboot and recompute the effective limit when
+  it changes. Automatic means no additional user cap, never a zero-current
+  register write. On startup, charging policy must validate its inputs before
+  applying a saved preference.
+* Show the requested cap separately from the effective limit and the reason
+  for a reduction or pause. A current cap is not a promised charging time or
+  measured current. Keep the entry unavailable if the policy service is absent.
+
+The UI, service interface and persistence are still to be implemented with the
+Android device tree. Enabling this feature also depends on battery-temperature
+conversion, charge-enable control, policy enforcement and hardware validation.
 
 ## MT6357 battery-sense ADC
 

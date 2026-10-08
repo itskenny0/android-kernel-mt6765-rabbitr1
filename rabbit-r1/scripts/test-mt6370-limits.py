@@ -45,6 +45,8 @@ prelude = r'''
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
 #define DIV_ROUND_UP(n,d) (((n)+(d)-1)/(d))
 #define dev_err(...) ((void)0)
+typedef uint8_t u8;
+struct regmap { int unused; };
 struct reg_field { unsigned int reg, lsb, msb; };
 #define REG_FIELD(r,l,h) {r,l,h}
 struct regmap_field { unsigned int id; };
@@ -56,6 +58,15 @@ static bool fail_write;
 static unsigned int registers[0x200];
 static void mutex_lock(struct mutex *m) { assert(!m->locked); m->locked=true; }
 static void mutex_unlock(struct mutex *m) { assert(m->locked); m->locked=false; }
+static struct mutex *lock_guard(struct mutex *m) { mutex_lock(m); return m; }
+static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
+#define guard(type) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
+static int regmap_write(struct regmap *map, unsigned int reg, unsigned int val)
+{ assert(!"Unexpected hidden access on unvalidated variant"); return -EIO; }
+static int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *buf, size_t n)
+{ assert(!"Unexpected hidden access on unvalidated variant"); return -EIO; }
+static int regmap_update_bits(struct regmap *map, unsigned int reg, unsigned int mask, unsigned int val)
+{ assert(!"Unexpected hidden access on unvalidated variant"); return -EIO; }
 static bool queue_work(struct workqueue_struct *q, struct work_struct *w)
 { queues++; return true; }
 union power_supply_propval { int intval; };
@@ -73,11 +84,15 @@ body = header[header.index('struct linear_range {'):header.index('unsigned int l
 for name in ('linear_range_get_max_value', 'linear_range_get_value',
              'linear_range_get_selector_high', 'linear_range_get_selector_within'):
     body += function(name, linear)
-body += s[s.index('#define MT6370_REG_CHG_CTRL1'):s.index('struct mt6370_priv {')]
+body += s[s.index('#define MT6370_REG_'):s.index('struct mt6370_priv {')]
 body += r'''
 struct mt6370_priv {
     struct regmap_field *rmap_fields[F_MAX];
     struct mutex attach_lock;
+    struct mutex ichg_lock;
+    struct regmap *regmap;
+    bool ichg_workaround;
+    unsigned int ichg_min;
     int attach;
     struct workqueue_struct *wq;
     struct work_struct bc12_work;
@@ -98,6 +113,8 @@ static int regmap_field_write(struct regmap_field *field, unsigned int selector)
 }
 '''
 body += function('mt6370_chg_field_set')
+if 'static int mt6370_chg_set_ichg(' in s:
+    body += function('mt6370_chg_set_ichg')
 body += function('mt6370_chg_set_online')
 body += function('mt6370_chg_set_property')
 body += function('mt6370_chg_property_is_writeable')
@@ -122,6 +139,8 @@ static const struct limits limits[] = {
 static void setup(unsigned int seed)
 {
     assert(!priv.attach_lock.locked);
+    assert(!priv.ichg_lock.locked);
+    priv.ichg_min=900000; priv.ichg_workaround=false;
     for (unsigned int i=0; i<ARRAY_SIZE(registers); i++) registers[i]=seed;
     for (unsigned int i=0; i<F_MAX; i++) { fields[i].id=i; priv.rmap_fields[i]=&fields[i]; }
     queues=writes=0; fail_write=false; priv.attach=0;
