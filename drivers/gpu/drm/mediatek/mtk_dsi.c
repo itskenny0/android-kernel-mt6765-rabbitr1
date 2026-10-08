@@ -3,18 +3,21 @@
  * Copyright (c) 2015 MediaTek Inc.
  */
 
+#include <linux/atomic.h>
 #include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/component.h>
 #include <linux/iopoll.h>
 #include <linux/irq.h>
 #include <linux/math64.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/units.h>
+#include <linux/unaligned.h>
 
 #include <video/mipi_display.h>
 #include <video/videomode.h>
@@ -99,6 +102,7 @@
 #define DSI_CMDQ_SIZE		0x60
 #define CMDQ_SIZE			0x3f
 #define CMDQ_SIZE_SEL		BIT(15)
+#define MT6765_DSI_CMDQ_WORDS	128
 
 #define DSI_HSTX_CKL_WC		0x64
 #define HSTX_CKL_WC			GENMASK(15, 2)
@@ -229,8 +233,10 @@ struct mtk_dsi {
 	int refcount;
 	bool enabled;
 	bool lanes_ready;
-	u32 irq_data;
+	atomic_t irq_data;
 	wait_queue_head_t irq_wait_queue;
+	struct mutex lock;
+	int irq;
 	const struct mtk_dsi_driver_data *driver_data;
 };
 
@@ -688,12 +694,12 @@ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
 
 static void mtk_dsi_irq_data_set(struct mtk_dsi *dsi, u32 irq_bit)
 {
-	dsi->irq_data |= irq_bit;
+	atomic_or(irq_bit, &dsi->irq_data);
 }
 
 static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
 {
-	dsi->irq_data &= ~irq_bit;
+	atomic_andnot(irq_bit, &dsi->irq_data);
 }
 
 static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
@@ -703,16 +709,18 @@ static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
 	unsigned long jiffies = msecs_to_jiffies(timeout);
 
 	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
-					       dsi->irq_data & irq_flag,
+					       atomic_read(&dsi->irq_data) & irq_flag,
 					       jiffies);
 	if (ret == 0) {
 		DRM_WARN("Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
 
-		mtk_dsi_enable(dsi);
-		mtk_dsi_reset_engine(dsi);
+		if (!dsi->driver_data->mt6765_regs) {
+			mtk_dsi_enable(dsi);
+			mtk_dsi_reset_engine(dsi);
+		}
 	}
 
-	return ret;
+	return ret > 0 ? 0 : ret ? ret : -ETIMEDOUT;
 }
 
 static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
@@ -724,34 +732,55 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
 	status = readl(dsi->regs + DSI_INTSTA) & flag;
 
 	if (status) {
-		do {
-			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-			tmp = readl(dsi->regs + DSI_INTSTA);
-		} while (tmp & DSI_BUSY);
-
-		if (dsi->driver_data->mt6765_regs)
+		if (dsi->driver_data->mt6765_regs) {
+			/* The reader copies RX data before asserting RACK. */
 			/* W0C: preserve events arriving after the status snapshot. */
 			writel(~status, dsi->regs + DSI_INTSTA);
-		else
+		} else {
+			do {
+				mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
+				tmp = readl(dsi->regs + DSI_INTSTA);
+			} while (tmp & DSI_BUSY);
 			mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
+		}
 		mtk_dsi_irq_data_set(dsi, status);
 		wake_up_interruptible(&dsi->irq_wait_queue);
 	}
 
-	return IRQ_HANDLED;
+	return status ? IRQ_HANDLED : IRQ_NONE;
 }
 
 static s32 mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi, u8 irq_flag, u32 t)
 {
+	int ret;
+
 	mtk_dsi_irq_data_clear(dsi, irq_flag);
 	mtk_dsi_set_cmd_mode(dsi);
 
-	if (!mtk_dsi_wait_for_irq_done(dsi, irq_flag, t)) {
+	ret = mtk_dsi_wait_for_irq_done(dsi, irq_flag, t);
+	if (ret)
 		DRM_ERROR("failed to switch cmd mode\n");
-		return -ETIME;
-	} else {
+	return ret;
+}
+
+/* Called with clocks running and the transfer/power mutex held. */
+static void mt6765_dsi_clear_irq(struct mtk_dsi *dsi, u32 flags)
+{
+	disable_irq(dsi->irq);
+	writel(~flags, dsi->regs + DSI_INTSTA);
+	mtk_dsi_irq_data_clear(dsi, flags);
+	enable_irq(dsi->irq);
+}
+
+static int mt6765_dsi_enter_cmd_mode(struct mtk_dsi *dsi)
+{
+	if (!(readl(dsi->regs + DSI_MODE_CTRL) & MODE))
 		return 0;
-	}
+
+	mt6765_dsi_clear_irq(dsi, VM_DONE_INT_FLAG);
+	mtk_dsi_stop(dsi);
+	mtk_dsi_set_cmd_mode(dsi);
+	return mtk_dsi_wait_for_irq_done(dsi, VM_DONE_INT_FLAG, 500);
 }
 
 static void mtk_dsi_lane_ready(struct mtk_dsi *dsi)
@@ -776,8 +805,15 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	u32 bit_per_pixel;
 	u64 data_rate;
 
+	if (dsi->driver_data->mt6765_regs)
+		mutex_lock(&dsi->lock);
+	ret = 0;
 	if (++dsi->refcount != 1)
-		return 0;
+		goto out_unlock;
+	if (!dsi->lanes || dsi->lanes > 4) {
+		ret = -EINVAL;
+		goto err_refcount;
+	}
 
 	ret = mipi_dsi_pixel_format_to_bpp(dsi->format);
 	if (ret < 0) {
@@ -820,6 +856,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 		goto err_disable_engine_clk;
 	}
 
+	if (dsi->driver_data->mt6765_regs)
+		writel(0, dsi->regs + DSI_INTEN);
 	mtk_dsi_enable(dsi);
 
 	if (dsi->driver_data->has_shadow_ctl)
@@ -827,32 +865,49 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 		       dsi->regs + dsi->driver_data->reg_shadow_dbg_off);
 
 	mtk_dsi_reset_engine(dsi);
+	if (dsi->driver_data->mt6765_regs) {
+		mtk_dsi_stop(dsi);
+		mtk_dsi_set_cmd_mode(dsi);
+	}
 	mtk_dsi_phy_timconfig(dsi);
 
 	mtk_dsi_ps_control(dsi, true);
 	mtk_dsi_set_vm_cmd(dsi);
 	mtk_dsi_config_vdo_timing(dsi);
-	mtk_dsi_set_interrupt_enable(dsi);
+	if (!dsi->driver_data->mt6765_regs)
+		mtk_dsi_set_interrupt_enable(dsi);
 	mtk_dsi_lane_ready(dsi);
 	mtk_dsi_clk_hs_mode(dsi, 1);
+	if (dsi->driver_data->mt6765_regs) {
+		writel(~(u32)(LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG),
+		       dsi->regs + DSI_INTSTA);
+		atomic_set(&dsi->irq_data, 0);
+		mtk_dsi_set_interrupt_enable(dsi);
+		enable_irq(dsi->irq);
+	}
 
-	return 0;
+	goto out_unlock;
 err_disable_engine_clk:
 	clk_disable_unprepare(dsi->engine_clk);
 err_phy_power_off:
 	phy_power_off(dsi->phy);
 err_refcount:
 	dsi->refcount--;
+out_unlock:
+	if (dsi->driver_data->mt6765_regs)
+		mutex_unlock(&dsi->lock);
 	return ret;
 }
 
 static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 {
+	if (dsi->driver_data->mt6765_regs)
+		mutex_lock(&dsi->lock);
 	if (WARN_ON(dsi->refcount == 0))
-		return;
+		goto out_unlock;
 
 	if (--dsi->refcount != 0)
-		return;
+		goto out_unlock;
 
 	/*
 	 * mtk_dsi_stop() and mtk_dsi_start() is asymmetric, since
@@ -861,9 +916,17 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 	 * mtk_dsi_start() needs to be called in mtk_output_dsi_enable(),
 	 * after dsi is fully set.
 	 */
-	mtk_dsi_stop(dsi);
-
-	mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500);
+	if (dsi->driver_data->mt6765_regs) {
+		mt6765_dsi_enter_cmd_mode(dsi);
+		mtk_dsi_stop(dsi);
+		writel(0, dsi->regs + DSI_INTEN);
+		/* Wait for any in-flight handler before disabling its clocks. */
+		disable_irq(dsi->irq);
+		atomic_set(&dsi->irq_data, 0);
+	} else {
+		mtk_dsi_stop(dsi);
+		mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500);
+	}
 	mtk_dsi_reset_engine(dsi);
 	mtk_dsi_lane0_ulp_mode_enter(dsi);
 	mtk_dsi_clk_ulp_mode_enter(dsi);
@@ -878,25 +941,37 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 	phy_power_off(dsi->phy);
 
 	dsi->lanes_ready = false;
+out_unlock:
+	if (dsi->driver_data->mt6765_regs)
+		mutex_unlock(&dsi->lock);
 }
 
 static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
 {
+	if (dsi->driver_data->mt6765_regs) {
+		mutex_lock(&dsi->lock);
+		if (!dsi->refcount)
+			goto out_unlock;
+	}
 	if (dsi->enabled)
-		return;
+		goto out_unlock;
 
 	mtk_dsi_set_mode(dsi);
 	mtk_dsi_start(dsi);
 
 	dsi->enabled = true;
+out_unlock:
+	if (dsi->driver_data->mt6765_regs)
+		mutex_unlock(&dsi->lock);
 }
 
 static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
 {
-	if (!dsi->enabled)
-		return;
-
+	if (dsi->driver_data->mt6765_regs)
+		mutex_lock(&dsi->lock);
 	dsi->enabled = false;
+	if (dsi->driver_data->mt6765_regs)
+		mutex_unlock(&dsi->lock);
 }
 
 static int mtk_dsi_bridge_attach(struct drm_bridge *bridge,
@@ -1265,10 +1340,181 @@ static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
 	mtk_dsi_cmdq(dsi, msg);
 	mtk_dsi_start(dsi);
 
-	if (!mtk_dsi_wait_for_irq_done(dsi, flag, 2000))
-		return -ETIME;
-	else
-		return 0;
+	return mtk_dsi_wait_for_irq_done(dsi, flag, 2000);
+}
+
+static int mt6765_dsi_validate_msg(const struct mipi_dsi_msg *msg)
+{
+	size_t len;
+
+	if (msg->channel > 3 || (msg->tx_len && !msg->tx_buf) ||
+	    (MTK_DSI_HOST_IS_READ(msg->type) ? !msg->rx_len || !msg->rx_buf :
+					    msg->rx_len != 0))
+		return -EINVAL;
+	if (msg->flags & ~MIPI_DSI_MSG_USE_LPM)
+		return -EOPNOTSUPP;
+
+	switch (msg->type) {
+	case MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM:
+	case MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM:
+		len = 0;
+		break;
+	case MIPI_DSI_GENERIC_SHORT_WRITE_1_PARAM:
+	case MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM:
+	case MIPI_DSI_DCS_SHORT_WRITE:
+	case MIPI_DSI_DCS_READ:
+		len = 1;
+		break;
+	case MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM:
+	case MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM:
+	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
+	case MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE:
+		len = 2;
+		break;
+	case MIPI_DSI_GENERIC_LONG_WRITE:
+	case MIPI_DSI_DCS_LONG_WRITE:
+		/* Native CMDQ has 128 words and an eight-bit size field. */
+		return msg->tx_len > (MT6765_DSI_CMDQ_WORDS - 1) * 4 ? -EMSGSIZE : 0;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return msg->tx_len == len ? 0 : -EINVAL;
+}
+
+static void mt6765_dsi_cmdq(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg,
+			   const struct mipi_dsi_packet *packet)
+{
+	u32 config = 0, word;
+	u32 offset = dsi->driver_data->reg_cmdq_off;
+	u32 size = 1 + DIV_ROUND_UP(packet->payload_length, 4);
+	size_t i, j;
+
+	if (MTK_DSI_HOST_IS_READ(msg->type))
+		config |= BTA;
+	if (mipi_dsi_packet_format_is_long(msg->type))
+		config |= LONG_PACKET;
+	if (!(msg->flags & MIPI_DSI_MSG_USE_LPM))
+		config |= HSTX;
+
+	if (config & BTA) {
+		/* Negotiate the response length before the read, as the stock host does. */
+		word = (config & HSTX) |
+		       (u32)(MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE |
+			     (packet->header[0] & 0xc0)) << 8 |
+		       (u32)min_t(size_t, msg->rx_len, 10) << 16;
+		writel(word, dsi->regs + offset);
+		offset += 4;
+		size++;
+	}
+	for (i = 0; i < packet->payload_length; i += 4) {
+		word = 0;
+		for (j = 0; j < 4 && i + j < packet->payload_length; j++)
+			word |= (u32)packet->payload[i + j] << (8 * j);
+		writel(word, dsi->regs + offset + 4 + i);
+	}
+	word = config | (u32)packet->header[0] << 8 |
+	       (u32)packet->header[1] << 16 | (u32)packet->header[2] << 24;
+	writel(word, dsi->regs + offset);
+	writel(size, dsi->regs + DSI_CMDQ_SIZE);
+}
+
+static ssize_t mt6765_dsi_read_response(const struct mipi_dsi_msg *msg, const u8 *data)
+{
+	size_t count, offset = 1;
+
+	if (data[0] >> 6 != msg->channel)
+		return -EPROTO;
+	switch (data[0] & 0x3f) {
+	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE:
+	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE:
+		count = 1;
+		break;
+	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_2BYTE:
+	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_2BYTE:
+		count = 2;
+		break;
+	case MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE:
+	case MIPI_DSI_RX_DCS_LONG_READ_RESPONSE:
+		/* The 16-byte RX window includes the header and two CRC bytes. */
+		count = min_t(size_t, get_unaligned_le16(data + 1), 10);
+		offset = 4;
+		break;
+	default:
+		return -EPROTO;
+	}
+	count = min(count, msg->rx_len);
+	memcpy(msg->rx_buf, data + offset, count);
+	return count;
+}
+
+static ssize_t mt6765_dsi_transfer(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg)
+{
+	struct mipi_dsi_packet packet;
+	u8 data[16];
+	u32 mode, val;
+	bool read = MTK_DSI_HOST_IS_READ(msg->type);
+	bool started = false, acked = false;
+	ssize_t ret;
+	int i;
+
+	ret = mt6765_dsi_validate_msg(msg);
+	if (ret)
+		return ret;
+	ret = mipi_dsi_create_packet(&packet, msg);
+	if (ret)
+		return ret;
+
+	mutex_lock(&dsi->lock);
+	if (!dsi->refcount) {
+		ret = -EHOSTDOWN;
+		goto out_unlock;
+	}
+	mode = readl(dsi->regs + DSI_MODE_CTRL);
+	ret = mt6765_dsi_enter_cmd_mode(dsi);
+	if (ret)
+		goto restore_mode;
+	ret = readl_poll_timeout(dsi->regs + DSI_INTSTA, val, !(val & DSI_BUSY),
+				 4, 2000000);
+	if (ret)
+		goto restore_mode;
+
+	mt6765_dsi_clear_irq(dsi, LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG);
+	mtk_dsi_lane_ready(dsi);
+	mt6765_dsi_cmdq(dsi, msg, &packet);
+	mtk_dsi_start(dsi);
+	started = true;
+	if (read) {
+		ret = mtk_dsi_wait_for_irq_done(dsi, LPRX_RD_RDY_INT_FLAG, 2000);
+		if (ret)
+			goto restore_mode;
+		for (i = 0; i < sizeof(data); i += 4)
+			put_unaligned_le32(readl(dsi->regs + DSI_RX_DATA0 + i), data + i);
+		mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
+		acked = true;
+	}
+	ret = mtk_dsi_wait_for_irq_done(dsi, CMD_DONE_INT_FLAG, 2000);
+	if (ret)
+		goto restore_mode;
+	ret = readl_poll_timeout(dsi->regs + DSI_INTSTA, val, !(val & DSI_BUSY),
+				 4, 2000000);
+	if (!ret)
+		ret = read ? mt6765_dsi_read_response(msg, data) : msg->tx_len;
+
+restore_mode:
+	if (ret < 0) {
+		mtk_dsi_stop(dsi);
+		if (read && started && !acked)
+			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
+		mtk_dsi_reset_engine(dsi);
+		mt6765_dsi_clear_irq(dsi, LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG |
+				   VM_DONE_INT_FLAG);
+	}
+	writel(mode, dsi->regs + DSI_MODE_CTRL);
+	if (mode & MODE)
+		mtk_dsi_start(dsi);
+out_unlock:
+	mutex_unlock(&dsi->lock);
+	return ret;
 }
 
 static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
@@ -1281,6 +1527,9 @@ static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
 	u8 irq_flag = CMD_DONE_INT_FLAG;
 	u32 dsi_mode;
 	int ret, i;
+
+	if (dsi->driver_data->mt6765_regs)
+		return mt6765_dsi_transfer(dsi, msg);
 
 	dsi_mode = readl(dsi->regs + DSI_MODE_CTRL);
 	if (dsi_mode & MODE) {
@@ -1338,7 +1587,7 @@ restore_dsi_mode:
 		mtk_dsi_start(dsi);
 	}
 
-	return ret < 0 ? ret : recv_cnt;
+	return ret ? ret : recv_cnt;
 }
 
 static const struct mipi_dsi_host_ops mtk_dsi_ops = {
@@ -1392,24 +1641,23 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 	dsi->host.dev = dev;
 
 	init_waitqueue_head(&dsi->irq_wait_queue);
+	atomic_set(&dsi->irq_data, 0);
+	mutex_init(&dsi->lock);
+	dsi->irq = irq_num;
 
 	platform_set_drvdata(pdev, dsi);
 
-	ret = mipi_dsi_host_register(&dsi->host);
-	if (ret < 0)
-		return dev_err_probe(dev, ret, "Failed to register DSI host\n");
-
 	ret = devm_request_irq(&pdev->dev, irq_num, mtk_dsi_irq,
-			       IRQF_TRIGGER_NONE, dev_name(&pdev->dev), dsi);
-	if (ret) {
-		mipi_dsi_host_unregister(&dsi->host);
+			       dsi->driver_data->mt6765_regs ? IRQF_NO_AUTOEN : 0,
+			       dev_name(&pdev->dev), dsi);
+	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "Failed to request DSI irq\n");
-	}
 
 	dsi->bridge.of_node = dev->of_node;
 	dsi->bridge.type = DRM_MODE_CONNECTOR_DSI;
 
-	return 0;
+	ret = mipi_dsi_host_register(&dsi->host);
+	return ret ? dev_err_probe(dev, ret, "Failed to register DSI host\n") : 0;
 }
 
 static void mtk_dsi_remove(struct platform_device *pdev)
@@ -1418,6 +1666,9 @@ static void mtk_dsi_remove(struct platform_device *pdev)
 
 	mtk_output_dsi_disable(dsi);
 	mipi_dsi_host_unregister(&dsi->host);
+	if (dsi->driver_data->mt6765_regs)
+		while (dsi->refcount)
+			mtk_dsi_poweroff(dsi);
 }
 
 static const struct mtk_dsi_driver_data mt8173_dsi_driver_data = {

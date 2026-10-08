@@ -192,17 +192,64 @@ registered callback are modeled. The fixture does not execute a panel read.
 The production-handler harness checks all 65,536 low status combinations,
 six new-event masks and two arrival points, including the final write window.
 It verifies that preserved completions are delivered on the next invocation,
-keeps existing software IRQ flags, and covers 192 unchanged MT8183 cases.
+keeps existing software IRQ flags, and covers 192 MT8183 acknowledgement cases.
 The old handler fails the late-VM_DONE case; seven compiled variants with
 incorrect acknowledgement or backend selection are rejected. These are
-ASan/UBSan tests with modeled W0C latches, finite BUSY delays and wakeups.
+ASan/UBSan tests with modeled W0C latches and wakeups. The native handler
+returns after one status read even when BUSY stays asserted; the legacy
+backend still uses its existing finite-delay model.
 Repeated occurrences of the same event can coalesce in one status latch.
 
-The shared handler still has an unbounded BUSY loop in hard IRQ context.
-DSI IRQ ownership across probe, power-on and power-off, stalled-controller
-recovery, and the complete read/RACK sequence remain acceptance work. Passing
-the acknowledgement tests does not establish those behaviors or justify
-enabling the display graph.
+The native handler no longer acknowledges received data or polls BUSY in
+hard IRQ context. The MT6765 transfer path waits for `RD_RDY`, copies all four
+RX registers, asserts RACK, then waits for `CMD_DONE` and idle. A command-done
+interrupt alone cannot complete a read. Both interrupt waits and idle polling
+are bounded; an interrupted wait returns its error. Recovery stops and resets
+the engine, clears stale completions, and restores the previous mode. A failed
+read leaves the caller's buffer untouched. Other SoCs retain their hardware
+handshake; the shared wait helper now propagates signal and timeout errors.
+
+`test-dsi-command.py` executes the shipped CPU reader's successful RX-copy/RACK
+slice at raw offsets `0x718634..0x7186c0` with 16 data/register fixtures. It
+verifies four 32-bit RX reads before RACK and the copied stack data. This slice
+starts after the stock read-ready wait and ends before command-done waiting;
+it does not emulate the stock scheduler or prove packet reception.
+
+The native host validates buffers, channel, short-packet lengths, supported
+command types and queue capacity before touching hardware. It uses the DRM
+packet constructor, including virtual-channel bits and explicit long-packet
+types even for payloads of one or two bytes. The stock register header declares
+128 command words and an eight-bit size field; one word holds the header,
+leaving a maximum payload of 508 bytes. Larger writes fail with `-EMSGSIZE`.
+This is a register-layout bound, not a measured hardware capacity. Reads decode
+short/long responses by packet type, enforce the virtual channel, preserve the
+stock ten-byte payload limit within the 16-byte RX window, and return protocol
+errors for unknown or error responses. Each read queues a maximum-return-size
+command before the BTA request, as the stock host does. Write acknowledgement requests and
+non-command packet types currently return `-EOPNOTSUPP`.
+
+Probe requests the native IRQ with `IRQF_NO_AUTOEN` before registering the host,
+and initializes bridge metadata before any synchronous attachment can occur.
+Power-on enables IRQ delivery only after clocks, lanes and stale-state cleanup
+are ready. Final power-off masks the device interrupt and calls `disable_irq()`
+before removing clocks. A mutex serializes native commands, output enable and
+power references; software IRQ flags use atomic operations. A transfer while
+off returns `-EHOSTDOWN` without MMIO. Command-mode shutdown skips the video
+completion wait, and removal drops outstanding power references.
+
+The ASan/UBSan harness compiles the production host dispatch, packet constructor,
+command helpers, ISR, waits, probe, output and power callbacks. It checks
+205,116 transactions/lifecycle cases: all channels and host modes, short writes,
+long writes through 508 bytes, short and long reads (including one/two-byte long
+responses), stale and unrelated completions, timeouts/signals, repeated power
+references, failure recovery followed by another transfer, and probe ordering.
+It models clocks, PHY, scheduling, IRQ synchronization and MMIO; it asserts no
+MMIO with clocks off, IRQ masking before clock teardown, and no RACK in hard
+IRQ context. Twenty-three compiled broken variants are rejected. The separate
+legacy callback and timing tests still pass. These tests establish software
+behavior under the models, not physical packet transmission or safe display
+startup. The display graph remains disabled pending panel-power, firmware
+handoff and hardware validation.
 
 An independent host API bug is fixed: successful writes now return `tx_len`
 instead of zero, as required by `mipi_dsi_host_ops.transfer`. Without this,

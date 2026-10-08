@@ -21,6 +21,7 @@ prelude = r'''
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -37,9 +38,12 @@ typedef uint32_t u32;
 #define MTK_DSI_HOST_IS_READ(t) ((t)==0x04 || (t)==0x14 || (t)==0x24 || (t)==0x06)
 struct mipi_dsi_host { int unused; };
 struct mipi_dsi_msg { u8 type; const void *tx_buf; size_t tx_len; void *rx_buf; size_t rx_len; };
-struct mtk_dsi { struct mipi_dsi_host host; u8 *regs; };
+struct mtk_dsi_driver_data { bool mt6765_regs; };
+static const struct mtk_dsi_driver_data legacy_data={0};
+struct mtk_dsi { struct mipi_dsi_host host; u8 *regs; const struct mtk_dsi_driver_data *driver_data; };
+static ssize_t mt6765_dsi_transfer(struct mtk_dsi *d, const struct mipi_dsi_msg *m) { (void)d;(void)m;assert(0);return 0; }
 static u8 regs[0x100];
-static struct mtk_dsi dsi = { .regs = regs };
+static struct mtk_dsi dsi = { .regs = regs, .driver_data=&legacy_data };
 static int switch_error, send_error, starts, stops, restores, ready, sends, switches, reads;
 static u32 readl(const u8 *p) { u32 v; memcpy(&v,p,4); return v; }
 static u8 readb(const u8 *p) { reads++; return *p; }

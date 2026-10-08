@@ -115,7 +115,7 @@ struct mtk_dsi { u8 *regs; int format; unsigned int lanes; unsigned long mode_fl
     u32 data_rate; struct videomode vm; struct mtk_phy_timing phy_timing;
     const struct mtk_dsi_driver_data *driver_data;
     struct mipi_dsi_host host; struct drm_bridge bridge;
-    int refcount; void *phy,*hs_clk,*engine_clk,*digital_clk; bool lanes_ready;
+    int refcount, lock, irq, irq_data; void *phy,*hs_clk,*engine_clk,*digital_clk; bool lanes_ready;
 };
 static u8 regs[0x400];
 static unsigned int writes,clk_sets,phy_ons,clock_ons;
@@ -137,8 +137,14 @@ static int clk_prepare_enable(void *clk) { (void)clk; clock_ons++; return 0; }
 static void clk_disable_unprepare(void *clk) { (void)clk; }
 static void mtk_dsi_enable(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_reset_engine(struct mtk_dsi *d) { (void)d; }
+static void mtk_dsi_stop(struct mtk_dsi *d) { (void)d; }
+static void mtk_dsi_set_cmd_mode(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_set_vm_cmd(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *d) { (void)d; }
+static void mutex_lock(int *m) { assert(!*m); *m=1; }
+static void mutex_unlock(int *m) { assert(*m); *m=0; }
+static void atomic_set(int *p,int v) { *p=v; }
+static void enable_irq(int irq) { (void)irq; }
 static void mtk_dsi_reset_dphy(struct mtk_dsi *d) {
     assert(d->lanes_ready);
     if (d->driver_data->mt6765_regs) assert(readl(regs+0x90)==0x3c);

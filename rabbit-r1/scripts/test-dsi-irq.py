@@ -106,6 +106,9 @@ PRELUDE = r'''
 typedef uint32_t u32;
 typedef int irqreturn_t;
 #define IRQ_HANDLED 1
+#define IRQ_NONE 0
+typedef u32 atomic_t;
+static void atomic_or(u32 bits, atomic_t *v) { *v |= bits; }
 #define BIT(n) (1U<<(n))
 #define GENMASK(h,l) ((~0U<<(l)) & (~0U>>(31-(h))))
 '''
@@ -165,10 +168,11 @@ static void check(struct mtk_dsi *d,u32 initial,u32 arrival,unsigned int when,
     memset(regs,0,sizeof(regs)); save(0xc,initial); save(0x84,0x12345678);
     reads=racks=acks=wakes=0; late=arrival; stage=when; busy=latency;
     u32 snapshot=initial&0xb;
-    assert(mtk_dsi_irq(73,d)==IRQ_HANDLED);
+    assert(mtk_dsi_irq(73,d)==(snapshot?IRQ_HANDLED:IRQ_NONE));
     assert(acks==!!snapshot && wakes==!!snapshot);
     assert(d->irq_data==(0xa5000000|snapshot));
-    assert(racks==(snapshot?latency+1:0));
+    assert(racks==(!native && snapshot?latency+1:0));
+    if (native) assert(reads==1); /* BUSY never delays the hard IRQ. */
     if (snapshot) {
         if (native) {
             assert(load(0xc)==((initial|arrival)&~snapshot));
@@ -188,7 +192,7 @@ static void check(struct mtk_dsi *d,u32 initial,u32 arrival,unsigned int when,
         u32 pending=load(0xc)&0xffff;
         reads=racks=acks=wakes=busy=0; late=0; stage=1;
         save(0xc,pending);
-        assert(mtk_dsi_irq(73,d)==IRQ_HANDLED);
+        assert(mtk_dsi_irq(73,d)==((pending&0xb)?IRQ_HANDLED:IRQ_NONE));
         assert(d->irq_data==(0xa5000000|snapshot|(pending&0xb)));
         assert(wakes==!!(pending&0xb) && acks==!!(pending&0xb));
         assert(load(0xc)==(pending&~0xb));
@@ -212,7 +216,7 @@ int main(void)
             for (unsigned int when=0;when<2;when++)
                 check(&d,status,arrivals[i]&~status,when,status%4,false);
     printf("PASS: %u native DSI IRQ cases, deferred completions and 192 MT8183 regressions\n",cases);
-    puts("MMIO, finite BUSY delays and wakeups modeled; IRQ lifetime and permanent BUSY are not validated.");
+    puts("MMIO and wakeups modeled; native IRQ returns after one status read even with BUSY asserted.");
 }
 '''
 
