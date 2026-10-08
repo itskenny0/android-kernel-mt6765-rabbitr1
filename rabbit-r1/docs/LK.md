@@ -210,6 +210,52 @@ secure-world and cache/MMU handoff. It does not validate physical RAM ownership,
 firmware allocation/free paths, display DMA or a complete LK boot. Final FDTs
 are saved as `out/lk-linux-fdt-{ram,expdb}.dtb` for inspection.
 
+## Secure firmware handoff
+
+`test-atf-handoff.py` checks the next interface using the stock `tee.img`
+(140,944 bytes, SHA-256
+`e6de1331346ea1df4a0b78106de5ec5886f6eda99270de5e23ac9e7ba7101b62`)
+and both stock and patched LK. The exact digest enforced by the test is also
+recorded in `out/atf-handoff-audit.json`.
+
+LK's function at file offset `0x2d84` disables and drains GIC interrupts.
+The separate secure post-init function is at `0x3760`. The tested callers use
+these SiP interfaces:
+
+| SiP call | LK arguments | Traced ATF behavior |
+| --- | --- | --- |
+| `0x8200010c` | Zero | Sets a software flag; the selected service performs no MMIO |
+| `0x82000101` | Zero | Applies device-access permissions and related infrastructure settings |
+| `0x82000115` | Kernel, FDT, zero, 64-bit flag | Prepares CPU power controls and a non-secure Linux entry context |
+
+Eight LK fixtures cover the cached crypto-disable flag, success/failure returns,
+and both images. The final jump's arguments must match both packaged boot
+headers. Twelve ATF fixtures cover three initial MMIO patterns, EL2 present or
+absent, and UART logging enabled or disabled. Shipped dispatch arms, permission
+table loops, context construction, copying and zeroing execute. Repeated kernel
+requests must preserve the first prepared context.
+
+The resulting context contains the FDT in `x0`, zero in `x1` through `x3`, the
+kernel entry address, masked interrupts, and EL1h or EL2h as selected by the
+modeled CPU feature register. The kernel preparation writes CPU/cluster power
+controls at SPM offsets `0x204` through `0x228` and `BYPASS_SPMC` at `0x2b4`.
+It does not write `DIS_PWR_CON` at `0x30c` or directly stop the display engines.
+These register names come from the official MT6765 `mtk_spm_reg.h`.
+
+This is **not proof of a safe display handoff**. The AArch64
+[boot protocol](https://www.kernel.org/doc/html/latest/arch/arm64/booting.html)
+requires DMA-capable devices to be quiescent before entering Linux. GIC cleanup
+and access-permission changes do not establish that condition. LK's normal
+handoff has no observed direct call to `primary_display_suspend` (`0x107a4`);
+its power-off path does. Display remains disabled pending teardown and panel
+power work. No speculative shutdown call is added by this audit.
+
+The ATF mapping resolves its linked GOT and relative addresses; it is a fixture,
+not a live memory map. System-register reads, logging, MMIO and secure-context
+restore are modeled. EL3 entry, exception return, physical cache coherency,
+asynchronous firmware and DMA completion are outside the test. No host SMC
+or hardware write is performed.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses

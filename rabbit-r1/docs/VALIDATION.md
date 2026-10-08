@@ -132,6 +132,7 @@
 | LK SCP regression and package gates | Restored old subcall rejected; twelve stale-LK MMC/SCP packaging/preparation cases rejected | `logs/lk-scp-regression.log`, `logs/lk-scp-flash-tests.log` |
 | LK console and successive Linux FDT updates | PASS: 40 console fixtures and both packaged profiles through final FDT packing | `logs/lk-linux-fdt-tests.log`, `out/lk-linux-fdt-audit.json`; controlled firmware state, no whole boot or physical handoff |
 | LK console regression and package gates | PASS: old console rewrite rejected; eighteen stale-LK MMC/SCP/console packaging/preparation cases | `logs/lk-console-regression.log`, `logs/lk-console-flash-tests-precommit.log` |
+| LK secure-call arguments and ATF entry context | PASS: 8 LK and 12 ATF fixtures, packaged addresses, permission writes, EL1h/EL2h context and repeated requests | `logs/atf-handoff-tests.log`, `out/atf-handoff-audit.json`; selected stock instructions with MMIO/system-register models, no EL3 entry/return or physical DMA proof |
 | Stock LK board overlay and LineageOS splash | PASS, GPIO/charger tree retained; 58 logo slots unchanged | `logs/lk-tests.log` |
 | mtkclient package repeated packaging | Identical SHA256 | `logs/package-reproducibility.log` |
 | Output SHA256SUMS and recorded source-diff hashes | PASS | `dist/{mainline,vendor,bringup}/` |

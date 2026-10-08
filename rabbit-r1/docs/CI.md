@@ -98,6 +98,9 @@ The workflow:
    executes successive Linux FDT updates on the packaged images through final
    packing, with controlled firmware state. The resulting command line,
    initramfs bounds, hardware bindings and reservations must be preserved.
+   It also traces LK's secure-call arguments and selected stock ATF dispatch
+   arms in 8 LK and 12 ATF fixtures. Entry registers and repeat-call behavior
+   are checked; EL3 entry/return and physical DMA handoff remain untested.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
    backup validation, AVB flags, checksums and repeat packaging.
 
