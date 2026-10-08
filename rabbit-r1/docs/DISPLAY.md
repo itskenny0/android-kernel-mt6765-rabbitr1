@@ -281,7 +281,7 @@ the remaining OVL plane paths, IOMMU and complete startup sequencing remain to a
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   packed-YUV cropping, framebuffer offsets, plane bounds and display IOMMU behavior.
+   inherited SBCH state, secure-engine handoff and display IOMMU behavior.
    The native RDMA/OVL setup and
    interrupt handling below still require hardware validation.
 2. Identify panel supply rails and implement cold power-on and power-off.
@@ -541,8 +541,62 @@ Fifteen deliberately broken variants are rejected by the runtime assertions
 or the stock-validated register traces, covering opacity, formats, reflection,
 clipping, layer color, nonsecure state and constant blending.
 
-Packed UYVY/YUYV crops, inherited SBCH state, framebuffer offsets, complete
-plane bounds/atomic validation and real blending output remain unverified.
-The generic pending-address helper currently omits `fb->offsets[0]`; that is a
-separate issue to fix before allowing nonzero framebuffer offsets. No scanout,
-IOMMU access or resulting pixel colors are established by these register tests.
+No scanout, IOMMU access or resulting pixel colors are established by these
+register tests. Addressing and packed-YUV crop work is described below.
+
+## Framebuffer addresses and packed-YUV crops
+
+The common pending-state helper now includes `fb->offsets[0]` in the DMA base.
+Previously framebuffer creation accepted that offset and included it in its
+allocation-size check, but the display driver fetched from the start of the GEM
+object instead. Linear source-row arithmetic now uses `dma_addr_t`, avoiding
+sign extension when a byte offset exceeds `INT_MAX`. The existing AFBC address
+calculation also starts at the framebuffer offset; AFBC remains unadvertised on
+MT6765 and its hardware decoding is not validated here.
+
+Native UYVY/YUYV fetches begin on an even source pixel and cover whole two-pixel
+chroma groups. An odd left edge moves the address back two bytes and sets
+`CLIP.LEFT`; an odd right edge fetches one extra pixel and sets `CLIP.RIGHT`.
+The source-size register contains the expanded width, while the destination
+rectangle keeps its visible size. Every native plane update writes CLIP,
+including zero for aligned YUV and RGB. The pending state carries the clipped
+source x coordinate so asynchronous updates cannot reuse an old crop parity.
+
+Both normal and asynchronous component checks run after DRM has clipped the
+source and destination rectangles. Native OVL validation rejects fractional
+source pixels, unsupported modifiers, zero or overflowing dimensions, pitches
+beyond 16 bits, and destination edges beyond 4095. It accounts for chroma-pair
+expansion before checking the row pitch, GEM allocation end and final 32-bit
+DMA address. An odd framebuffer edge is accepted only when row padding and the
+allocation contain the full pair. RGB width 4095 is valid; an expanded YUV fetch
+of 4096 pixels is rejected. The existing prohibition on YUV rotation remains.
+
+Async cursor checks now validate the new plane state instead of mutating the
+old state's derived rectangles. Updates retain the new source/destination
+rectangles and visibility, calculate the pending address before swapping
+framebuffers, and disable a fully off-screen plane. Invisible updates skip
+address calculation. DRM's normal scaling, framebuffer-coordinate and atomic
+lifetime checks remain prerequisites; the native helper does not replace them.
+The address and state fixes are shared by the MediaTek backends. The new
+hardware bounds and YUV register handling apply only to MT6765.
+
+`test-mt6765-plane-address.py` compiles the production pending-state, normal/async
+check/update and OVL callbacks with ASan/UBSan. Its 144 packed-YUV fixtures match
+the shipped `ovl_layer_config` writes for both formats, all six physical layers,
+every left/right crop parity and three initial register patterns. Each fixture
+uses a nonzero framebuffer offset and passes through the actual pending-address
+helper; the stock fixture uses the equivalent adjusted buffer base. Immediate
+and queued native writes are covered.
+
+Additional checks cover 216 RGB crop/reflection combinations, offsets above
+`INT_MAX`, AFBC header/body bookkeeping, 16/32-bit field limits, exact allocation
+and DMA ends, pair expansion at odd framebuffer edges, disabled and invalid
+states, error propagation, different old/new async framebuffers and unchanged
+MT8192 layer checks. Twenty-three mutations are rejected by assertions or the
+stock-validated traces. Results are in `out/mt6765-plane-address-audit.json`.
+
+The test models DRM clipping and kernel services; it checks the driver's use of
+those results, not the complete atomic core. It does not simulate DMA, IOMMU
+translation, speculative hardware fetches or YUV-to-RGB pixel output. Inherited
+SBCH state, secure-engine handoff, physical bus behavior and display acceptance
+remain unfinished. The graph and `CONFIG_DRM_MEDIATEK` remain disabled.

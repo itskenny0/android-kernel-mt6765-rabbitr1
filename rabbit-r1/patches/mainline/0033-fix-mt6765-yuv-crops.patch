@@ -1,0 +1,124 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MT6765 YUV crops
+
+Fetch complete chroma pairs and clip their extra edge pixels.
+Validate the visible native plane geometry, pitch, allocation and
+32-bit DMA range before register programming, including the width
+added for packed-YUV alignment.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 495f819e17..41ee6e5b58 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -6,7 +6,9 @@
+ #include <drm/drm_blend.h>
+ #include <drm/drm_fourcc.h>
+ #include <drm/drm_framebuffer.h>
++#include <drm/drm_gem_dma_helper.h>
+ 
++#include <linux/align.h>
+ #include <linux/clk.h>
+ #include <linux/component.h>
+ #include <linux/interrupt.h>
+@@ -43,6 +45,8 @@
+ #define DISP_REG_OVL_PITCH(n)			(0x0044 + 0x20 * (n))
+ #define OVL_CONST_BLEND					BIT(28)
+ #define DISP_REG_OVL_CLIP(n)			(0x004c + 0x20 * (n))
++#define OVL_CLIP_LEFT				BIT(0)
++#define OVL_CLIP_RIGHT				BIT(8)
+ #define DISP_REG_OVL_CLR(n)			(0x025c + 4 * (n))
+ #define DISP_REG_OVL_SECURE			0x0fc0
+ #define DISP_REG_OVL_RDMA_CTRL(n)		(0x00c0 + 0x20 * (n))
+@@ -533,10 +537,54 @@ unsigned int mtk_ovl_supported_rotations(struct device *dev)
+ 	       DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y;
+ }
+ 
++static int mt6765_ovl_plane_check(struct mtk_disp_ovl *ovl, unsigned int idx,
++				struct drm_plane_state *state)
++{
++	struct drm_framebuffer *fb = state->fb;
++	struct drm_gem_dma_object *obj;
++	unsigned int x, y, w, h, cpp = fb->format->cpp[0];
++	u64 end;
++
++	if (!state->visible)
++		return 0;
++	if (idx >= ovl->data->layer_nr || fb->modifier != DRM_FORMAT_MOD_LINEAR ||
++	    !cpp || !fb->pitches[0] || fb->pitches[0] > U16_MAX)
++		return -EINVAL;
++	/* Component checks run after DRM has clipped and unrotated the source. */
++	if (state->src.x1 < 0 || state->src.y1 < 0 ||
++	    ((state->src.x1 | state->src.y1 | state->src.x2 | state->src.y2) & 0xffff))
++		return -EINVAL;
++	x = state->src.x1 >> 16;
++	y = state->src.y1 >> 16;
++	w = drm_rect_width(&state->src) >> 16;
++	h = drm_rect_height(&state->src) >> 16;
++	if (!w || !h || w > 4095 || h > 4095)
++		return -EINVAL;
++	if (fb->format->is_yuv) {
++		w = ALIGN(w + (x & 1), 2);
++		x &= ~1U;
++	}
++	if (w > 4095 ||
++	    state->dst.x1 < 0 || state->dst.y1 < 0 ||
++	    state->dst.x2 > 4095 || state->dst.y2 > 4095 ||
++	    (u64)(x + w) * cpp > fb->pitches[0])
++		return -EINVAL;
++
++	obj = to_drm_gem_dma_obj(fb->obj[0]);
++	end = (u64)fb->offsets[0] + (u64)(y + h - 1) * fb->pitches[0] +
++	      (u64)(x + w) * cpp;
++	if (end > obj->base.size || obj->dma_addr > U32_MAX ||
++	    obj->dma_addr + end - 1 > U32_MAX)
++		return -EINVAL;
++
++	return 0;
++}
++
+ int mtk_ovl_layer_check(struct device *dev, unsigned int idx,
+ 			struct mtk_plane_state *mtk_state)
+ {
+ 	struct drm_plane_state *state = &mtk_state->base;
++	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
+ 
+ 	/* check if any unsupported rotation is set */
+ 	if (state->rotation & ~mtk_ovl_supported_rotations(dev))
+@@ -551,6 +599,9 @@ int mtk_ovl_layer_check(struct device *dev, unsigned int idx,
+ 	if (state->fb->format->is_yuv && (state->rotation & ~DRM_MODE_ROTATE_0))
+ 		return -EINVAL;
+ 
++	if (ovl->data->mt6765)
++		return mt6765_ovl_plane_check(ovl, idx, state);
++
+ 	return 0;
+ }
+ 
+@@ -751,10 +802,23 @@ void mtk_ovl_layer_config(struct device *dev, unsigned int idx,
+ 	}
+ 
+ 	if (ovl->data->mt6765) {
+-		/* RGB has no packed-YUV edge pixels to clip. */
+-		if (state->base.fb && !state->base.fb->format->is_yuv)
+-			mtk_ddp_write_relaxed(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,
+-					      DISP_REG_OVL_CLIP(idx));
++		u32 clip = 0, width = pending->width;
++
++		if (fmt == DRM_FORMAT_UYVY || fmt == DRM_FORMAT_YUYV) {
++			/* Fetch complete chroma pairs and discard their extra edge pixels. */
++			if (pending->src_x & 1) {
++				addr -= 2;
++				width++;
++				clip |= OVL_CLIP_LEFT;
++			}
++			if (width & 1) {
++				width++;
++				clip |= OVL_CLIP_RIGHT;
++			}
++			src_size = pending->height << 16 | width;
++		}
++		mtk_ddp_write_relaxed(cmdq_pkt, clip, &ovl->cmdq_reg, ovl->regs,
++				      DISP_REG_OVL_CLIP(idx));
+ 		mtk_ddp_write_relaxed(cmdq_pkt, OVL_COLOR_ALPHA, &ovl->cmdq_reg,
+ 				      ovl->regs, DISP_REG_OVL_CLR(idx));
+ 		mtk_ddp_write_relaxed(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,

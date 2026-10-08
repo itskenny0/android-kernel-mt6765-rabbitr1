@@ -18,7 +18,7 @@ The workflow:
    setup/recovery, DSI transfer results, CST836 transport/input callbacks,
    bounded expdb mapper and log decoder.
 3. Builds the AArch64 kernel, device tree, modules and static diagnostic initramfs.
-   It also compiles the DSI host, RDMA, OVL and DRM driver objects, which are not enabled
+   It also compiles the DSI host, RDMA, OVL, plane, CRTC and DRM driver objects, which are not enabled
    in the boot profile.
 4. Inspects stock metadata, compares the r1 power-device wiring against the
    stock FDT, checks touch wiring and I2C4 firmware identity, emulates the
@@ -46,6 +46,9 @@ The workflow:
    RGB plane setup is compared with shipped instructions for all six physical
    layers, nine formats and three blend modes. A separate DRM address/opacity
    check covers all 16-bit alpha values, cropped reflections and padded rows.
+   Packed-YUV edge clipping is compared with the shipped kernel through the
+   production pending-address callback. Framebuffer offsets, native field and
+   allocation bounds, and normal/async validation and visibility are checked.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.

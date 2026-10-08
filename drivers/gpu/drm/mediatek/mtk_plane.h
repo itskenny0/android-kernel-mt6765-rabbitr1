@@ -26,6 +26,7 @@ struct mtk_plane_pending_state {
 	unsigned long long		modifier;
 	unsigned int			x;
 	unsigned int			y;
+	unsigned int			src_x;
 	unsigned int			width;
 	unsigned int			height;
 	unsigned int			rotation;

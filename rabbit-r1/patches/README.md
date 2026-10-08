@@ -68,5 +68,10 @@ unfinished; see `docs/DISPLAY.md`.
 
 Patch 0031 fixes native MT6765 RGB plane opacity, constant-alpha format selection
 and reflected crop addressing. It also clears stale RGB clipping/source-key state
-and programs stock layer color and nonsecure input. Packed-YUV cropping, complete
-plane validation and real pixel output still need work; see `docs/DISPLAY.md`.
+and programs stock layer color and nonsecure input.
+
+Patch 0032 includes framebuffer offsets in pending DMA addresses, validates
+clipped geometry before component checks, and corrects async state/visibility
+handling. Patch 0033 adds native packed-YUV pair expansion and clipping, with
+field, row-pitch, allocation and 32-bit address bounds. Firmware handoff, IOMMU
+and real pixel output still need work; see `docs/DISPLAY.md`.

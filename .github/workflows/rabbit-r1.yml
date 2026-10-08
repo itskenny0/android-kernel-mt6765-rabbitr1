@@ -116,6 +116,8 @@ jobs:
             drivers/gpu/drm/mediatek/mtk_drm_drv.o \
             drivers/gpu/drm/mediatek/mtk_disp_rdma.o \
             drivers/gpu/drm/mediatek/mtk_disp_ovl.o \
+            drivers/gpu/drm/mediatek/mtk_plane.o \
+            drivers/gpu/drm/mediatek/mtk_crtc.o \
             2>&1 | tee logs/mt6765-dsi-build.log
 
       - name: Build the diagnostic initramfs
@@ -139,6 +141,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-mt6765-rdma-irq.py 2>&1 | tee logs/mt6765-rdma-irq-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-ovl.py 2>&1 | tee logs/mt6765-ovl-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-ovl-plane.py 2>&1 | tee logs/mt6765-ovl-plane-tests.log
+          toolchains/boot-tools/bin/python scripts/test-mt6765-plane-address.py 2>&1 | tee logs/mt6765-plane-address-tests.log
 
       - name: Patch LK and build the LineageOS splash
         run: |

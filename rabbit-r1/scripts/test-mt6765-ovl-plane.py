@@ -37,7 +37,8 @@ FORMATS = [
 ]
 
 
-def stock(raw, module, layer, fmt, alpha, const_blend, seed, x, y, width, height, pitch):
+def stock(raw, module, layer, fmt, alpha, const_blend, seed, x, y, width, height, pitch,
+          base=0x58000000):
     bias, obj, mmio, stop = 0x1000000, 0x20000000, 0x30000000, 0x40000000
     uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
     uc.mem_map(bias, 0x2000000); uc.mem_write(bias, raw)
@@ -47,7 +48,7 @@ def stock(raw, module, layer, fmt, alpha, const_blend, seed, x, y, width, height
         64:pitch, 68:5, 72:9, 92:width, 96:height, 108:1, 112:alpha, 156:1,
         164:const_blend, 168:0xffffffff, 172:0xffffffff, 176:layer}
     for off, value in fields.items(): struct.pack_into('<I', cfg, off, value)
-    struct.pack_into('<Q', cfg, 24, 0x58000000)
+    struct.pack_into('<Q', cfg, 24, base)
     uc.mem_write(obj, bytes(cfg)); uc.mem_write(mmio, struct.pack('<I', seed)*1024)
     # disp_rect consumes x2/x3; cfg is x5. NULL CMDQ handle is the ninth argument.
     for reg, value in zip([UC_ARM64_REG_X0, UC_ARM64_REG_X1, UC_ARM64_REG_X2,
@@ -108,7 +109,7 @@ struct drm_framebuffer { const struct drm_format_info *format; };
 struct drm_plane_state { struct drm_framebuffer *fb; unsigned int alpha,pixel_blend_mode; };
 struct mtk_plane_pending_state {
     bool enable; dma_addr_t addr,hdr_addr; unsigned int pitch,hdr_pitch,format;
-    uint64_t modifier; unsigned int x,y,width,height,rotation;
+    uint64_t modifier; unsigned int x,y,src_x,width,height,rotation;
 };
 struct mtk_plane_state { struct drm_plane_state base; struct mtk_plane_pending_state pending; };
 static void *dev_get_drvdata(struct device *dev) { return dev->data; }

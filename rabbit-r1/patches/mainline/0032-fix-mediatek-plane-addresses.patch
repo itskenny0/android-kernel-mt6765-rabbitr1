@@ -1,0 +1,148 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MediaTek plane addresses
+
+Include framebuffer offsets and use unsigned DMA-width row offsets.
+Validate the new clipped state before component checks and retain
+its source crop and visibility during asynchronous cursor updates.
+Skip invisible address setup.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_plane.c b/drivers/gpu/drm/mediatek/mtk_plane.c
+index 86c6f60ead..16627eba91 100644
+--- a/drivers/gpu/drm/mediatek/mtk_plane.c
++++ b/drivers/gpu/drm/mediatek/mtk_plane.c
+@@ -87,7 +87,8 @@ static int mtk_plane_atomic_async_check(struct drm_plane *plane,
+ 	struct drm_crtc_state *crtc_state;
+ 	int ret;
+ 
+-	if (plane != new_plane_state->crtc->cursor)
++	if (!new_plane_state->crtc || !new_plane_state->fb ||
++	    plane != new_plane_state->crtc->cursor)
+ 		return -EINVAL;
+ 
+ 	if (!plane->state)
+@@ -96,18 +97,19 @@ static int mtk_plane_atomic_async_check(struct drm_plane *plane,
+ 	if (!plane->state->fb)
+ 		return -EINVAL;
+ 
+-	ret = mtk_crtc_plane_check(new_plane_state->crtc, plane,
+-				   to_mtk_plane_state(new_plane_state));
+-	if (ret)
+-		return ret;
+-
+ 	crtc_state = drm_atomic_get_new_crtc_state(state,
+ 						   new_plane_state->crtc);
++	if (!crtc_state)
++		return -EINVAL;
+ 
+-	return drm_atomic_helper_check_plane_state(plane->state, crtc_state,
+-						   DRM_PLANE_NO_SCALING,
+-						   DRM_PLANE_NO_SCALING,
+-						   true, true);
++	ret = drm_atomic_helper_check_plane_state(new_plane_state, crtc_state,
++						DRM_PLANE_NO_SCALING,
++						DRM_PLANE_NO_SCALING, true, true);
++	if (ret)
++		return ret;
++
++	return mtk_crtc_plane_check(new_plane_state->crtc, plane,
++				   to_mtk_plane_state(new_plane_state));
+ }
+ 
+ static void mtk_plane_update_new_state(struct drm_plane_state *new_state,
+@@ -121,11 +123,15 @@ static void mtk_plane_update_new_state(struct drm_plane_state *new_state,
+ 	dma_addr_t addr;
+ 	dma_addr_t hdr_addr = 0;
+ 	unsigned int hdr_pitch = 0;
+-	int offset;
++	dma_addr_t offset;
++
++	mtk_plane_state->pending.enable = new_state->visible;
++	if (!new_state->visible)
++		return;
+ 
+ 	gem = fb->obj[0];
+ 	dma_obj = to_drm_gem_dma_obj(gem);
+-	addr = dma_obj->dma_addr;
++	addr = dma_obj->dma_addr + fb->offsets[0];
+ 	pitch = fb->pitches[0];
+ 	format = fb->format->format;
+ 	modifier = fb->modifier;
+@@ -138,7 +144,7 @@ static void mtk_plane_update_new_state(struct drm_plane_state *new_state,
+ 		 */
+ 		offset = (new_state->src.x1 >> 16) * fb->format->cpp[0];
+ 		addr += offset;
+-		offset = (new_state->src.y1 >> 16) * pitch;
++		offset = (dma_addr_t)(new_state->src.y1 >> 16) * pitch;
+ 		addr += offset;
+ 	} else {
+ 		int width_in_blocks = ALIGN(fb->width, AFBC_DATA_BLOCK_WIDTH)
+@@ -177,7 +183,6 @@ static void mtk_plane_update_new_state(struct drm_plane_state *new_state,
+ 		addr = addr + hdr_size + offset;
+ 	}
+ 
+-	mtk_plane_state->pending.enable = true;
+ 	mtk_plane_state->pending.pitch = pitch;
+ 	mtk_plane_state->pending.hdr_pitch = hdr_pitch;
+ 	mtk_plane_state->pending.format = format;
+@@ -186,6 +191,7 @@ static void mtk_plane_update_new_state(struct drm_plane_state *new_state,
+ 	mtk_plane_state->pending.hdr_addr = hdr_addr;
+ 	mtk_plane_state->pending.x = new_state->dst.x1;
+ 	mtk_plane_state->pending.y = new_state->dst.y1;
++	mtk_plane_state->pending.src_x = new_state->src.x1 >> 16;
+ 	mtk_plane_state->pending.width = drm_rect_width(&new_state->dst);
+ 	mtk_plane_state->pending.height = drm_rect_height(&new_state->dst);
+ 	mtk_plane_state->pending.rotation = new_state->rotation;
+@@ -207,8 +213,9 @@ static void mtk_plane_atomic_async_update(struct drm_plane *plane,
+ 	plane->state->src_y = new_state->src_y;
+ 	plane->state->src_h = new_state->src_h;
+ 	plane->state->src_w = new_state->src_w;
+-	plane->state->dst.x1 = new_state->dst.x1;
+-	plane->state->dst.y1 = new_state->dst.y1;
++	plane->state->src = new_state->src;
++	plane->state->dst = new_state->dst;
++	plane->state->visible = new_state->visible;
+ 
+ 	mtk_plane_update_new_state(new_state, new_plane_state);
+ 	swap(plane->state->fb, new_state->fb);
+@@ -242,21 +249,19 @@ static int mtk_plane_atomic_check(struct drm_plane *plane,
+ 	if (WARN_ON(!new_plane_state->crtc))
+ 		return 0;
+ 
+-	ret = mtk_crtc_plane_check(new_plane_state->crtc, plane,
+-				   to_mtk_plane_state(new_plane_state));
+-	if (ret)
+-		return ret;
+-
+ 	crtc_state = drm_atomic_get_crtc_state(state,
+ 					       new_plane_state->crtc);
+ 	if (IS_ERR(crtc_state))
+ 		return PTR_ERR(crtc_state);
+ 
+-	return drm_atomic_helper_check_plane_state(new_plane_state,
+-						   crtc_state,
+-						   DRM_PLANE_NO_SCALING,
+-						   DRM_PLANE_NO_SCALING,
+-						   true, true);
++	ret = drm_atomic_helper_check_plane_state(new_plane_state, crtc_state,
++						DRM_PLANE_NO_SCALING,
++						DRM_PLANE_NO_SCALING, true, true);
++	if (ret)
++		return ret;
++
++	return mtk_crtc_plane_check(new_plane_state->crtc, plane,
++				   to_mtk_plane_state(new_plane_state));
+ }
+ 
+ static void mtk_plane_atomic_disable(struct drm_plane *plane,
+diff --git a/drivers/gpu/drm/mediatek/mtk_plane.h b/drivers/gpu/drm/mediatek/mtk_plane.h
+index 95c5fa5295..ee77693bc3 100644
+--- a/drivers/gpu/drm/mediatek/mtk_plane.h
++++ b/drivers/gpu/drm/mediatek/mtk_plane.h
+@@ -26,6 +26,7 @@ struct mtk_plane_pending_state {
+ 	unsigned long long		modifier;
+ 	unsigned int			x;
+ 	unsigned int			y;
++	unsigned int			src_x;
+ 	unsigned int			width;
+ 	unsigned int			height;
+ 	unsigned int			rotation;
