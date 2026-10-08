@@ -21,6 +21,7 @@ static struct mtk_dsi *bridge_to_dsi(struct drm_bridge *bridge)
 
 CRTC = r'''
 #define MTK_MAX_BPC 10
+#define WRITE_ONCE(x,v) ((x)=(v))
 #define drm_err(dev,...) ((void)(dev))
 #define drm_dbg_driver(dev,...) ((void)(dev))
 #define DRM_DEV_ERROR(dev,...) ((void)(dev))
@@ -113,7 +114,7 @@ static void mtk_ddp_comp_layer_config(struct mtk_ddp_comp *c,unsigned int local,
 static struct mtk_crtc *to_mtk_crtc(struct drm_crtc *c) { assert(c==&crtc.base);return &crtc; }
 static void mtk_crtc_update_output(struct drm_crtc *c,struct drm_atomic_state *s)
 { assert(c==&crtc.base && !s);update_calls++; }
-static void drm_crtc_vblank_on(struct drm_crtc *c) { assert(c==&crtc.base);vblank_ons++; }
+static void drm_crtc_vblank_on(struct drm_crtc *c) { assert(c==&crtc.base && crtc.enabled);vblank_ons++; }
 '''
 
 TESTS = r'''

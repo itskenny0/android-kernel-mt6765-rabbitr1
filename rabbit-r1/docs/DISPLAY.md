@@ -297,9 +297,62 @@ Fifteen compiled faulty variants and the previous production callbacks are
 rejected by the runtime checks.
 
 Other display components, DRM services, clocks, PHY, MMIO and interrupt delivery
-remain models. Full atomic-commit event delivery, page-flip recovery after a
-failed modeset, panel rails and firmware DMA handoff still need validation.
-The display graph remains disabled.
+remain models. The event path is covered separately below. Panel rails, physical
+page-flip behavior and firmware DMA handoff still need validation. The display
+graph remains disabled.
+
+## Events after failed display startup
+
+The shared MediaTek CRTC callbacks now check whether hardware startup succeeded
+before programming colors, updating display configuration, processing a frame
+IRQ or enabling vblank. The ready flag is set before `drm_crtc_vblank_on()`,
+which may immediately invoke the driver's vblank-enable callback. Normal shutdown
+keeps the flag set while the core disables vblank, then clears it after hardware
+teardown. An off-state vblank-disable callback does not access component registers.
+
+DRM's runtime-PM commit helper enables outputs before committing planes. A failed
+CRTC enable does not change the already accepted atomic state's `active` bit, so
+plane begin/flush callbacks can still run. Begin now sends the event immediately
+if the hardware is off or `drm_crtc_vblank_get()` fails. Only a successful get
+creates a private pending event with a matching put. Flush skips color and
+configuration writes while off. This avoids a stranded commit completion and
+an unowned vblank-reference release; an immediate event is not evidence that
+the requested framebuffer was displayed. A later explicit modeset can retry.
+
+A new event cannot overwrite an older private event: the older one is completed
+and its reference released under the event lock, with the condition logged.
+The new event starts with a cleared pending-vblank flag, so the old flag cannot
+complete it before flush. The lock order is configuration lock, then event lock.
+Shutdown completes private events after hardware teardown, including when startup
+failed and there is no hardware to disable. It also completes the inactive atomic
+state's event, which previously depended on running hardware teardown. Active
+state events belonging to a subsequent modeset stay with that new state.
+
+`test-crtc-events.py` runs the production begin/flush, enable/disable, config,
+IRQ and CMDQ callback code through the real DRM runtime-PM commit-tail ordering
+and plane-commit loops. It also executes DRM's vblank enable/get/put helpers and
+event-delivery helpers, including commit completion, fence signaling, timestamps
+and user-event delivery. Core vblank on/off, hardware, other components, locks,
+mailbox transport and scheduling are models. Vblank-enable error injection and
+reference-call counters are instrumented in the extracted core helpers.
+
+The ASan/UBSan builds cover 60 scenarios with CMDQ compiled out and 90 with it
+compiled in: CPU, shadow-register and modeled command-queue paths; power-domain
+and hardware-init errors; active state after failed startup; explicit retries;
+vblank-reference errors; lost completions; shutdown; duplicate pending events;
+three vblank-off policies; and both internal and userspace events. They check
+single completion and fence release, balanced owned references, lock ordering,
+no off-state register access, and delayed error callbacks after shutdown.
+Eighteen compiled faulty variants and the previous callbacks fail in both builds.
+The existing 180-case native DSI acquisition test still passes.
+
+**Command-queue cancellation remains unresolved.** A shutdown timeout can leave
+transport work outstanding. The event test explicitly supplies a delayed error
+callback and proves only that it does not duplicate an event or access display
+registers after shutdown. It does not prove that the GCE task was stopped. The
+current mailbox flush can return an error while a task remains active, and its
+error paths need auditing before packet reuse or display power removal is safe.
+Full hardware synchronization and firmware handoff remain release gates.
 
 ## Native host power sequencing
 

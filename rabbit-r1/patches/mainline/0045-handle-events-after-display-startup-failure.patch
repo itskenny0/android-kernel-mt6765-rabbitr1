@@ -1,0 +1,216 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Handle events after display startup failure
+
+Skip off-state programming and complete events when vblank cannot be
+acquired. Balance private event references, retire pending events during
+shutdown and mark hardware ready before restoring vblank interrupts.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_crtc.c b/drivers/gpu/drm/mediatek/mtk_crtc.c
+index fcb16f3f7b..8c8b46d139 100644
+--- a/drivers/gpu/drm/mediatek/mtk_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_crtc.c
+@@ -97,13 +97,13 @@ static void mtk_crtc_finish_page_flip(struct mtk_crtc *mtk_crtc)
+ 	struct drm_crtc *crtc = &mtk_crtc->base;
+ 	unsigned long flags;
+ 
++	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+ 	if (mtk_crtc->event) {
+-		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+ 		drm_crtc_send_vblank_event(crtc, mtk_crtc->event);
+ 		drm_crtc_vblank_put(crtc);
+ 		mtk_crtc->event = NULL;
+-		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+ 	}
++	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+ }
+ 
+ static void mtk_drm_finish_page_flip(struct mtk_crtc *mtk_crtc)
+@@ -441,8 +441,6 @@ static int mtk_crtc_ddp_hw_init(struct mtk_crtc *mtk_crtc)
+ static void mtk_crtc_ddp_hw_fini(struct mtk_crtc *mtk_crtc)
+ {
+ 	struct drm_device *drm = mtk_crtc->base.dev;
+-	struct drm_crtc *crtc = &mtk_crtc->base;
+-	unsigned long flags;
+ 	int i;
+ 
+ 	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
+@@ -472,13 +470,6 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_crtc *mtk_crtc)
+ 	mtk_mutex_unprepare(mtk_crtc->mutex);
+ 
+ 	pm_runtime_put(drm->dev);
+-
+-	if (crtc->state->event && !crtc->state->active) {
+-		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+-		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+-		crtc->state->event = NULL;
+-		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+-	}
+ }
+ 
+ static void mtk_crtc_ddp_config(struct drm_crtc *crtc,
+@@ -566,6 +557,8 @@ static void mtk_crtc_update_config(struct mtk_crtc *mtk_crtc, bool needs_vblank)
+ 	unsigned long flags;
+ 
+ 	mutex_lock(&mtk_crtc->hw_lock);
++	if (!mtk_crtc->enabled)
++		goto out_unlock;
+ 
+ 	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+ 	mtk_crtc->config_updating = true;
+@@ -625,20 +618,18 @@ static void mtk_crtc_update_config(struct mtk_crtc *mtk_crtc, bool needs_vblank)
+ 		spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+ 
+ 		if (pm_runtime_resume_and_get(mtk_crtc->cmdq_client.chan->mbox->dev) < 0)
+-			goto update_config_out;
++			goto out_unlock;
+ 
+ 		mbox_send_message(mtk_crtc->cmdq_client.chan, cmdq_handle);
+ 		mbox_client_txdone(mtk_crtc->cmdq_client.chan, 0);
+-		goto update_config_out;
++		goto out_unlock;
+ 	}
+ #endif
+ 	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
+ 	mtk_crtc->config_updating = false;
+ 	spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+ 
+-#if IS_REACHABLE(CONFIG_MTK_CMDQ)
+-update_config_out:
+-#endif
++out_unlock:
+ 	mutex_unlock(&mtk_crtc->hw_lock);
+ }
+ 
+@@ -650,6 +641,12 @@ static void mtk_crtc_ddp_irq(void *data)
+ 
+ #if IS_REACHABLE(CONFIG_MTK_CMDQ)
+ 	struct drm_device *dev = mtk_crtc->base.dev;
++#endif
++
++	if (!READ_ONCE(mtk_crtc->enabled))
++		return;
++
++#if IS_REACHABLE(CONFIG_MTK_CMDQ)
+ 	if (!priv->data->shadow_register && !mtk_crtc->cmdq_client.chan)
+ 		mtk_crtc_ddp_config(crtc, NULL);
+ 	else if (mtk_crtc->cmdq_vblank_cnt > 0 && --mtk_crtc->cmdq_vblank_cnt == 0)
+@@ -667,6 +664,9 @@ static int mtk_crtc_enable_vblank(struct drm_crtc *crtc)
+ 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
+ 	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
+ 
++	if (!READ_ONCE(mtk_crtc->enabled))
++		return -EINVAL;
++
+ 	mtk_ddp_comp_enable_vblank(comp);
+ 
+ 	return 0;
+@@ -677,7 +677,8 @@ static void mtk_crtc_disable_vblank(struct drm_crtc *crtc)
+ 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
+ 	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
+ 
+-	mtk_ddp_comp_disable_vblank(comp);
++	if (READ_ONCE(mtk_crtc->enabled))
++		mtk_ddp_comp_disable_vblank(comp);
+ }
+ 
+ static void mtk_crtc_update_output(struct drm_crtc *crtc,
+@@ -797,8 +798,8 @@ static void mtk_crtc_atomic_enable(struct drm_crtc *crtc,
+ 		return;
+ 	}
+ 
++	WRITE_ONCE(mtk_crtc->enabled, true);
+ 	drm_crtc_vblank_on(crtc);
+-	mtk_crtc->enabled = true;
+ }
+ 
+ static void mtk_crtc_atomic_disable(struct drm_crtc *crtc,
+@@ -807,11 +808,12 @@ static void mtk_crtc_atomic_disable(struct drm_crtc *crtc,
+ 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
+ 	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
+ 	struct drm_device *dev = mtk_crtc->base.dev;
++	unsigned long flags;
+ 	int i;
+ 
+ 	drm_dbg_driver(dev, "%s %d\n", __func__, crtc->base.id);
+ 	if (!mtk_crtc->enabled)
+-		return;
++		goto complete_events;
+ 
+ 	/* Set all pending plane state to disabled */
+ 	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+@@ -839,7 +841,21 @@ static void mtk_crtc_atomic_disable(struct drm_crtc *crtc,
+ 	mtk_crtc_ddp_hw_fini(mtk_crtc);
+ 	mtk_ddp_comp_power_off(comp);
+ 
+-	mtk_crtc->enabled = false;
++	WRITE_ONCE(mtk_crtc->enabled, false);
++
++complete_events:
++	/* Private events are not on the core's vblank event list. */
++	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
++	mtk_crtc_finish_page_flip(mtk_crtc);
++	mtk_crtc->pending_needs_vblank = false;
++	spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
++
++	if (crtc->state->event && !crtc->state->active) {
++		spin_lock_irqsave(&crtc->dev->event_lock, flags);
++		drm_crtc_send_vblank_event(crtc, crtc->state->event);
++		crtc->state->event = NULL;
++		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
++	}
+ }
+ 
+ static void mtk_crtc_atomic_begin(struct drm_crtc *crtc,
+@@ -847,24 +863,30 @@ static void mtk_crtc_atomic_begin(struct drm_crtc *crtc,
+ {
+ 	struct drm_crtc_state *crtc_state = drm_atomic_get_new_crtc_state(state,
+ 									  crtc);
+-	struct mtk_crtc_state *mtk_crtc_state = to_mtk_crtc_state(crtc_state);
+ 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
+ 	struct drm_device *dev = mtk_crtc->base.dev;
+ 	unsigned long flags;
+ 
+-	if (mtk_crtc->event && mtk_crtc_state->base.event)
+-		drm_err(dev, "new event while there is still a pending event\n");
+-
+-	if (mtk_crtc_state->base.event) {
+-		mtk_crtc_state->base.event->pipe = drm_crtc_index(crtc);
+-		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+-
+-		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+-		mtk_crtc->event = mtk_crtc_state->base.event;
+-		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
++	if (!crtc_state->event)
++		return;
+ 
+-		mtk_crtc_state->base.event = NULL;
++	spin_lock_irqsave(&mtk_crtc->config_lock, flags);
++	if (mtk_crtc->event) {
++		drm_err(dev, "new event while there is still a pending event\n");
++		mtk_crtc_finish_page_flip(mtk_crtc);
+ 	}
++	/* Do not carry the old commit's pending-vblank flag into the new one. */
++	mtk_crtc->pending_needs_vblank = false;
++
++	spin_lock(&crtc->dev->event_lock);
++	crtc_state->event->pipe = drm_crtc_index(crtc);
++	if (!mtk_crtc->enabled || drm_crtc_vblank_get(crtc))
++		drm_crtc_send_vblank_event(crtc, crtc_state->event);
++	else
++		mtk_crtc->event = crtc_state->event;
++	crtc_state->event = NULL;
++	spin_unlock(&crtc->dev->event_lock);
++	spin_unlock_irqrestore(&mtk_crtc->config_lock, flags);
+ }
+ 
+ static void mtk_crtc_atomic_flush(struct drm_crtc *crtc,
+@@ -873,6 +895,9 @@ static void mtk_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	struct mtk_crtc *mtk_crtc = to_mtk_crtc(crtc);
+ 	int i;
+ 
++	if (!mtk_crtc->enabled)
++		return;
++
+ 	if (crtc->state->color_mgmt_changed)
+ 		for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
+ 			mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], crtc->state);

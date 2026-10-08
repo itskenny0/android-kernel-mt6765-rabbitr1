@@ -38,6 +38,10 @@ The workflow:
    Native DSI acquisition also runs through the production CRTC startup path:
    component/clock/PHY failures, reverse unwind, bridge gating, power-reference
    ownership, panel-unprepare access and successful retries are checked.
+   CRTC events run through DRM commit ordering and vblank reference/completion
+   helpers with CMDQ compiled both in and out. Failed startup, off-state guards,
+   event ownership, explicit retries and shutdown are checked with models;
+   transport cancellation and hardware synchronization remain unverified.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for
