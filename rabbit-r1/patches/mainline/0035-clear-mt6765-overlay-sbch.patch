@@ -1,0 +1,31 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Clear MT6765 overlay reuse state
+
+Disable transparent and constant-region reuse after successful reset.
+Mainline does not maintain the layer-change tracking required by SBCH.
+Clear both physical and extended controls before enabling IRQs or scanout,
+without relying on undocumented reset values.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 41ee6e5b58..8a7833bbc5 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -118,6 +118,8 @@
+ #define DISP_REG_OVL_FUNC_DCM0	0x02a0
+ #define DISP_REG_OVL_FUNC_DCM1	0x02a4
+ #define DISP_REG_OVL_EXT_CON	0x0324
++#define DISP_REG_OVL_SBCH		0x03a0
++#define DISP_REG_OVL_SBCH_EXT	0x03a4
+ #define MT6765_OVL_GMC		0x03ff03ff
+ 
+ static inline bool is_10bit_rgb(u32 fmt)
+@@ -354,6 +356,9 @@ int mtk_ovl_clk_enable(struct device *dev)
+ 	/* Drop inherited physical, constant-color and extended layers. */
+ 	writel(0, ovl->regs + DISP_REG_OVL_SRC_CON);
+ 	writel(0, ovl->regs + DISP_REG_OVL_EXT_CON);
++	/* Mainline does not track SBCH's reusable transparent/constant regions. */
++	writel(0, ovl->regs + DISP_REG_OVL_SBCH);
++	writel(0, ovl->regs + DISP_REG_OVL_SBCH_EXT);
+ 	/* CRTC will enable the upstream background input on the second overlay. */
+ 	writel(readl(ovl->regs + DISP_REG_OVL_DATAPATH_CON) &
+ 	       ~(OVL_BGCLR_SEL_IN | OVL_RANDOM_BGCLR_EN),

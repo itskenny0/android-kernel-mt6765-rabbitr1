@@ -331,7 +331,7 @@ reclaiming the firmware framebuffer and display IOMMU setup remain unresolved.
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   inherited SBCH state, secure-engine handoff and display IOMMU behavior.
+   secure-engine handoff and display IOMMU behavior.
    The native RDMA/OVL setup and
    interrupt handling below still require hardware validation.
 2. Identify panel supply rails and implement cold power-on and power-off.
@@ -473,8 +473,8 @@ The four-layer `mediatek,mt6765-disp-ovl` and two-layer
 `mediatek,mt6765-disp-ovl-2l` now have native data, bindings and DRM component
 matches. The MT8192 fallbacks have been removed. Both retain the existing
 eight-bit RGB/YUV format list and blending capabilities; neither advertises
-AFBC or ten-bit input. Native plane formatting and blending still need a
-separate audit and pixel-output tests.
+AFBC or ten-bit input. Native plane formatting and blending are covered below;
+pixel-output tests remain necessary.
 
 Probe makes no MMIO accesses and requests `IRQF_NO_AUTOEN`. After the CRTC
 powers the display domain, clock enable masks interrupts, stops the inherited
@@ -484,11 +484,40 @@ reads that register only once before its delay loop; the new code re-reads it.
 A timeout drops the clock reference without enabling the IRQ or engine.
 
 Successful reset disables all physical and constant-color layers, clears
-extended-layer control and stops each physical layer's RDMA. It clears random
-background mode and the upstream background input; CRTC subsequently enables
-that input on the second overlay. This avoids inheriting the stock pipeline's
-different overlay order. It does not disconnect leftover MMSYS MOUT routes or
+extended-layer control and SBCH reuse state, and stops each physical layer's
+RDMA. It clears random background mode and the upstream background input;
+CRTC subsequently enables that input on the second overlay. This establishes
+the intended background chain without inheriting firmware selections.
+It does not disconnect leftover MMSYS MOUT routes or
 quiesce an inherited RSZ engine; firmware-path teardown remains unfinished.
+
+SBCH reuses transparent or constant regions based on layer-change tracking.
+Mainline does not maintain that tracking, so native clock enable writes zero
+to `OVL_SBCH` (`0x3a0`) and `OVL_SBCH_EXT` (`0x3a4`) after successful reset and
+layer disable. The writes precede IRQ enable and engine startup on every power
+cycle. Clock and reset failures do not attempt this cleanup. Other platforms
+retain their existing behavior. `SBCH_CON` (`0x3a8`) is left alone; its
+transparency-invalid status is not needed while the reuse controls are off.
+No assumption is made that soft reset clears these registers.
+
+The shipped Android `ovl_config_l` at raw Image offset `0x6fe054` clears both
+registers when `DISP_OPT_OVL_SBCH` is off, or when the feature is on but
+`pConfig->sbch_enable` is false. The test executes its post-layer branch from
+`0x6fed38` to `0x6ffd28`. It covers both overlay modules, three initial register
+patterns, both direct and queued paths, and all three disabled-feature/config
+combinations: 36 fixtures. The per-frame-disabled branch also clears stock's
+software tracking cache. Mainline has no corresponding cache to clear.
+
+The test models module-address lookup, the option query, CMDQ writes, memset,
+ftrace and logging; it does not execute layer layout, secure transitions or
+the complete `ovl_config_l`. Its SBCH writes are compared with the production
+native clock-enable callback under ASan/UBSan. The MMIO model retains dirty
+SBCH state across reset and requires cleanup while the clock is on, the engine
+is stopped and reset has completed. Repeated cycles, reset/clock failures,
+untouched `0x3a8` and unchanged MT8192 behavior are checked. Eight compiled
+variants with missing, incorrect or misplaced writes are rejected. Traces are
+in `out/mt6765-sbch-audit.json`. Hardware reset and real region reuse remain
+unverified.
 
 Native configuration accepts nonzero dimensions up to the vendor's 4095 limit,
 sets opaque-black ROI and constant-layer dimensions, and programs the shipped
@@ -647,6 +676,6 @@ stock-validated traces. Results are in `out/mt6765-plane-address-audit.json`.
 
 The test models DRM clipping and kernel services; it checks the driver's use of
 those results, not the complete atomic core. It does not simulate DMA, IOMMU
-translation, speculative hardware fetches or YUV-to-RGB pixel output. Inherited
-SBCH state, secure-engine handoff, physical bus behavior and display acceptance
+translation, speculative hardware fetches or YUV-to-RGB pixel output.
+Secure-engine handoff, physical bus behavior and display acceptance
 remain unfinished. The graph and `CONFIG_DRM_MEDIATEK` remain disabled.

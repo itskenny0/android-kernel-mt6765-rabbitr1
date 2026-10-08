@@ -12,7 +12,9 @@ import struct
 import subprocess
 from unicorn import Uc,UC_ARCH_ARM64,UC_MODE_ARM,UC_HOOK_CODE,UC_HOOK_MEM_WRITE,UC_HOOK_MEM_READ
 from unicorn.arm64_const import (UC_ARM64_REG_PC,UC_ARM64_REG_SP,UC_ARM64_REG_X0,
-    UC_ARM64_REG_X1,UC_ARM64_REG_X2,UC_ARM64_REG_X3,UC_ARM64_REG_X4,UC_ARM64_REG_X30)
+    UC_ARM64_REG_X1,UC_ARM64_REG_X2,UC_ARM64_REG_X3,UC_ARM64_REG_X4,UC_ARM64_REG_X30,
+    UC_ARM64_REG_X20,UC_ARM64_REG_X22,UC_ARM64_REG_X23,UC_ARM64_REG_X24,
+    UC_ARM64_REG_X25,UC_ARM64_REG_X26)
 
 ROOT=Path('/rabbitr1'); SRC=ROOT/'src/mainline'
 resource.setrlimit(resource.RLIMIT_CORE,(0,0))
@@ -103,6 +105,74 @@ def block(source,start):
     return source[begin:end]+'\n'
 
 
+def stock_sbch(raw,module,seed,feature,config,queued):
+    """Execute ovl_config_l's post-layer branch through SBCH cleanup only."""
+    assert not (feature and config), 'Enabled SBCH tracking is outside this fixture'
+    bias,obj,mmio,phys=0x1000000,0x20000000,0x30000000,0x1400b000
+    uc=Uc(UC_ARCH_ARM64,UC_MODE_ARM)
+    uc.mem_map(bias,0x2000000);uc.mem_write(bias,raw)
+    uc.mem_map(obj,0x10000);uc.mem_map(mmio,0x2000)
+    base=mmio+module*0x1000
+    uc.mem_write(mmio,struct.pack('<I',seed)*2048)
+    uc.mem_write(obj+0xf04,struct.pack('<I',config))
+    handle=obj+0x2000 if queued else 0
+    uc.mem_write(obj+0x8098,struct.pack('<Q',handle))
+    registers={UC_ARM64_REG_SP:obj+0x8000,UC_ARM64_REG_X20:module,UC_ARM64_REG_X22:obj,
+               UC_ARM64_REG_X24:handle,UC_ARM64_REG_X26:1,UC_ARM64_REG_X25:3,UC_ARM64_REG_X23:0x10000}
+    for reg,value in registers.items():uc.reg_write(reg,value)
+    events=[];packets=[];options=[];clears=[]
+    cache=bias+0x19f8278
+    uc.mem_write(cache,b'\xa5'*0x870)
+    def code(uc,address,size,_):
+        at=address-bias
+        a,b,c,d=[uc.reg_read(r) for r in [UC_ARM64_REG_X0,UC_ARM64_REG_X1,UC_ARM64_REG_X2,UC_ARM64_REG_X3]]
+        if at in (0x1f01c,0x743f94,0x743cb0,0x7a2740,0x747728,0xf1e480,0x6c0ca4):
+            result=0
+            if at==0x1f01c:result=a
+            elif at in (0x743f94,0x743cb0):
+                assert a in (0,1)
+                result=(mmio if at==0x743f94 else phys)+a*0x1000
+            elif at==0x7a2740:
+                assert a==0x37;options.append(a);result=feature
+            elif at==0xf1e480:
+                assert (a,b,c)==(cache,0,0x870)
+                uc.mem_write(a,bytes(c));clears.append(c);result=a
+            elif at==0x6c0ca4:
+                assert queued and a==handle
+                offset=b-phys-module*0x1000
+                assert offset in (0x2c,0x324,0x3a0,0x3a4)
+                assert d==(0xf if offset==0x2c else 0xffffffff)
+                packets.append((offset,c,d))
+            uc.reg_write(UC_ARM64_REG_X0,result)
+            uc.reg_write(UC_ARM64_REG_PC,uc.reg_read(UC_ARM64_REG_X30))
+        else:
+            allowed=((0x6fed38,0x6feeec),(0x6ff970,0x6ffa90),(0x6ffab0,0x6ffad4),
+                     (0x6ffbe8,0x6ffd28),(0x6f7010,0x6f7088),(0x6f7110,0x6f71a4))
+            assert any(lo<=at<hi for lo,hi in allowed),hex(at)
+    def write(uc,access,address,size,value,_):
+        if base<=address<base+0x1000:
+            assert not queued and size==4
+            events.append((address-base,value))
+        else:
+            assert obj+0x7000<=address and address+size<=obj+0x8000,hex(address)
+    uc.hook_add(UC_HOOK_CODE,code);uc.hook_add(UC_HOOK_MEM_WRITE,write)
+    uc.emu_start(bias+0x6fed38,bias+0x6ffd28,count=10000)
+    assert uc.reg_read(UC_ARM64_REG_PC)==bias+0x6ffd28
+    assert uc.reg_read(UC_ARM64_REG_SP)==obj+0x8000
+    assert options==[0x37] and clears==([0x870] if feature else [])
+    assert bytes(uc.mem_read(cache,0x870))==(bytes(0x870) if feature else b'\xa5'*0x870)
+    if queued:
+        assert not events
+        for offset,value,mask in packets:
+            before=struct.unpack('<I',uc.mem_read(base+offset,4))[0]
+            after=(before&~mask)|(value&mask)
+            uc.mem_write(base+offset,struct.pack('<I',after));events.append((offset,after))
+    assert events==[(0x2c,(seed&~0xf)|1),(0x324,0x10003),(0x3a0,0),(0x3a4,0)],events
+    assert struct.unpack('<I',uc.mem_read(base+0x3a8,4))[0]==seed
+    return {'module':module,'seed':seed,'feature':feature,'config':config,'queued':queued,
+            'writes':events,'packets':packets,'cache_cleared':bool(clears)}
+
+
 PRELUDE=r'''
 #include <assert.h>
 #include <errno.h>
@@ -146,6 +216,7 @@ struct component_ops { int (*bind)(struct device *,struct device *,void *);
 static void *dev_get_drvdata(struct device *dev) { return dev->data; }
 static u32 regs[1024],late_status;
 static unsigned int reads,writes,clock_refs,polls,irq_depth=1,enables,disables;
+static unsigned int sbch_writes;
 static unsigned int callbacks;
 static bool trace,atomic_context,irq_inflight;
 static int clock_error,reset_error,latency,remaining=-1,failure,pm_refs,components,requested;
@@ -173,6 +244,11 @@ static void writel(u32 val,void *ptr)
 {
     assert(clock_refs && (uintptr_t)ptr>=(uintptr_t)regs && (uintptr_t)ptr<(uintptr_t)regs+sizeof(regs));
     unsigned int off=(u8 *)ptr-(u8 *)regs;
+    if (off==0x3a0 || off==0x3a4) {
+        assert(!val && off==0x3a0+4*sbch_writes && sbch_writes<2);
+        assert(irq_depth==1 && !load(4) && !(load(0xc)&1) && !load(0x14) && (load(0x240)&3));
+        assert(!load(0x2c) && !load(0x324)); sbch_writes++;
+    }
     if (off==0x14) {
         if (val==1) { save(0x240,load(0x240)&~3U); remaining=-1; }
         else { assert(val==0); remaining=latency; }
@@ -193,6 +269,7 @@ static void enable_irq(int irq)
 {
     assert(irq==73 && !atomic_context && clock_refs && irq_depth==1 && !load(4));
     assert(!load(0x14) && (load(0x240)&3) && !(load(0xc)&1)); irq_depth--; enables++;
+    assert(sbch_writes==2 && !load(0x3a0) && !load(0x3a4));
 }
 static void disable_irq(int irq)
 {
@@ -257,7 +334,7 @@ static const struct mtk_disp_ovl_data *match(const char *name)
     assert(false); return NULL;
 }
 static void fill(u32 seed)
-{ for (unsigned int off=0;off<sizeof(regs);off+=4) save(off,seed); remaining=-1; }
+{ for (unsigned int off=0;off<sizeof(regs);off+=4) save(off,seed); remaining=-1; sbch_writes=0; }
 static void lifecycle(const struct mtk_disp_ovl_data *data)
 {
     const int errors[]={0,-ENOMEM,-EPROBE_DEFER,-EPROBE_DEFER,-ENOMEM,-EBUSY,-EIO};
@@ -274,9 +351,13 @@ static void lifecycle(const struct mtk_disp_ovl_data *data)
                 fill(~0U); polls=0; latency=2; reset_error=cycle==1; clock_error=cycle==2?-EIO:0;
                 int ret=mtk_ovl_clk_enable(&pdev.dev);
                 assert(ret==(clock_error?clock_error:reset_error?-ETIMEDOUT:0));
-                if (ret) { assert(!ovl->clock_enabled && !ovl->config_valid && !clock_refs && irq_depth==1); continue; }
+                if (ret) {
+                    assert(!ovl->clock_enabled && !ovl->config_valid && !clock_refs && irq_depth==1);
+                    assert(!sbch_writes && load(0x3a0)==~0U && load(0x3a4)==~0U); continue;
+                }
                 assert(clock_refs==1 && !irq_depth && ovl->clock_enabled && polls==3);
                 assert(!load(0x2c) && !load(0x324) && !load(8));
+                assert(sbch_writes==2 && !load(0x3a0) && !load(0x3a4) && load(0x3a8)==~0U);
                 assert(!(load(0x24)&6));
                 for (unsigned int i=0;i<data->layer_nr;i++) assert(!load(0xc0+0x20*i));
                 unsigned int before=writes; mtk_ovl_start(&pdev.dev); assert(writes==before);
@@ -341,6 +422,7 @@ int main(int argc,char **argv)
     fill(seed);latency=2;trace=true;puts("RESET");assert(!mtk_ovl_clk_enable(&dev));
     /* Dirty registers after modeled reset test complete ownership of setup fields. */
     fill(seed);save(4,0);save(0x14,0);save(0xc,load(0xc)&~1U);writes=0;
+    save(0x3a0,0);save(0x3a4,0); /* Cleanup belongs to clock enable, not per-frame config. */
     struct cmdq_pkt pkt={0};atomic_context=true;puts("CONFIG");
     mtk_ovl_config(&dev,width,height,59,8,queued?&pkt:NULL);
     assert(ovl.config_valid);if (queued) { assert(!writes && pkt.count);flush(&pkt); }
@@ -372,6 +454,7 @@ int main(int argc,char **argv)
     mtk_ovl_start(&dev);atomic_context=false;assert(writes==before);
     /* The old MT8192 path keeps its reset, GMC, startup and IRQ behavior. */
     ovl.data=match("mediatek,mt8192-disp-ovl");fill(0);writes=0;
+    save(0x3a0,~0U);save(0x3a4,~0U);save(0x3a8,~0U);
     assert(!mtk_ovl_clk_enable(&dev) && !writes);
     atomic_context=true;mtk_ovl_config(&dev,480,640,59,8,NULL);assert(writes==4);
     mtk_ovl_start(&dev);assert(load(0xc)==1 && load(0x24)==1);
@@ -381,6 +464,7 @@ int main(int argc,char **argv)
     assert(mtk_disp_ovl_irq_handler(73,&ovl)==IRQ_HANDLED && callbacks==before+1);
     mtk_ovl_stop(&dev);assert(!load(0xc) && !load(0x24));atomic_context=false;mtk_ovl_clk_disable(&dev);
     assert(!clock_refs && enables==disables);
+    assert(!sbch_writes && load(0x3a0)==~0U && load(0x3a4)==~0U && load(0x3a8)==~0U);
 }
 '''
 
@@ -416,9 +500,12 @@ def check():
     source=folder/'harness.c';binary=folder/'harness';source.write_text(harness())
     subprocess.run(['cc','-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror','-Wno-unused-parameter',
         '-fsanitize=address,undefined','-fno-pie','-no-pie',str(source),'-o',str(binary)],check=True)
-    audit=[];fixtures=0
+    audit=[];sbch_audit=[];fixtures=0
     for module in [0,1]:
         for seed in [0,0xffffffff,0xa5a55a5a]:
+            cleanup=[stock_sbch(raw,module,seed,feature,config,queued)
+                     for feature,config in [(0,0),(0,1),(1,0)] for queued in [False,True]]
+            sbch_audit.extend(cleanup)
             for width,height in [(480,640),(4095,4095),(1,1)]:
                 result=subprocess.check_output([str(binary),str(module),str(seed),str(seed&1),str(width),str(height)],text=True)
                 sections={};current=None
@@ -438,6 +525,8 @@ def check():
                 # The native IRQ policy enables errors plus requested vblank, not frame-start.
                 assert actual[4]==4|0x2000|(((1<<(2 if module else 4))-1)<<5)
                 assert [event for event in sections['RESET'] if event[0]==0x14]==stock(raw,'reset',module,seed)['writes']
+                sbch=[event for event in sections['RESET'] if event[0] in (0x3a0,0x3a4)]
+                assert all(sbch==case['writes'][-2:] for case in cleanup)
                 assert not any(event[0]==0x14 for event in sections['CONFIG'])
                 fixtures+=1
         statuses=[0,0x7fff,0xffffffff,0x2064]+[1<<bit for bit in range(15)]
@@ -455,8 +544,12 @@ def check():
         drv=(SRC/'drivers/gpu/drm/mediatek/mtk_drm_drv.c').read_text()
         assert re.search(r'\.compatible = "'+compatible+r'",\s*\.data = \(void \*\)MTK_DISP_OVL'+('_2L' if part.endswith('_2l') else '')+r'\s*}',drv)
     (ROOT/'out/mt6765-ovl-audit.json').write_text(json.dumps(audit,indent=2)+'\n')
+    (ROOT/'out/mt6765-sbch-audit.json').write_text(json.dumps({
+        'stock_image_sha256':hashlib.sha256(raw).hexdigest(),
+        'fragment_entry':0x6fed38,'fragment_end':0x6ffd28,'cases':sbch_audit},indent=2)+'\n')
     print(f'PASS: {fixtures} native setup fixtures match stock register values; 76 stock IRQ traces classify frame completion and errors')
     print('PASS: reset polling/timeouts, clock/probe failures, inherited layers off, queued writes, bounds, IRQ lifetime and MT8192 regression')
+    print('PASS: 36 stock SBCH cleanup fixtures; both native blocks clear reuse state after reset and before IRQ/start, including repeated power cycles')
     print('PASS: 65,536 status/callback combinations per native block, late status, vblank masks and error accounting; native DT resources match stock')
     print('MMIO side effects, clocks, IRQ synchronization and kernel services are modeled. No pixel flow or hardware boot is established.')
 

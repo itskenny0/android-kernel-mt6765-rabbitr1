@@ -118,6 +118,8 @@
 #define DISP_REG_OVL_FUNC_DCM0	0x02a0
 #define DISP_REG_OVL_FUNC_DCM1	0x02a4
 #define DISP_REG_OVL_EXT_CON	0x0324
+#define DISP_REG_OVL_SBCH		0x03a0
+#define DISP_REG_OVL_SBCH_EXT	0x03a4
 #define MT6765_OVL_GMC		0x03ff03ff
 
 static inline bool is_10bit_rgb(u32 fmt)
@@ -354,6 +356,9 @@ int mtk_ovl_clk_enable(struct device *dev)
 	/* Drop inherited physical, constant-color and extended layers. */
 	writel(0, ovl->regs + DISP_REG_OVL_SRC_CON);
 	writel(0, ovl->regs + DISP_REG_OVL_EXT_CON);
+	/* Mainline does not track SBCH's reusable transparent/constant regions. */
+	writel(0, ovl->regs + DISP_REG_OVL_SBCH);
+	writel(0, ovl->regs + DISP_REG_OVL_SBCH_EXT);
 	/* CRTC will enable the upstream background input on the second overlay. */
 	writel(readl(ovl->regs + DISP_REG_OVL_DATAPATH_CON) &
 	       ~(OVL_BGCLR_SEL_IN | OVL_RANDOM_BGCLR_EN),

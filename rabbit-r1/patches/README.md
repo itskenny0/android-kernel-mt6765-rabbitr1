@@ -80,3 +80,8 @@ Patch 0034 programs the display COLOR selector used by LK, alongside the
 existing selector copied from Android. LK primary-init and scenario traces
 now supplement the Android route comparison. Complete firmware handoff and
 physical display validation remain open; see `docs/DISPLAY.md`.
+
+Patch 0035 clears native overlay SBCH reuse controls after successful reset,
+before IRQ enable. Mainline does not implement the layer-change tracking that
+this optimization needs. The stock direct/queued cleanup paths and native
+power-cycle ordering are checked; see `docs/DISPLAY.md`.
