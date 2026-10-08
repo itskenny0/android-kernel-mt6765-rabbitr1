@@ -47,6 +47,11 @@
 | Missing routes, narrow masks, DSI module enable/removal, legacy MOD1 and RDMA clock regressions | All nine rejected at runtime | `logs/mt6765-display-path-regression-*.log` |
 | MMSYS, mutex and RDMA DT fixes | AArch64 objects and DTB compiled | `logs/mt6765-display-path-build.log` |
 | LK primary display route | PASS: primary-init prefix selects scenario 0/DSI0; 16 connect/disconnect/reconnect fixtures | `scripts/test-lk-display-path.py`, `out/lk-display-path-audit.json`; discovery/allocation and MMIO modeled, no full boot |
+| Native MT6765 SMI port setup | PASS: 312 stock enable/disable calls; native enable matches all 52 ports at three seeds | `logs/mt6765-smi-tests.log`, `out/mt6765-smi-audit.json`; shipped table/control flow, modeled clocks, locks and MMIO |
+| SMI/IOMMU callback integration | PASS: bind, bank-zero masks, clock errors, repeated resume, software detach and unchanged bitmap backends | `scripts/test-mt6765-smi.py`; ASan/UBSan, no physical address-translation test |
+| SMI backend, register, field, mask and clock regressions | Ten compiled variants rejected; SMI object and DTB compiled | `logs/mt6765-smi-mutations.log`, `logs/mt6765-smi-build.log` |
+| Compiled LARB nodes | PASS: native matches, four IDs, clock counts and display port wiring; zero LARB schema diagnostics | `out/mt6765-smi-schema.json`, `logs/mt6765-smi-schema.log` |
+| LARB compatible, clock-list, ID/order and display-port regressions | Six edited DT fixtures rejected | `logs/mt6765-smi-dtb-mutations.log` |
 | Display COLOR selector inherited from LK | PASS: production route callbacks match both LK and Android programming with four dirty-register seeds | `logs/lk-display-path-tests.log`; missing `0xf64` write fails the comparison; MMSYS object compiled |
 | Display COLOR route regressions | Four compiled variants rejected: wrong register, input, wide mask and empty mask | `logs/lk-display-path-mutations.log`; checks emitted writes and unrelated-bit preservation |
 | Native RDMA FIFO/QoS vs shipped instructions | PASS: 108 traces, direct/memory video input, vendor clock states and inherited registers; equivalent-pixel-rate fixtures for other refresh rates | `logs/mt6765-rdma-tests.log`, `out/mt6765-rdma-audit.json` |

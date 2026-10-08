@@ -1,0 +1,32 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MT6765 SMI port setup
+
+Use the per-port NONSEC_CON registers selected by the shipped MT6765
+driver, instead of the MT8167 bitmap register. The native single IOVA
+region supplies bank zero. Keep foreign QoS tables and flags out of the
+MT6765 configuration.
+
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 4d27070851..7876b36941 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -491,6 +491,10 @@ static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
+ 	.larb_direct_to_common_mask = BIT(8) | BIT(9),      /* bdpsys */
+ };
+ 
++static const struct mtk_smi_larb_gen mtk_smi_larb_mt6765 = {
++	.config_port = mtk_smi_larb_config_port_gen2_general,
++};
++
+ static const struct mtk_smi_larb_gen mtk_smi_larb_mt6779 = {
+ 	.config_port  = mtk_smi_larb_config_port_gen2_general,
+ 	.larb_direct_to_common_mask =
+@@ -548,7 +552,7 @@ static const struct mtk_smi_larb_gen mtk_smi_larb_mt8195 = {
+ static const struct of_device_id mtk_smi_larb_of_ids[] = {
+ 	{.compatible = "mediatek,mt2701-smi-larb", .data = &mtk_smi_larb_mt2701},
+ 	{.compatible = "mediatek,mt2712-smi-larb", .data = &mtk_smi_larb_mt2712},
+-	{.compatible = "mediatek,mt6765-smi-larb", .data = &mtk_smi_larb_mt8167},
++	{.compatible = "mediatek,mt6765-smi-larb", .data = &mtk_smi_larb_mt6765},
+ 	{.compatible = "mediatek,mt6779-smi-larb", .data = &mtk_smi_larb_mt6779},
+ 	{.compatible = "mediatek,mt6795-smi-larb", .data = &mtk_smi_larb_mt8173},
+ 	{.compatible = "mediatek,mt6893-smi-larb", .data = &mtk_smi_larb_mt6893},

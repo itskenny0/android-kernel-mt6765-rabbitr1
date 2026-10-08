@@ -378,6 +378,58 @@ handoff. In particular, LK writes cached MOUT values as whole registers but
 does not clear unrelated RSZ routes in these fixtures. Stopping inherited DMA,
 reclaiming the firmware framebuffer and display IOMMU setup remain unresolved.
 
+## SMI port translation
+
+The native MT6765 SMI match now uses the per-port generation-2 configuration
+callback. Previously it selected MT8167's callback, which writes a port bitmap
+at LARB offset `0xfc0`. The shipped Rabbit kernel instead changes bit 0 of
+`SMI_LARB_NON_SEC_CON`, at `0x380 + 4 * port`. With the old match, mainline
+did not issue those translation-enable writes.
+
+The native match has no foreign QoS table, direct-to-common bypass or secure
+monitor flag. MT6765's existing single IOVA region starts at zero, so the
+IOMMU callback supplies bank zero. The selected SMI callback therefore sets
+only bit 0 of each requested port and preserves its other fields, matching
+the shipped enable operation. Ports absent from the software mask remain
+untouched. MT8167 and MT8173 retain their bitmap backends.
+
+The four compiled LARB nodes use only their native compatible. The MT8192
+fallback was outside the binding and would select another SoC's QoS table.
+LARB2 also had a third clock name, `gals`, with only two clock specifiers;
+the unmatched name is removed. The optional clock is now absent rather than
+referring past the end of the clock list. Physical clock behavior is still
+unverified.
+
+`test-mt6765-smi.py` executes the shipped `m4u_config_port` function at raw
+Image offset `0x8a13cc`. The actual port table at `0x179ddb0`, with 48-byte
+entries, maps 52 ports across LARB0..3 (8, 11, 12 and 21 ports). The MMIO write
+at `0x8a15e8` preserves all bits except translation enable. The test covers
+enable and disable for every entry with three initial register values: 312
+stock calls. All native enable writes are compared with those results.
+The stock code takes the direct, nonsecure path; its table lookup, control
+flow and register operations execute, while clocks, spinlocks, prefetch
+invalidation, timers and logging/profiling are modeled. Firmware security
+ownership is not established by this test.
+
+The ASan/UBSan harness executes the production SMI bind/resume/suspend and
+IOMMU configuration callbacks. It checks four arbiters, 37 masks (including
+individual bits through bit 31), three dirty-register seeds, clock failure
+before any MMIO, repeated resume after modeled state loss, software detach
+and legacy bitmap writes. Bits outside the 52 populated stock ports are
+software boundary tests, not claims about additional physical ports. The
+compiled DT checks LARB ordering, native compatibles, clock counts and the
+OVL0/OVL0_2L/RDMA0 IOMMU IDs. The LARB binding reports no diagnostics.
+The old backend fails the register comparison; ten compiled faulty variants
+are rejected. Six edited DT fixtures also reject foreign fallback, clock-list,
+LARB ID/order and display-port regressions.
+
+This change does not complete IOMMU bring-up. As in the shared generation-2
+backend, removing a client from the software mask does not clear a previously
+enabled hardware port. It is not a transition to physical addressing.
+Controller configuration, page-table format, TLB invalidation, inherited
+security/bank fields, active firmware DMA, suspend retention and real mapped
+framebuffer access still require validation. The display graph stays disabled.
+
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,

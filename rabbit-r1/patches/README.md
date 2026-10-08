@@ -96,3 +96,9 @@ preserving interrupts that arrive after the handled snapshot. The stock
 CPU/CMDQ acknowledgement paths and native late-event behavior are checked;
 IRQ lifetime, the unbounded BUSY loop and complete panel reads still need
 work. See `docs/DISPLAY.md`.
+
+Patch 0038 selects per-port SMI translation control for MT6765 instead of the
+MT8167 bitmap register. Patch 0039 removes the MT8192 LARB fallbacks and the
+unmatched LARB2 clock name. Shipped port operations, native callback/clock
+behavior and compiled DT wiring are checked. Actual IOMMU translation and
+firmware DMA handoff remain unverified; see `docs/DISPLAY.md`.

@@ -1,0 +1,55 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MT6765 LARB descriptions
+
+Use the native SMI compatible without the MT8192 QoS fallback. Remove the
+unmatched LARB2 gals clock name; only two clock specifiers are present.
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+index d1701e2a17..014bc6a5a3 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6765.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+@@ -908,8 +908,7 @@ smi_common: smi_common@14002000 {
+ 		};
+ 
+ 		smi_larb0: memory-controller@14003000 {
+-			compatible = "mediatek,mt6765-smi-larb",
+-						 "mediatek,mt8192-smi-larb";
++			compatible = "mediatek,mt6765-smi-larb";
+ 			reg = <0 0x14003000 0 0x1000>;
+ 			clocks = <&mmsys CLK_MM_SMI_LARB0>,
+ 				 <&mmsys CLK_MM_SMI_LARB0>;
+@@ -1034,12 +1033,11 @@ imgsys: clock-controller@15020000 {
+ 		};
+ 
+ 		smi_larb2: memory-controller@15021000 {
+-			compatible = "mediatek,mt6765-smi-larb",
+-				     "mediatek,mt8192-smi-larb";
++			compatible = "mediatek,mt6765-smi-larb";
+ 			reg = <0 0x15021000 0 0x1000>;
+ 			clocks = <&mmsys CLK_MM_SMI_IMG>,
+ 				 <&imgsys CLK_IMG_LARB2>;
+-			clock-names = "apb", "smi", "gals";
++			clock-names = "apb", "smi";
+ 			power-domains = <&spm MT6765_POWER_DOMAIN_ISP>;
+ 			mediatek,smi = <&smi_common>;
+ 			mediatek,larb-id = <2>;
+@@ -1052,8 +1050,7 @@ vcodecsys: clock-controller@17000000 {
+ 		};
+ 
+ 		smi_larb1: memory-controller@17010000 {
+-			compatible = "mediatek,mt6765-smi-larb",
+-				     "mediatek,mt8192-smi-larb";
++			compatible = "mediatek,mt6765-smi-larb";
+ 			reg = <0 0x17010000 0 0x1000>;
+ 			clocks = <&vcodecsys CLK_VENC_SET0_LARB>,
+ 				 <&vcodecsys CLK_VENC_SET1_VENC>;
+@@ -1070,8 +1067,7 @@ camsys: clock-controller@1a000000  {
+ 		};
+ 
+ 		smi_larb3: memory-controller@1a002000 {
+-			compatible = "mediatek,mt6765-smi-larb",
+-				     "mediatek,mt8192-smi-larb";
++			compatible = "mediatek,mt6765-smi-larb";
+ 			reg = <0 0x1a002000 0 0x1000>;
+ 			clocks = <&mmsys CLK_MM_SMI_CAM>,
+ 				 <&camsys CLK_CAM_LARB3>;
