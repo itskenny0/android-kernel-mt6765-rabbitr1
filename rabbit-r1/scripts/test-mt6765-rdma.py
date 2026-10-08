@@ -137,6 +137,12 @@ static bool irq_inflight;
 static void (*irq_before_disable)(void);
 static u32 late_status;
 static int atomic_context,clock_error,reset_error,latency,pending=-1,remaining;
+static void (*retry_hook)(void);
+static void msleep(unsigned int ms)
+{
+    assert(ms==20 && !atomic_context && clock_refs && irq_depth==1 && !irq_inflight);
+    assert(retry_hook); retry_hook();
+}
 static bool trace;
 static u32 load(unsigned int offset) { u32 v; memcpy(&v,regs+offset,4); return v; }
 static void save(unsigned int offset,u32 value) { memcpy(regs+offset,&value,4); }
@@ -321,7 +327,7 @@ def harness():
     result=PRELUDE+'enum { '+','.join(names)+' };\n'
     result+=source[source.index('#define DISP_REG_RDMA_INT_ENABLE'):source.index('static irqreturn_t')]
     result+=block(source,'static void rdma_update_bits(')
-    for name in ['mtk_rdma_clk_enable','mtk_rdma_clk_disable','mtk_rdma_start','mtk_rdma_stop',
+    for name in ['mt6765_rdma_reset','mtk_rdma_clk_enable','mtk_rdma_clk_disable','mtk_rdma_start','mtk_rdma_stop',
                  'mt6765_rdma_calc_fifo','mt6765_rdma_write_fifo','mt6765_rdma_config','mtk_rdma_config',
                  'rdma_fmt_convert','mtk_rdma_layer_config']:
         match=re.search(r'^(?:static )?(?:int|void|unsigned int) '+name+r'\(',source,re.M)

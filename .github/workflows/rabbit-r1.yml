@@ -155,6 +155,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-mt6765-rdma.py 2>&1 | tee logs/mt6765-rdma-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-rdma-irq.py 2>&1 | tee logs/mt6765-rdma-irq-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-ovl.py 2>&1 | tee logs/mt6765-ovl-tests.log
+          toolchains/boot-tools/bin/python scripts/test-display-drain.py 2>&1 | tee logs/display-drain-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-ovl-plane.py 2>&1 | tee logs/mt6765-ovl-plane-tests.log
           toolchains/boot-tools/bin/python scripts/test-mt6765-plane-address.py 2>&1 | tee logs/mt6765-plane-address-tests.log
 

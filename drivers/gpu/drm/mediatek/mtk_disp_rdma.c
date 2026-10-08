@@ -7,6 +7,7 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/math64.h>
@@ -236,10 +237,26 @@ size_t mtk_rdma_get_num_formats(struct device *dev)
 	return rdma->data->num_formats;
 }
 
-int mtk_rdma_clk_enable(struct device *dev)
+static int mt6765_rdma_reset(struct device *dev)
 {
 	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
 	u32 value;
+	int ret;
+
+	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, RDMA_SOFT_RESET);
+	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
+				(value & RDMA_RESET_STATE) != RDMA_RESET_IDLE, 10, 100000);
+	/* Always release reset, including a timeout while entering reset. */
+	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, 0);
+	if (ret)
+		return ret;
+	return readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
+				 (value & RDMA_RESET_STATE) == RDMA_RESET_IDLE, 10, 100000);
+}
+
+int mtk_rdma_clk_enable(struct device *dev)
+{
+	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
 	int ret;
 
 	ret = clk_prepare_enable(rdma->clk);
@@ -258,15 +275,7 @@ int mtk_rdma_clk_enable(struct device *dev)
 	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN, 0);
 	writel(0, rdma->regs + DISP_REG_RDMA_INT_ENABLE);
 	writel(0, rdma->regs + DISP_REG_RDMA_INT_STATUS);
-	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, RDMA_SOFT_RESET);
-	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
-				(value & RDMA_RESET_STATE) != RDMA_RESET_IDLE, 10, 100000);
-	/* Always release reset, including a timeout while entering reset. */
-	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, 0);
-	if (ret)
-		goto disable_clock;
-	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
-				(value & RDMA_RESET_STATE) == RDMA_RESET_IDLE, 10, 100000);
+	ret = mt6765_rdma_reset(dev);
 	if (!ret) {
 		enable_irq(rdma->irq);
 		return 0;
@@ -284,10 +293,22 @@ void mtk_rdma_clk_disable(struct device *dev)
 	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
 
 	if (rdma->data->mt6765) {
+		int ret;
+
+		rdma->config_valid = false;
+		rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN, 0);
 		writel(0, rdma->regs + DISP_REG_RDMA_INT_ENABLE);
 		/* Drain a running handler before its registers become inaccessible. */
 		disable_irq(rdma->irq);
 		writel(0, rdma->regs + DISP_REG_RDMA_INT_STATUS);
+		/*
+		 * Returning lets CRTC teardown release DMA buffers. Keep the clock
+		 * and wait for reset completion, even after a persistent failure.
+		 */
+		while ((ret = mt6765_rdma_reset(dev))) {
+			dev_err_ratelimited(dev, "RDMA teardown reset failed: %d\n", ret);
+			msleep(20);
+		}
 	}
 	clk_disable_unprepare(rdma->clk);
 	rdma->config_valid = false;

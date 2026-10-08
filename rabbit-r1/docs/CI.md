@@ -72,6 +72,9 @@ The workflow:
    Native RDMA FIFO/QoS writes and reset transitions are compared with stock
    instructions. Clock/reset failures, IRQ-safe configuration, queued writes,
    input-mode changes and the native component/DT lookup are covered.
+   Native RDMA/overlay teardown checks delayed reset completion, both RDMA
+   timeout stages, recovery retries and persistent failures. Clock release must
+   wait for reset success; IRQ draining and caller buffer ownership are modeled.
    The RDMA IRQ test compares event classification and selective acknowledgement
    with shipped instructions, then checks masked vblank, error diagnostics,
    clock-free probe, failure cleanup and synchronized IRQ shutdown with models.

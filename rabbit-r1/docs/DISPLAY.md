@@ -349,6 +349,34 @@ remain models. The event path is covered separately below. Panel rails, physical
 page-flip behavior and firmware DMA handoff still need validation. The display
 graph remains disabled.
 
+### Display DMA teardown
+
+The native RDMA and overlay clock-disable callbacks now confirm reset completion
+before dropping their clock references. Clearing the engine-enable bit alone
+does not establish that outstanding DMA has finished. The callbacks disable the
+engine and its interrupts, drain an in-flight IRQ handler, then run the same
+reset sequence used at startup. RDMA checks both reset-entry and reset-exit
+states; each overlay polls its flow-control state after the reset pulse.
+
+The CRTC teardown callbacks cannot return a reset error to DRM. They therefore
+retain the clock and retry after a 20 ms sleep when a reset times out. A permanent
+failure deliberately blocks that display teardown; it must not continue into
+clock/power release and framebuffer cleanup. Normal completion releases the
+clock once. Legacy platforms retain their existing behavior.
+
+`test-display-drain.py` compiles the production reset and clock-disable paths
+with ASan/UBSan. Its 44 fixtures cover both overlays, RDMA direct/memory modes,
+delayed completion, failures at each RDMA reset stage, recovery after one or
+three failures, and persistent failures. The persistent-failure observer exits
+the test after three retries while confirming the clock remains held; the
+production code keeps waiting. MMIO, IRQ synchronization, sleeps and the caller's
+buffer ownership are modeled. MT8183 RDMA and MT8192 overlay behavior are also
+checked. Separate tests retain the existing setup and IRQ coverage.
+
+This fixes the Linux teardown path. It does not establish physical DMA
+completion or fix the earlier LK-to-Linux ownership transfer. The graph remains
+disabled pending that handoff and panel power work; see [LK.md](LK.md).
+
 ## Events after failed display startup
 
 The shared MediaTek CRTC callbacks now check whether hardware startup succeeded

@@ -220,6 +220,12 @@ static unsigned int sbch_writes;
 static unsigned int callbacks;
 static bool trace,atomic_context,irq_inflight;
 static int clock_error,reset_error,latency,remaining=-1,failure,pm_refs,components,requested;
+static void (*retry_hook)(void);
+static void msleep(unsigned int ms)
+{
+    assert(ms==20 && !atomic_context && clock_refs && irq_depth==1 && !irq_inflight);
+    assert(retry_hook); retry_hook();
+}
 static void *allocation,*irq_data;
 static const void *match_data;
 static struct clk clock_;
@@ -479,7 +485,7 @@ def harness():
                  'static u32 mt6765_ovl_error_mask(', 'static irqreturn_t mt6765_ovl_irq(',
                  'static irqreturn_t mtk_disp_ovl_irq_handler(']:result+=block(source,name)
     names=['mtk_ovl_register_vblank_cb','mtk_ovl_unregister_vblank_cb','mtk_ovl_enable_vblank','mtk_ovl_disable_vblank',
-           'mtk_ovl_clk_enable','mtk_ovl_clk_disable','mtk_ovl_start','mtk_ovl_stop','mt6765_ovl_config','mtk_ovl_config',
+           'mt6765_ovl_reset','mtk_ovl_clk_enable','mtk_ovl_clk_disable','mtk_ovl_start','mtk_ovl_stop','mt6765_ovl_config','mtk_ovl_config',
            'mtk_ovl_layer_on','mtk_ovl_layer_off','mtk_ovl_bgclr_in_on','mtk_ovl_bgclr_in_off',
            'mtk_disp_ovl_bind','mtk_disp_ovl_unbind']
     for name in names:

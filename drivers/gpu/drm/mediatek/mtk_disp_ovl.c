@@ -11,6 +11,7 @@
 #include <linux/align.h>
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
@@ -327,10 +328,21 @@ bool mtk_ovl_is_afbc_supported(struct device *dev)
 	return ovl->data->supports_afbc;
 }
 
-int mtk_ovl_clk_enable(struct device *dev)
+static int mt6765_ovl_reset(struct device *dev)
 {
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 	u32 value;
+
+	writel(1, ovl->regs + DISP_REG_OVL_RST);
+	writel(0, ovl->regs + DISP_REG_OVL_RST);
+	/* Unlike the stock loop, re-read the state on every poll. */
+	return readl_poll_timeout(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG, value,
+				  value & 3, 10, 20000);
+}
+
+int mtk_ovl_clk_enable(struct device *dev)
+{
+	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 	unsigned int i;
 	int ret;
 
@@ -342,11 +354,7 @@ int mtk_ovl_clk_enable(struct device *dev)
 	writel(0, ovl->regs + DISP_REG_OVL_INTEN);
 	writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
 	       ovl->regs + DISP_REG_OVL_EN);
-	writel(1, ovl->regs + DISP_REG_OVL_RST);
-	writel(0, ovl->regs + DISP_REG_OVL_RST);
-	/* Unlike the stock loop, re-read the state on every poll. */
-	ret = readl_poll_timeout(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG, value,
-				value & 3, 10, 20000);
+	ret = mt6765_ovl_reset(dev);
 	if (ret) {
 		dev_err(dev, "OVL reset failed: %d\n", ret);
 		clk_disable_unprepare(ovl->clk);
@@ -376,11 +384,23 @@ void mtk_ovl_clk_disable(struct device *dev)
 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
 
 	if (ovl->data->mt6765) {
+		int ret;
+
+		ovl->config_valid = false;
+		writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
+		       ovl->regs + DISP_REG_OVL_EN);
 		writel(0, ovl->regs + DISP_REG_OVL_INTEN);
 		disable_irq(ovl->irq);
 		writel(0, ovl->regs + DISP_REG_OVL_INTSTA);
+		/*
+		 * Returning lets CRTC teardown release DMA buffers. Keep the clock
+		 * and wait for reset completion, even after a persistent failure.
+		 */
+		while ((ret = mt6765_ovl_reset(dev))) {
+			dev_err_ratelimited(dev, "OVL teardown reset failed: %d\n", ret);
+			msleep(20);
+		}
 		ovl->clock_enabled = false;
-		ovl->config_valid = false;
 	}
 	clk_disable_unprepare(ovl->clk);
 }

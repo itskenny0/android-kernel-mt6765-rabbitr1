@@ -1,0 +1,162 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Wait for display DMA reset before clock release
+
+Clearing the engine-enable bits is not a completion check. Reuse the native
+reset sequences during teardown and retain clocks until reset completes.
+Keep reset failures from returning into CRTC power and framebuffer cleanup.
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 8a7833bbc5..0e2df7fbff 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -11,6 +11,7 @@
+ #include <linux/align.h>
+ #include <linux/clk.h>
+ #include <linux/component.h>
++#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+@@ -327,10 +328,21 @@ bool mtk_ovl_is_afbc_supported(struct device *dev)
+ 	return ovl->data->supports_afbc;
+ }
+ 
+-int mtk_ovl_clk_enable(struct device *dev)
++static int mt6765_ovl_reset(struct device *dev)
+ {
+ 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
+ 	u32 value;
++
++	writel(1, ovl->regs + DISP_REG_OVL_RST);
++	writel(0, ovl->regs + DISP_REG_OVL_RST);
++	/* Unlike the stock loop, re-read the state on every poll. */
++	return readl_poll_timeout(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG, value,
++				  value & 3, 10, 20000);
++}
++
++int mtk_ovl_clk_enable(struct device *dev)
++{
++	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
+ 	unsigned int i;
+ 	int ret;
+ 
+@@ -342,11 +354,7 @@ int mtk_ovl_clk_enable(struct device *dev)
+ 	writel(0, ovl->regs + DISP_REG_OVL_INTEN);
+ 	writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
+ 	       ovl->regs + DISP_REG_OVL_EN);
+-	writel(1, ovl->regs + DISP_REG_OVL_RST);
+-	writel(0, ovl->regs + DISP_REG_OVL_RST);
+-	/* Unlike the stock loop, re-read the state on every poll. */
+-	ret = readl_poll_timeout(ovl->regs + DISP_REG_OVL_FLOW_CTRL_DBG, value,
+-				value & 3, 10, 20000);
++	ret = mt6765_ovl_reset(dev);
+ 	if (ret) {
+ 		dev_err(dev, "OVL reset failed: %d\n", ret);
+ 		clk_disable_unprepare(ovl->clk);
+@@ -376,11 +384,23 @@ void mtk_ovl_clk_disable(struct device *dev)
+ 	struct mtk_disp_ovl *ovl = dev_get_drvdata(dev);
+ 
+ 	if (ovl->data->mt6765) {
++		int ret;
++
++		ovl->config_valid = false;
++		writel(readl(ovl->regs + DISP_REG_OVL_EN) & ~OVL_ENGINE_EN,
++		       ovl->regs + DISP_REG_OVL_EN);
+ 		writel(0, ovl->regs + DISP_REG_OVL_INTEN);
+ 		disable_irq(ovl->irq);
+ 		writel(0, ovl->regs + DISP_REG_OVL_INTSTA);
++		/*
++		 * Returning lets CRTC teardown release DMA buffers. Keep the clock
++		 * and wait for reset completion, even after a persistent failure.
++		 */
++		while ((ret = mt6765_ovl_reset(dev))) {
++			dev_err_ratelimited(dev, "OVL teardown reset failed: %d\n", ret);
++			msleep(20);
++		}
+ 		ovl->clock_enabled = false;
+-		ovl->config_valid = false;
+ 	}
+ 	clk_disable_unprepare(ovl->clk);
+ }
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 4c55210cc4..1792e2f33f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -7,6 +7,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/component.h>
++#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/iopoll.h>
+ #include <linux/math64.h>
+@@ -236,12 +237,28 @@ size_t mtk_rdma_get_num_formats(struct device *dev)
+ 	return rdma->data->num_formats;
+ }
+ 
+-int mtk_rdma_clk_enable(struct device *dev)
++static int mt6765_rdma_reset(struct device *dev)
+ {
+ 	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
+ 	u32 value;
+ 	int ret;
+ 
++	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, RDMA_SOFT_RESET);
++	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
++				(value & RDMA_RESET_STATE) != RDMA_RESET_IDLE, 10, 100000);
++	/* Always release reset, including a timeout while entering reset. */
++	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, 0);
++	if (ret)
++		return ret;
++	return readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
++				 (value & RDMA_RESET_STATE) == RDMA_RESET_IDLE, 10, 100000);
++}
++
++int mtk_rdma_clk_enable(struct device *dev)
++{
++	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
++	int ret;
++
+ 	ret = clk_prepare_enable(rdma->clk);
+ 	if (ret || !rdma->data->mt6765)
+ 		return ret;
+@@ -258,15 +275,7 @@ int mtk_rdma_clk_enable(struct device *dev)
+ 	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN, 0);
+ 	writel(0, rdma->regs + DISP_REG_RDMA_INT_ENABLE);
+ 	writel(0, rdma->regs + DISP_REG_RDMA_INT_STATUS);
+-	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, RDMA_SOFT_RESET);
+-	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
+-				(value & RDMA_RESET_STATE) != RDMA_RESET_IDLE, 10, 100000);
+-	/* Always release reset, including a timeout while entering reset. */
+-	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_SOFT_RESET, 0);
+-	if (ret)
+-		goto disable_clock;
+-	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
+-				(value & RDMA_RESET_STATE) == RDMA_RESET_IDLE, 10, 100000);
++	ret = mt6765_rdma_reset(dev);
+ 	if (!ret) {
+ 		enable_irq(rdma->irq);
+ 		return 0;
+@@ -284,10 +293,22 @@ void mtk_rdma_clk_disable(struct device *dev)
+ 	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
+ 
+ 	if (rdma->data->mt6765) {
++		int ret;
++
++		rdma->config_valid = false;
++		rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN, 0);
+ 		writel(0, rdma->regs + DISP_REG_RDMA_INT_ENABLE);
+ 		/* Drain a running handler before its registers become inaccessible. */
+ 		disable_irq(rdma->irq);
+ 		writel(0, rdma->regs + DISP_REG_RDMA_INT_STATUS);
++		/*
++		 * Returning lets CRTC teardown release DMA buffers. Keep the clock
++		 * and wait for reset completion, even after a persistent failure.
++		 */
++		while ((ret = mt6765_rdma_reset(dev))) {
++			dev_err_ratelimited(dev, "RDMA teardown reset failed: %d\n", ret);
++			msleep(20);
++		}
+ 	}
+ 	clk_disable_unprepare(rdma->clk);
+ 	rdma->config_valid = false;
