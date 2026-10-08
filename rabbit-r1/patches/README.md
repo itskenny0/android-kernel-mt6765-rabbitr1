@@ -51,3 +51,10 @@ stock PLL, bandgap and lane shutdown sequence. Shared hooks keep the reference
 clock enabled through analog setup/teardown, with failure cleanup and the
 existing backends' callback order retained. The r1 PHY stays disabled pending
 the remaining display pipeline work and hardware validation; see `docs/DISPLAY.md`.
+
+Patch 0025 corrects the native MMSYS route selectors, DSI mutex membership and
+RDMA clock. Patches 0026/0027 add the native RDMA binding, FIFO/QoS setup,
+reset sequence and input-mode configuration. Patch 0028 adds selective IRQ
+acknowledgement and error diagnostics, avoids unpowered probe accesses and
+synchronizes IRQ shutdown before clock disable. See `docs/DISPLAY.md` for the
+stock-instruction comparisons and remaining display acceptance work.

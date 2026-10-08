@@ -36,6 +36,9 @@ The workflow:
    Native RDMA FIFO/QoS writes and reset transitions are compared with stock
    instructions. Clock/reset failures, IRQ-safe configuration, queued writes,
    input-mode changes and the native component/DT lookup are covered.
+   The RDMA IRQ test compares event classification and selective acknowledgement
+   with shipped instructions, then checks masked vblank, error diagnostics,
+   clock-free probe, failure cleanup and synchronized IRQ shutdown with models.
    It then builds patched LK and the LineageOS splash with
    pinned mtklkzap, checks Fastboot relock refusal, and emulates the Linux DT handoff.
 5. Builds both mtkclient boot profiles.

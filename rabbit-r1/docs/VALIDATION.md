@@ -47,6 +47,10 @@
 | RDMA FIFO, mode, request flags, SRAM, clocks, reset, startup, width, pending depth and refresh-rate regressions | All twelve rejected at runtime | `logs/mt6765-rdma-regression-*.log` |
 | Native RDMA binding/example and compiled node | PASS: zero RDMA diagnostics; FIFO override rejected | `logs/mt6765-rdma-binding.log`, `logs/mt6765-rdma-schema.log`, `out/mt6765-rdma-schema{,-regression}.json`; unrelated tphy warning and unavailable optional yamllint noted |
 | Native RDMA, DRM lookup and DTB | AArch64 objects and DTB compiled | `logs/mt6765-rdma-build.log` |
+| RDMA IRQ classification and selective acknowledgement | PASS: 260 stock traces and 1,560 production-handler cases, masked vblank, late events and error counters/logs | `logs/mt6765-rdma-irq-tests.log`, `out/mt6765-rdma-irq-audit.json` |
+| RDMA probe and IRQ/clock lifetime | PASS: no native probe MMIO, eight probe failures, reset errors, repeated cycles, CRTC unwind, synchronous shutdown and legacy behavior | `scripts/test-mt6765-rdma-irq.py`; ASan/UBSan with kernel-service/MMIO models |
+| RDMA probe access, IRQ lifetime, acknowledgement, source masks, vblank and error-accounting regressions | All fifteen rejected at runtime | `logs/mt6765-rdma-irq-regression-*.log` |
+| Native RDMA IRQ object | AArch64 object compiled | `logs/mt6765-rdma-irq-build.log` |
 | Native PHY binding/example and compiled node | PASS, zero PHY-node diagnostics | `logs/mt6765-phy-binding.log`, `logs/mt6765-phy-schema.log`, `out/mt6765-phy-schema.json`; unrelated tphy warning and optional yamllint absence noted |
 | Native DSI binding/example and compiled host node | PASS, zero host diagnostics | `logs/mt6765-dsi-binding.log`, `logs/mt6765-dsi-schema.log`, `out/mt6765-dsi-schema.json`; inherited PHY warning and unavailable optional yamllint noted |
 | Panel driver and DSI host | AArch64 objects compiled | `logs/r1-panel-build.log`, `logs/dsi-transfer-build.log` |
@@ -88,6 +92,7 @@
 | Native PHY binding/backend patches checkpatch | No errors; one generic new-file MAINTAINERS warning (existing wildcard covers it) | `logs/mt6765-phy-checkpatch.log` |
 | MT6765 display-path patch checkpatch | No errors or warnings (`--no-signoff`) | `logs/mt6765-display-path-checkpatch.log` |
 | Native RDMA patches checkpatch | No errors or warnings (`--no-signoff`) | `logs/mt6765-rdma-checkpatch.log` |
+| Native RDMA IRQ patch checkpatch | No errors or warnings (`--no-signoff`) | `logs/mt6765-rdma-irq-checkpatch.log` |
 | Actual r1 boot, charging, display, storage or LineageOS | **NOT TESTED** | No device available |
 
 The full schema failures are recorded, not inferred from the validator's exit
@@ -128,6 +133,7 @@ toolchains/boot-tools/bin/python scripts/test-dsi-timing.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-phy.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-display-path.py
 toolchains/boot-tools/bin/python scripts/test-mt6765-rdma.py
+toolchains/boot-tools/bin/python scripts/test-mt6765-rdma-irq.py
 python3 scripts/test-i2c.py
 python3 scripts/test-i2c-irq.py
 toolchains/boot-tools/bin/python scripts/test-i2c-stock-timing.py

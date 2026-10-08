@@ -7,6 +7,7 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/math64.h>
 #include <linux/module.h>
@@ -75,6 +76,11 @@
 #define DISP_RDMA_ENTER_DRS_SETTING		0x00dc
 #define DISP_RDMA_MEM_GMC_SETTING_3		0x00e8
 #define MT6765_RDMA_FIFO_WORDS			384
+#define DISP_RDMA_IN_P_CNT			0x00f0
+#define DISP_RDMA_IN_LINE_CNT			0x00f4
+#define DISP_RDMA_OUT_P_CNT			0x00f8
+#define DISP_RDMA_OUT_LINE_CNT			0x00fc
+#define RDMA_ERROR_INT				(RDMA_EOF_ABNORMAL_INT | RDMA_FIFO_UNDERFLOW_INT)
 
 static const u32 mt8173_formats[] = {
 	DRM_FORMAT_XRGB8888,
@@ -102,6 +108,7 @@ struct mtk_disp_rdma_data {
  * @data: local driver data
  */
 struct mtk_disp_rdma {
+	struct device			*dev;
 	struct clk			*clk;
 	void __iomem			*regs;
 	struct cmdq_client_reg		cmdq_reg;
@@ -112,15 +119,53 @@ struct mtk_disp_rdma {
 	unsigned long			clock_rate;
 	unsigned int			width, height, vrefresh, bpc;
 	bool				config_valid;
+	int				irq;
+	u32				underflow_count, abnormal_count;
 };
 
 struct mt6765_rdma_fifo {
 	u32 pre_ultra, ultra, request, sodi, dvfs, dvfs_pre, dvfs_ultra, urgent;
 };
 
+static irqreturn_t mt6765_rdma_irq(struct mtk_disp_rdma *rdma)
+{
+	u32 status = readl(rdma->regs + DISP_REG_RDMA_INT_STATUS);
+	u32 enabled;
+
+	if (!status)
+		return IRQ_NONE;
+
+	enabled = readl(rdma->regs + DISP_REG_RDMA_INT_ENABLE);
+	/* Write zero to clear: preserve different events arriving after the read. */
+	writel(~status, rdma->regs + DISP_REG_RDMA_INT_STATUS);
+
+	if (status & RDMA_EOF_ABNORMAL_INT) {
+		rdma->abnormal_count++;
+		dev_err_ratelimited(rdma->dev, "RDMA abnormal EOF: count=%u status=%#x\n",
+				    rdma->abnormal_count, status);
+	}
+	if (status & RDMA_FIFO_UNDERFLOW_INT) {
+		rdma->underflow_count++;
+		dev_err_ratelimited(rdma->dev,
+				    "RDMA underflow: count=%u status=%#x in=%u,%u out=%u,%u\n",
+				    rdma->underflow_count, status,
+				    readl(rdma->regs + DISP_RDMA_IN_P_CNT),
+				    readl(rdma->regs + DISP_RDMA_IN_LINE_CNT),
+				    readl(rdma->regs + DISP_RDMA_OUT_P_CNT),
+				    readl(rdma->regs + DISP_RDMA_OUT_LINE_CNT));
+	}
+	if ((status & enabled & RDMA_FRAME_END_INT) && rdma->vblank_cb)
+		rdma->vblank_cb(rdma->vblank_cb_data);
+
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t mtk_disp_rdma_irq_handler(int irq, void *dev_id)
 {
 	struct mtk_disp_rdma *priv = dev_id;
+
+	if (priv->data->mt6765)
+		return mt6765_rdma_irq(priv);
 
 	/* Clear frame completion interrupt */
 	writel(0x0, priv->regs + DISP_REG_RDMA_INT_STATUS);
@@ -163,6 +208,11 @@ void mtk_rdma_unregister_vblank_cb(struct device *dev)
 
 void mtk_rdma_enable_vblank(struct device *dev)
 {
+	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
+
+	if (rdma->data->mt6765)
+		writel(~(u32)RDMA_FRAME_END_INT, rdma->regs + DISP_REG_RDMA_INT_STATUS);
+
 	rdma_update_bits(dev, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT,
 			 RDMA_FRAME_END_INT);
 }
@@ -217,8 +267,10 @@ int mtk_rdma_clk_enable(struct device *dev)
 		goto disable_clock;
 	ret = readl_poll_timeout(rdma->regs + DISP_REG_RDMA_GLOBAL_CON, value,
 				(value & RDMA_RESET_STATE) == RDMA_RESET_IDLE, 10, 100000);
-	if (!ret)
+	if (!ret) {
+		enable_irq(rdma->irq);
 		return 0;
+	}
 
 disable_clock:
 	dev_err(dev, "RDMA clock/reset failed: %d\n", ret);
@@ -231,6 +283,12 @@ void mtk_rdma_clk_disable(struct device *dev)
 {
 	struct mtk_disp_rdma *rdma = dev_get_drvdata(dev);
 
+	if (rdma->data->mt6765) {
+		writel(0, rdma->regs + DISP_REG_RDMA_INT_ENABLE);
+		/* Drain a running handler before its registers become inaccessible. */
+		disable_irq(rdma->irq);
+		writel(0, rdma->regs + DISP_REG_RDMA_INT_STATUS);
+	}
 	clk_disable_unprepare(rdma->clk);
 	rdma->config_valid = false;
 	rdma->clock_rate = 0;
@@ -242,6 +300,9 @@ void mtk_rdma_start(struct device *dev)
 
 	if (rdma->data->mt6765 && !rdma->config_valid)
 		return;
+
+	if (rdma->data->mt6765)
+		rdma_update_bits(dev, DISP_REG_RDMA_INT_ENABLE, RDMA_ERROR_INT, RDMA_ERROR_INT);
 
 	rdma_update_bits(dev, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN,
 			 RDMA_ENGINE_EN);
@@ -522,6 +583,7 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mtk_disp_rdma *priv;
+	unsigned long irq_flags = IRQF_TRIGGER_NONE;
 	int irq;
 	int ret;
 
@@ -532,6 +594,8 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
+	priv->dev = dev;
+	priv->irq = irq;
 
 	priv->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(priv->clk))
@@ -558,12 +622,17 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
 	if (priv->data->mt6765 && priv->fifo_size)
 		return dev_err_probe(dev, -EINVAL, "MT6765 uses its unshared RDMA0 FIFO\n");
 
-	/* Disable and clear pending interrupts */
-	writel(0x0, priv->regs + DISP_REG_RDMA_INT_ENABLE);
-	writel(0x0, priv->regs + DISP_REG_RDMA_INT_STATUS);
+	if (priv->data->mt6765) {
+		/* The display domain/clock may be off until the CRTC enables us. */
+		irq_flags |= IRQF_NO_AUTOEN;
+	} else {
+		/* Disable and clear pending interrupts */
+		writel(0x0, priv->regs + DISP_REG_RDMA_INT_ENABLE);
+		writel(0x0, priv->regs + DISP_REG_RDMA_INT_STATUS);
+	}
 
 	ret = devm_request_irq(dev, irq, mtk_disp_rdma_irq_handler,
-			       IRQF_TRIGGER_NONE, dev_name(dev), priv);
+			       irq_flags, dev_name(dev), priv);
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "Failed to request irq %d\n", irq);
 

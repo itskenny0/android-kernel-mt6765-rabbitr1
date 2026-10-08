@@ -125,13 +125,17 @@ typedef int64_t s64;
 #define dev_err_ratelimited(...) ((void)0)
 struct clk { unsigned long rate; };
 struct cmdq_client_reg { int unused; };
-struct device { void *data; };
+struct device { void *data; void *of_node; };
 struct of_device_id { const char *compatible; const void *data; };
 struct mtk_plane_pending_state { u32 addr,pitch,format; };
 struct mtk_plane_state { struct mtk_plane_pending_state pending; };
 static void *dev_get_drvdata(struct device *d) { return d->data; }
 static unsigned char regs[0x1000];
-static unsigned int writes,clock_refs,clock_calls,polls;
+static unsigned int writes,reads,clock_refs,clock_calls,polls;
+static unsigned int irq_depth=1,irq_enables,irq_disables;
+static bool irq_inflight;
+static void (*irq_before_disable)(void);
+static u32 late_status;
 static int atomic_context,clock_error,reset_error,latency,pending=-1,remaining;
 static bool trace;
 static u32 load(unsigned int offset) { u32 v; memcpy(&v,regs+offset,4); return v; }
@@ -139,6 +143,7 @@ static void save(unsigned int offset,u32 value) { memcpy(regs+offset,&value,4); 
 static u32 readl(const void *p)
 {
     assert(clock_refs && (const u8 *)p>=regs && (const u8 *)p+4<=regs+sizeof(regs));
+    reads++;
     unsigned int off=(const u8 *)p-regs;
     if (off==0x10 && pending>=0) {
         if (remaining) remaining--;
@@ -146,7 +151,9 @@ static u32 readl(const void *p)
             save(off,(load(off)&~0x700)|(unsigned int)pending); pending=-1;
         }
     }
-    return load(off);
+    u32 value=load(off);
+    if (off==4 && late_status) { save(off,value|late_status); late_status=0; }
+    return value;
 }
 static void writel(u32 value,void *p)
 {
@@ -155,7 +162,7 @@ static void writel(u32 value,void *p)
     if (off==0x10 && ((load(off)^value)&16)) {
         pending=value&16?0:0x100; remaining=latency;
     }
-    save(off,value); writes++;
+    save(off,off==4?load(off)&value:value); writes++;
     if (trace) printf("W %x %x\n",off,value);
 }
 #define readl_poll_timeout(addr,val,cond,delay,timeout) ({ \
@@ -166,9 +173,22 @@ static void writel(u32 value,void *p)
 static int clk_prepare_enable(struct clk *c)
 { (void)c; assert(!atomic_context); clock_calls++; if (clock_error) return clock_error; clock_refs++; return 0; }
 static void clk_disable_unprepare(struct clk *c)
-{ (void)c; assert(!atomic_context && clock_refs); clock_refs--; }
+{ (void)c; assert(!atomic_context && clock_refs && !irq_inflight); clock_refs--; }
 static unsigned long clk_get_rate(struct clk *c)
 { assert(!atomic_context && clock_refs); return c->rate; }
+static void enable_irq(int irq)
+{
+    (void)irq; assert(!atomic_context && clock_refs && irq_depth==1 && !load(0));
+    assert((load(0x10)&0x711)==0x100);
+    irq_depth--; irq_enables++;
+}
+static void disable_irq(int irq)
+{
+    (void)irq; assert(!atomic_context && clock_refs && !irq_depth && !load(0));
+    irq_depth++; irq_disables++;
+    if (irq_before_disable) irq_before_disable();
+    irq_inflight=false;
+}
 struct queued { u32 offset,value,mask; };
 struct cmdq_pkt { struct queued ops[128]; size_t count; };
 static void queue(struct cmdq_pkt *pkt,u32 v,void *base,u32 offset,u32 mask)
@@ -199,13 +219,13 @@ static void lifecycle(void)
 {
     struct clk clk={230000000};
     struct mtk_disp_rdma rdma={.clk=&clk,.regs=regs,.data=match("mediatek,mt6765-disp-rdma")};
-    struct device dev={&rdma};
+    struct device dev={.data=&rdma};
     for (int fail=0;fail<3;fail++) {
         fill(0xa5000000); writes=0; polls=0; reset_error=fail; latency=2;
         int ret=mtk_rdma_clk_enable(&dev);
         assert(ret==(fail?-ETIMEDOUT:0));
         assert(!(load(0x10)&0x11));
-        if (fail) { assert(!clock_refs && !rdma.config_valid && !rdma.clock_rate); continue; }
+        if (fail) { assert(irq_depth==1 && !clock_refs && !rdma.config_valid && !rdma.clock_rate); continue; }
         assert(clock_refs==1 && (load(0x10)&0x700)==0x100 && polls==6);
         unsigned int before=writes;
         mtk_rdma_start(&dev); assert(writes==before);
@@ -222,7 +242,7 @@ static void lifecycle(void)
         clk.rate=n==0?0:n==1?0x100000000UL:230000000;
         clock_error=n==2?-EIO:0; fill(0); writes=0;
         assert(mtk_rdma_clk_enable(&dev)==(clock_error?-EIO:-EINVAL));
-        assert(!clock_refs && !rdma.clock_rate && !rdma.config_valid);
+        assert(irq_depth==1 && !clock_refs && !rdma.clock_rate && !rdma.config_valid);
         unsigned int before=writes;
         atomic_context=1; mtk_rdma_config(&dev,480,640,60,8,NULL); mtk_rdma_start(&dev);
         atomic_context=0; assert(writes==before);
@@ -263,7 +283,7 @@ int main(int argc,char **argv)
     unsigned int fps=atoi(argv[5]); bool memory=atoi(argv[6]); u32 seed=strtoul(argv[7],NULL,0);
     bool queued=atoi(argv[8]);
     struct mtk_disp_rdma rdma={.clk=&clk,.regs=regs,.data=match("mediatek,mt6765-disp-rdma")};
-    struct device dev={&rdma}; struct cmdq_pkt cmd={0};
+    struct device dev={.data=&rdma}; struct cmdq_pkt cmd={0};
     fill(seed); latency=2; trace=true; puts("RESET");
     assert(!mtk_rdma_clk_enable(&dev));
     /* Synthetic dirty setup registers after reset exercise masked updates. */

@@ -276,13 +276,13 @@ MMIO, module base addresses, logging and profiling are modeled. This does not
 emulate CMDQ, hardware frame synchronization, clock waveforms or pixel flow.
 It also does not establish that every route left active by LK has been shut
 down: masked MOUT writes preserve unrelated outputs. Firmware path teardown,
-OVL/RDMA configuration, IOMMU and complete startup sequencing remain to audit.
+OVL configuration, IOMMU and complete startup sequencing remain to audit.
 
 ## Remaining acceptance work
 
 1. Audit remaining host startup, clock parents, firmware path teardown,
-   powered RDMA probe accesses and IRQ reporting, OVL configuration and display
-   IOMMU behavior. The native RDMA setup below does not complete that audit.
+   OVL configuration and display IOMMU behavior. The native RDMA setup and
+   interrupt handling below still require hardware validation.
 2. Identify panel supply rails and implement cold power-on and power-off.
 3. Enable the DSI graph and backlight together for a controlled hardware test.
 4. Verify calibration handoff and PLL lock, measure link/frame timing, check an RGB test pattern and touch orientation,
@@ -367,8 +367,51 @@ The native binding and compiled node pass validation; a FIFO override fixture
 is rejected.
 
 This work covers RDMA0 video operation with unshared SRAM. It does not implement
-command-mode FIFO policy, shared-SRAM arbitration, display DVFS/SODI, secure
-buffers or full interrupt/error reporting. Programming the vendor's threshold
+command-mode FIFO policy, shared-SRAM arbitration, display DVFS/SODI or secure
+buffers. Programming the vendor's threshold
 registers does not establish that those power-saving modes are safe to enable.
 Hardware reset, FIFO occupancy, pixel output and underflow behavior remain
 untested. The display graph and DRM driver remain disabled.
+
+### Interrupts and register access
+
+Native probe makes no register accesses and requests `IRQF_NO_AUTOEN`. The
+CRTC enables the display power domain before component clocks. After RDMA's
+clock enable and reset succeed, the driver enables its IRQ line with all
+hardware sources still masked. Clock/reset failures leave the IRQ disabled.
+Clock disable masks all sources and calls synchronous `disable_irq()` before
+clearing pending status and dropping the clock reference. This also handles
+CRTC cleanup if a later component fails before RDMA starts.
+
+Start enables abnormal EOF and FIFO-underflow interrupts (`0x18`). The vblank
+API independently controls frame-end (`0x4`), clearing an old frame-end flag
+before enabling that source while preserving error flags. The r1 pipeline
+normally uses OVL0 for CRTC vblank; RDMA must handle its errors even without a
+vblank callback. Its handler reads status, acknowledges the observed bits with
+`~status`, and dispatches vblank only for a frame-end whose source is enabled.
+Different events arriving between the read and acknowledgement remain pending.
+Repeated occurrences of the same latched bit can still coalesce.
+
+Abnormal EOF and underflow have separate rate-limited error messages and
+counters. Underflow includes input/output pixel and line counters at
+`0xf0` through `0xfc`. Accounting continues when log output is rate-limited.
+This provides diagnostics, not automatic display recovery. Existing platforms
+retain their probe, clock and interrupt behavior.
+
+`test-mt6765-rdma-irq.py` executes the shipped `disp_irq_handler` at raw Image
+offset `0x742260`, including RDMA dispatch, event classification, acknowledgement
+and counter updates. Its external logging/profiling, IRQ-number and module-base
+helpers are modeled; the callback tables are empty. The 260 traces cover all
+seven low status bits, reserved-bit fixtures and a different event arriving
+during acknowledgement. Stock's `DDPERR` macro evaluates the abnormal counter
+increment twice; the new driver deliberately counts the event once.
+
+The production handlers run under ASan/UBSan for 1,560 combinations of status,
+source mask, callback presence and late events. Tests also execute probe and
+removal, eight probe failures, both reset timeouts, repeated clock/IRQ cycles,
+CRTC error cleanup and a running IRQ completing during clock shutdown. The
+MMIO model rejects access without a clock. Stock trace results are recorded in
+`out/mt6765-rdma-irq-audit.json`. Fifteen deliberately broken variants are
+rejected, including premature IRQ enable, lost status, incorrect vblank and
+unsynchronized shutdown. These tests do not emulate the real GIC,
+power-domain hardware or electrical behavior; those remain unverified.
