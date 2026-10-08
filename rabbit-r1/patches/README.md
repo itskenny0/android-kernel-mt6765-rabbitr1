@@ -108,3 +108,11 @@ the root before enabling table walks, flushes on first attachment and
 restores zero-valued snapshots. Stock instructions and production software
 lifecycle callbacks are checked; hardware translation, IRQ lifetime and
 firmware handoff remain unverified. See `docs/DISPLAY.md`.
+
+Patch 0041 selects the shipped MT6765 address format: 32-bit IOVAs, 34-bit
+mapped physical addresses and tables in DMA32 memory. It validates complete
+mapping batches against the physical limit and domain aperture. It also decodes
+native fault addresses without treating status/reserved bits as address extensions.
+The stock mapping/IRQ instructions and actual ARM v7s software page-table
+operations are checked; physical DMA and IRQ ownership remain unverified.
+See `docs/DISPLAY.md`.

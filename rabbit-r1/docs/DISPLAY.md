@@ -426,8 +426,8 @@ LARB ID/order and display-port regressions.
 This change does not complete IOMMU bring-up. As in the shared generation-2
 backend, removing a client from the software mask does not clear a previously
 enabled hardware port. It is not a transition to physical addressing.
-The controller audit below covers startup and software state restoration.
-Page-table format, inherited security/bank fields, active firmware DMA,
+The controller audits below cover startup, address formats and software state
+restoration. Inherited security/bank fields, active firmware DMA,
 physical suspend retention and real mapped framebuffer access still require
 validation. The display graph stays disabled.
 
@@ -457,8 +457,8 @@ mapping, locks and logging are modeled. Native final values are compared
 with those traces. The secure page-table root at `0x04` remains untouched,
 and native fault interrupts remain limited to `0x3fff` instead of copying
 the stock MAU monitoring mask. Synthetic high protection addresses exercise
-the encoding through bit 33; they do not establish physical address limits
-or the native driver's advertised 35-bit page-table support.
+the encoding through bit 33; they do not establish physical address limits.
+The address-format audit below removes the unverified 35-bit table setting.
 
 The ASan/UBSan harness extracts the production attachment, initialization,
 full-flush and suspend/resume functions. Eight seeds across MT6765, MT8183
@@ -471,8 +471,74 @@ AArch64 object also builds. CI runs the positive stock and lifecycle tests.
 
 These checks do not execute DMA, hardware table walks, range invalidations
 or IRQ delivery. IRQ masking and ownership across power transitions,
-firmware DMA teardown, page-table/address formats and mapped scanout remain
+firmware DMA teardown, hardware table walks and mapped scanout remain
 acceptance work. The display graph remains disabled.
+
+## IOMMU address formats and faults
+
+The native driver now selects the address format used by the shipped MT6765
+code: 32-bit IOVAs, a 16 KiB root table and 34-bit mapped physical addresses.
+The shared allocator keeps translation tables below 4 GiB. The previous
+`IOVA_34_EN` and `PGTABLE_PA_35_EN` flags selected a 64 KiB root and allowed
+table placement with unverified upper address bits. Those flags are removed
+for MT6765. Other platforms retain their existing domain settings.
+The IOMMU domain still reserves the top 8 MiB of its 32-bit IOVA range.
+
+In the shipped Image, `m4u_pgtable_init` at `0x8ada68` requests 16 KiB and
+checks 16 KiB alignment. `m4u_reg_init` writes the low 32 bits of the root
+address directly. The 4 KiB, 64 KiB, 1 MiB and 16 MiB mapping functions at
+`0x8accac`, `0x8ac86c`, `0x8ac568` and `0x8ac21c` encode PA bit 32 in
+descriptor bit 9 and PA bit 33 in descriptor bit 4. They do not encode
+PA bit 34. These observations define the software contract used here;
+synthetic high addresses do not prove the board's physical address range.
+
+`test-mt6765-address.py` executes three stock root-allocation fixtures and
+48 stock mappings, covering all four page sizes, all four upper-PA values
+and three address positions. The stock mapping fixtures use an existing
+second-level table and disable the legacy 4G-remapping mode. Allocation,
+locks, memset and logging are modeled; the mapping and alignment branches
+execute. Stack, callee-saved registers and writes are checked. The native
+harness compiles the production ARM v7s allocator, map, unmap and software
+walk implementation together with the actual MediaTek domain finalizer.
+Address, type, shareability, security and cache bits match the stock writes.
+The generic format additionally sets nG and normal-memory TEX attributes;
+those differences are recorded explicitly, not claimed to be tested on the
+hardware. Cache coherency still requires a physical DMA test.
+
+The same harness checks first/last bytes, duplicate mappings, address limits,
+allocation failures, rejected high table addresses, domain sharing and
+unchanged MT8183/MT6779 formats. The highest-IOVA case tests the raw page-table
+format directly; real native mappings are restricted to the domain aperture.
+The native map callback checks the complete batch before writing any entries.
+The generic page-table callback previously checked only the first address,
+so a multi-page request could cross the physical limit or wrap the IOVA index.
+The new check uses division to avoid overflowing the byte count. Tests cover
+physical and IOVA boundary crossings, oversized counts, empty requests and
+valid batches ending at the physical limit, for all four page sizes.
+Mapped addresses at or above 16 GiB are rejected instead of encoding an
+unsupported third extension bit; the reserved IOVA gap is also enforced.
+
+Native fault reporting now masks `FAULT_VA` to bits 31:12 after capturing
+the write/layer flags. It reports `INVLD_PA` as a 32-bit value, matching the
+stock handler; it cannot recover the upper bits of a faulting physical
+address. The previous generic decoder could interpret reserved low bits as
+IOVA or PA extensions and leave status bits in the reported IOVA.
+
+`test-mt6765-fault.py` executes `MTK_M4U_isr` at `0x8a2d44` for 416 cases:
+all 52 stock port IDs, both MMU slaves and four low-field patterns. The real
+port-table lookup, address decode and interrupt-clear instructions execute.
+Diagnostic port callbacks are disabled in the fixture; dump/query/profile
+helpers and logging are modeled. All reports match the native handler.
+The host harness checks all 4,096 low-field values for every port and slave,
+plus accepted/rejected fault callbacks and missing domains: 425,990 cases.
+It verifies clear-bit preservation and the existing full-flush sequence.
+Physical IRQ delivery, power ownership, L2-only faults and simultaneous
+fault servicing remain separate work.
+
+Eighteen compiled regressions in address width, batch bounds, table placement,
+descriptor bits, fault fields, ports, acknowledgement and flush behavior are rejected.
+The native AArch64 IOMMU object builds. CI runs both positive tests. Neither
+test establishes physical translation or permits enabling the display yet.
 
 ## Remaining acceptance work
 

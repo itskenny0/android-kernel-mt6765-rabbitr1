@@ -1,0 +1,76 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Fix MT6765 IOMMU address formats
+
+Use the shipped 32-bit IOVA and 34-bit mapped-PA format. Keep translation
+tables in DMA32 memory instead of selecting unverified extended table
+addresses. Validate complete mapping batches before writing entries.
+Decode native fault registers without interpreting their low status and
+reserved bits as address extensions.
+
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index bb76d8da4d..f4842a93a7 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -502,13 +502,18 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
+ 	}
+ 	layer = fault_iova & F_MMU_FAULT_VA_LAYER_BIT;
+ 	write = fault_iova & F_MMU_FAULT_VA_WRITE_BIT;
+-	if (MTK_IOMMU_HAS_FLAG(plat_data, IOVA_34_EN)) {
+-		va34_32 = FIELD_GET(F_MMU_INVAL_VA_34_32_MASK, fault_iova);
+-		fault_iova = fault_iova & F_MMU_INVAL_VA_31_12_MASK;
+-		fault_iova |= (u64)va34_32 << 32;
++	if (plat_data->m4u_plat == M4U_MT6765) {
++		/* These registers report 32-bit addresses without extension fields. */
++		fault_iova &= F_MMU_INVAL_VA_31_12_MASK;
++	} else {
++		if (MTK_IOMMU_HAS_FLAG(plat_data, IOVA_34_EN)) {
++			va34_32 = FIELD_GET(F_MMU_INVAL_VA_34_32_MASK, fault_iova);
++			fault_iova = fault_iova & F_MMU_INVAL_VA_31_12_MASK;
++			fault_iova |= (u64)va34_32 << 32;
++		}
++		pa34_32 = FIELD_GET(F_MMU_INVAL_PA_34_32_MASK, fault_iova);
++		fault_pa |= (u64)pa34_32 << 32;
+ 	}
+-	pa34_32 = FIELD_GET(F_MMU_INVAL_PA_34_32_MASK, fault_iova);
+-	fault_pa |= (u64)pa34_32 << 32;
+ 
+ 	if (MTK_IOMMU_IS_TYPE(plat_data, MTK_IOMMU_TYPE_MM)) {
+ 		if (MTK_IOMMU_HAS_FLAG(plat_data, HAS_SUB_COMM_2BITS)) {
+@@ -690,6 +695,8 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom,
+ 
+ 	if (MTK_IOMMU_HAS_FLAG(data->plat_data, HAS_4GB_MODE))
+ 		dom->cfg.oas = data->enable_4GB ? 33 : 32;
++	else if (data->plat_data->m4u_plat == M4U_MT6765)
++		dom->cfg.oas = 34;
+ 	else
+ 		dom->cfg.oas = 35;
+ 
+@@ -830,6 +837,19 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ {
+ 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+ 
++	if (dom->bank->parent_data->plat_data->m4u_plat == M4U_MT6765) {
++		u64 iova_limit = domain->geometry.aperture_end + 1;
++		u64 pa_limit = BIT_ULL(dom->cfg.oas);
++
++		if (!pgsize || !pgcount)
++			return -EINVAL;
++		/* Validate the whole batch without overflowing its byte count. */
++		if (iova < domain->geometry.aperture_start || iova >= iova_limit ||
++		    paddr >= pa_limit || pgcount > (iova_limit - iova) / pgsize ||
++		    pgcount > (pa_limit - paddr) / pgsize)
++			return -ERANGE;
++	}
++
+ 	/* The "4GB mode" M4U physically can not use the lower remap of Dram. */
+ 	if (dom->bank->parent_data->enable_4GB)
+ 		paddr |= BIT_ULL(32);
+@@ -1605,7 +1625,7 @@ static const struct dev_pm_ops mtk_iommu_pm_ops = {
+ 
+ static const struct mtk_iommu_plat_data mt6765_data = {
+ 	.m4u_plat      = M4U_MT6765,
+-	.flags         = MTK_IOMMU_TYPE_MM | RESET_AXI | WR_THROT_EN | IOVA_34_EN | PGTABLE_PA_35_EN,
++	.flags         = MTK_IOMMU_TYPE_MM | RESET_AXI | WR_THROT_EN,
+ 	.inv_sel_reg   = REG_MMU_INV_SEL_GEN1,
+ 	.banks_num    = 1,
+ 	.banks_enable = {true},
