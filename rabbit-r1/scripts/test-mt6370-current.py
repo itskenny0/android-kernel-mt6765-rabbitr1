@@ -95,6 +95,17 @@ typedef uint32_t u32;
 #define ERR_PTR(e) ((void *)(intptr_t)(e))
 struct device { struct device *parent; void *data; };
 struct platform_device { struct device dev; void *data; };
+struct of_device_id { const char *compatible; };
+struct platform_driver {
+    int (*probe)(struct platform_device *);
+    void (*shutdown)(struct platform_device *);
+    struct { const char *name; const struct of_device_id *of_match_table; } driver;
+};
+#define MODULE_DEVICE_TABLE(...)
+typedef int irqreturn_t;
+typedef irqreturn_t (*irq_handler_t)(int, void *);
+#define IRQ_HANDLED 1
+#define IRQF_TRIGGER_FALLING 1
 struct mutex { pthread_mutex_t raw; bool initialized; unsigned int owner; };
 struct regmap { int unused; };
 struct reg_field { unsigned int reg, lsb, msb; };
@@ -119,6 +130,9 @@ enum { POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT
     POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE_AWAKE, POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE };
 enum { POWER_SUPPLY_TYPE_USB, POWER_SUPPLY_USB_TYPE_SDP, POWER_SUPPLY_USB_TYPE_CDP,
     POWER_SUPPLY_USB_TYPE_DCP, POWER_SUPPLY_USB_TYPE_UNKNOWN };
+enum { POWER_SUPPLY_STATUS_DISCHARGING, POWER_SUPPLY_STATUS_NOT_CHARGING,
+    POWER_SUPPLY_STATUS_CHARGING, POWER_SUPPLY_STATUS_FULL, POWER_SUPPLY_STATUS_UNKNOWN,
+    POWER_SUPPLY_CHARGE_TYPE_FAST, POWER_SUPPLY_CHARGE_TYPE_TRICKLE, POWER_SUPPLY_CHARGE_TYPE_NONE };
 struct power_supply { void *drvdata; };
 struct power_supply_desc {
     const char *name; int type; unsigned int charge_behaviours, usb_types;
@@ -134,6 +148,19 @@ static void *dev_fwnode(struct device *dev) { return dev; }
 #define PTR_ERR_OR_ZERO(p) (IS_ERR(p) ? PTR_ERR(p) : 0)
 static void *power_supply_get_drvdata(struct power_supply *psy) { return psy->drvdata; }
 static _Thread_local unsigned int thread_id=1;
+static pthread_mutex_t pause_lock=PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t pause_cond=PTHREAD_COND_INITIALIZER;
+static bool pause_active, pause_entered, pause_release;
+static void pause_operation(void)
+{
+    assert(!pthread_mutex_lock(&pause_lock));
+    if (pause_active && thread_id == 2) {
+        pause_entered=true; assert(!pthread_cond_broadcast(&pause_cond));
+        while (!pause_release) assert(!pthread_cond_wait(&pause_cond,&pause_lock));
+        pause_active=false;
+    }
+    assert(!pthread_mutex_unlock(&pause_lock));
+}
 static void mutex_lock(struct mutex *m)
 {
     assert(m->initialized); assert(!pthread_mutex_lock(&m->raw));
@@ -143,10 +170,12 @@ static void mutex_unlock(struct mutex *m)
 { assert(m->owner == thread_id); m->owner=0; assert(!pthread_mutex_unlock(&m->raw)); }
 static struct mutex *lock_guard(struct mutex *m) { mutex_lock(m); return m; }
 static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
-#define guard(type) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
+#define JOIN_INNER(a,b) a##b
+#define JOIN(a,b) JOIN_INNER(a,b)
+#define guard(type) struct mutex *JOIN(held,__COUNTER__) __attribute__((cleanup(unlock_guard))) = lock_guard
 #define lockdep_assert_held(m) assert((m)->owner == thread_id)
 static bool queue_work(struct workqueue_struct *q, struct work_struct *w)
-{ assert(q->active && w->initialized); bool old=w->pending; w->pending=true; return !old; }
+{ assert(q->active && w->initialized); pause_operation(); bool old=w->pending; w->pending=true; return !old; }
 '''
 linear = (SRC/'lib/linear_ranges.c').read_text()
 header = (SRC/'include/linux/linear_range.h').read_text()
@@ -170,13 +199,16 @@ static struct regmap_field fields[F_MAX];
 static struct workqueue_struct wq;
 static unsigned int regs[0x200], errors[256], nops, unlocks, closes, stops;
 static bool gate, apply_failed_write, settings_done, published, irq_active;
+static unsigned int irq_live, irq_depth[MT6370_IRQ_MAX], irq_disables, wake_refs;
+static bool run_mivr_on_cancel, inject_irq_callback;
 static unsigned int partial_key, slept_us;
 struct bus_op { char type; unsigned int reg, value, thread; };
 static struct bus_op trace[20000];
 static int record(char type, unsigned int reg, unsigned int value)
 {
     assert(reg < ARRAY_SIZE(regs));
-    if (reg != 0x100) assert(priv.ichg_lock.owner == thread_id || !settings_done);
+    if (reg != 0x100) assert(priv.ichg_lock.owner == thread_id || priv.psy_lock.owner == thread_id || !settings_done);
+    pause_operation();
     assert(nops < ARRAY_SIZE(trace));
     trace[nops]=(struct bus_op){type,reg,value,thread_id};
     int error=nops < ARRAY_SIZE(errors) ? errors[nops] : 0;
@@ -249,7 +281,7 @@ for name in ('mt6370_chg_field_get', 'mt6370_chg_field_set', 'mt6370_chg_init_ic
 body += r'''
 static unsigned int stage, fail_stage, resources[16], nr_resources;
 static unsigned int publication_calls, publication_io_start, drains;
-enum { RES_MEMORY, RES_MUTEX_ATTACH, RES_MUTEX_CURRENT, RES_QUEUE, RES_INHIBIT, RES_OTG, RES_PSY, RES_CANCEL, RES_IRQ };
+enum { RES_MEMORY, RES_MUTEX_ATTACH, RES_MUTEX_CURRENT, RES_MUTEX_PSY, RES_QUEUE, RES_INHIBIT, RES_OTG, RES_PSY, RES_QUIESCE, RES_IRQ };
 static int step(void) { return ++stage == fail_stage ? -ENOMEM : 0; }
 static void add(unsigned int kind) { assert(nr_resources < ARRAY_SIZE(resources)); resources[nr_resources++]=kind; }
 static void init_mutex(struct mutex *m)
@@ -267,6 +299,9 @@ static int mt6370_chg_init_rmap_fields(struct mt6370_priv *p)
     return 0;
 }
 static void platform_set_drvdata(struct platform_device *p, void *data) { p->data=data; }
+static void *platform_get_drvdata(struct platform_device *p) { return p->data; }
+static struct platform_device *to_platform_device(struct device *d)
+{ return container_of(d,struct platform_device,dev); }
 static struct iio_channel channel;
 static struct iio_channel *devm_iio_channel_get_all(struct device *dev)
 { return step() ? ERR_PTR(-ENOMEM) : &channel; }
@@ -275,7 +310,7 @@ static struct iio_channel *mt6370_chg_find_ibus(struct iio_channel *c)
 static int devm_mutex_init(struct device *d, struct mutex *m)
 {
     int ret=step(); if (ret) return ret; init_mutex(m);
-    add(m == &priv.ichg_lock ? RES_MUTEX_CURRENT : RES_MUTEX_ATTACH); return 0;
+    add(m == &priv.ichg_lock ? RES_MUTEX_CURRENT : m == &priv.psy_lock ? RES_MUTEX_PSY : RES_MUTEX_ATTACH); return 0;
 }
 static const char *dev_name(struct device *d) { return "mt6370"; }
 static struct workqueue_struct *devm_alloc_ordered_workqueue(struct device *d, const char *fmt, int flags, const char *name)
@@ -328,34 +363,85 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
     }
     publication_calls++; return &psy;
 }
-static void cancel_delayed_work_sync(struct delayed_work *w)
-{ assert(published && wq.active && w->work.initialized); w->work.pending=false; drains++; }
+static void enable_irq(unsigned int irq)
+{ assert(irq >= 100 && irq-100<irq_live && irq_depth[irq-100]); irq_depth[irq-100]--; }
+static void pm_relax(struct device *dev) { assert(wake_refs); wake_refs--; }
+static bool cancel_delayed_work_sync(struct delayed_work *w)
+{
+    assert(published && wq.active && w->work.initialized && priv.stopping);
+    assert(!priv.psy_lock.owner);
+    for (unsigned int i=0; i<irq_live; i++) assert(irq_depth[i]);
+    bool pending=w->work.pending;
+    if (run_mivr_on_cancel && pending) {
+        /* Model a running MIVR worker completing its own IRQ/wake cleanup. */
+        enable_irq(priv.irq_nums[MT6370_IRQ_MIVR]); pm_relax(priv.dev); pending=false;
+    }
+    w->work.pending=false; drains++; return pending;
+}
 static void cancel_work_sync(struct work_struct *w)
-{ assert(published && wq.active && w->initialized); w->pending=false; drains++; }
-static void mt6370_chg_cancel_work(void *data);
+{ assert(published && wq.active && w->initialized && priv.stopping); w->pending=false; drains++; }
+static void mt6370_chg_quiesce(void *data);
 static void mt6370_chg_inhibit(void *data);
 static int devm_add_action_or_reset(struct device *d, void (*fn)(void *), void *arg)
 {
-    assert((fn == mt6370_chg_cancel_work || fn == mt6370_chg_inhibit) && arg == &priv);
-    int ret=step(); if (ret) fn(arg); else add(fn == mt6370_chg_cancel_work ? RES_CANCEL : RES_INHIBIT); return ret;
+    assert((fn == mt6370_chg_quiesce || fn == mt6370_chg_inhibit) && arg == &priv);
+    int ret=step(); if (ret) fn(arg); else add(fn == mt6370_chg_quiesce ? RES_QUIESCE : RES_INHIBIT); return ret;
 }
-static int mt6370_chg_init_irq(struct mt6370_priv *p)
-{ int ret=step(); if (!ret) { add(RES_IRQ); irq_active=true; } return ret; }
+static int platform_get_irq_byname(struct platform_device *p, const char *name)
+{
+    if (step()) return -ENOMEM;
+    const char *names[]={"attach_i","uvp_d_evt","mivr"};
+    for (unsigned int i=0; i<ARRAY_SIZE(names); i++) if (!strcmp(name,names[i])) return 100+i;
+    assert(false); return -EINVAL;
+}
+static int devm_request_threaded_irq(struct device *d, int irq, void *top,
+    irqreturn_t (*fn)(int,void *), int flags, const char *name, void *arg)
+{
+    int ret=step(); if (ret) return ret;
+    assert(irq == (int)(100+irq_live) && irq_live<MT6370_IRQ_MAX && arg == &priv);
+    irq_depth[irq_live++]=0; add(RES_IRQ); irq_active=true; return 0;
+}
+static void disable_irq(unsigned int irq)
+{
+    assert(irq >= 100 && irq-100<irq_live && !priv.psy_lock.owner);
+    assert(priv.stopping);
+    irq_depth[irq-100]++; irq_disables++;
+    /* synchronize_irq may finish a handler that calls the power-supply API. */
+    if (inject_irq_callback) {
+        union power_supply_propval v={.intval=1}; unsigned int start=nops;
+        assert(mt6370_chg_set_property(&psy,POWER_SUPPLY_PROP_ONLINE,&v) == -ESHUTDOWN);
+        assert(nops == start);
+    }
+}
+static irqreturn_t mt6370_attach_i_handler(int irq, void *data) { return IRQ_HANDLED; }
+static irqreturn_t mt6370_uvp_d_evt_handler(int irq, void *data) { return IRQ_HANDLED; }
+static irqreturn_t mt6370_mivr_handler(int irq, void *data) { return IRQ_HANDLED; }
+#define MT6370_CHG_IRQ(n) { .name=#n, .handler=mt6370_##n##_handler }
 static void mt6370_chg_pwr_rdy_check(struct mt6370_priv *p)
 { assert(irq_active && published); }
 '''
+body += function('mt6370_chg_init_irq')
 body += r'''
-static int mt6370_chg_get_online(struct mt6370_priv *p, union power_supply_propval *v) { return -EOPNOTSUPP; }
-static int mt6370_chg_get_status(struct mt6370_priv *p, union power_supply_propval *v) { return -EOPNOTSUPP; }
-static int mt6370_chg_get_charge_type(struct mt6370_priv *p, union power_supply_propval *v) { return -EOPNOTSUPP; }
+static int mt6370_chg_get_property(struct power_supply *, enum power_supply_property,
+    union power_supply_propval *);
+static int power_supply_get_property(struct power_supply *p, enum power_supply_property prop,
+    union power_supply_propval *v)
+{ assert(priv.psy_lock.owner != thread_id); return mt6370_chg_get_property(p,prop,v); }
 '''
+status_start = s.index('enum {\n\tMT6370_CHG_STAT_READY')
+body += s[status_start:s.index('};', status_start)+2]+'\n'
+for name in ('mt6370_chg_get_online', 'mt6370_chg_get_status', 'mt6370_chg_get_charge_type'):
+    body += function(name)
 body += function('mt6370_chg_get_property')
 body += function('mt6370_chg_property_is_writeable')
 body += s[s.index('static enum power_supply_property mt6370_chg_properties'):s.index('static const struct regulator_ops')]
 body += function('mt6370_chg_init_psy')
 body += function('mt6370_chg_cancel_work')
 body += function('mt6370_chg_inhibit')
+body += function('mt6370_chg_quiesce')
+body += function('mt6370_chg_shutdown')
 body += function('mt6370_chg_probe')
+body += s[s.index('static const struct of_device_id mt6370_chg_of_match'):s.index('module_platform_driver(mt6370_chg_driver)')]
 # Compile the stock stop routine as an independent write/delay oracle. Its
 # cache is initialized from each test's hardware setting, not the new driver's
 # request cache. Error recovery intentionally differs from the stock routine.
@@ -400,6 +486,8 @@ static void reset_bus(unsigned int vendor, bool open, unsigned int current, unsi
 {
     nops=unlocks=closes=stops=slept_us=0; notifications=0; memset(errors,0,sizeof(errors));
     apply_failed_write=false; partial_key=0;
+    priv.stopping=false; run_mivr_on_cancel=inject_irq_callback=false;
+    irq_disables=0;
     for (unsigned int i=0; i<ARRAY_SIZE(regs); i++) regs[i]=0xa5;
     regs[0x100]=vendor; gate=open;
     regs[STOCK_CURRENT_REG]=(current/100000-1)*4+3;
@@ -444,8 +532,10 @@ static void check_success(int ua, bool workaround, unsigned int old_hidden, unsi
 static void release_probe(void)
 {
     while (nr_resources) switch (resources[--nr_resources]) {
-    case RES_IRQ: irq_active=false; break;
-    case RES_CANCEL: assert(!irq_active); mt6370_chg_cancel_work(&priv); break;
+    case RES_IRQ:
+        assert(priv.stopping && !priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
+        assert(irq_live && irq_depth[irq_live-1] == 1); irq_live--; irq_active=!!irq_live; break;
+    case RES_QUIESCE: mt6370_chg_quiesce(&priv); break;
     case RES_PSY:
         assert(published && !priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
         published=false; break;
@@ -454,6 +544,7 @@ static void release_probe(void)
     case RES_QUEUE: assert(!published); wq.active=false; break;
     case RES_MUTEX_ATTACH: destroy_mutex(&priv.attach_lock); break;
     case RES_MUTEX_CURRENT: destroy_mutex(&priv.ichg_lock); break;
+    case RES_MUTEX_PSY: destroy_mutex(&priv.psy_lock); break;
     default: break;
     }
     assert(!published && !irq_active && !wq.active);
@@ -526,7 +617,7 @@ static void check_failed_ramp_wait(void)
 static void check_controls(void)
 {
     unsigned int stops_checked=0, resumes=0, failures=0, rejected=0, reads=0;
-    init_mutex(&priv.ichg_lock); init_mutex(&priv.attach_lock); priv.regmap=&map;
+    init_mutex(&priv.ichg_lock); init_mutex(&priv.attach_lock); init_mutex(&priv.psy_lock); priv.regmap=&map;
     for (unsigned int i=0; i<F_MAX; i++) { fields[i].id=i; priv.rmap_fields[i]=&fields[i]; }
     for (unsigned int model=0; model<2; model++)
     for (unsigned int enabled=0; enabled<2; enabled++)
@@ -647,15 +738,141 @@ static void check_controls(void)
         assert(trace[i-1].thread == trace[i].thread && trace[i+1].thread == trace[i].thread && trace[i+2].thread == trace[i].thread);
         assert(trace[i-1].reg == STOCK_CURRENT_REG && trace[i+1].reg == 0x112 && trace[i+2].reg == 0x112);
     }
-    destroy_mutex(&priv.ichg_lock); destroy_mutex(&priv.attach_lock);
+    destroy_mutex(&priv.ichg_lock); destroy_mutex(&priv.attach_lock); destroy_mutex(&priv.psy_lock);
     printf("PASS: %u inhibit/readback cases, %u resumes, %u rejected control requests, %u control fault/recovery cases, %u control reads and 600 threaded control/current operations\n",stops_checked,resumes,rejected,failures,reads);
+}
+
+
+static void shutdown_probe(struct platform_device *pdev, unsigned int model)
+{
+    assert(!nr_resources && !irq_live && !wake_refs);
+    settings_done=false; stage=fail_stage=0; reset_bus(model,false,1000000,0x40);
+    assert(mt6370_chg_driver.probe && mt6370_chg_driver.shutdown);
+    assert(!mt6370_chg_driver.probe(pdev));
+    assert(irq_live == MT6370_IRQ_MAX && priv.num_irqs == irq_live);
+    assert(!set_current(1000000)); nops=slept_us=0;
+    union power_supply_propval status={.intval=-1};
+    unsigned int saved=regs[0x14a]; regs[0x14a]=1U << 6;
+    assert(!mt6370_chg_psy_desc.get_property(&psy,POWER_SUPPLY_PROP_STATUS,&status));
+    assert(status.intval == POWER_SUPPLY_STATUS_CHARGING);
+    regs[0x14a]=saved; nops=0;
+    inject_irq_callback=true;
+}
+static unsigned int check_stopped_api(void)
+{
+    unsigned int start=nops, changed=notifications, checks=0;
+    for (unsigned int i=0; i<mt6370_chg_psy_desc.num_properties; i++) {
+        enum power_supply_property prop=mt6370_chg_psy_desc.properties[i];
+        union power_supply_propval value={.intval=123};
+        assert(mt6370_chg_psy_desc.get_property(&psy,prop,&value) == -ESHUTDOWN);
+        assert(value.intval == 123); checks++;
+        value.intval=prop == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT ? 1000000 : 0;
+        assert(mt6370_chg_psy_desc.set_property(&psy,prop,&value) == -ESHUTDOWN); checks++;
+    }
+    assert(nops == start && notifications == changed && !priv.bc12_work.pending);
+    return checks;
+}
+static int raced_property, raced_result, raced_value;
+static unsigned int shutdown_started;
+static void *property_racer(void *unused)
+{
+    thread_id=2;
+    if (raced_property == 0) raced_result=set_current(900000);
+    else if (raced_property == 1) {
+        union power_supply_propval v={.intval=0};
+        raced_result=mt6370_chg_psy_desc.get_property(&psy,POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,&v);
+        raced_value=v.intval;
+    } else {
+        union power_supply_propval v={.intval=0};
+        raced_result=mt6370_chg_psy_desc.set_property(&psy,POWER_SUPPLY_PROP_ONLINE,&v);
+    }
+    return NULL;
+}
+static void *shutdown_racer(void *pdev)
+{
+    thread_id=3;
+    __atomic_store_n(&shutdown_started,1,__ATOMIC_RELEASE);
+    mt6370_chg_driver.shutdown(pdev); return NULL;
+}
+static void check_shutdown(void)
+{
+    const unsigned int ids[]={0x80,0xe0,0x90,0xa0,0xb0,0xf0};
+    unsigned int stops_checked=0, rejects=0, failures=0, races=0, stop_ops=0;
+    struct bus_op stop_trace[32];
+    for (unsigned int id=0; id<ARRAY_SIZE(ids); id++)
+    for (unsigned int pending=0; pending<3; pending++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,ids[id]);
+        if (pending) {
+            priv.mivr_dwork.work.pending=true;
+            irq_depth[MT6370_IRQ_MIVR]++; wake_refs++;
+            run_mivr_on_cancel=pending == 2;
+        }
+        unsigned int before_resources=nr_resources, before_drains=drains;
+        unsigned int enabled=regs[0x112];
+        mt6370_chg_driver.shutdown(&pdev);
+        assert(priv.stopping && published && wq.active && !wake_refs);
+        assert(irq_disables == 3 && drains == before_drains+2);
+        assert(nr_resources == before_resources && irq_live == 3);
+        assert(!priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
+        for (unsigned int i=0; i<irq_live; i++) assert(irq_depth[i] == 1);
+        if (id<2) {
+            assert(!(regs[0x112]&1) && current_value() == 500000 && slept_us == 20000);
+            if (!id && !pending) {
+                stop_ops=nops; assert(stop_ops<ARRAY_SIZE(stop_trace));
+                memcpy(stop_trace,trace,stop_ops*sizeof(*trace));
+            }
+        } else assert(regs[0x112] == enabled && !nops);
+        rejects+=check_stopped_api();
+        unsigned int before=nops;
+        mt6370_chg_driver.shutdown(&pdev);
+        assert(nops == before && drains == before_drains+2 && irq_disables == 3);
+        release_probe(); stops_checked++;
+    }
+    assert(stop_ops);
+    for (unsigned int fail=0; fail<stop_ops; fail++) {
+        if (stop_trace[fail].type == 'd') continue;
+        for (unsigned int effects=0; effects<2; effects++) {
+            struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+            errors[fail]=EIO; apply_failed_write=effects;
+            mt6370_chg_driver.shutdown(&pdev);
+            assert(priv.stopping && !priv.ichg_valid && irq_disables == 3);
+            assert(!priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
+            rejects+=check_stopped_api();
+            if (regs[0x112]&1) assert(stop_trace[fail].reg == 0x112);
+            /* Managed release retries inhibit if the bus has recovered. */
+            memset(errors,0,sizeof(errors)); release_probe(); failures++;
+        }
+    }
+    for (int property=0; property<3; property++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        raced_property=property; raced_result=1; shutdown_started=0;
+        assert(!pthread_mutex_lock(&pause_lock));
+        pause_active=true; pause_entered=pause_release=false;
+        assert(!pthread_mutex_unlock(&pause_lock));
+        pthread_t writer, stopper;
+        assert(!pthread_create(&writer,NULL,property_racer,NULL));
+        assert(!pthread_mutex_lock(&pause_lock));
+        while (!pause_entered) assert(!pthread_cond_wait(&pause_cond,&pause_lock));
+        /* The entire admitted property operation must hold the API gate. */
+        assert(pthread_mutex_trylock(&priv.psy_lock.raw) == EBUSY);
+        assert(!pthread_create(&stopper,NULL,shutdown_racer,&pdev));
+        while (!__atomic_load_n(&shutdown_started,__ATOMIC_ACQUIRE)) sched_yield();
+        pause_release=true; assert(!pthread_cond_broadcast(&pause_cond));
+        assert(!pthread_mutex_unlock(&pause_lock));
+        assert(!pthread_join(writer,NULL) && !pthread_join(stopper,NULL));
+        assert(!raced_result && priv.stopping && !(regs[0x112]&1));
+        if (property == 1) assert(raced_value == 1000000);
+        assert(irq_disables == 3 && !priv.bc12_work.pending && !wake_refs);
+        rejects+=check_stopped_api(); release_probe(); races++;
+    }
+    printf("PASS: %u shutdown/model/work cases, %u stopped API requests, %u shutdown I/O faults, %u property/shutdown races; actual driver callback and partial IRQ unwind checked\n",stops_checked,rejects,failures,races);
 }
 
 int main(void)
 {
     unsigned int models=0, valid=0, failures=0, rejects=0, probes=0;
     priv.regmap=&map;
-    init_mutex(&priv.ichg_lock); init_mutex(&priv.attach_lock);
+    init_mutex(&priv.ichg_lock); init_mutex(&priv.attach_lock); init_mutex(&priv.psy_lock);
     for (unsigned int i=0; i<F_MAX; i++) { fields[i].id=i; priv.rmap_fields[i]=&fields[i]; }
     for (unsigned int id=0; id<256; id++) {
         reset_bus(id,false,900000,0x40);
@@ -756,7 +973,7 @@ int main(void)
         transactions++;
     }
     assert(transactions == 400);
-    destroy_mutex(&priv.ichg_lock); destroy_mutex(&priv.attach_lock);
+    destroy_mutex(&priv.ichg_lock); destroy_mutex(&priv.attach_lock); destroy_mutex(&priv.psy_lock);
     struct platform_device pdev={0};
     settings_done=false; reset_bus(0xe0,true,500000,0);
     assert(!mt6370_chg_probe(&pdev)); unsigned int stages=stage;
@@ -792,6 +1009,7 @@ int main(void)
         release_probe(); probes++;
     }
     check_controls();
+    check_shutdown();
     printf("PASS: %u model cases, %u current transitions, %u rejected requests, %u fault/recovery cases, 400 threaded transitions and %u probe/unwind cases\n",models,valid,rejects,failures,probes);
     return 0;
 }
@@ -805,5 +1023,5 @@ subprocess.run(['gcc','-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror',
 subprocess.run([str(OUT/'host')],check=True,timeout=30)
 (ROOT/'out/mt6370-current-audit.json').write_text(json.dumps(dict(
     hardware_tested=False, source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-    scope='production current/control helpers, properties, descriptor, init and probe; compiled Rabbit stop-sequence oracle; modeled regmap/time/devres/workqueue with pthread locks; no electrical or battery-policy validation'
+    scope='production current/control helpers, properties, descriptor, probe, IRQ registration and registered shutdown callback; compiled Rabbit stop oracle; modeled I/O/time/IRQ/work/devres and pthread API/shutdown races; no electrical or battery-policy validation'
 ),indent=2)+'\n')

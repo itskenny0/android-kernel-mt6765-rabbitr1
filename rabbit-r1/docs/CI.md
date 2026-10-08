@@ -129,9 +129,10 @@ failures, concurrent setters, immediate callbacks during registration and failed
 probe cleanup. It also checks charge inhibit/resume, request invalidation,
 model-specific property exposure and stop-on-teardown, using the compiled stock
 stop routine as a write/delay oracle. Early BC1.2 work is tested before and after
-the power-supply handle is published. Regmap, time, workqueue and device-resource
-behavior are modeled;
-these checks do not validate physical charging.
+the power-supply handle is published. The registered shutdown callback, partial
+IRQ setup, pending-work cleanup and property calls racing with shutdown are
+also exercised. Regmap, time, IRQ synchronization, workqueue and device-resource
+behavior are modeled; these checks do not validate physical charging.
 The MT6357 current harness compares every raw value with the active stock gauge
 at several calibrations. It runs the production read, latch cleanup, property
 and probe code with the kernel's polling macros, a modeled clock/regmap and

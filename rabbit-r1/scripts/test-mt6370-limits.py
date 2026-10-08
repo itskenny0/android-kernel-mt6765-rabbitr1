@@ -60,7 +60,9 @@ static void mutex_lock(struct mutex *m) { assert(!m->locked); m->locked=true; }
 static void mutex_unlock(struct mutex *m) { assert(m->locked); m->locked=false; }
 static struct mutex *lock_guard(struct mutex *m) { mutex_lock(m); return m; }
 static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
-#define guard(type) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
+#define JOIN_INNER(a,b) a##b
+#define JOIN(a,b) JOIN_INNER(a,b)
+#define guard(type) struct mutex *JOIN(held,__COUNTER__) __attribute__((cleanup(unlock_guard))) = lock_guard
 #define lockdep_assert_held(m) assert((m)->locked)
 static int regmap_write(struct regmap *map, unsigned int reg, unsigned int val)
 { assert(!"Unexpected hidden access on unvalidated variant"); return -EIO; }
@@ -95,6 +97,8 @@ struct mt6370_priv {
     struct regmap_field *rmap_fields[F_MAX];
     struct mutex attach_lock;
     struct mutex ichg_lock;
+    struct mutex psy_lock;
+    bool stopping;
     struct regmap *regmap;
     bool ichg_workaround;
     unsigned int ichg_min, ichg_request;

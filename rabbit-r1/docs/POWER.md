@@ -188,7 +188,7 @@ the power supply and workqueue.
 `test-mt6370-current.py` compiles the production helpers, setter, initialization
 and probe with the kernel's range helpers. It checks 257 identification cases,
 816 current transitions, 66 invalid requests, 246 fault/recovery cases, 400
-threaded transitions and 48 probe/unwind cases. The bus model covers partial
+threaded transitions and 54 probe/unwind cases. The bus model covers partial
 passcodes, failed writes that take effect, failed cleanup, stale protection and
 an inherited open gate. Fifteen faulty variants fail runtime assertions.
 ASan/UBSan and pthread locks check the host model; physical protection behavior,
@@ -230,12 +230,25 @@ and power-supply notifications cover successful changes and failed operations
 that may have changed hardware state.
 
 On these two models, probe inhibits charging before changing initial settings.
-It does not enable charging on successful registration. Managed teardown attempts
-to inhibit after draining driver work and unregistering the power supply, while
-the regmap and mutex still exist. BC1.2 work now checks that registration has
-published the power-supply handle before notifying it; early ONLINE writes
-must not cause a NULL-handle notification. The core supplies its initial
-notification after registration.
+It does not enable charging on successful registration. Shutdown and managed
+teardown close the power-supply API, mask and synchronize every successfully
+registered IRQ, drain driver work, then attempt to inhibit charging. This runs
+before IRQ and power-supply resources are released. Partial IRQ setup failures
+use the same path. A fallback managed inhibit runs again after power-supply
+removal, while the regmap and current mutex still exist.
+
+A separate API mutex lets admitted property calls finish before shutdown closes
+the gate; later reads and writes return `-ESHUTDOWN`. It is released before IRQ
+synchronization because an IRQ handler can call the property setter. Status
+reads use the internal ONLINE helper to avoid recursively acquiring that mutex.
+Canceled pending MIVR work balances the handler's IRQ mask and wake reference;
+running work completes its own cleanup. Repeated shutdown calls are harmless.
+Other PMIC variants quiesce callbacks and work without applying an unestablished
+charge-disable sequence.
+
+BC1.2 work checks that registration has published the power-supply handle before
+notifying it; early ONLINE writes must not cause a NULL-handle notification.
+The core supplies its initial notification after registration.
 
 This driver property is a control mechanism, not the Android UI's **Automatic**
 preference and not a complete charging policy. The future policy service must
@@ -254,6 +267,15 @@ failed write to take effect and a failed read to overwrite its destination.
 Twenty-one control regressions and the existing 15 current regressions fail
 runtime assertions. Locks, time, I/O and device resources are modeled; neither
 VSYS transients nor real charge-enable behavior has been measured.
+
+The shutdown tests invoke the production `platform_driver.shutdown` callback.
+They cover 18 model/work cases, 858 rejected property calls after shutdown,
+12 bus-failure cases and three synchronized property/shutdown races. The actual
+IRQ registration code is exercised through partial lookup/request failures.
+IRQ synchronization, running work and managed resources are modeled; these
+checks reject 21 faulty variants but do not establish behavior during a physical
+reboot. Initial input-limit
+selection and USB enumeration/suspend budget integration remain unfinished.
 
 ### Android charging-speed setting
 

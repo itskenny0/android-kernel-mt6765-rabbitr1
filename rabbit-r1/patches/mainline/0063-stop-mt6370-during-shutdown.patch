@@ -1,0 +1,183 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Stop charger callbacks before shutdown
+
+Fence power-supply access before draining IRQs and work. Inhibit charging
+on the established models at shutdown and before managed resources are
+released, including partial IRQ setup failures. Balance canceled MIVR work
+and avoid recursively entering the property callback for status reads.
+
+---
+ drivers/power/supply/mt6370-charger.c | 72 ++++++++++++++++++++++++++++-------
+ 1 file changed, 59 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/power/supply/mt6370-charger.c b/drivers/power/supply/mt6370-charger.c
+index 2a57d3d79d..44f6deafe5 100644
+--- a/drivers/power/supply/mt6370-charger.c
++++ b/drivers/power/supply/mt6370-charger.c
+@@ -100,6 +100,7 @@ struct mt6370_priv {
+ 	struct iio_channel *iio_ibus;
+ 	struct mutex attach_lock;
+ 	struct mutex ichg_lock;
++	struct mutex psy_lock;
+ 	struct power_supply *psy;
+ 	struct power_supply_desc psy_desc;
+ 	struct regmap *regmap;
+@@ -109,6 +110,8 @@ struct mt6370_priv {
+ 	struct work_struct bc12_work;
+ 	struct delayed_work mivr_dwork;
+ 	unsigned int irq_nums[MT6370_IRQ_MAX];
++	unsigned int num_irqs;
++	bool stopping;
+ 	int attach;
+ 	int psy_usb_type;
+ 	bool pwr_rdy;
+@@ -647,12 +650,7 @@ static int mt6370_chg_get_status(struct mt6370_priv *priv,
+ 	unsigned int chg_stat;
+ 	union power_supply_propval online;
+ 
+-	ret = power_supply_get_property(priv->psy, POWER_SUPPLY_PROP_ONLINE,
+-					&online);
+-	if (ret) {
+-		dev_err(priv->dev, "Failed to get online status\n");
+-		return ret;
+-	}
++	mt6370_chg_get_online(priv, &online);
+ 
+ 	if (!online.intval) {
+ 		val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+@@ -744,6 +742,10 @@ static int mt6370_chg_get_property(struct power_supply *psy,
+ 	unsigned int setting;
+ 	int ret;
+ 
++	guard(mutex)(&priv->psy_lock);
++	if (priv->stopping)
++		return -ESHUTDOWN;
++
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_ONLINE:
+ 		return mt6370_chg_get_online(priv, val);
+@@ -775,9 +777,11 @@ static int mt6370_chg_get_property(struct power_supply *psy,
+ 	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+ 		fd = F_IEOC;
+ 		break;
+-	case POWER_SUPPLY_PROP_USB_TYPE:
++	case POWER_SUPPLY_PROP_USB_TYPE: {
++		guard(mutex)(&priv->attach_lock);
+ 		val->intval = priv->psy_usb_type;
+ 		return 0;
++	}
+ 	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
+ 		return mt6370_chg_get_behaviour(priv, &val->intval);
+ 	default:
+@@ -802,6 +806,10 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ 	unsigned int setting;
+ 	int ret;
+ 
++	guard(mutex)(&priv->psy_lock);
++	if (priv->stopping)
++		return -ESHUTDOWN;
++
+ 	if (val->intval < 0)
+ 		return -EINVAL;
+ 
+@@ -1103,7 +1111,8 @@ static irqreturn_t mt6370_mivr_handler(int irq, void *data)
+ 
+ static int mt6370_chg_init_irq(struct mt6370_priv *priv)
+ {
+-	int i, ret;
++	unsigned int i;
++	int ret;
+ 	const struct {
+ 		char *name;
+ 		irq_handler_t handler;
+@@ -1128,6 +1137,7 @@ static int mt6370_chg_init_irq(struct mt6370_priv *priv)
+ 			return dev_err_probe(priv->dev, ret,
+ 					     "Failed to request irq %s\n",
+ 					     mt6370_chg_irqs[i].name);
++		priv->num_irqs++;
+ 	}
+ 
+ 	return 0;
+@@ -1137,7 +1147,11 @@ static void mt6370_chg_cancel_work(void *data)
+ {
+ 	struct mt6370_priv *priv = data;
+ 
+-	cancel_delayed_work_sync(&priv->mivr_dwork);
++	if (cancel_delayed_work_sync(&priv->mivr_dwork)) {
++		/* Balance the IRQ mask and wake reference acquired by the handler. */
++		enable_irq(priv->irq_nums[MT6370_IRQ_MIVR]);
++		pm_relax(priv->dev);
++	}
+ 	cancel_work_sync(&priv->bc12_work);
+ }
+ 
+@@ -1151,6 +1165,32 @@ static void mt6370_chg_inhibit(void *data)
+ 		dev_err(priv->dev, "Failed to inhibit charging during teardown: %d\n", ret);
+ }
+ 
++static void mt6370_chg_quiesce(void *data)
++{
++	struct mt6370_priv *priv = data;
++	unsigned int i;
++
++	mutex_lock(&priv->psy_lock);
++	if (priv->stopping) {
++		mutex_unlock(&priv->psy_lock);
++		return;
++	}
++	priv->stopping = true;
++	mutex_unlock(&priv->psy_lock);
++
++	/* IRQ handlers may call power_supply_set_property(), so release psy_lock. */
++	for (i = 0; i < priv->num_irqs; i++)
++		disable_irq(priv->irq_nums[i]);
++	mt6370_chg_cancel_work(priv);
++	if (priv->ichg_workaround)
++		mt6370_chg_inhibit(priv);
++}
++
++static void mt6370_chg_shutdown(struct platform_device *pdev)
++{
++	mt6370_chg_quiesce(platform_get_drvdata(pdev));
++}
++
+ static int mt6370_chg_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1186,6 +1226,9 @@ static int mt6370_chg_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 	ret = devm_mutex_init(dev, &priv->ichg_lock);
++	if (ret)
++		return ret;
++	ret = devm_mutex_init(dev, &priv->psy_lock);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1222,12 +1265,14 @@ static int mt6370_chg_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Failed to init psy\n");
+ 
+-	/* Drain work before managed power-supply and workqueue teardown. */
+-	ret = devm_add_action_or_reset(dev, mt6370_chg_cancel_work, priv);
+-	if (ret)
++	ret = mt6370_chg_init_irq(priv);
++	if (ret) {
++		mt6370_chg_quiesce(priv);
+ 		return ret;
++	}
+ 
+-	ret = mt6370_chg_init_irq(priv);
++	/* Quiesce before the managed IRQs, power supply and workqueue disappear. */
++	ret = devm_add_action_or_reset(dev, mt6370_chg_quiesce, priv);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1244,6 +1289,7 @@ MODULE_DEVICE_TABLE(of, mt6370_chg_of_match);
+ 
+ static struct platform_driver mt6370_chg_driver = {
+ 	.probe = mt6370_chg_probe,
++	.shutdown = mt6370_chg_shutdown,
+ 	.driver = {
+ 		.name = "mt6370-charger",
+ 		.of_match_table = mt6370_chg_of_match,
