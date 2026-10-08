@@ -115,7 +115,10 @@ The workflow:
    backup validation, AVB flags, checksums and repeat packaging.
 
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
-archive, mtklkzap, the mtklogo binary and a checksummed MT6357 vendor header. It leaves the checked-out kernel
+archive, mtklkzap, the mtklogo binary and checksummed MT6357 register/ADC source
+references. The ADC harness checks voltage units, channel requests, mux cleanup,
+scaling and timeout locking; its inactive driver is also compiled for AArch64.
+It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.
 

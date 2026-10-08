@@ -94,7 +94,7 @@ for name, item in lock['archives'].items():
     print(name, 'SHA256 verified', flush=True)
 
 if args.profile == 'ci':
-    # The regulator harness needs one vendor header, not the whole 4.19 tree.
+    # Power-driver checks need pinned reference files, not the whole 4.19 tree.
     for name, item in lock['ci_files'].items():
         dest = local(name)
         if not dest.exists():

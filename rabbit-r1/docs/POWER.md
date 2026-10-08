@@ -126,6 +126,73 @@ reference release are checked on every path. Restoring positional indexing or
 the old unscaled-reading behavior makes the test fail. These are host tests;
 the actual ADC calibration, IRQ delivery and charger operation remain untested.
 
+## MT6357 battery-sense ADC
+
+The upstream `mt6359-auxadc` driver also supports MT6357, but its inherited
+tables and conversion code had several problems. The corrections use Rabbit's
+published `drivers/iio/adc/mt635x-auxadc.c`, its MT6357 register definitions, and
+the shipped v0.8.293 device tree:
+
+* ISENSE requests bit 1, VCDT bit 2, and DCXO temperature bit 4 of `RQST0`.
+  The old entries requested bits 0, 0 and 10 respectively. ISENSE has 15 data
+  bits, not 12. Register offsets above ADC36 are not consecutive hardware
+  channel numbers; the existing output addresses for DCXO/VCORE/VPROC are
+  correct and stay unchanged.
+* The ordinary channels measure voltage. Battery-temperature conversion needs
+  a thermistor model; ISENSE is a voltage input, not a computed battery current.
+  MT6357 now exposes these as `IIO_VOLTAGE`. This changes their incorrect
+  `in_temp`, `in_current` or `in_resistance` sysfs names to `in_voltage` names.
+* The shared scale now includes ADC resolution:
+  `raw * ratio_numerator * VREF_mV / (ratio_denominator * 2^bits)`.
+  A half-scale 12-bit, 1:1 input is 900 mV at the 1,800 mV reference. The old
+  scale would report 3,686,400 in the channel's claimed units. This scale
+  correction also applies to the driver's other PMIC models.
+* VBIF is exposed as binding ID 13; existing IDs are unchanged. Conversion
+  temporarily clears `BATON_TDET_EN` at `0x1236[1]`. DCXO conversion selects
+  the AP input at `0x1216[4]`. Both save and attempt to restore the prior bit
+  under the ADC mutex, including failed conversions; a failed restoration
+  returns an error instead of a reading. Unrelated bits are preserved.
+* The former VDCXO entry had no MT6357 descriptor and could use zero-valued
+  fields as register addresses. It is no longer advertised; its binding ID
+  remains reserved. Rabbit's MT6357 table provides no validated mapping for it.
+
+Sampling errors and failed stop writes now propagate to callers. The shared
+external-input path attempts to release its pull-up after failed selection,
+sampling or stopping. Timeout recovery stays inside the ADC mutex so one read
+cannot reset hardware while another conversion is running. These changes do
+not guarantee recovery when the PMIC bus itself has failed.
+
+`test-mt6357-auxadc.py` compiles the production tables, chip callback selection
+and conversion functions with ASan/UBSan. It derives 12 mappings from pinned
+Rabbit sources and checks raw values, voltage units, fractional scales, delayed
+readiness, repeated timeouts, cleanup and unrelated-bit preservation. It covers
+227 conversion/cleanup cases plus 48 injected mux bus errors, including writes
+that take effect despite reporting an error. Thirteen faulty variants are
+rejected by runtime assertions. Polling, regmap operations and locking are
+modeled; the impedance-conversion routine and electrical accuracy are not
+covered. CI separately compiles the AArch64 object.
+
+MT6357 ADC and charging remain disabled in the diagnostic kernel. Probe/reset
+error handling, firmware-owned ADC requests, battery-current compensation and
+the temperature policy still need work before enabling battery management.
+An ADC voltage is not yet a temperature or a fuel-gauge reading.
+
+### Battery policy recovered from stock
+
+The shipped `/charger` node selects a 4,400,000 µV normal charge voltage and
+1,000,000 µA AC charge/input limits; USB uses 500,000 µA. Its JEITA table stops
+charging below 0 °C or at/above 55 °C and lowers the configured current/voltage
+to 500,000 µA and 4,200,000 µV above 45 °C and below 55 °C. Hysteresis must
+be carried over with the transition logic. These are recovered stock settings,
+not limits newly approved by hardware tests.
+
+The gauge node provides a 16,900-ohm pull-up and a nominal 1,800 mV reference.
+Rabbit's battery code reads VBIF and compensates the temperature-sense voltage
+using measured battery current before applying its thermistor table. The
+MT6370 driver's initial 4,450,000 µV setting is distinct from the charger
+manager's policy; copying that driver default would not reproduce stock
+charging. The extracted nodes are recorded in `out/r1-battery-stock-inputs.json`.
+
 ## r1 power monitor
 
 I2C5 and the MT6370 MFD/ADC are now enabled in the r1 board file. The bus uses
@@ -150,7 +217,7 @@ This does not guarantee or manage whatever charging state LK left behind.
 
 The MT6370 and hwmon schemas pass for these nodes. A compiled-DTB test compares
 the wiring with the stock image and rejects a changed IRQ or enabled unfinished
-child. Full-board schema validation still has the previously recorded 41
+child. Full-board schema validation still has the previously recorded 28
 diagnostics. Actual bus transfers, interrupt routing and measured ADC accuracy
 require the device; none are inferred from a successful build.
 

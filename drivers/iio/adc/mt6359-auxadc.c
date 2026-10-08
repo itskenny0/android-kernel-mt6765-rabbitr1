@@ -37,6 +37,10 @@
 #define PMIC_RG_RESET_VAL		(BIT(0) | BIT(3))
 #define PMIC_AUXADC_RDY_BIT		BIT(15)
 #define MT6357_IMP_ADC_NUM		30
+#define MT6357_AUXADC_DCXO_MDRT_2	0x1216
+#define MT6357_AUXADC_CHR_TOP_CON2	0x1236
+#define MT6357_DCXO_CH4_MUX_AP_SEL	BIT(4)
+#define MT6357_BATON_TDET_EN		BIT(1)
 #define MT6358_IMP_ADC_NUM		28
 
 #define MT6358_DCM_CK_SW_EN		GENMASK(1, 0)
@@ -151,6 +155,7 @@ struct mtk_pmic_auxadc_chan {
  * @imp_adc_num:    ADC channel for battery impedance readings
  * @is_spmi:        Defines whether this PMIC communicates over SPMI
  * @no_reset:       If true, this PMIC does not support ADC reset
+ * @read_adc:       Optional callback for model-specific channel selection
  * @read_imp:       Callback to read impedance channels
  */
 struct mtk_pmic_auxadc_info {
@@ -164,6 +169,8 @@ struct mtk_pmic_auxadc_info {
 	u8 imp_adc_num;
 	bool is_spmi;
 	bool no_reset;
+	int (*read_adc)(struct mt6359_auxadc *adc_dev,
+			const struct iio_chan_spec *chan, int *out);
 	int (*read_imp)(struct mt6359_auxadc *adc_dev,
 			const struct iio_chan_spec *chan, int *vbat, int *ibat);
 };
@@ -206,18 +213,20 @@ struct mtk_pmic_auxadc_info {
 }
 
 static const struct iio_chan_spec mt6357_auxadc_channels[] = {
-	MTK_PMIC_IIO_CHAN(MT6357, bat_adc, BATADC, 0, 15, IIO_RESISTANCE),
-	MTK_PMIC_IIO_CHAN(MT6357, isense, ISENSE, 1, 12, IIO_CURRENT),
-	MTK_PMIC_IIO_CHAN(MT6357, cdt_v, VCDT, 2, 12, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, batt_temp, BAT_TEMP, 3, 12, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, chip_temp, CHIP_TEMP, 4, 12, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, acc_det, ACCDET, 5, 12, IIO_RESISTANCE),
-	MTK_PMIC_IIO_CHAN(MT6357, dcxo_v, VDCXO, 6, 12, IIO_VOLTAGE),
-	MTK_PMIC_IIO_CHAN(MT6357, tsx_temp, TSX_TEMP, 7, 15, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, hp_ofs_cal, HPOFS_CAL, 9, 15, IIO_RESISTANCE),
-	MTK_PMIC_IIO_CHAN(MT6357, dcxo_temp, DCXO_TEMP, 36, 15, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, vcore_temp, VCORE_TEMP, 40, 12, IIO_TEMP),
-	MTK_PMIC_IIO_CHAN(MT6357, vproc_temp, VPROC_TEMP, 41, 12, IIO_TEMP),
+	/* These are sensor voltages, before thermistor/current conversion. */
+	MTK_PMIC_IIO_CHAN(MT6357, bat_adc, BATADC, 0, 15, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, isense, ISENSE, 1, 15, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, cdt_v, VCDT, 2, 12, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, batt_temp, BAT_TEMP, 3, 12, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, chip_temp, CHIP_TEMP, 4, 12, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, acc_det, ACCDET, 5, 12, IIO_VOLTAGE),
+	/* VDCXO has no MT6357 request mapping; retain its binding ID only. */
+	MTK_PMIC_IIO_CHAN(MT6357, tsx_temp, TSX_TEMP, 7, 15, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, hp_ofs_cal, HPOFS_CAL, 9, 15, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, dcxo_temp, DCXO_TEMP, 36, 15, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, bif_v, VBIF, 11, 12, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, vcore_temp, VCORE_TEMP, 40, 12, IIO_VOLTAGE),
+	MTK_PMIC_IIO_CHAN(MT6357, vproc_temp, VPROC_TEMP, 41, 12, IIO_VOLTAGE),
 
 	/* Battery impedance channels */
 	MTK_PMIC_IIO_CHAN(MT6357, batt_v, VBAT, 0, 15, IIO_VOLTAGE),
@@ -225,14 +234,14 @@ static const struct iio_chan_spec mt6357_auxadc_channels[] = {
 
 static const struct mtk_pmic_auxadc_chan mt6357_auxadc_ch_desc[] = {
 	MTK_PMIC_ADC_CHAN(BATADC, PMIC_AUXADC_RQST0, 0, PMIC_AUXADC_IMP0, 8, 128, 3, 1),
-	MTK_PMIC_ADC_CHAN(ISENSE, PMIC_AUXADC_RQST0, 0, PMIC_AUXADC_IMP0, 8, 128, 3, 1),
-	MTK_PMIC_ADC_CHAN(VCDT, PMIC_AUXADC_RQST0, 0, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
+	MTK_PMIC_ADC_CHAN(ISENSE, PMIC_AUXADC_RQST0, 1, PMIC_AUXADC_IMP0, 8, 128, 3, 1),
+	MTK_PMIC_ADC_CHAN(VCDT, PMIC_AUXADC_RQST0, 2, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(BAT_TEMP, PMIC_AUXADC_RQST0, 3, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(CHIP_TEMP, PMIC_AUXADC_RQST0, 4, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(ACCDET, PMIC_AUXADC_RQST0, 5, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(TSX_TEMP, PMIC_AUXADC_RQST0, 7, PMIC_AUXADC_IMP0, 8, 128, 1, 1),
 	MTK_PMIC_ADC_CHAN(HPOFS_CAL, PMIC_AUXADC_RQST0, 9, PMIC_AUXADC_IMP0, 8, 256, 1, 1),
-	MTK_PMIC_ADC_CHAN(DCXO_TEMP, PMIC_AUXADC_RQST0, 10, PMIC_AUXADC_IMP0, 8, 16, 1, 1),
+	MTK_PMIC_ADC_CHAN(DCXO_TEMP, PMIC_AUXADC_RQST0, 4, PMIC_AUXADC_IMP0, 8, 16, 1, 1),
 	MTK_PMIC_ADC_CHAN(VBIF, PMIC_AUXADC_RQST0, 11, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(VCORE_TEMP, PMIC_AUXADC_RQST1, 5, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
 	MTK_PMIC_ADC_CHAN(VPROC_TEMP, PMIC_AUXADC_RQST1, 6, PMIC_AUXADC_IMP0, 8, 8, 1, 1),
@@ -549,6 +558,9 @@ static int mt6359_read_imp(struct mt6359_auxadc *adc_dev,
 	return 0;
 }
 
+static int mt6357_auxadc_read_adc(struct mt6359_auxadc *adc_dev,
+				const struct iio_chan_spec *chan, int *out);
+
 static const struct mtk_pmic_auxadc_info mt6357_chip_info = {
 	.model_name = "MT6357",
 	.channels = mt6357_auxadc_channels,
@@ -556,6 +568,7 @@ static const struct mtk_pmic_auxadc_info mt6357_chip_info = {
 	.desc = mt6357_auxadc_ch_desc,
 	.regs = mt6357_auxadc_regs,
 	.imp_adc_num = MT6357_IMP_ADC_NUM,
+	.read_adc = mt6357_auxadc_read_adc,
 	.read_imp = mt6358_read_imp,
 	.vref_mV = 1800,
 };
@@ -701,7 +714,7 @@ static int mt6359_auxadc_read_adc(struct mt6359_auxadc *adc_dev,
 	const struct mtk_pmic_auxadc_info *cinfo = adc_dev->chip_info;
 	const struct mtk_pmic_auxadc_chan *desc = &cinfo->desc[chan->scan_index];
 	struct regmap *regmap = adc_dev->regmap;
-	int ret, adc_stop_err;
+	int ret, adc_stop_err, deselect_err;
 	u8 ext_sel;
 	u32 val;
 
@@ -713,44 +726,79 @@ static int mt6359_auxadc_read_adc(struct mt6359_auxadc *adc_dev,
 					 MT6363_EXT_PURES_MASK | MT6363_EXT_CHAN_MASK,
 					 ext_sel);
 		if (ret)
-			return ret;
+			goto deactivate_input;
 	}
 
-	/*
-	 * Get sampled value, then stop sampling unconditionally; the gathered
-	 * value is good regardless of if the ADC could be stopped.
-	 *
-	 * Note that if the ADC cannot be stopped but sampling was ok, this
-	 * function will not return any error, but will set the timed_out
-	 * status: this is not critical, as the ADC may auto recover and auto
-	 * stop after some time (depending on the PMIC model); if not, the next
-	 * read attempt will return -ETIMEDOUT and, for models that support it,
-	 * reset will be triggered.
-	 */
+	/* Stop sampling and release the external input on every conversion path. */
 	ret = mt6359_auxadc_sample_adc_val(adc_dev, chan, &val);
 
 	adc_stop_err = regmap_write(regmap, cinfo->regs[desc->req_idx], 0);
 	if (adc_stop_err) {
 		dev_warn(adc_dev->dev, "Could not stop the ADC: %d\n,", adc_stop_err);
 		adc_dev->timed_out = true;
+		if (!ret)
+			ret = adc_stop_err;
 	}
 
-	/* If any sampling error occurred, the retrieved value is invalid */
-	if (ret)
-		return ret;
-
-	/* ...and deactivate the ADC GPIO if previously done */
+deactivate_input:
+	/* Deactivate the ADC GPIO even after a select, sample or stop error. */
 	if (desc->ext_sel_idx >= 0) {
 		ext_sel = FIELD_PREP(MT6363_EXT_PURES_MASK, MT6363_PULLUP_RES_OPEN);
 
-		ret = regmap_update_bits(regmap, cinfo->regs[desc->ext_sel_idx],
-					 MT6363_EXT_PURES_MASK, ext_sel);
-		if (ret)
-			return ret;
+		deselect_err = regmap_update_bits(regmap, cinfo->regs[desc->ext_sel_idx],
+						 MT6363_EXT_PURES_MASK, ext_sel);
+		if (!ret)
+			ret = deselect_err;
 	}
+	if (ret)
+		return ret;
 
 	/* Everything went fine, give back the ADC reading */
 	*out = val & GENMASK(chan->scan_type.realbits - 1, 0);
+	return 0;
+}
+
+static int mt6357_auxadc_read_adc(struct mt6359_auxadc *adc_dev,
+				const struct iio_chan_spec *chan, int *out)
+{
+	struct regmap *regmap = adc_dev->regmap;
+	u32 reg, mask, select, saved;
+	int ret, restore_ret, val;
+
+	/* The caller holds the ADC mutex through selection and restoration. */
+	switch (chan->scan_index) {
+	case PMIC_AUXADC_CHAN_DCXO_TEMP:
+		reg = MT6357_AUXADC_DCXO_MDRT_2;
+		mask = MT6357_DCXO_CH4_MUX_AP_SEL;
+		select = mask;
+		break;
+	case PMIC_AUXADC_CHAN_VBIF:
+		reg = MT6357_AUXADC_CHR_TOP_CON2;
+		mask = MT6357_BATON_TDET_EN;
+		select = 0;
+		break;
+	default:
+		return mt6359_auxadc_read_adc(adc_dev, chan, out);
+	}
+
+	ret = regmap_read(regmap, reg, &saved);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(regmap, reg, mask, select);
+	if (!ret)
+		ret = mt6359_auxadc_read_adc(adc_dev, chan, &val);
+
+	/* Also restore after a failed selection or conversion. */
+	restore_ret = regmap_update_bits(regmap, reg, mask, saved);
+	if (restore_ret) {
+		dev_err(adc_dev->dev, "Failed to restore ADC mux: %d\n", restore_ret);
+		return restore_ret;
+	}
+	if (ret)
+		return ret;
+
+	*out = val;
 	return 0;
 }
 
@@ -771,33 +819,33 @@ static int mt6359_auxadc_read_raw(struct iio_dev *indio_dev,
 
 	if (mask == IIO_CHAN_INFO_SCALE) {
 		*val = desc->r_ratio.numerator * cinfo->vref_mV;
-
-		if (desc->r_ratio.denominator > 1) {
-			*val2 = desc->r_ratio.denominator;
-			return IIO_VAL_FRACTIONAL;
-		}
-
-		return IIO_VAL_INT;
+		*val2 = desc->r_ratio.denominator << chan->scan_type.realbits;
+		return IIO_VAL_FRACTIONAL;
 	}
+	if (mask != IIO_CHAN_INFO_RAW)
+		return -EINVAL;
 
-	scoped_guard(mutex, &adc_dev->lock) {
-		switch (chan->scan_index) {
-		case PMIC_AUXADC_CHAN_IBAT:
-			if (!adc_dev->chip_info->read_imp)
-				return -EOPNOTSUPP;
+	guard(mutex)(&adc_dev->lock);
 
-			ret = adc_dev->chip_info->read_imp(adc_dev, chan, NULL, val);
-			break;
-		case PMIC_AUXADC_CHAN_VBAT:
-			if (!adc_dev->chip_info->read_imp)
-				return -EOPNOTSUPP;
+	switch (chan->scan_index) {
+	case PMIC_AUXADC_CHAN_IBAT:
+		if (!cinfo->read_imp)
+			return -EOPNOTSUPP;
 
-			ret = adc_dev->chip_info->read_imp(adc_dev, chan, val, NULL);
-			break;
-		default:
+		ret = cinfo->read_imp(adc_dev, chan, NULL, val);
+		break;
+	case PMIC_AUXADC_CHAN_VBAT:
+		if (!cinfo->read_imp)
+			return -EOPNOTSUPP;
+
+		ret = cinfo->read_imp(adc_dev, chan, val, NULL);
+		break;
+	default:
+		if (cinfo->read_adc)
+			ret = cinfo->read_adc(adc_dev, chan, val);
+		else
 			ret = mt6359_auxadc_read_adc(adc_dev, chan, val);
-			break;
-		}
+		break;
 	}
 
 	if (ret) {

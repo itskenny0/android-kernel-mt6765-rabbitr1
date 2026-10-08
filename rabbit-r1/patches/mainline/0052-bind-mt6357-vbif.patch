@@ -1,0 +1,17 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Add MT6357 VBIF channel ID
+
+Reserve a channel ID for the battery thermistor reference voltage.
+Keep existing channel IDs unchanged.
+
+diff --git a/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h b/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h
+index 03ebb1d239..09ae7c27bc 100644
+--- a/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h
++++ b/include/dt-bindings/iio/adc/mediatek,mt6357-auxadc.h
+@@ -17,5 +17,6 @@
+ #define MT6357_AUXADC_VCORE_TEMP	10
+ #define MT6357_AUXADC_VPROC_TEMP	11
+ #define MT6357_AUXADC_VBAT		12
++#define MT6357_AUXADC_VBIF		13
+ 
+ #endif
