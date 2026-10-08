@@ -1,6 +1,6 @@
 # LK and splash build
 
-`build-lk.py` uses the pinned [mtklkzap](https://github.com/itskenny0/mtklkzap)
+`build-lk.py` uses the pinned [mtklkzap](https://github.com/haretic/mtklkzap)
 revision `0decfc224e7f47c98092e85d1174f23575cc4980` after stock firmware extraction.
 It produces `dist/lk/lk.bin`, `logo.bin`, a splash preview, a build record and
 checksums. Packaging consumes these files; CI builds and tests them before
@@ -31,7 +31,7 @@ guard covers this LK's command handler; a different slot's loader or direct
 The generated restore script replays saved backups; it does not establish that
 the complete device firmware is stock or that relocking is safe.
 
-See [mtklkzap's relock documentation](https://github.com/itskenny0/mtklkzap/blob/main/docs/RELOCK.md)
+See [mtklkzap's relock documentation](https://github.com/haretic/mtklkzap/blob/main/docs/RELOCK.md)
 for the profile and test details. Unknown stock LK images are rejected; this
 protection has not been hardware-tested.
 

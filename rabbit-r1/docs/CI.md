@@ -161,7 +161,7 @@ Build outputs are not cached. The cache and artifact actions are pinned to full
 commit IDs. The workflow uses a read-only repository token and no stored secrets;
 the public source checkout itself needs no credentials.
 
-[mtklkzap's relock workflow](https://github.com/itskenny0/mtklkzap/actions/workflows/relock.yml)
+[mtklkzap's relock workflow](https://github.com/haretic/mtklkzap/actions/workflows/relock.yml)
 also tests the pinned tool independently. It checks the official stock LK,
 executes its Fastboot registration and refusal path, tests command-line write
 protection, and confirms relock refusal survives the warning patches. These
@@ -176,7 +176,7 @@ checksums. `rabbit-r1-logs-<commit>` is uploaded even when a later step fails.
 Both artifacts are retained for 14 days. Download them from the run's Actions
 page and follow [FLASHING.md](FLASHING.md) before using a boot image.
 
-The [first hosted run](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/actions/runs/37671533107)
+The [first hosted run](https://github.com/haretic/android-kernel-mt6765-rabbitr1/actions/runs/37671533107)
 passed in 17m55s at `98375f81dbc0b060aa04b8480868833b96779311`. Both uploaded
 artifacts were downloaded and their file checksums verified. The record is in
 [ci-first-run.json](research/ci-first-run.json). That historical artifact predates the [LK/DTBO fix](LK.md); use a run

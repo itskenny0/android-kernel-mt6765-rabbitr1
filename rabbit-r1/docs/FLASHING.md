@@ -19,7 +19,7 @@ MMC pin states instead of applying LK's vendor-specific name swap. It also
 skips the missing vendor SCP node requirement that otherwise aborts boot, and
 preserves the Linux console instead of replacing it with LK's logging port. The warning patches and
 LineageOS splash are built with pinned mtklkzap tools; see
-[LK.md](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/LK.md).
+[LK.md](https://github.com/haretic/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/LK.md).
 The handoff is checked by emulation, but patched LK acceptance and booting still
 need a device test. Restore LK and boot together when returning to RabbitOS.
 

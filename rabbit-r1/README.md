@@ -1,7 +1,7 @@
 # rabbit r1 kernel workspace
 
 Mainline-first development for the rabbit r1, confined to `/rabbitr1`.
-The development tree is [itskenny0/android-kernel-mt6765-rabbitr1](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1),
+The development tree is [haretic/android-kernel-mt6765-rabbitr1](https://github.com/haretic/android-kernel-mt6765-rabbitr1),
 based on [fenolftalein-mamir/linux-mt6765](https://github.com/fenolftalein-mamir/linux-mt6765).
 The pinned base is `cceb223d0c2d7ce52fade7bb6b9ef679c560bea7` on `mt6765-devel`.
 Work is committed on `rabbit-r1/bringup`. GitHub authentication is required to
