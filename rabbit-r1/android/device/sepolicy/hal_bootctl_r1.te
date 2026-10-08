@@ -1,0 +1,28 @@
+type hal_bootctl_r1, domain;
+hal_server_domain(hal_bootctl_r1, hal_bootctl)
+type hal_bootctl_r1_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(hal_bootctl_r1)
+
+type r1_emmc_block_device, dev_type;
+type sysfs_r1_mmc, fs_type, sysfs_type;
+
+read_fstab(hal_bootctl_r1)
+allow hal_bootctl_r1 block_device:dir { search getattr };
+allow hal_bootctl_r1 block_device:lnk_file { read getattr };
+allow hal_bootctl_r1 misc_block_device:lnk_file { read getattr };
+allow hal_bootctl_r1 misc_block_device:blk_file { open read write getattr lock ioctl };
+# BLKGETSIZE64 only, for the 512 KiB para size check.
+allowxperm hal_bootctl_r1 misc_block_device:blk_file ioctl { 0x1272 };
+
+# The adapter uses the whole-disk fd only for MMC_IOC_CMD. It does not issue
+# read(), write(), BLKDISCARD or raw writes to either hardware boot partition.
+allow hal_bootctl_r1 r1_emmc_block_device:blk_file { open read getattr ioctl };
+allowxperm hal_bootctl_r1 r1_emmc_block_device:blk_file ioctl { 0xb300 };
+allow hal_bootctl_r1 self:global_capability_class_set sys_rawio;
+
+allow hal_bootctl_r1 sysfs:dir { search getattr };
+allow hal_bootctl_r1 sysfs:lnk_file { read getattr };
+allow hal_bootctl_r1 sysfs_r1_mmc:dir { search getattr };
+allow hal_bootctl_r1 sysfs_r1_mmc:lnk_file { read getattr };
+allow hal_bootctl_r1 sysfs_r1_mmc:file r_file_perms;
+allow hal_bootctl_r1 kmsg_device:chr_file { open write };

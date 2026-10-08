@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_defaults {
+    name: "r1_boot_control_defaults",
+    defaults: ["libboot_control_defaults"],
+    cpp_std: "c++17",
+    srcs: ["main.cpp", "BootControl.cpp", "Control.cpp", "LinuxStorage.cpp"],
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "android.hardware.boot-V1-ndk",
+        "android.hardware.boot@1.1",
+    ],
+    static_libs: ["libboot_control"],
+}
+
+cc_binary {
+    name: "android.hardware.boot-service.r1",
+    defaults: ["r1_boot_control_defaults"],
+    vendor: true,
+    init_rc: ["android.hardware.boot-service.r1.rc"],
+    vintf_fragments: ["android.hardware.boot-service.r1.xml"],
+}
+
+cc_binary {
+    name: "android.hardware.boot-service.r1_recovery",
+    defaults: ["r1_boot_control_defaults"],
+    recovery: true,
+    init_rc: ["android.hardware.boot-service.r1_recovery.rc"],
+    vintf_fragments: ["android.hardware.boot-service.r1.xml"],
+}

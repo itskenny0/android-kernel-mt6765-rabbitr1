@@ -43,7 +43,7 @@ cd /rabbitr1/src/android
 set +eu
 source build/envsetup.sh
 lunch lineage_r1 trunk_staging userdebug || exit
-m R1ChargingSettings r1-charging selinux_policy
+m R1ChargingSettings r1-charging android.hardware.boot-service.r1 android.hardware.boot-service.r1_recovery selinux_policy
 ```
 
 These are the next validation commands, not a claim that the product already
@@ -58,7 +58,7 @@ the change from stock virtual A/B to dedicated A/B extents. Existing flash and
 restore helpers cover the diagnostic package; an Android package needs its own
 complete backup, layout and restore validation before distribution.
 
-The [boot-control audit](BOOT-CONTROL.md) establishes the stock A/B record format
-and records two MediaTek extensions missing from the provisional default HAL:
-eMMC boot-region selection and clearing the `avbbctl` flag. Complete that
-adapter and its failure handling before testing Android slot transitions.
+The [boot-control adapter](BOOT-CONTROL.md) implements the stock A/B record
+format, eMMC boot-region selection and clearing the `avbbctl` flag. Its core
+and storage boundary have host tests. The product selects its Android and
+recovery services; their Soong, SELinux and device checks are still required.

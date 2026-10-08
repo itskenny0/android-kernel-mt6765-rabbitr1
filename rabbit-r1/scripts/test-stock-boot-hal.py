@@ -142,6 +142,24 @@ def main():
     emu = Emulator(image)
     cases = 0
     for current in (0, 1):
+        # Independently verify query semantics, including ties and zero retries,
+        # against the shipped instructions rather than the adapter's formulas.
+        for a in range(16):
+            for b in range(16):
+                emu.reset(control(a, b), current)
+                assert emu.run(0xd598) == (current if a == b else 0 if a > b else 1)
+                assert emu.events == ['read']
+                cases += 1
+        for slot in (0, 1):
+            for value in range(256):
+                data = bytearray(control())
+                data[12 + 2 * slot] = value
+                data = crc(data)
+                emu.reset(data, current)
+                assert emu.run(0xd8a8, slot) == bool(value & 0x70)
+                assert emu.run(0xd940, slot) == bool((value & 0x70) and (value & 0x80))
+                assert emu.events == ['read', 'read'] and emu.media == data
+                cases += 2
         for slot in (0, 1):
             for value in (0, 0x0f, 0x7f, 0x80, 0xff):
                 data = control(value, value)

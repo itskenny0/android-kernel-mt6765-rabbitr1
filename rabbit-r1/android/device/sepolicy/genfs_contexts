@@ -1,0 +1,1 @@
+genfscon sysfs /devices/platform/soc/11230000.mmc u:object_r:sysfs_r1_mmc:s0

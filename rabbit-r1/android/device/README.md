@@ -22,9 +22,10 @@ kernel does not have. This configuration instead reserves 4 GiB per physical
 A/B slot inside the existing 8,792,064,000-byte super partition. It is a proposed
 replacement layout, not an in-place upgrade of stock. Boot-control compatibility,
 both slot transitions, recovery, encryption and OTA updates still require testing.
-The stock record layout is now covered by LK instruction replay. The provisional
-default boot HAL still lacks MediaTek boot-region selection and the successful
-boot flag update; see `rabbit-r1/docs/BOOT-CONTROL.md` in the kernel repository.
+The stock record layout is covered by LK instruction replay. The r1 boot HAL
+implements MediaTek boot-region selection and the successful-boot flag update
+with readback and failure handling. Its core has host tests; Android service,
+SELinux and physical-device checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
 
 Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL

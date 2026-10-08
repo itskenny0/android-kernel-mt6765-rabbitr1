@@ -8,9 +8,7 @@ TARGET_HEALTH_HAL := default-aidl
 TARGET_GRAPHICS := swiftshader
 TARGET_GRAPHICS_COMPOSER_HAL := drmfb-composer
 TARGET_SUPPORTS_SUSPEND := false
-# Provisional: stock also selects the eMMC boot region and clears avbbctl.
-# Complete the adapter in docs/BOOT-CONTROL.md before testing slot changes.
-TARGET_BOOT_HAL := default
+TARGET_BOOT_HAL := r1
 TARGET_FOLLOWS_LATEST_VINTF_TARGET_LEVEL := true
 
 TARGET_PREBUILT_KERNEL := device/rabbit/r1/prebuilt/Image.gz
@@ -28,6 +26,10 @@ PRODUCT_VIRTUAL_AB_COMPRESSION := false
 
 $(call inherit-product, device/mainline/common/mainline_common.mk)
 $(call inherit-product, device/rabbit/r1/charging/product.mk)
+
+PRODUCT_PACKAGES += \
+    android.hardware.boot-service.r1 \
+    android.hardware.boot-service.r1_recovery
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/rootdir/fstab.r1:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.r1 \

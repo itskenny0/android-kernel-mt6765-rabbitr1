@@ -1,0 +1,3 @@
+/vendor/bin/hw/android\.hardware\.boot-service\.r1 u:object_r:hal_bootctl_r1_exec:s0
+/dev/block/by-name/para u:object_r:misc_block_device:s0
+/dev/block/mmcblk[0-9]+ u:object_r:r1_emmc_block_device:s0

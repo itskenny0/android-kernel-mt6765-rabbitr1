@@ -13,6 +13,7 @@ TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/Image.gz
 TARGET_KERNEL_MIXED_MODE := false
 include $(MAINLINE_COMMON_PATH)/BoardConfigMainlineCommon.mk
 include $(DEVICE_PATH)/charging/board.mk
+BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy
 # expdb requires its bounded mapper before pstore_blk is loaded.
 BOARD_VENDOR_KERNEL_MODULES_LOAD := false
 

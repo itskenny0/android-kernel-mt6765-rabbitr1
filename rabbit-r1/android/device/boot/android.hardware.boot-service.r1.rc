@@ -1,0 +1,6 @@
+service vendor.boot-r1 /vendor/bin/hw/android.hardware.boot-service.r1
+    class early_hal
+    user root
+    group root
+    capabilities SYS_RAWIO
+    interface aidl android.hardware.boot.IBootControl/default
