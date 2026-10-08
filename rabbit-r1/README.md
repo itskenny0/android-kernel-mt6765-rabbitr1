@@ -16,6 +16,8 @@ mainline handoff patch. [LK.md](docs/LK.md) covers mtklkzap integration, the
 LineageOS splash, and emulation checks. Hardware acceptance remains untested.
 The Android target is **LineageOS 24.0**: the inspected official manifest selects
 `android-17.0.0_r1`. Source-branch availability does not establish r1 compatibility.
+The initial Android product, dependency pins, and installation steps are in
+[ANDROID.md](docs/ANDROID.md); a full product build is still pending.
 
 ## Results
 

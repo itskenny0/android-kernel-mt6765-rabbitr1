@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+on fs
+    mount_all /vendor/etc/fstab.r1 --early
+
+on late-fs
+    mount_all /vendor/etc/fstab.r1 --late

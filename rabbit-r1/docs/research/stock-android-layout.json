@@ -1,0 +1,396 @@
+{
+  "firmware": "RabbitOS v0.8.293",
+  "archive_sha256": "f6c28b221a91055ec5e44ab0ac0ee59c7e6b52fac12ad08f2bb23c8f0551c6c0",
+  "boot_ramdisk_sha256": "440be5ca42d377286015872ddef1596b9a957ddf944e3e10e96f76f6e6a1075e",
+  "vendor_image_sha256": "279dfbe260bc66f587729571f2e516750f46a06906650542e6618767b5dad42a",
+  "fstab_sha256": "bee839c5cda2c48c4aa8c3e3b33e1436438ffdbfe4fc394fcdb97586bc2ba17b",
+  "boot_and_vendor_fstab_identical": true,
+  "metadata_mount_partition": "md_udc",
+  "misc_partition": "para",
+  "effective_vendor_properties": {
+    "ro.product.first_api_level": "33",
+    "ro.board.first_api_level": "30",
+    "ro.sf.lcd_density": "320",
+    "ro.virtual_ab.enabled": "true",
+    "ro.virtual_ab.compression.enabled": "true",
+    "ro.virtual_ab.userspace.snapshots.enabled": "true"
+  },
+  "physical_partitions": [
+    {
+      "partition_name": "para",
+      "file_name": "NONE",
+      "linear_start_addr": "0x108000",
+      "partition_size": "0x80000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "expdb",
+      "file_name": "NONE",
+      "linear_start_addr": "0x188000",
+      "partition_size": "0x1400000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "md_udc",
+      "file_name": "NONE",
+      "linear_start_addr": "0x7688000",
+      "partition_size": "0x169a000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "metadata",
+      "file_name": "NONE",
+      "linear_start_addr": "0x8d22000",
+      "partition_size": "0x2000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "boot_a",
+      "file_name": "boot.img",
+      "linear_start_addr": "0x19000000",
+      "partition_size": "0x2000000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "dtbo_a",
+      "file_name": "dtbo.img",
+      "linear_start_addr": "0x1f800000",
+      "partition_size": "0x800000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "boot_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x29800000",
+      "partition_size": "0x2000000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "dtbo_b",
+      "file_name": "NONE",
+      "linear_start_addr": "0x30000000",
+      "partition_size": "0x800000",
+      "is_download": "false"
+    },
+    {
+      "partition_name": "super",
+      "file_name": "super.img",
+      "linear_start_addr": "0x31000000",
+      "partition_size": "0x20c0c4000",
+      "is_download": "true"
+    },
+    {
+      "partition_name": "userdata",
+      "file_name": "userdata.img",
+      "linear_start_addr": "0x23f000000",
+      "partition_size": "0xc0000000",
+      "is_download": "true"
+    }
+  ],
+  "logical_partitions": {
+    "geometry": {
+      "metadata_max_size": 65536,
+      "metadata_slot_count": 3,
+      "logical_block_size": 4096
+    },
+    "slots": [
+      {
+        "slot": 0,
+        "header_version": "10.2",
+        "flags": 1,
+        "partitions": [
+          [
+            "product_a",
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            "product_b",
+            1,
+            1,
+            0,
+            2
+          ],
+          [
+            "system_a",
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            "system_b",
+            1,
+            2,
+            0,
+            2
+          ],
+          [
+            "vendor_a",
+            1,
+            2,
+            1,
+            1
+          ],
+          [
+            "vendor_b",
+            1,
+            3,
+            0,
+            2
+          ]
+        ],
+        "extents": [
+          [
+            366512,
+            0,
+            2048,
+            0
+          ],
+          [
+            3095704,
+            0,
+            368640,
+            0
+          ],
+          [
+            691736,
+            0,
+            3465216,
+            0
+          ]
+        ],
+        "groups": [
+          [
+            "default",
+            0,
+            0
+          ],
+          [
+            "main_a",
+            0,
+            8789966848
+          ],
+          [
+            "main_b",
+            0,
+            8789966848
+          ]
+        ],
+        "block_devices": [
+          [
+            2048,
+            1048576,
+            0,
+            8792064000,
+            "super",
+            0
+          ]
+        ]
+      },
+      {
+        "slot": 1,
+        "header_version": "10.2",
+        "flags": 1,
+        "partitions": [
+          [
+            "product_a",
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            "product_b",
+            1,
+            1,
+            0,
+            2
+          ],
+          [
+            "system_a",
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            "system_b",
+            1,
+            2,
+            0,
+            2
+          ],
+          [
+            "vendor_a",
+            1,
+            2,
+            1,
+            1
+          ],
+          [
+            "vendor_b",
+            1,
+            3,
+            0,
+            2
+          ]
+        ],
+        "extents": [
+          [
+            366512,
+            0,
+            2048,
+            0
+          ],
+          [
+            3095704,
+            0,
+            368640,
+            0
+          ],
+          [
+            691736,
+            0,
+            3465216,
+            0
+          ]
+        ],
+        "groups": [
+          [
+            "default",
+            0,
+            0
+          ],
+          [
+            "main_a",
+            0,
+            8789966848
+          ],
+          [
+            "main_b",
+            0,
+            8789966848
+          ]
+        ],
+        "block_devices": [
+          [
+            2048,
+            1048576,
+            0,
+            8792064000,
+            "super",
+            0
+          ]
+        ]
+      },
+      {
+        "slot": 2,
+        "header_version": "10.2",
+        "flags": 1,
+        "partitions": [
+          [
+            "product_a",
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            "product_b",
+            1,
+            1,
+            0,
+            2
+          ],
+          [
+            "system_a",
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            "system_b",
+            1,
+            2,
+            0,
+            2
+          ],
+          [
+            "vendor_a",
+            1,
+            2,
+            1,
+            1
+          ],
+          [
+            "vendor_b",
+            1,
+            3,
+            0,
+            2
+          ]
+        ],
+        "extents": [
+          [
+            366512,
+            0,
+            2048,
+            0
+          ],
+          [
+            3095704,
+            0,
+            368640,
+            0
+          ],
+          [
+            691736,
+            0,
+            3465216,
+            0
+          ]
+        ],
+        "groups": [
+          [
+            "default",
+            0,
+            0
+          ],
+          [
+            "main_a",
+            0,
+            8789966848
+          ],
+          [
+            "main_b",
+            0,
+            8789966848
+          ]
+        ],
+        "block_devices": [
+          [
+            2048,
+            1048576,
+            0,
+            8792064000,
+            "super",
+            0
+          ]
+        ]
+      }
+    ]
+  },
+  "inspection": {
+    "all_metadata_slots_identical": true,
+    "geometry_and_metadata_backups_identical": true,
+    "geometry_header_and_table_sha256_verified": true,
+    "metadata_layout_source": "LineageOS/android_system_fs_fs_mgr",
+    "metadata_layout_source_commit": "6db70ed0b12a6da338dfa652913c03b5524e216e",
+    "e2fsprogs_source_commit": "347a1592a840e193b9c52674227d72c9c3cc1a69",
+    "hardware_tested": false
+  }
+}

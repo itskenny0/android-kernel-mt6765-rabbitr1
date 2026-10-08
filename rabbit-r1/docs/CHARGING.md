@@ -88,9 +88,10 @@ The installer copies the feature to `device/rabbit/r1/charging`, adds its produc
 and BoardConfig includes once, and refuses to overwrite modified feature files.
 `--product` and `--board` select other existing makefiles within that Android tree.
 Build `R1ChargingSettings`, `r1-charging` and `selinux_policy` in the configured
-product. A complete r1 Android product tree is not present in this workspace yet;
-the diagnostic boot ZIP therefore contains the kernel policy, not Android or
-an installed settings APK.
+product. The initial r1 product now includes the charging feature through
+`install-lineage-device.py`; see [ANDROID.md](ANDROID.md). Its full build is
+pending. The diagnostic boot ZIP contains the kernel policy, not Android or an
+installed settings APK.
 
 The kernel ABI is documented in
 `Documentation/ABI/testing/sysfs-platform-rabbit-r1-charging`. `r1-report` includes

@@ -4,6 +4,8 @@ Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
 policy are now enabled experimentally; earlier driver-only stages below record
 their previous disabled state. Android control sources, persistence and build
 hooks are implemented, but no full Android image or physical charging test exists.
+The initial r1 Android product and pinned mainline dependencies are now tracked;
+see [ANDROID.md](ANDROID.md) for the source checkout and pending build validation.
 
 As of the inspected sources on 2026-10-07, the mainline fork reports Linux 7.1.0.
 This is a development fork with downstream MT6765 changes, not an upstream Linux
@@ -116,7 +118,8 @@ The pinned [official manifest](https://github.com/LineageOS/android/tree/lineage
 uses branch `lineage-24.0` and AOSP tag `android-17.0.0_r1`. The inspected
 [mainline/common device tree](https://github.com/LineageOS/android_device_mainline_common/tree/lineage-24.0)
 explicitly supports mainline-style kernels. Both are cloned and pinned in
-`sources.lock.json`; there is no full Android source sync or built system image.
+`sources.lock.json`. The full source checkout is underway with pinned mainline
+dependencies; no Android system image has been built.
 
 The kernel enables Binder/binderfs, BPF/cgroups, SELinux, relevant filesystems,
 encryption/verity and FunctionFS as groundwork. This is not a full Android 17
@@ -126,8 +129,8 @@ The intended integration sequence is:
 
 1. Reach a stable RAM-only Linux shell and verify the loader memory map.
 2. Establish storage, USB and at least framebuffer/DRM display access.
-3. Create the r1 Android device tree using `device/mainline/common`, the actual
-   partition layout and the proven legacy boot packaging. Build userdebug with
+3. Validate the initial r1 Android device tree against `device/mainline/common`,
+   the actual partition layout and the legacy boot packaging. Build userdebug with
    software rendering for the first UI. Keep HAL capabilities limited to what
    the kernel exposes.
 4. Replace provisional health/power/input/audio choices with r1 implementations.
