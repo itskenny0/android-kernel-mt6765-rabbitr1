@@ -49,6 +49,9 @@
 #define F_INVLD_EN0				BIT(0)
 #define F_INVLD_EN1				BIT(1)
 
+#define REG_MMU_DUMMY_MT6765			0x044
+#define F_MMU_IDLE_ENABLE_MT6765			BIT(0)
+
 #define REG_MMU_MISC_CTRL			0x048
 #define F_MMU_IN_ORDER_WR_EN_MASK		(BIT(1) | BIT(17))
 #define F_MMU_STANDARD_AXI_MODE_MASK		(BIT(3) | BIT(19))
@@ -58,6 +61,11 @@
 
 #define REG_MMU_WR_LEN_CTRL			0x054
 #define F_MMU_WR_THROT_DIS_MASK			(BIT(5) | BIT(21))
+#define F_MMU_WR_THROT_DIS_MASK_MT6765		GENMASK(11, 10)
+
+#define REG_MMU_COHERENCE_EN_MT6765		0x080
+#define REG_MMU_IN_ORDER_WR_EN_MT6765		0x084
+#define REG_MMU_TABLE_WALK_DIS_MT6765		0x088
 
 #define REG_MMU_CTRL_REG			0x110
 #define F_MMU_TF_PROT_TO_PROGRAM_ADDR		(2 << 4)
@@ -187,6 +195,7 @@ struct mtk_iommu_iova_region {
 };
 
 struct mtk_iommu_suspend_reg {
+	bool			valid;
 	u32			misc_ctrl;
 	u32			dcm_dis;
 	u32			ctrl_reg;
@@ -760,6 +769,10 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
 			goto err_unlock;
 		}
 
+		/* Establish the root before enabling the native table walker. */
+		if (data->plat_data->m4u_plat == M4U_MT6765)
+			writel(dom->cfg.arm_v7s_cfg.ttbr, bank->base + REG_MMU_PT_BASE_ADDR);
+
 		ret = mtk_iommu_hw_init(data, bankid);
 		if (ret) {
 			pm_runtime_put(m4udev);
@@ -767,6 +780,8 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
 		}
 		bank->m4u_dom = dom;
 		writel(dom->cfg.arm_v7s_cfg.ttbr, bank->base + REG_MMU_PT_BASE_ADDR);
+		if (data->plat_data->m4u_plat == M4U_MT6765)
+			mtk_iommu_tlb_flush_all(data);
 
 		pm_runtime_put(m4udev);
 	}
@@ -1076,6 +1091,19 @@ static const struct iommu_ops mtk_iommu_ops = {
 	}
 };
 
+static void mt6765_iommu_config(void __iomem *base)
+{
+	u32 regval;
+
+	writel_relaxed(3, base + REG_MMU_COHERENCE_EN_MT6765);
+	writel_relaxed(0, base + REG_MMU_IN_ORDER_WR_EN_MT6765);
+	regval = readl_relaxed(base + REG_MMU_DUMMY_MT6765);
+	writel_relaxed(regval & ~F_MMU_IDLE_ENABLE_MT6765,
+		       base + REG_MMU_DUMMY_MT6765);
+	/* The page-table root must already be installed. */
+	writel_relaxed(0, base + REG_MMU_TABLE_WALK_DIS_MT6765);
+}
+
 static int mtk_iommu_hw_init(const struct mtk_iommu_data *data, unsigned int bankid)
 {
 	const struct mtk_iommu_bank_data *bankx = &data->bank[bankid];
@@ -1112,7 +1140,10 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data, unsigned int ban
 	if (MTK_IOMMU_HAS_FLAG(data->plat_data, WR_THROT_EN)) {
 		/* write command throttling mode */
 		regval = readl_relaxed(bank0->base + REG_MMU_WR_LEN_CTRL);
-		regval &= ~F_MMU_WR_THROT_DIS_MASK;
+		if (data->plat_data->m4u_plat == M4U_MT6765)
+			regval &= ~F_MMU_WR_THROT_DIS_MASK_MT6765;
+		else
+			regval &= ~F_MMU_WR_THROT_DIS_MASK;
 		writel_relaxed(regval, bank0->base + REG_MMU_WR_LEN_CTRL);
 	}
 
@@ -1127,6 +1158,9 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data, unsigned int ban
 			regval &= ~F_MMU_IN_ORDER_WR_EN_MASK;
 	}
 	writel_relaxed(regval, bank0->base + REG_MMU_MISC_CTRL);
+
+	if (data->plat_data->m4u_plat == M4U_MT6765)
+		mt6765_iommu_config(bank0->base);
 
 	/* Independent settings for each bank */
 	regval = F_L2_MULIT_HIT_EN |
@@ -1508,6 +1542,7 @@ static int __maybe_unused mtk_iommu_runtime_suspend(struct device *dev)
 		reg->int_main_control[i] = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
 		reg->ivrp_paddr[i] = readl_relaxed(base + REG_MMU_IVRP_PADDR);
 	} while (++i < data->plat_data->banks_num);
+	reg->valid = true;
 	clk_disable_unprepare(data->bclk);
 	return 0;
 }
@@ -1527,10 +1562,10 @@ static int __maybe_unused mtk_iommu_runtime_resume(struct device *dev)
 	}
 
 	/*
-	 * Uppon first resume, only enable the clk and return, since the values of the
-	 * registers are not yet set.
+	 * On first resume, only enable the clock. A saved WR_LEN_CTRL value
+	 * of zero is valid and must not suppress register restoration.
 	 */
-	if (!reg->wr_len_ctrl)
+	if (!reg->valid)
 		return 0;
 
 	base = data->bank[i].base;
@@ -1549,6 +1584,9 @@ static int __maybe_unused mtk_iommu_runtime_resume(struct device *dev)
 		writel_relaxed(reg->ivrp_paddr[i], base + REG_MMU_IVRP_PADDR);
 		writel(m4u_dom->cfg.arm_v7s_cfg.ttbr, base + REG_MMU_PT_BASE_ADDR);
 	} while (++i < data->plat_data->banks_num);
+
+	if (data->plat_data->m4u_plat == M4U_MT6765 && data->bank[0].m4u_dom)
+		mt6765_iommu_config(data->bank[0].base);
 
 	/*
 	 * Users may allocate dma buffer before they call pm_runtime_get,

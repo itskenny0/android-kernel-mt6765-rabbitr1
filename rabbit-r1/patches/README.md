@@ -102,3 +102,9 @@ MT8167 bitmap register. Patch 0039 removes the MT8192 LARB fallbacks and the
 unmatched LARB2 clock name. Shipped port operations, native callback/clock
 behavior and compiled DT wiring are checked. Actual IOMMU translation and
 firmware DMA handoff remain unverified; see `docs/DISPLAY.md`.
+
+Patch 0040 corrects native IOMMU throttling and controller setup, installs
+the root before enabling table walks, flushes on first attachment and
+restores zero-valued snapshots. Stock instructions and production software
+lifecycle callbacks are checked; hardware translation, IRQ lifetime and
+firmware handoff remain unverified. See `docs/DISPLAY.md`.

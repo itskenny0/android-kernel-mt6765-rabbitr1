@@ -52,6 +52,9 @@
 | SMI backend, register, field, mask and clock regressions | Ten compiled variants rejected; SMI object and DTB compiled | `logs/mt6765-smi-mutations.log`, `logs/mt6765-smi-build.log` |
 | Compiled LARB nodes | PASS: native matches, four IDs, clock counts and display port wiring; zero LARB schema diagnostics | `out/mt6765-smi-schema.json`, `logs/mt6765-smi-schema.log` |
 | LARB compatible, clock-list, ID/order and display-port regressions | Six edited DT fixtures rejected | `logs/mt6765-smi-dtb-mutations.log` |
+| Native MT6765 IOMMU controller setup | PASS: 24 shipped initializations, including the real full-TLB-invalidate instructions, match native register values | `logs/mt6765-iommu-tests.log`, `out/mt6765-iommu-audit.json`; secure root and MAU mask differences are intentional |
+| IOMMU attachment and runtime state | PASS: 24 MT6765/MT8183/MT6779 lifecycle cases, root-before-walk order, first flush, zero-valued snapshots, repeated resume and failure cleanup | `scripts/test-mt6765-iommu.py`; ASan/UBSan with modeled PM, clocks, allocation and IRQ registration; no DMA or hardware IRQ validation |
+| IOMMU register, ordering, snapshot and failure regressions | Fourteen compiled variants rejected; native AArch64 object compiled | `logs/mt6765-iommu-mutations.log`, `logs/mt6765-iommu-build.log` |
 | Display COLOR selector inherited from LK | PASS: production route callbacks match both LK and Android programming with four dirty-register seeds | `logs/lk-display-path-tests.log`; missing `0xf64` write fails the comparison; MMSYS object compiled |
 | Display COLOR route regressions | Four compiled variants rejected: wrong register, input, wide mask and empty mask | `logs/lk-display-path-mutations.log`; checks emitted writes and unrelated-bit preservation |
 | Native RDMA FIFO/QoS vs shipped instructions | PASS: 108 traces, direct/memory video input, vendor clock states and inherited registers; equivalent-pixel-rate fixtures for other refresh rates | `logs/mt6765-rdma-tests.log`, `out/mt6765-rdma-audit.json` |
@@ -89,7 +92,7 @@
 | CST836 binding/example and board node schema | PASS, zero CST836 diagnostics | `logs/cst836-binding.log`, `logs/cst836-schema.log`, `out/cst836-schema.json` |
 | CST836 count, short-read and failed-resume regressions | All rejected by production-code tests | `logs/cst836-regression-*.log` |
 | Original I2C fixed-divider regression | Rejected: 100 kHz request decodes to 500 kHz | `logs/i2c-regression-before.log` |
-| Patch series on pristine affected files | PASS, all 36 files match working tree | `logs/patch-check.log` |
+| Patch series on pristine affected files | PASS, every affected file matches the working tree | `logs/patch-check.log` |
 | Fetch workflow with existing sources/patches | PASS, checksums verified and patches detected | `logs/fetch-check.log` |
 | Stock image extraction/overlay merge | PASS | `logs/inspect-stock.log`, `docs/research/stock-facts.json` |
 | Initramfs archive inspection, target-shell syntax and static AArch64 BusyBox smoke test | PASS, userspace only | `logs/initramfs-contents.log`, `out/busybox/busybox` |

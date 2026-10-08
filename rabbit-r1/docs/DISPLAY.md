@@ -426,9 +426,53 @@ LARB ID/order and display-port regressions.
 This change does not complete IOMMU bring-up. As in the shared generation-2
 backend, removing a client from the software mask does not clear a previously
 enabled hardware port. It is not a transition to physical addressing.
-Controller configuration, page-table format, TLB invalidation, inherited
-security/bank fields, active firmware DMA, suspend retention and real mapped
-framebuffer access still require validation. The display graph stays disabled.
+The controller audit below covers startup and software state restoration.
+Page-table format, inherited security/bank fields, active firmware DMA,
+physical suspend retention and real mapped framebuffer access still require
+validation. The display graph stays disabled.
+
+## IOMMU controller setup
+
+MT6765 write throttling uses bits 11:10 of `WR_LEN_CTRL` at `0x54`. The
+shared driver previously cleared bits 5 and 21, leaving the native throttle
+controls unchanged. Native initialization now uses the shipped mask and
+programs coherence (`0x80 = 3`), write ordering (`0x84 = 0`), table walks
+(`0x88 = 0`) and the idle-enable bit (`0x44`, clear bit 0). Other bits at
+`0x44` and `0x54` are preserved.
+
+The first attachment installs the page-table root before enabling table
+walks, then performs a full TLB flush before configuring client ports.
+Runtime resume restores the root and repeats the native controller setup
+before the existing full flush. It does not enable walks for a bank without
+an attached domain. Register snapshots now have an explicit validity flag:
+zero is a valid saved write-length value and no longer suppresses restoration.
+That snapshot correction also applies to the other MediaTek backends; their
+register programming is otherwise unchanged.
+
+`test-mt6765-iommu.py` executes the shipped `m4u_reg_init` at raw Image offset
+`0x8a370c`, including its call to `m4u_invalid_tlb` at `0x89ed3c`. Eight dirty
+register seeds and three protection addresses produce 24 initialization
+traces. The stock LARB lookup and controller writes execute; DT lookup,
+mapping, locks and logging are modeled. Native final values are compared
+with those traces. The secure page-table root at `0x04` remains untouched,
+and native fault interrupts remain limited to `0x3fff` instead of copying
+the stock MAU monitoring mask. Synthetic high protection addresses exercise
+the encoding through bit 33; they do not establish physical address limits
+or the native driver's advertised 35-bit page-table support.
+
+The ASan/UBSan harness extracts the production attachment, initialization,
+full-flush and suspend/resume functions. Eight seeds across MT6765, MT8183
+and MT6779 cover first attachment, repeated attachment, cold resume, three
+state-loss cycles, zero-valued snapshots, allocation/clock/IRQ-request
+failures and retry. It models page-table allocation, immediate runtime
+suspend and IRQ registration, rather than actual scheduling or interrupts.
+Fourteen compiled faulty variants fail the runtime checks; the native
+AArch64 object also builds. CI runs the positive stock and lifecycle tests.
+
+These checks do not execute DMA, hardware table walks, range invalidations
+or IRQ delivery. IRQ masking and ownership across power transitions,
+firmware DMA teardown, page-table/address formats and mapped scanout remain
+acceptance work. The display graph remains disabled.
 
 ## Remaining acceptance work
 
