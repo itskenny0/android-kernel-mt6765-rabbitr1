@@ -75,6 +75,9 @@ def main():
     if lk_record.get('kernel_mmc_pinctrl_preserved') is not True or \
             (ROOT/'dist/lk/lk.bin').read_bytes()[0x1c290:0x1c294] != bytes.fromhex('002000bf'):
         raise ValueError('Rebuild LK to preserve the mainline MMC pin states')
+    if lk_record.get('kernel_scp_fixup_bypassed') is not True or \
+            (ROOT/'dist/lk/lk.bin').read_bytes()[0x4a44:0x4a48] != bytes.fromhex('002000bf'):
+        raise ValueError('Rebuild LK to skip the vendor SCP node requirement')
     if lk_record['stock_lk_sha256'] != sha(STOCK/'lk.img'):
         raise ValueError('LK build uses a different stock image')
     for name, facts in lk_record['files'].items():

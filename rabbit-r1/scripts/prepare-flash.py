@@ -138,6 +138,9 @@ def prepare(args):
     if manifest.get('lk_build', {}).get('kernel_mmc_pinctrl_preserved') is not True or \
             local(args.package/'lk.bin').read_bytes()[0x1c290:0x1c294] != bytes.fromhex('002000bf'):
         raise ValueError('Package lacks the LK MMC pin-state fix; rebuild it')
+    if manifest.get('lk_build', {}).get('kernel_scp_fixup_bypassed') is not True or \
+            local(args.package/'lk.bin').read_bytes()[0x4a44:0x4a48] != bytes.fromhex('002000bf'):
+        raise ValueError('Package lacks the LK SCP node fix; rebuild it')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')

@@ -56,6 +56,8 @@ print('PASS: relock guard survives warning and mainline handoff patches')
 assert patched[0x211bc:0x212e8] == stock[0x211bc:0x212e8]  # shared overlay function
 assert patched[0x3e064:0x3e3d0] == stock[0x3e064:0x3e3d0]  # early LK caller
 assert patched[0x6bd4:0x6db4] == stock[0x6bd4:0x6db4]  # MMC fixup itself unchanged
+assert patched[0x14be8:0x14c88] == stock[0x14be8:0x14c88]  # SCP helper unchanged
+assert patched[0x4a48:0x4a70] == stock[0x4a48:0x4a70]  # remaining platform fixups
 for offset, before, after in build.HANDOFF_PATCHES:
     code = list(Cs(CS_ARCH_ARM, CS_MODE_THUMB).disasm(after, offset))
     print('PATCH:', '; '.join(f'{i.address:#x} {i.mnemonic} {i.op_str}' for i in code))

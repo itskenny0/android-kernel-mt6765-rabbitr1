@@ -126,6 +126,49 @@ node. The original code reproduces the bad rename; the patched caller leaves
 the expanded FDT byte-identical. An image with the old call restored fails
 the preservation check. This is not a full LK boot or a physical eMMC test.
 
+## Missing vendor SCP node
+
+The Linux platform fixup at `0x4a40` calls `platform_fdt_scp()` at `0x14be8`.
+That helper requires a node compatible with `mediatek,scp`, which is absent
+from the mainline DT. A failed lookup returns 1; the wrapper stops before the
+other fixups, and `boot_linux_fdt()` takes its fatal assertion at `0x1c25e`.
+This happens whether LK's SCP-loaded flag is zero or one. The caller's linked
+GOT entry at `0xb7554` confirms this is a reachable path.
+
+The build replaces just the SCP subcall in the Linux platform wrapper:
+
+| Offset | Original | Replacement |
+| --- | --- | --- |
+| `0x4a44` | `10 f0 d0 f8` (`bl 0x14be8`) | `00 20 00 bf` (`movs r0,#0; nop`) |
+
+The wrapper continues to the SSPM, SPM, PLL and PMIC ADC fixups. Its SSPM
+reservation status becomes `okay`; the missing vendor SPM/ADC nodes are already
+handled without aborting. The remaining mainline hardware properties are
+unchanged in both boot profiles. The SCP helper itself and LK's firmware
+loading/private DT paths are unchanged. This patch neither starts nor stops
+SCP and does not add a mainline remote-processor driver.
+
+The LK build record marks `kernel_scp_fixup_bypassed`; packaging and flash
+preparation check both the mark and the four instruction bytes. An older LK
+cannot pass by claiming the feature in its metadata.
+
+`test-lk-platform-fixup.py` executes the real Linux caller and weak-symbol check,
+the wrapper and its callees with shipped libfdt/libc. The stock image reaches
+the assertion; the patched image runs the remaining fixups. Both SCP-loaded
+states and both mainline profiles are covered. A separate vendor-style SCP
+node tests the unchanged helper's status updates. Restoring the old subcall
+makes the mainline test fail.
+
+The test also runs the later `fdt_memory_append()` (`0x32f4c`), mrdump setup
+(`0x256b4`) and reservation-node writer (`0x30bb4`) with **controlled boot
+arguments**. All five supplied reservations retain their 64-bit address/size
+and mapping flags, including a synthetic range above 4 GiB. LK creates
+`/debug-kinfo` before linking its reserved-memory phandle, so it does not need
+a placeholder in the mainline tree. Existing hardware bindings remain intact.
+Logging, verbosity and uncontended mutexes are modeled; the instructions that
+traverse and change the FDT execute. These checks do not establish the actual
+RAM map, firmware memory ownership, remote-processor state, or whole LK boot.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses

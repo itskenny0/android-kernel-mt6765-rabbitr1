@@ -15,7 +15,8 @@ is not proof that the whole device is stock or safe to relock.
 
 The package includes a patched LK and retains the stock DTBO for LK's own board
 setup. The Linux handoff bypasses the vendor overlay and preserves mainline's
-MMC pin states instead of applying LK's vendor-specific name swap. The warning patches and
+MMC pin states instead of applying LK's vendor-specific name swap. It also
+skips the missing vendor SCP node requirement that otherwise aborts boot. The warning patches and
 LineageOS splash are built with pinned mtklkzap tools; see
 [LK.md](https://github.com/itskenny0/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/LK.md).
 The handoff is checked by emulation, but patched LK acceptance and booting still

@@ -25,7 +25,8 @@ The old no-op DTBO dropped those additions from LK's private DT. The package
 now retains the complete stock DTBO and patches only the Linux overlay call
 site in the exact v0.8.293 LK. Its shared overlay function and early board setup
 remain unchanged. See [LK.md](LK.md) for the instruction changes and emulation
-checks. The final loader memory fixups and hardware boot remain untested.
+checks. Selected later reservation writers now run in emulation with controlled
+boot arguments; the live memory map and hardware boot remain untested.
 
 ## Logs and reserved memory
 
