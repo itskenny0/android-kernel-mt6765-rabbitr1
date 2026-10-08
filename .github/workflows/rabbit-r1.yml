@@ -103,6 +103,7 @@ jobs:
           python3 scripts/test-mt6370.py 2>&1 | tee logs/mt6370-tests.log
           python3 scripts/test-mt6370-limits.py 2>&1 | tee logs/mt6370-limits-tests.log
           python3 scripts/test-mt6370-current.py 2>&1 | tee logs/mt6370-current-tests.log
+          python3 scripts/test-musb-budget.py 2>&1 | tee logs/musb-budget-tests.log
           python3 scripts/test-mt6370-backlight.py 2>&1 | tee logs/mt6370-backlight-tests.log
           python3 scripts/test-dsi-transfer.py 2>&1 | tee logs/dsi-transfer-tests.log
           python3 scripts/test-i2c.py 2>&1 | tee logs/i2c-tests.log

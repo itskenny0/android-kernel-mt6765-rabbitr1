@@ -349,9 +349,58 @@ that differs from the software request, and input requests racing shutdown.
 Twenty-eight faulty input-path variants fail runtime assertions.
 Bus transactions, IRQ execution, scheduling and elapsed time are modeled.
 Actual input isolation, USB suspend timing and battery/system-rail behavior
-still require hardware measurements. The USB budget bridge and charge policy
-are not yet connected, and the charger node remains disabled.
+still require hardware measurements. The USB budget source below is not yet
+connected to charging policy, and the charger node remains disabled.
 With that node disabled, charger settings remain inherited from earlier firmware.
+
+### USB gadget power budget
+
+The MediaTek MUSB controller now exposes a read-only power supply named
+`<controller>-gadget`, normally `11200000.usb-gadget` on r1. The r1 kernel enables
+`CONFIG_USB_MUSB_MEDIATEK_POWER_SUPPLY`. `current_max` reports the gadget's USB 2
+request in microamps, `online` indicates a nonzero request, and `scope=Device`
+keeps Linux's system-supply helper from counting this constraint source as
+external power. The Android health implementation must also exclude it when
+reporting plugged-in state. The supply uses the USB controller's firmware node
+so policy can reference it by phandle.
+It does not measure VBUS or identify a charger, cable, Type-C Rp or PD contract.
+
+This fixes a missing software path: MUSB previously passed each request to the
+generic USB PHY, whose unknown charger type and absent `set_power` callback
+left no usable budget notification. The new optional MUSB platform callback
+retains the PHY call and publishes requests through the power-supply core's
+queued notifications. Callbacks take only a spinlock; they do not access the
+charger or wait for a consumer. Other MUSB platforms retain their PHY path.
+
+A request below the current budget reduces the published limit before calling
+the PHY. An increase is published only after that callback succeeds. Requests
+are sequenced so an older completion cannot replace a newer request, including
+suspend or disconnect. PHY errors withdraw the budget. Requests above 500 mA
+also withdraw it and return `-ERANGE`. Leaving peripheral mode clears the
+budget; returning requires a fresh request. Removal and shutdown permanently
+close the source before controller/PHY release, and managed cleanup precedes
+power-supply unregistration. The disabled build option preserves the original
+PHY behavior.
+
+The source retains the gadget's units and values: composite suspend requests
+2 mA, disconnect requests zero, and the MUSB reset path ends with an 8 mA
+request. Configured requests follow the gadget configuration; the diagnostic
+ACM configuration uses 100 mA. These values must not be rounded up to the
+MT6370's 100 mA input minimum. Charging policy must choose input isolation when
+an applicable budget is below that minimum. It must also distinguish an SDP
+budget from a separately established CDP, DCP or Type-C/PD allowance. No such
+classification or policy enforcement is implemented by this source.
+
+`scripts/test-musb-budget.py` compiles the production property, registration,
+budget, dispatch, role-switch, controller-exit, removal and shutdown callbacks.
+It checks 1,011 requests, seven invalid budgets/roles, ten PHY/probe failures and eight
+supersession interleavings, including a synchronized two-thread case. It also
+checks registration-time reads, notification coalescing, error propagation,
+cleanup order, and both enabled and disabled configurations. Nineteen faulty
+variants fail runtime assertions; both AArch64 configurations compile. PHY, MMIO,
+notifications and device resources are modeled; timing, real USB enumeration
+and physical current draw remain untested. `r1-report` includes the new supply's
+uevent once the controller probes.
 
 ### Android charging-speed setting
 

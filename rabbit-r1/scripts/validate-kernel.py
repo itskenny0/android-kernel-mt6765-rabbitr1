@@ -95,7 +95,8 @@ def main():
         check_mainline(dist/'mt6765-rabbit-r1.dtb')
         config = (dist/'config').read_text()
         for key in ['ANDROID_BINDER_IPC','ANDROID_BINDERFS','SECURITY_SELINUX','BPF_SYSCALL','CGROUP_BPF',
-                    'USB_CONFIGFS_F_FS','USB_CONFIGFS_ACM','BLK_DEV_INITRD','DEVTMPFS',
+                    'USB_CONFIGFS_F_FS','USB_CONFIGFS_ACM','USB_MUSB_MEDIATEK_POWER_SUPPLY',
+                    'BLK_DEV_INITRD','DEVTMPFS',
                     'BLK_DEV_DM','PSTORE','PSTORE_CONSOLE','PSTORE_PMSG','MMC_MTK','EFI_PARTITION']:
             assert f'CONFIG_{key}=y\n' in config, f'Missing CONFIG_{key}'
         for key in ['MFD_MT6370', 'MEDIATEK_MT6370_ADC', 'SENSORS_IIO_HWMON',

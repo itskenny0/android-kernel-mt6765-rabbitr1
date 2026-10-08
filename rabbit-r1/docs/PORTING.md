@@ -71,7 +71,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | UART / PSCI | UART0 wiring, single-core diagnostic configuration | Full early log, correct RAM, then secondary CPU startup on r1 firmware |
 | MT6357 | Driver corrections and mocked register tests; [details](POWER.md) | PMIC access/IRQ and measured rail behavior |
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
-| USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
+| USB | Peripheral DT, configfs functions, optional ACM initramfs and gadget power-budget source | Enumeration, console and VBUS/charger interaction |
 | I2C | MT6765 interrupts, AP channels, native counters and hardware timeout; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
 | Charging / battery | MT6370 MFD/ADC and hwmon enabled; MT6357 current/voltage/NTC measurements and MT6370 charge and input-path control plus shutdown handling added; charger node still disabled | Measurement validation, capacity and charge policy, watchdog and USB detection, measured behavior |
 | Display | r1 panel, selected native DSI timings and native PHY setup/shutdown match stock offline; backlight settings corrected; [details](DISPLAY.md) | Remaining host startup, clocks, routing and panel power, then measured PLL/link behavior, scanout and brightness |

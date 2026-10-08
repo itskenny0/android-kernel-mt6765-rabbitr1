@@ -135,6 +135,7 @@ struct musb_io;
  * @set_mode:	forcefully changes operating mode
  * @try_idle:	tries to idle the IP
  * @recover:	platform-specific babble recovery
+ * @vbus_draw: optional gadget current-budget callback; must not sleep
  * @vbus_status: returns vbus status if possible
  * @set_vbus:	forces vbus status
  * @pre_root_reset_end: called before the root usb port reset flag gets cleared
@@ -183,6 +184,7 @@ struct musb_platform_ops {
 	void	(*try_idle)(struct musb *musb, unsigned long timeout);
 	int	(*recover)(struct musb *musb);
 
+	int	(*vbus_draw)(struct musb *musb, unsigned int mA);
 	int	(*vbus_status)(struct musb *musb);
 	void	(*set_vbus)(struct musb *musb, int on);
 

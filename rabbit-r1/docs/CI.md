@@ -138,6 +138,10 @@ bus failures, including loop enable and settling before the pin limit is removed
 Zero-budget input isolation and explicit restoration run through property callbacks,
 with failed writes, pending/running MIVR work, early publication, inherited state
 and shutdown races. These checks do not establish USB suspend compliance.
+The MUSB budget harness compiles the MediaTek power-supply callbacks and MUSB
+dispatch, tests role changes and teardown, and interleaves delayed requests with
+suspend and shutdown. Both build options and the legacy PHY path are covered.
+It models PHY/MMIO/notifications and does not prove input-current enforcement.
 The MT6357 current harness compares every raw value with the active stock gauge
 at several calibrations. It runs the production read, latch cleanup, property
 and probe code with the kernel's polling macros, a modeled clock/regmap and

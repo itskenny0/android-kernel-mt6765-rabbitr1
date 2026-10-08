@@ -112,6 +112,16 @@ config USB_MUSB_MEDIATEK
 	select GENERIC_PHY
 	select USB_ROLE_SWITCH
 
+config USB_MUSB_MEDIATEK_POWER_SUPPLY
+	bool "MediaTek gadget power-budget reporting"
+	depends on USB_MUSB_MEDIATEK && POWER_SUPPLY
+	depends on !USB_MUSB_HOST
+	help
+	  Publish gadget current requests through a read-only power supply.
+	  Charging policy can use this to honor USB enumeration and suspend
+	  limits. This does not detect chargers or program charging hardware.
+	  The supply is device-scoped and starts with a zero current budget.
+
 config USB_MUSB_POLARFIRE_SOC
 	tristate "Microchip PolarFire SoC platforms"
 	depends on ARCH_MICROCHIP_POLARFIRE || COMPILE_TEST

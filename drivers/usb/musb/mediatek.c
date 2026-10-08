@@ -13,6 +13,7 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/power_supply.h>
 #include <linux/usb/role.h>
 #include <linux/usb/usb_phy_generic.h>
 #include "musb_core.h"
@@ -39,6 +40,187 @@
 
 #define MTK_MUSB_CLKS_NUM	3
 
+#if IS_ENABLED(CONFIG_USB_MUSB_MEDIATEK_POWER_SUPPLY)
+struct mtk_musb_power {
+	spinlock_t lock;
+	struct power_supply *psy;
+	struct power_supply_desc desc;
+	unsigned int current_ma;
+	u64 sequence;
+	bool peripheral;
+	bool stopped;
+};
+
+static const enum power_supply_property mtk_musb_power_properties[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_SCOPE,
+};
+
+static int mtk_musb_power_get(struct power_supply *psy,
+			    enum power_supply_property property,
+			    union power_supply_propval *val)
+{
+	struct mtk_musb_power *power = power_supply_get_drvdata(psy);
+	unsigned long flags;
+	unsigned int ma;
+
+	spin_lock_irqsave(&power->lock, flags);
+	ma = power->peripheral && !power->stopped ? power->current_ma : 0;
+	spin_unlock_irqrestore(&power->lock, flags);
+
+	switch (property) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = !!ma;
+		return 0;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		val->intval = ma * 1000;
+		return 0;
+	case POWER_SUPPLY_PROP_SCOPE:
+		/* A gadget constraint, not proof that the system has external power. */
+		val->intval = POWER_SUPPLY_SCOPE_DEVICE;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
+/* Called from gadget callbacks, including with the controller spinlock held. */
+static int mtk_musb_power_begin(struct mtk_musb_power *power, unsigned int ma,
+				u64 *sequence)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&power->lock, flags);
+	if (power->stopped) {
+		ret = -ESHUTDOWN;
+		goto unlock;
+	}
+	*sequence = ++power->sequence;
+	if (ma > 500) {
+		/* This is a USB 2 controller. Invalid requests withdraw its budget. */
+		ma = 0;
+		ret = -ERANGE;
+	}
+	if (!power->peripheral && ma) {
+		ma = 0;
+		ret = -ENOTCONN;
+	}
+	/* Reductions cannot wait for a potentially older PHY callback. */
+	if (ma < power->current_ma) {
+		power->current_ma = ma;
+		power_supply_changed(power->psy);
+	}
+unlock:
+	spin_unlock_irqrestore(&power->lock, flags);
+	return ret;
+}
+
+static int mtk_musb_power_complete(struct mtk_musb_power *power, unsigned int ma,
+				   u64 sequence, int result)
+{
+	unsigned long flags;
+	int ret = result;
+
+	spin_lock_irqsave(&power->lock, flags);
+	if (power->stopped) {
+		ret = -ESHUTDOWN;
+		goto unlock;
+	}
+	if (sequence != power->sequence) {
+		ret = -ECANCELED;
+		goto unlock;
+	}
+	if (result)
+		ma = 0;
+	if (power->current_ma != ma) {
+		power->current_ma = ma;
+		/* Core defers notifications; it never invokes consumers here. */
+		power_supply_changed(power->psy);
+	}
+unlock:
+	spin_unlock_irqrestore(&power->lock, flags);
+	return ret;
+}
+
+static void mtk_musb_power_role(struct mtk_musb_power *power, enum usb_role role)
+{
+	unsigned long flags;
+	bool peripheral = role == USB_ROLE_DEVICE;
+
+	spin_lock_irqsave(&power->lock, flags);
+	if (!power->stopped && power->peripheral != peripheral) {
+		power->peripheral = peripheral;
+		power->sequence++;
+		/* Each peripheral session needs a fresh gadget request. */
+		power->current_ma = 0;
+		power_supply_changed(power->psy);
+	}
+	spin_unlock_irqrestore(&power->lock, flags);
+}
+
+static void mtk_musb_power_stop(void *data)
+{
+	struct mtk_musb_power *power = data;
+	unsigned long flags;
+
+	spin_lock_irqsave(&power->lock, flags);
+	if (!power->stopped) {
+		power->stopped = true;
+		power->sequence++;
+		power->current_ma = 0;
+		power_supply_changed(power->psy);
+	}
+	spin_unlock_irqrestore(&power->lock, flags);
+}
+
+static int mtk_musb_power_init(struct device *dev, struct mtk_musb_power *power)
+{
+	struct power_supply_config config = {
+		.drv_data = power,
+		.fwnode = dev_fwnode(dev),
+	};
+
+	spin_lock_init(&power->lock);
+	power->desc.name = devm_kasprintf(dev, GFP_KERNEL, "%s-gadget", dev_name(dev));
+	if (!power->desc.name)
+		return -ENOMEM;
+	power->desc.type = POWER_SUPPLY_TYPE_USB;
+	power->desc.properties = mtk_musb_power_properties;
+	power->desc.num_properties = ARRAY_SIZE(mtk_musb_power_properties);
+	power->desc.get_property = mtk_musb_power_get;
+	power->psy = devm_power_supply_register(dev, &power->desc, &config);
+	if (IS_ERR(power->psy))
+		return PTR_ERR(power->psy);
+
+	/* Stop producers before devres unregisters and drains the supply. */
+	return devm_add_action_or_reset(dev, mtk_musb_power_stop, power);
+}
+#else
+struct mtk_musb_power { };
+
+static int mtk_musb_power_init(struct device *dev, struct mtk_musb_power *power)
+{
+	return 0;
+}
+
+static int mtk_musb_power_begin(struct mtk_musb_power *power, unsigned int ma,
+				u64 *sequence)
+{
+	return 0;
+}
+
+static int mtk_musb_power_complete(struct mtk_musb_power *power, unsigned int ma,
+				   u64 sequence, int result)
+{
+	return result;
+}
+
+static void mtk_musb_power_role(struct mtk_musb_power *power, enum usb_role role) { }
+static void mtk_musb_power_stop(void *data) { }
+#endif
+
 struct mtk_glue {
 	struct device *dev;
 	struct musb *musb;
@@ -50,6 +232,7 @@ struct mtk_glue {
 	struct clk_bulk_data clks[MTK_MUSB_CLKS_NUM];
 	enum usb_role role;
 	struct usb_role_switch *role_sw;
+	struct mtk_musb_power power;
 };
 
 static int mtk_musb_clks_get(struct mtk_glue *glue)
@@ -74,6 +257,7 @@ static int mtk_otg_switch_set(struct mtk_glue *glue, enum usb_role role)
 
 	switch (role) {
 	case USB_ROLE_HOST:
+		mtk_musb_power_role(&glue->power, USB_ROLE_NONE);
 		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
 		glue->phy_mode = PHY_MODE_USB_HOST;
 		new_role = USB_ROLE_HOST;
@@ -85,6 +269,7 @@ static int mtk_otg_switch_set(struct mtk_glue *glue, enum usb_role role)
 		MUSB_HST_MODE(musb);
 		break;
 	case USB_ROLE_DEVICE:
+		mtk_musb_power_role(&glue->power, USB_ROLE_NONE);
 		musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		glue->phy_mode = PHY_MODE_USB_DEVICE;
 		new_role = USB_ROLE_DEVICE;
@@ -96,6 +281,7 @@ static int mtk_otg_switch_set(struct mtk_glue *glue, enum usb_role role)
 		MUSB_DEV_MODE(musb);
 		break;
 	case USB_ROLE_NONE:
+		mtk_musb_power_role(&glue->power, USB_ROLE_NONE);
 		glue->phy_mode = PHY_MODE_USB_OTG;
 		new_role = USB_ROLE_NONE;
 		devctl &= ~MUSB_DEVCTL_SESSION;
@@ -111,6 +297,7 @@ static int mtk_otg_switch_set(struct mtk_glue *glue, enum usb_role role)
 
 	glue->role = new_role;
 	phy_set_mode(glue->phy, glue->phy_mode);
+	mtk_musb_power_role(&glue->power, new_role);
 
 	return 0;
 }
@@ -290,11 +477,13 @@ static int mtk_musb_init(struct musb *musb)
 #endif
 	musb_writel(musb->mregs, USB_L1INTM, TX_INT_STATUS | RX_INT_STATUS |
 		    USBCOM_INT_STATUS | DMA_INT_STATUS);
+	mtk_musb_power_role(&glue->power, glue->role);
 	return 0;
 
 err_phy_power_on:
 	phy_exit(glue->phy);
 err_phy_init:
+	mtk_musb_power_role(&glue->power, USB_ROLE_NONE);
 	if (musb->port_mode == MUSB_OTG)
 		mtk_otg_switch_exit(glue);
 	return ret;
@@ -336,6 +525,7 @@ static int mtk_musb_exit(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct mtk_glue *glue = dev_get_drvdata(dev->parent);
 
+	mtk_musb_power_role(&glue->power, USB_ROLE_NONE);
 	mtk_otg_switch_exit(glue);
 	phy_power_off(glue->phy);
 	phy_exit(glue->phy);
@@ -344,6 +534,19 @@ static int mtk_musb_exit(struct musb *musb)
 	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
 	return 0;
+}
+
+static int mtk_musb_vbus_draw(struct musb *musb, unsigned int ma)
+{
+	struct mtk_glue *glue = dev_get_drvdata(musb->controller->parent);
+	u64 sequence = 0;
+	int ret;
+
+	ret = mtk_musb_power_begin(&glue->power, ma, &sequence);
+	if (ret)
+		return ret;
+	ret = usb_phy_set_power(musb->xceiv, ma);
+	return mtk_musb_power_complete(&glue->power, ma, sequence, ret);
 }
 
 static const struct musb_platform_ops mtk_musb_ops = {
@@ -360,6 +563,7 @@ static const struct musb_platform_ops mtk_musb_ops = {
 	.clearw = mtk_musb_clearw,
 	.busctl_offset = mtk_musb_busctl_offset,
 	.set_mode = mtk_musb_set_mode,
+	.vbus_draw = mtk_musb_vbus_draw,
 };
 
 #define MTK_MUSB_MAX_EP_NUM	8
@@ -451,6 +655,10 @@ static int mtk_musb_probe(struct platform_device *pdev)
 				"Error 'dr_mode' property\n");
 	}
 
+	ret = mtk_musb_power_init(dev, &glue->power);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to register gadget power budget\n");
+
 	glue->phy = devm_of_phy_get_by_index(dev, np, 0);
 	if (IS_ERR(glue->phy))
 		return dev_err_probe(dev, PTR_ERR(glue->phy),
@@ -509,8 +717,16 @@ static void mtk_musb_remove(struct platform_device *pdev)
 	struct mtk_glue *glue = platform_get_drvdata(pdev);
 	struct platform_device *usb_phy = glue->usb_phy;
 
+	mtk_musb_power_stop(&glue->power);
 	platform_device_unregister(glue->musb_pdev);
 	usb_phy_generic_unregister(usb_phy);
+}
+
+static void mtk_musb_shutdown(struct platform_device *pdev)
+{
+	struct mtk_glue *glue = platform_get_drvdata(pdev);
+
+	mtk_musb_power_stop(&glue->power);
 }
 
 #ifdef CONFIG_OF
@@ -524,6 +740,7 @@ MODULE_DEVICE_TABLE(of, mtk_musb_match);
 static struct platform_driver mtk_musb_driver = {
 	.probe = mtk_musb_probe,
 	.remove = mtk_musb_remove,
+	.shutdown = mtk_musb_shutdown,
 	.driver = {
 		   .name = "musb-mtk",
 		   .of_match_table = of_match_ptr(mtk_musb_match),
