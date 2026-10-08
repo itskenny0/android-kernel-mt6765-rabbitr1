@@ -1,0 +1,65 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Reject invalid charger settings
+
+Validate signed power-supply values before unsigned conversion and reject
+limits outside the supported range instead of silently clamping them.
+Accept only boolean ONLINE values before changing attachment state.
+
+diff --git a/drivers/power/supply/mt6370-charger.c b/drivers/power/supply/mt6370-charger.c
+index dad61f1239..8e7bdb926f 100644
+--- a/drivers/power/supply/mt6370-charger.c
++++ b/drivers/power/supply/mt6370-charger.c
+@@ -573,25 +573,47 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ 				   const union power_supply_propval *val)
+ {
+ 	struct mt6370_priv *priv = power_supply_get_drvdata(psy);
++	const struct linear_range *range;
++	enum mt6370_chg_reg_field fd;
++	unsigned int setting;
++
++	if (val->intval < 0)
++		return -EINVAL;
+ 
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_ONLINE:
++		if (val->intval > 1)
++			return -EINVAL;
+ 		return mt6370_chg_set_online(priv, val);
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
+-		return mt6370_chg_field_set(priv, F_ICHG, val->intval);
++		fd = F_ICHG;
++		break;
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
+-		return mt6370_chg_field_set(priv, F_VOREG, val->intval);
++		fd = F_VOREG;
++		break;
+ 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+-		return mt6370_chg_field_set(priv, F_IAICR, val->intval);
++		fd = F_IAICR;
++		break;
+ 	case POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT:
+-		return mt6370_chg_field_set(priv, F_VMIVR, val->intval);
++		fd = F_VMIVR;
++		break;
+ 	case POWER_SUPPLY_PROP_PRECHARGE_CURRENT:
+-		return mt6370_chg_field_set(priv, F_IPREC, val->intval);
++		fd = F_IPREC;
++		break;
+ 	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+-		return mt6370_chg_field_set(priv, F_IEOC, val->intval);
++		fd = F_IEOC;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
++
++	setting = val->intval;
++	range = mt6370_chg_fields[fd].range;
++	/* Never silently raise a requested limit to the supported minimum. */
++	if (setting < range->min || setting > linear_range_get_max_value(range))
++		return -ERANGE;
++
++	return mt6370_chg_field_set(priv, fd, setting);
+ }
+ 
+ static int mt6370_chg_property_is_writeable(struct power_supply *psy,

@@ -126,6 +126,39 @@ reference release are checked on every path. Restoring positional indexing or
 the old unscaled-reading behavior makes the test fail. These are host tests;
 the actual ADC calibration, IRQ delivery and charger operation remain untested.
 
+## MT6370 writable limits
+
+The charger previously passed signed power-supply values into an unsigned
+range helper. A request of `-1` selected the maximum register value: 5 A for
+charge current, 4.71 V for charge voltage, 3.25 A for input current, 13.4 V for
+the minimum-input-voltage setting, and 850 mA for precharge/termination current.
+These results were reproduced with the original setter and the kernel's actual
+linear-range helpers; no device was accessed. A 500 mA charge-current request
+also silently selected the driver's 900 mA minimum.
+
+The setter now rejects negative values with `-EINVAL` and nonnegative limits
+outside its supported range with `-ERANGE`, before any register write.
+`ONLINE` accepts only 0 or 1 before changing attachment state or queuing work.
+In-range quantization is unchanged: minimum input voltage rounds upward;
+current limits and charge voltage round downward. Register-write errors still
+propagate to callers. Zero is rejected for these six limits; it is not a
+charge-disable operation.
+
+These are generic driver bounds, not the r1 battery's approved charging limits.
+The driver's existing 900 mA charge-current minimum remains in place pending
+the stock low-current workaround. The r1's warm JEITA setting of 500 mA will
+now fail explicitly instead of increasing the requested current. Charging
+remains disabled in the device tree while charge-enable control, battery
+constraints, low-current behavior and temperature policy are unfinished.
+
+`test-mt6370-limits.py` compiles the production property setter, ONLINE handler,
+register/range tables and kernel range helpers with ASan/UBSan. It checks
+3,744 valid-limit writes/bus failures, 57 rejected requests and six ONLINE
+transitions, including range endpoints, adjacent values, field mapping,
+rounding and preservation of neighboring bits. Ten regression variants fail
+the runtime assertions. Regmap writes, locking and work queuing are modeled;
+these checks do not establish charger operation or electrical safety.
+
 ## MT6357 battery-sense ADC
 
 The `mt6359-auxadc` driver in this fork supports MT6357, but its inherited

@@ -120,7 +120,9 @@ references. The ADC harness checks voltage units, channel requests, mux cleanup,
 scaling, reset/probe errors and timeout locking; its inactive driver is also
 compiled for AArch64. The impedance harness checks MT6357 start/stop ordering,
 data masking, bus failures and reset gating. The ADC harness also checks
-binding-ID translation for all supported PMIC tables.
+binding-ID translation for all supported PMIC tables. The MT6370 limit harness
+compiles the property setter and kernel range helpers to check rejected inputs,
+rounding, register fields and bus-error propagation.
 It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.
