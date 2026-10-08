@@ -1,0 +1,109 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Describe the MT6357 battery gauge
+
+Add a gauge child binding with explicit shunt and calibration units.
+Register the binding under the MT6357 MFD.
+
+---
+ .../devicetree/bindings/mfd/mediatek,mt6357.yaml   |    6 ++
+ .../power/supply/mediatek,mt6357-gauge.yaml        |   52 ++++++++++++++++++++
+ MAINTAINERS                                        |    5 ++
+ 3 files changed, 63 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+index b67fbe0e7a..eb821b1931 100644
+--- a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+@@ -19,6 +19,7 @@ description: |
+   - Regulator
+   - RTC
+   - Keys
++  - Battery gauge
+ 
+   It is interfaced to host controller using SPI interface by a proprietary hardware
+   called PMIC wrapper or pwrap. This MFD is a child device of pwrap.
+@@ -55,6 +56,11 @@ properties:
+            2100000, 2500000, 2600000, 2700000]
+     default: 1700000
+ 
++  gauge:
++    type: object
++    $ref: /schemas/power/supply/mediatek,mt6357-gauge.yaml
++    unevaluatedProperties: false
++
+   regulators:
+     type: object
+     $ref: /schemas/regulator/mediatek,mt6357-regulator.yaml
+diff --git a/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml b/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
+new file mode 100644
+index 0000000000..b78b8b1f0c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
+@@ -0,0 +1,52 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/power/supply/mediatek,mt6357-gauge.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: MediaTek MT6357 battery gauge
++
++maintainers:
++  - itskenny0 <0@kenny.cat>
++
++description:
++  Battery current sensing in the MT6357 PMIC. The gauge is a child of the
++  PMIC MFD and uses its regmap. Positive current means charging. Current
++  measurements use the firmware-initialized gauge engine; this binding does
++  not establish support for capacity estimation or charging policy.
++
++allOf:
++  - $ref: power-supply.yaml#
++
++properties:
++  compatible:
++    const: mediatek,mt6357-gauge
++
++  shunt-resistor-micro-ohms:
++    description: Battery current sense resistor resistance in microohms.
++    minimum: 1
++
++  mediatek,current-gain-permille:
++    $ref: /schemas/types.yaml#/definitions/uint32
++    description:
++      Board current calibration multiplier, in parts per thousand. A value
++      of 1000 leaves the shunt-corrected reading unchanged. This is the
++      applied gain, not the stock firmware's CAR_TUNE_VALUE percentage.
++    minimum: 1
++    default: 1000
++
++required:
++  - compatible
++  - shunt-resistor-micro-ohms
++
++unevaluatedProperties: false
++
++examples:
++  - |
++    pmic {
++        gauge {
++            compatible = "mediatek,mt6357-gauge";
++            shunt-resistor-micro-ohms = <10000>;
++            mediatek,current-gain-permille = <1000>;
++        };
++    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -16501,6 +16501,11 @@
+ F:	Documentation/devicetree/bindings/mtd/mediatek,mtk-nfc.yaml
+ F:	drivers/mtd/nand/raw/mtk_*
+ 
++MEDIATEK MT6357 BATTERY GAUGE
++M:	itskenny0 <0@kenny.cat>
++S:	Maintained
++F:	Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
++
+ MEDIATEK PMIC LED DRIVER
+ M:	Sen Chu <sen.chu@mediatek.com>
+ M:	Sean Wang <sean.wang@mediatek.com>

@@ -326,6 +326,50 @@ channels and malformed specifiers return `-EINVAL`. The ADC harness covers
 440 lookups across all five PMIC tables, including reversed tables, wide IDs
 and incorrect cell counts. Six lookup regressions fail the runtime checks.
 
+## MT6357 battery current
+
+The r1 configuration now includes `BATTERY_MT6357` and a gauge node with the
+stock 10 mOhm shunt and unity current calibration. It exposes signed
+`current_now` in microamps under `/sys/class/power_supply/mt6357-battery/`;
+positive means charging, negative means discharging. `r1-report` includes this
+power-supply data. This is experimental current sensing, not a capacity or
+charging-policy implementation.
+
+The reference is Rabbit's active `drivers/power/supply/mt6357-gauge.c` and
+`drivers/power/supply/mtk_battery.c`, selected by `CONFIG_BATTERY_MT6357`.
+The older files under `drivers/misc/mediatek/pmic/` and
+`drivers/power/supply/mediatek/battery/` are not this firmware's active path.
+The shipped kernel's symbols and disassembly corroborate the selected latch
+and current-conversion routines.
+
+Current is latched through `FGADC_CON1` at 0xd0a and read from 0xd8a. Its
+16-bit sample is ones' complement: both 0x0000 and 0xffff mean zero. The
+conversion preserves stock rounding in 0.1 mA before correcting for shunt
+resistance and current gain, then reports microamps. Stock DT `R_FG_VALUE=10`
+becomes internal 100 and `CAR_TUNE_VALUE=100` becomes internal 1000. Copying
+the raw DT values into the driver's internal formula would give wrong results.
+The mainline binding instead specifies microohms and gain in parts per thousand.
+Missing, zero, overflowing or unrepresentable calibration is rejected at probe.
+
+The driver retains firmware's measurement-engine configuration. It checks the
+engine enable bit and analog/digital clock gates before sampling; stopped
+hardware returns `-EAGAIN`. It clears inherited latch state before its first
+sample and serializes reads. Each latch poll has a 20 ms timeout with a 100 µs
+interval; those are initial software bounds, not measured hardware timings.
+Every error attempts the full latch-release sequence. Failed release blocks
+publication and forces recovery before another sample. Failed recovery returns
+an error instead of reading potentially stale data. No charger, coulomb-counter
+reset, measurement-engine enable or clock settings are written.
+
+`test-mt6357-current.py` checks 786,432 conversions against compiled stock
+arithmetic, 60 sampling/readiness cases, 3,903 fault/recovery/timeout cases,
+200 threaded reads and 16 probe cases. Sixteen faulty variants are rejected.
+It compiles the production callbacks and actual kernel polling macros with
+ASan/UBSan; bus behavior, registration, time and hardware readiness are modeled.
+Electrical accuracy, retained firmware calibration and boot-time engine state
+still require a device. MT6357 auxiliary ADC and charger control remain disabled
+pending battery-temperature and charging-policy integration.
+
 ### Battery policy recovered from stock
 
 The shipped `/charger` node selects a 4,400,000 µV normal charge voltage and

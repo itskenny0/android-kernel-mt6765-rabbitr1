@@ -429,6 +429,16 @@ config AXP288_FUEL_GAUGE
 	  monitoring as well as alerts for battery over/under voltage and
 	  over/under temperature.
 
+config BATTERY_MT6357
+	tristate "MediaTek MT6357 battery current sensing"
+	depends on MFD_MT6397
+	help
+	  Read signed battery current from the MT6357 gauge. The firmware must
+	  have started the measurement engine. This driver does not yet report
+	  state of charge or control charging.
+
+	  This driver can also be built as a module, called mt6357-gauge.
+
 config BATTERY_MAX17040
 	tristate "Maxim MAX17040/17041/17043 family Fuel Gauge"
 	depends on I2C && IIO

@@ -114,6 +114,21 @@
       "bytes": 14547,
       "sha256": "983c24c07772ae32c216b9ef091f72a338baa6bb8f4a32ff42105baa1291c9f3",
       "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/misc/mediatek/pmic/mt6370/inc/mt6370_pmu_charger.h"
+    },
+    "src/kernel/drivers/power/supply/mt6357-gauge.c": {
+      "bytes": 86944,
+      "sha256": "4def22ad2b77e2b470c151b9b6b9bd48fcc344f459e737849109da22f59a25ae",
+      "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mt6357-gauge.c"
+    },
+    "src/kernel/drivers/power/supply/mtk_battery.c": {
+      "bytes": 91528,
+      "sha256": "1e5c210adda37b94a7b9a61d9949fa6859a884010bc7caa49d18432c1699c663",
+      "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mtk_battery.c"
+    },
+    "src/kernel/drivers/power/supply/Makefile": {
+      "bytes": 6331,
+      "sha256": "85737cc77388fad11b6411b31eb96facc6a3830f1dcbbc8a0edd4e082e89a19d",
+      "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/Makefile"
     }
   }
 }

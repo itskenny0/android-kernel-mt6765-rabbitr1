@@ -23,6 +23,15 @@ def cells(value):
     return struct.unpack('>' + 'I' * (len(value) // 4), value)
 
 
+gauge = nodes['/soc/pwrap@1000d000/pmic/gauge']
+old_gauge = stock['/pwrap@1000d000/main_pmic/mtk_gauge']
+assert gauge['compatible'] == old_gauge['compatible'] == b'mediatek,mt6357-gauge\0'
+assert gauge.get('status', b'okay\0') == b'okay\0'
+# Stock DT shunt is in mOhm and current calibration is a percentage. The stock
+# parser multiplies each by ten for its internal units; do not copy the raw cells.
+assert cells(gauge['shunt-resistor-micro-ohms']) == (cells(old_gauge['R_FG_VALUE'])[0] * 1000,)
+assert cells(gauge['mediatek,current-gain-permille']) == (cells(old_gauge['CAR_TUNE_VALUE'])[0] * 10,)
+
 bus = nodes['/soc/i2c@11016000']
 old_bus = stock['/i2c5@11016000']
 assert bus['status'] == b'okay\0'
@@ -92,4 +101,5 @@ assert cells(backlight['default-brightness']) == (0,)
 assert cells(backlight['mediatek,bled-ovp-microvolt']) == (17000000 + 4000000 * cells(old_backlight['mt,bl_ovp_level'])[0],)
 assert cells(backlight['mediatek,bled-ocp-microamp']) == (900000 + 300000 * cells(old_backlight['mt,bl_ocp_level'])[0],)
 print('PASS: r1 I2C5 pins/mode/address/IRQs match stock; ADC/hwmon channels and child gates checked')
+print('PASS: MT6357 current-shunt resistance and gain units match the stock gauge configuration')
 print('No bus transfers performed; this does not establish charging or battery-temperature support.')

@@ -115,7 +115,7 @@ The workflow:
    backup validation, AVB flags, checksums and repeat packaging.
 
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
-archive, mtklkzap, the mtklogo binary and checksummed MT6357 register/ADC source
+archive, mtklkzap, the mtklogo binary and checksummed MT6357 register/ADC/gauge source
 references. The ADC harness checks voltage units, channel requests, mux cleanup,
 scaling, reset/probe errors and timeout locking; its inactive driver is also
 compiled for AArch64. The impedance harness checks MT6357 start/stop ordering,
@@ -128,6 +128,12 @@ pinned Rabbit sources, both threshold directions, partial writes and cleanup
 failures, concurrent setters, immediate callbacks during registration and failed
 probe cleanup. Regmap, workqueue and device-resource behavior are modeled;
 these checks do not validate physical charging.
+The MT6357 current harness compares every raw value with the active stock gauge
+at several calibrations. It runs the production read, latch cleanup, property
+and probe code with the kernel's polling macros, a modeled clock/regmap and
+pthread locks. Failed reads, partial writes, repeated recovery, timeout bounds,
+concurrent callers and invalid probe settings are checked. The board wiring
+test compares the new shunt/gain properties with the stock DT units.
 It leaves the checked-out kernel
 unchanged. The patch base is fetched separately for the patch consistency test.
 The ordinary fetch command still provisions the complete development workspace.

@@ -133,6 +133,13 @@
 	interrupt-parent = <&pio>;
 	interrupts = <144 IRQ_TYPE_LEVEL_HIGH>;
 	#interrupt-cells = <2>;
+
+	gauge {
+		compatible = "mediatek,mt6357-gauge";
+		/* Stock R_FG_VALUE=10 mOhm, CAR_TUNE_VALUE=100 percent. */
+		shunt-resistor-micro-ohms = <10000>;
+		mediatek,current-gain-permille = <1000>;
+	};
 };
 
 &mt6357_vdram_reg {

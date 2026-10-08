@@ -16501,6 +16501,12 @@ S:	Orphan
 F:	Documentation/devicetree/bindings/mtd/mediatek,mtk-nfc.yaml
 F:	drivers/mtd/nand/raw/mtk_*
 
+MEDIATEK MT6357 BATTERY GAUGE
+M:	itskenny0 <0@kenny.cat>
+S:	Maintained
+F:	Documentation/devicetree/bindings/power/supply/mediatek,mt6357-gauge.yaml
+F:	drivers/power/supply/mt6357-gauge.c
+
 MEDIATEK PMIC LED DRIVER
 M:	Sen Chu <sen.chu@mediatek.com>
 M:	Sean Wang <sean.wang@mediatek.com>
