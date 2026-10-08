@@ -57,3 +57,8 @@ release gates, including missing battery capacity, Android `expdb` startup, and
 the change from stock virtual A/B to dedicated A/B extents. Existing flash and
 restore helpers cover the diagnostic package; an Android package needs its own
 complete backup, layout and restore validation before distribution.
+
+The [boot-control audit](BOOT-CONTROL.md) establishes the stock A/B record format
+and records two MediaTek extensions missing from the provisional default HAL:
+eMMC boot-region selection and clearing the `avbbctl` flag. Complete that
+adapter and its failure handling before testing Android slot transitions.

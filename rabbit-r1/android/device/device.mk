@@ -8,6 +8,8 @@ TARGET_HEALTH_HAL := default-aidl
 TARGET_GRAPHICS := swiftshader
 TARGET_GRAPHICS_COMPOSER_HAL := drmfb-composer
 TARGET_SUPPORTS_SUSPEND := false
+# Provisional: stock also selects the eMMC boot region and clears avbbctl.
+# Complete the adapter in docs/BOOT-CONTROL.md before testing slot changes.
 TARGET_BOOT_HAL := default
 TARGET_FOLLOWS_LATEST_VINTF_TARGET_LEVEL := true
 
