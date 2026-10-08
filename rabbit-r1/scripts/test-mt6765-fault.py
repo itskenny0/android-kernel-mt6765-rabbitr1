@@ -80,6 +80,8 @@ def stock_faults(raw):
     return result
 
 MODEL = r'''
+#include <stdarg.h>
+#define IRQ_NONE 0
 #define FIELD_GET(mask,value) (((value)&(mask))>>__builtin_ctzl(mask))
 #define IRQ_HANDLED 1
 #define IOMMU_FAULT_READ 0
@@ -101,6 +103,7 @@ static u32 readl_relaxed(const void *p) {
     assert((const u32 *)p>=regs && (const u32 *)p<regs+ARRAY_SIZE(regs));
     return *(const u32 *)p;
 }
+#define readl readl_relaxed
 static void writel_relaxed(u32 value,void *p) {
     assert((u32 *)p>=regs && (u32 *)p<regs+ARRAY_SIZE(regs) && writes<ARRAY_SIZE(values));
     unsigned int off=(u32 *)p-regs;
@@ -113,10 +116,15 @@ static int report_iommu_fault(struct iommu_domain *dom,struct device *dev,u64 io
     assert(current->m4u_dom && dom==&current->m4u_dom->domain && dev==current->parent_dev);
     reports++;reported_iova=iova;reported_write=write;return report_result;
 }
-static void dev_err_ratelimited(struct device *dev,const char *fmt,u32 status,u64 iova,u64 pa,u32 id,unsigned int larb,unsigned int port,bool layer,const char *operation) {
-    (void)fmt;assert(dev==current->parent_dev);
-    logs++;logged.status=status;logged.iova=iova;logged.pa=pa;logged.id=id;
-    logged.larb=larb;logged.port=port;logged.layer=layer;logged.write=!strcmp(operation,"write");
+static void dev_err_ratelimited(struct device *dev,const char *fmt,...) {
+    assert(dev==current->parent_dev);
+    assert(!strncmp(fmt,"fault type=",11));
+    va_list args;va_start(args,fmt);
+    logs++;logged.status=va_arg(args,u32);logged.iova=va_arg(args,u64);
+    logged.pa=va_arg(args,u64);logged.id=va_arg(args,u32);
+    logged.larb=va_arg(args,unsigned int);logged.port=va_arg(args,unsigned int);
+    logged.layer=va_arg(args,int);logged.write=!strcmp(va_arg(args,const char *),"write");
+    va_end(args);
 }
 '''
 MAIN = r'''
@@ -127,7 +135,7 @@ static void fault(u32 status,u32 rawva,u32 pa,unsigned int larb,unsigned int por
     bank.parent_data=&data;bank.m4u_dom=disposition<0?NULL:&dom;current=&bank;
     unsigned int slave=(status&0x7f)?0:1;
     for(unsigned int i=0;i<ARRAY_SIZE(regs);i++)regs[i]=0xa5a5a5a5;
-    regs[0x134/4]=status;regs[(0x13c+8*slave)/4]=rawva;
+    regs[0x130/4]=0;regs[0x134/4]=status;regs[(0x13c+8*slave)/4]=rawva;
     regs[(0x140+8*slave)/4]=pa;regs[(0x150+4*slave)/4]=id;
     reports=logs=writes=barriers=0;report_result=disposition;
     assert(mtk_iommu_isr(73,&bank)==IRQ_HANDLED);
@@ -169,7 +177,9 @@ def build_harness(source):
     for name in ('mtk_iommu_plat','mtk_iommu_iova_region','mtk_iommu_plat_data','mtk_iommu_bank_data','single_domain','mt6765_data'):
         code += smi.block(s,name)
     code += MODEL
-    for name in ('mtk_iommu_tlb_flush_all','mtk_iommu_isr'): code += smi.block(s,name)
+    for name in ('mtk_iommu_tlb_flush_all','mt6765_iommu_isr','mtk_iommu_isr'):
+        if name != 'mt6765_iommu_isr' or 'static irqreturn_t mt6765_iommu_isr(' in s:
+            code += smi.block(s,name)
     code += MAIN
     path = ROOT/'out/mt6765-fault-host.c'; path.write_text(code)
     binary = ROOT/'out/mt6765-fault-host'

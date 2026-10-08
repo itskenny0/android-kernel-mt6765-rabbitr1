@@ -57,6 +57,10 @@ The workflow:
    helpers and checks the IRQ gate, drain, suspend failures and resume failures
    with PM enabled, plus IRQ access with PM disabled. Clocks, MMIO, PM bookkeeping
    and IRQ-core synchronization remain models.
+   Native IOMMU fault tests separate L2 and main sources, snapshot both slaves,
+   check posted-clear readback, and deliver faults arriving during callbacks on
+   the next invocation. Inactive and non-translation records must not be read;
+   MMIO, status latches, callbacks and TLB completion are modeled.
    The native MT6765 PHY is compared with stock setup/shutdown sequences,
    including calibration restoration, PLL divider boundaries and clock cleanup.
    MMSYS routing and mutex writes are compared with shipped instructions for

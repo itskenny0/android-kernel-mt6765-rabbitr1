@@ -1,0 +1,139 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Handle native IOMMU faults
+
+Separate L2 and main errors, snapshot both slaves, and complete the global
+clear before reporting translation faults. Keep late callback faults
+pending and avoid stale translation reports for empty or non-translation
+status.
+
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index f4842a93a7..09cf0f65f6 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -98,6 +98,10 @@
+ 
+ #define REG_MMU_CPE_DONE			0x12C
+ 
++#define REG_MMU_L2_FAULT_ST_MT6765		0x130
++#define F_L2_TABLE_WALK_FAULT_MT6765		BIT(1)
++#define REG_MMU_TBWALK_FAULT_VA_MT6765		0x138
++
+ #define REG_MMU_FAULT_ST1			0x134
+ #define F_REG_MMU0_FAULT_MASK			GENMASK(6, 0)
+ #define F_REG_MMU1_FAULT_MASK			GENMASK(13, 7)
+@@ -477,6 +481,80 @@ static void mtk_iommu_tlb_flush_range_sync(unsigned long iova, size_t size,
+ 	}
+ }
+ 
++static irqreturn_t mt6765_iommu_isr(struct mtk_iommu_bank_data *bank)
++{
++	struct mtk_iommu_data *data = bank->parent_data;
++	struct mtk_iommu_domain *dom = bank->m4u_dom;
++	void __iomem *base = bank->base;
++	u32 va[2] = {}, pa[2] = {}, id[2] = {};
++	u32 main, l2, walk = 0, regval, state;
++	unsigned int i, larb, port;
++	bool layer, write;
++
++	l2 = readl_relaxed(base + REG_MMU_L2_FAULT_ST_MT6765);
++	main = readl_relaxed(base + REG_MMU_FAULT_ST1);
++	if (!main && !l2)
++		return IRQ_NONE;
++
++	if (l2 & F_L2_TABLE_WALK_FAULT_MT6765)
++		walk = readl_relaxed(base + REG_MMU_TBWALK_FAULT_VA_MT6765);
++
++	/* Capture both slaves before the global clear or a client callback. */
++	for (i = 0; i < ARRAY_SIZE(va); i++) {
++		if (!(main & BIT(i * 7)))
++			continue;
++		va[i] = readl_relaxed(base + REG_MMU0_FAULT_VA + i * 8);
++		pa[i] = readl_relaxed(base + REG_MMU0_INVLD_PA + i * 8);
++		id[i] = readl_relaxed(base + REG_MMU0_INT_ID + i * 4);
++	}
++
++	/* A fault arriving during reporting must remain pending for the next IRQ. */
++	regval = readl_relaxed(base + REG_MMU_INT_CONTROL0);
++	writel_relaxed(regval | F_INT_CLR_BIT, base + REG_MMU_INT_CONTROL0);
++	/* Complete the posted clear before callbacks can trigger more DMA. */
++	readl(base + REG_MMU_INT_CONTROL0);
++
++	if (l2 & F_L2_TABLE_WALK_FAULT_MT6765)
++		dev_err_ratelimited(bank->parent_dev,
++				    "L2 fault status=0x%x table-walk VA register=0x%x\n",
++				    l2, walk);
++	else if (l2)
++		dev_err_ratelimited(bank->parent_dev, "L2 fault status=0x%x\n", l2);
++
++	for (i = 0; i < ARRAY_SIZE(va); i++) {
++		state = (main >> (i * 7)) & F_REG_MMU0_FAULT_MASK;
++		/* FIFO and other main faults do not identify a translation request. */
++		regval = state & ~BIT(0);
++		if (regval)
++			dev_err_ratelimited(bank->parent_dev,
++					    "MMU%u non-translation fault status=0x%x\n",
++					    i, regval);
++		if (!(state & BIT(0)))
++			continue;
++
++		layer = va[i] & F_MMU_FAULT_VA_LAYER_BIT;
++		write = va[i] & F_MMU_FAULT_VA_WRITE_BIT;
++		va[i] &= F_MMU_INVAL_VA_31_12_MASK;
++		larb = F_MMU_INT_ID_LARB_ID(id[i]);
++		port = F_MMU_INT_ID_PORT_ID(id[i]);
++
++		if (!dom || report_iommu_fault(&dom->domain, bank->parent_dev, va[i],
++					       write ? IOMMU_FAULT_WRITE : IOMMU_FAULT_READ))
++			dev_err_ratelimited(bank->parent_dev,
++					    "fault type=0x%x iova=0x%llx pa=0x%llx master=0x%x(larb=%d port=%d) layer=%d %s\n",
++					    main, (u64)va[i], (u64)pa[i], id[i], larb, port,
++					    layer, str_write_read(write));
++	}
++
++	state = main & ~(F_REG_MMU0_FAULT_MASK | F_REG_MMU1_FAULT_MASK);
++	if (state)
++		dev_err_ratelimited(bank->parent_dev, "Unexpected main fault status=0x%x\n",
++				    state);
++
++	mtk_iommu_tlb_flush_all(data);
++	return IRQ_HANDLED;
++}
++
+ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
+ {
+ 	struct mtk_iommu_bank_data *bank = dev_id;
+@@ -489,6 +567,9 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
+ 	u64 fault_iova, fault_pa;
+ 	bool layer, write;
+ 
++	if (plat_data->m4u_plat == M4U_MT6765)
++		return mt6765_iommu_isr(bank);
++
+ 	/* Read error info from registers */
+ 	int_state = readl_relaxed(base + REG_MMU_FAULT_ST1);
+ 	if (int_state & F_REG_MMU0_FAULT_MASK) {
+@@ -502,18 +583,13 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
+ 	}
+ 	layer = fault_iova & F_MMU_FAULT_VA_LAYER_BIT;
+ 	write = fault_iova & F_MMU_FAULT_VA_WRITE_BIT;
+-	if (plat_data->m4u_plat == M4U_MT6765) {
+-		/* These registers report 32-bit addresses without extension fields. */
+-		fault_iova &= F_MMU_INVAL_VA_31_12_MASK;
+-	} else {
+-		if (MTK_IOMMU_HAS_FLAG(plat_data, IOVA_34_EN)) {
+-			va34_32 = FIELD_GET(F_MMU_INVAL_VA_34_32_MASK, fault_iova);
+-			fault_iova = fault_iova & F_MMU_INVAL_VA_31_12_MASK;
+-			fault_iova |= (u64)va34_32 << 32;
+-		}
+-		pa34_32 = FIELD_GET(F_MMU_INVAL_PA_34_32_MASK, fault_iova);
+-		fault_pa |= (u64)pa34_32 << 32;
++	if (MTK_IOMMU_HAS_FLAG(plat_data, IOVA_34_EN)) {
++		va34_32 = FIELD_GET(F_MMU_INVAL_VA_34_32_MASK, fault_iova);
++		fault_iova = fault_iova & F_MMU_INVAL_VA_31_12_MASK;
++		fault_iova |= (u64)va34_32 << 32;
+ 	}
++	pa34_32 = FIELD_GET(F_MMU_INVAL_PA_34_32_MASK, fault_iova);
++	fault_pa |= (u64)pa34_32 << 32;
+ 
+ 	if (MTK_IOMMU_IS_TYPE(plat_data, MTK_IOMMU_TYPE_MM)) {
+ 		if (MTK_IOMMU_HAS_FLAG(plat_data, HAS_SUB_COMM_2BITS)) {

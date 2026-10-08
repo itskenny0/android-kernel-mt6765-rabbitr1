@@ -828,13 +828,48 @@ helpers and logging are modeled. All reports match the native handler.
 The host harness checks all 4,096 low-field values for every port and slave,
 plus accepted/rejected fault callbacks and missing domains: 425,990 cases.
 It verifies clear-bit preservation and the existing full-flush sequence.
-Physical IRQ delivery, power ownership, L2-only faults and simultaneous
-fault servicing remain separate work.
+Physical IRQ delivery and power ownership remain separate work.
 
 Eighteen compiled regressions in address width, batch bounds, table placement,
 descriptor bits, fault fields, ports, acknowledgement and flush behavior are rejected.
 The native AArch64 IOMMU object builds. CI runs both positive tests. Neither
 test establishes physical translation or permits enabling the display yet.
+
+The native handler now reads both L2 (`0x130`) and main (`0x134`) status before
+classifying an interrupt. An empty status returns `IRQ_NONE` without clearing
+registers or flushing the TLB. L2 errors are logged independently, including the
+raw table-walk VA register (`0x138`) when its fault bit is set. No master or
+read/write direction is invented for an L2-only error. Non-translation main
+errors are also logged without passing stale addresses to a translation-fault
+callback. These register locations and bit classes come from the published
+MT6765 `m4u_reg.h` and `MTK_M4U_isr` source.
+
+Both slaves' translation records are captured before the global clear. A
+readback completes the posted clear before either client callback runs, following
+[Linux's MMIO ordering guidance](https://docs.kernel.org/driver-api/device-io.html). A new
+fault raised during reporting remains pending for the next invocation. Each
+captured translation fault is passed to the available domain callback or
+logged when unhandled. The existing full TLB invalidation follows reporting. Other platforms retain their existing handler. This does
+not prevent hardware faults from coalescing between the status read and clear,
+or establish that a client can recover from a physical fault.
+
+`test-mt6765-fault-irq.py` executes the production dispatch, native handler and
+full-flush helper in 22,547 fixtures. It covers all fourteen-bit main status
+combinations, all nine-bit L2 combinations against zero/one/two translation
+faults and three callback/domain dispositions, unexpected main bits, and a
+late fault delivered on the next invocation. The model delays the clear until
+readback and poisons old records then, so callbacks must use their snapshots.
+It checks that inactive/non-translation slaves' address registers are not read.
+Fifteen compiled faulty variants and two previous-handler cases are rejected;
+the 425,990 existing decode checks and 416 stock instruction comparisons still
+pass. MMIO, latches, callbacks and TLB completion remain models.
+
+The current r1 DT gives the IOMMU no separate bus clock or power domain; the
+driver documents use of the EMI clock when `HAS_BCLK` is absent. Generic
+runtime-PM code alone therefore does not demonstrate physical clock removal
+on this board. IRQ/domain lifetime, EMI behavior across power transitions and
+firmware handoff still require investigation. This fault-classification change
+does not alter the IOMMU power lifecycle or enable display scanout.
 
 ## Remaining acceptance work
 

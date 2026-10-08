@@ -132,3 +132,9 @@ Patch 0048 closes the GCE IRQ access gate and drains in-flight handlers before
 forced system suspend removes clocks. Failed suspend restores the gate; failed
 resume keeps it closed. Pthread tests execute the real controller callbacks and
 core force-PM helpers with modeled hardware and IRQ-core synchronization.
+
+Patch 0049 separates native IOMMU L2 and main fault sources, snapshots both
+MMU slaves before clearing, and acknowledges before callbacks can trigger new
+faults. A readback completes the posted clear. Empty and non-translation status
+no longer produces a stale translation report. See `docs/DISPLAY.md` for coverage
+and the remaining power, firmware-handoff and hardware requirements.
