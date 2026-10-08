@@ -59,6 +59,8 @@
 #define MT6370_VSYS_SHORT_ENABLE		BIT(6)
 
 enum mt6370_chg_reg_field {
+	/* MT6370_REG_CHG_CTRL1 */
+	F_FORCE_SLEEP,
 	/* MT6370_REG_CHG_CTRL2 */
 	F_IINLMTSEL, F_CFO_EN, F_CHG_EN,
 	/* MT6370_REG_CHG_CTRL3 */
@@ -119,6 +121,9 @@ struct mt6370_priv {
 	unsigned int ichg_min;
 	unsigned int ichg_request;
 	bool ichg_valid;
+	bool input_suspended;
+	bool mivr_irq_paused;
+	unsigned int mivr_request;
 };
 
 enum mt6370_usb_status {
@@ -171,6 +176,7 @@ static const struct linear_range mt6370_chg_ranges[MT6370_RANGE_F_MAX] = {
 }
 
 static const struct mt6370_chg_field mt6370_chg_fields[F_MAX] = {
+	MT6370_CHG_FIELD(F_FORCE_SLEEP, MT6370_REG_CHG_CTRL1, 3, 3),
 	MT6370_CHG_FIELD(F_IINLMTSEL, MT6370_REG_CHG_CTRL2, 2, 3),
 	MT6370_CHG_FIELD(F_CFO_EN, MT6370_REG_CHG_CTRL2, 1, 1),
 	MT6370_CHG_FIELD(F_CHG_EN, MT6370_REG_CHG_CTRL2, 0, 0),
@@ -378,6 +384,7 @@ static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
 
 static int mt6370_chg_set_behaviour(struct mt6370_priv *priv, int behaviour)
 {
+	unsigned int asleep;
 	int ret, stop_ret;
 
 	if (behaviour != POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO &&
@@ -391,6 +398,20 @@ static int mt6370_chg_set_behaviour(struct mt6370_priv *priv, int behaviour)
 		return mt6370_chg_stop(priv);
 	if (!priv->ichg_valid)
 		return -EAGAIN;
+	if (priv->input_suspended)
+		return -EAGAIN;
+	ret = mt6370_chg_field_get(priv, F_FORCE_SLEEP, &asleep);
+	if (ret || asleep) {
+		if (ret)
+			priv->ichg_valid = false;
+		else
+			priv->input_suspended = true;
+		stop_ret = mt6370_chg_stop(priv);
+		if (stop_ret)
+			dev_err(priv->dev, "Failed to inhibit with unavailable input: %d\n",
+				stop_ret);
+		return ret ? ret : -EAGAIN;
+	}
 
 	/* Restore the last successful request and its protection before enabling. */
 	ret = mt6370_chg_program_ichg(priv, priv->ichg_request);
@@ -422,6 +443,133 @@ static int mt6370_chg_get_behaviour(struct mt6370_priv *priv, int *behaviour)
 	*behaviour = enabled ? POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO :
 			      POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE;
 	return 0;
+}
+
+static void mt6370_chg_cancel_mivr(struct mt6370_priv *priv)
+{
+	if (cancel_delayed_work_sync(&priv->mivr_dwork)) {
+		/* Balance the IRQ mask and wake reference acquired by the handler. */
+		enable_irq(priv->irq_nums[MT6370_IRQ_MIVR]);
+		pm_relax(priv->dev);
+	}
+}
+
+/* Caller serializes power-supply requests, including IRQ registration. */
+static void mt6370_chg_pause_mivr(struct mt6370_priv *priv)
+{
+	if (priv->num_irqs <= MT6370_IRQ_MIVR || priv->mivr_irq_paused)
+		return;
+
+	/* This handler never enters the power-supply API. */
+	disable_irq(priv->irq_nums[MT6370_IRQ_MIVR]);
+	priv->mivr_irq_paused = true;
+	mt6370_chg_cancel_mivr(priv);
+}
+
+static int mt6370_chg_suspend_input(struct mt6370_priv *priv)
+{
+	int ret, err;
+
+	priv->input_suspended = true;
+	/* Withdraw input before waiting for work or the charge-current ramp. */
+	ret = mt6370_chg_field_set(priv, F_FORCE_SLEEP, 1);
+	mt6370_chg_pause_mivr(priv);
+
+	guard(mutex)(&priv->ichg_lock);
+	/* Failed isolation must not prevent an attempt to inhibit charging. */
+	err = mt6370_chg_stop(priv);
+	if (!ret)
+		ret = err;
+	err = mt6370_chg_field_set(priv, F_VMIVR,
+		linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_VMIVR]));
+	if (!ret)
+		ret = err;
+	if (ret)
+		dev_err(priv->dev, "Failed to suspend charger input: %d\n", ret);
+	return ret;
+}
+
+static int mt6370_chg_set_input(struct mt6370_priv *priv, unsigned int ua)
+{
+	unsigned int asleep;
+	int ret, err;
+
+	ret = mt6370_chg_field_get(priv, F_FORCE_SLEEP, &asleep);
+	if (ret)
+		goto suspend;
+	if (asleep)
+		priv->input_suspended = true;
+	if (priv->input_suspended) {
+		/* Keep work paused and charging off throughout input-path recovery. */
+		ret = mt6370_chg_suspend_input(priv);
+		if (ret)
+			return ret;
+	}
+
+	ret = mt6370_chg_field_set(priv, F_IAICR, ua);
+	if (ret)
+		goto suspend;
+	if (!priv->input_suspended)
+		return 0;
+
+	ret = mt6370_chg_field_set(priv, F_AICR_EN, 1);
+	if (ret)
+		goto suspend;
+	ret = mt6370_chg_field_set(priv, F_IINLMTSEL, 2);
+	if (ret)
+		goto suspend;
+	ret = mt6370_chg_field_set(priv, F_VMIVR, priv->mivr_request);
+	if (ret)
+		goto suspend;
+	ret = mt6370_chg_field_set(priv, F_FORCE_SLEEP, 0);
+	if (ret)
+		goto suspend;
+
+	priv->input_suspended = false;
+	if (priv->mivr_irq_paused) {
+		priv->mivr_irq_paused = false;
+		enable_irq(priv->irq_nums[MT6370_IRQ_MIVR]);
+	}
+	return 0;
+
+suspend:
+	err = mt6370_chg_suspend_input(priv);
+	if (err)
+		dev_err(priv->dev, "Failed to suspend input after limit error: %d\n", err);
+	return ret;
+}
+
+static int mt6370_chg_get_input(struct mt6370_priv *priv, unsigned int *ua)
+{
+	unsigned int asleep;
+	int ret;
+
+	ret = mt6370_chg_field_get(priv, F_FORCE_SLEEP, &asleep);
+	if (ret)
+		return ret;
+	if (asleep) {
+		*ua = 0;
+		return 0;
+	}
+	return mt6370_chg_field_get(priv, F_IAICR, ua);
+}
+
+static int mt6370_chg_set_mivr(struct mt6370_priv *priv, unsigned int uv)
+{
+	unsigned int selector;
+	bool found;
+	int ret;
+	const struct linear_range *range = &mt6370_chg_ranges[MT6370_RANGE_F_VMIVR];
+
+	ret = linear_range_get_selector_high(range, uv, &selector, &found);
+	if (ret)
+		return ret;
+	if (!priv->input_suspended) {
+		ret = regmap_field_write(priv->rmap_fields[F_VMIVR], selector);
+		if (ret)
+			return ret;
+	}
+	return linear_range_get_value(range, selector, &priv->mivr_request);
 }
 
 enum {
@@ -766,6 +914,12 @@ static int mt6370_chg_get_property(struct power_supply *psy,
 		val->intval = linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_VOREG]);
 		return 0;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+		if (priv->ichg_workaround) {
+			ret = mt6370_chg_get_input(priv, &setting);
+			if (!ret)
+				val->intval = setting;
+			return ret;
+		}
 		fd = F_IAICR;
 		break;
 	case POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT:
@@ -832,6 +986,11 @@ static int mt6370_chg_set_property(struct power_supply *psy,
 		fd = F_VOREG;
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+		if (priv->ichg_workaround && !val->intval) {
+			ret = mt6370_chg_suspend_input(priv);
+			power_supply_changed(psy);
+			return ret;
+		}
 		fd = F_IAICR;
 		break;
 	case POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT:
@@ -861,6 +1020,13 @@ static int mt6370_chg_set_property(struct power_supply *psy,
 		power_supply_changed(psy);
 		return ret;
 	}
+	if (priv->ichg_workaround && fd == F_IAICR) {
+		ret = mt6370_chg_set_input(priv, setting);
+		power_supply_changed(psy);
+		return ret;
+	}
+	if (priv->ichg_workaround && fd == F_VMIVR)
+		return mt6370_chg_set_mivr(priv, setting);
 
 	return mt6370_chg_field_set(priv, fd, setting);
 }
@@ -975,11 +1141,19 @@ static int mt6370_chg_init_rmap_fields(struct mt6370_priv *priv)
 
 static int mt6370_chg_init_setting(struct mt6370_priv *priv)
 {
+	unsigned int asleep;
 	int ret;
 
 	if (priv->ichg_workaround) {
 		/* Policy must explicitly enable charging after validating its inputs. */
 		ret = mt6370_chg_set_behaviour(priv, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE);
+		if (ret)
+			return ret;
+		ret = mt6370_chg_field_get(priv, F_FORCE_SLEEP, &asleep);
+		if (ret)
+			return ret;
+		priv->input_suspended = asleep;
+		ret = mt6370_chg_field_get(priv, F_VMIVR, &priv->mivr_request);
 		if (ret)
 			return ret;
 	}
@@ -1130,6 +1304,7 @@ static int mt6370_chg_init_irq(struct mt6370_priv *priv)
 		MT6370_CHG_IRQ(mivr),
 	};
 
+	guard(mutex)(&priv->psy_lock);
 	for (i = 0; i < ARRAY_SIZE(mt6370_chg_irqs); i++) {
 		ret = platform_get_irq_byname(to_platform_device(priv->dev),
 					      mt6370_chg_irqs[i].name);
@@ -1147,6 +1322,8 @@ static int mt6370_chg_init_irq(struct mt6370_priv *priv)
 					     mt6370_chg_irqs[i].name);
 		priv->num_irqs++;
 	}
+	if (priv->input_suspended)
+		mt6370_chg_pause_mivr(priv);
 
 	return 0;
 }
@@ -1155,11 +1332,7 @@ static void mt6370_chg_cancel_work(void *data)
 {
 	struct mt6370_priv *priv = data;
 
-	if (cancel_delayed_work_sync(&priv->mivr_dwork)) {
-		/* Balance the IRQ mask and wake reference acquired by the handler. */
-		enable_irq(priv->irq_nums[MT6370_IRQ_MIVR]);
-		pm_relax(priv->dev);
-	}
+	mt6370_chg_cancel_mivr(priv);
 	cancel_work_sync(&priv->bc12_work);
 }
 

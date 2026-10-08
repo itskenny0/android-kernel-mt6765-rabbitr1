@@ -102,7 +102,7 @@ struct mt6370_priv {
     struct regmap *regmap;
     bool ichg_workaround;
     unsigned int ichg_min, ichg_request;
-    bool ichg_valid;
+    bool ichg_valid, input_suspended;
     int attach;
     struct workqueue_struct *wq;
     struct work_struct bc12_work;
@@ -127,6 +127,11 @@ if 'static int mt6370_chg_set_ichg(' in s:
     for name in ('mt6370_chg_field_get', 'mt6370_chg_stop', 'mt6370_chg_program_ichg',
                  'mt6370_chg_set_ichg', 'mt6370_chg_set_behaviour'):
         body += function(name)
+body += r'''
+static int mt6370_chg_suspend_input(struct mt6370_priv *p) { assert(false); return -EIO; }
+static int mt6370_chg_set_input(struct mt6370_priv *p, unsigned int ua) { assert(false); return -EIO; }
+static int mt6370_chg_set_mivr(struct mt6370_priv *p, unsigned int uv) { assert(false); return -EIO; }
+'''
 body += function('mt6370_chg_set_online')
 body += function('mt6370_chg_set_property')
 body += function('mt6370_chg_property_is_writeable')

@@ -135,6 +135,9 @@ also exercised. Regmap, time, IRQ synchronization, workqueue and device-resource
 behavior are modeled; these checks do not validate physical charging.
 Input initialization is checked across inherited register/selector values and
 bus failures, including loop enable and settling before the pin limit is removed.
+Zero-budget input isolation and explicit restoration run through property callbacks,
+with failed writes, pending/running MIVR work, early publication, inherited state
+and shutdown races. These checks do not establish USB suspend compliance.
 The MT6357 current harness compares every raw value with the active stock gauge
 at several calibrations. It runs the production read, latch cleanup, property
 and probe code with the kernel's polling macros, a modeled clock/regmap and

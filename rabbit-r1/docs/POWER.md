@@ -188,7 +188,7 @@ the power supply and workqueue.
 `test-mt6370-current.py` compiles the production helpers, setter, initialization
 and probe with the kernel's range helpers. It checks 257 identification cases,
 816 current transitions, 66 invalid requests, 246 fault/recovery cases, 400
-threaded transitions and 58 probe/unwind cases. The bus model covers partial
+threaded transitions and 60 probe/unwind cases. The bus model covers partial
 passcodes, failed writes that take effect, failed cleanup, stale protection and
 an inherited open gate. Fifteen faulty variants fail runtime assertions.
 ASan/UBSan and pthread locks check the host model; physical protection behavior,
@@ -260,7 +260,7 @@ watchdog handling and hardware validation are unfinished.
 The current harness compiles the actual control helpers, property callbacks,
 per-model descriptor, probe, cleanup and BC1.2 notification path. It compares
 normal stop writes and delays with the compiled Rabbit stop routine. Tests
-cover 256 inhibit/readback cases, 257 resumes, 73 rejected requests, 365 control
+cover 256 inhibit/readback cases, 257 resumes, 73 rejected requests, 385 control
 fault/recovery cases, 520 reads and 600 threaded control/current operations,
 in addition to the current-transition cases above. The bus model permits a
 failed write to take effect and a failed read to overwrite its destination.
@@ -269,8 +269,8 @@ runtime assertions. Locks, time, I/O and device resources are modeled; neither
 VSYS transients nor real charge-enable behavior has been measured.
 
 The shutdown tests invoke the production `platform_driver.shutdown` callback.
-They cover 18 model/work cases, 858 rejected property calls after shutdown,
-12 bus-failure cases and three synchronized property/shutdown races. The actual
+They cover 18 model/work cases, 910 rejected property calls after shutdown,
+12 bus-failure cases and five synchronized property/shutdown races. The actual
 IRQ registration code is exercised through partial lookup/request failures.
 IRQ synchronization, running work and managed resources are modeled; these
 checks reject 21 faulty variants but do not establish behavior during a physical
@@ -294,7 +294,7 @@ reproducible local reference.
 
 The production initialization runs against all 256 inherited input-register
 values and all four selector values on six supported models: 6,144 cases.
-Another 40 fault cases check error propagation and ensure the pin constraint
+Another 48 fault cases check error propagation and ensure the pin constraint
 is not removed early, including failed writes that take effect. Probe tests
 also inject initialization failures before callback publication. These are
 register and timing models, not measured input-current limits. Twelve faulty
@@ -304,9 +304,54 @@ initial limit.
 This 100 mA starting point does not handle USB suspend or authorize charging.
 The gadget requests budgets below the charger's 100 mA minimum, including 2 mA
 at suspend; those requests must not be rounded upward. Connecting the USB budget
-to the charger and establishing input-path isolation remain required before
+to the charger and validating input-path isolation remain required before
 enabling the r1 charger node. Battery-current preferences cannot override that
 input budget.
+
+### Zero input budget and restoration
+
+On MT6370/RT5081, writing `0` to `input_current_limit` requests power-path
+isolation. Positive requests below 100 mA still return `-ERANGE`; the policy
+must deliberately choose isolation for such budgets. Other PMIC variants keep
+their existing range and reject zero because this sequence is not established
+for them.
+
+The operation first sets FORCE_SLEEP, before waiting for work or the charge
+ramp. It then masks and synchronizes the MIVR IRQ, drains its delayed work,
+inhibits charging and sets MIVR to 13.4 V. The register and power-path sequence
+come from Rabbit's [active driver](https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/misc/mediatek/pmic/mt6370/mt6370_pmu_charger.c#L2059).
+The shipped `mt6370_enable_power_path` at `0xffffff80089342d0` also selects
+physical register 0x11, bit 3. This is distinct from HZ, bit 2. Mainline preserves
+the first error and continues the remaining stop attempts; stock overwrites
+some errors and updates its cached state even after failed transactions.
+
+The software request remains suspended after any error. `charge_behaviour=auto`
+cannot release it. Readback checks the physical FORCE_SLEEP bit: it reports
+zero when that bit is set, otherwise the programmed IAICR limit, and propagates
+read errors. This is register state, not a measurement or proof that USB draw
+has reached zero. Failed writes can leave the input path active.
+
+When input is suspended, a valid positive request reasserts isolation, stops charging,
+programs the input budget, enables its loop, selects IAICR and restores the
+last successful MIVR request before clearing FORCE_SLEEP and unmasking MIVR.
+Charging stays inhibited until policy explicitly permits it. A positive limit
+change on an already active input path preserves the charging state. While suspended,
+voltage-limit writes update the stored restore target and leave hardware MIVR
+at its maximum. Probe captures inherited MIVR and sleep state before exposing
+callbacks. IRQ registration shares the API lock, so an early zero request is
+honored when the MIVR IRQ becomes available.
+
+The host harness exercises 386 input transitions, 262 fault/recovery cases,
+46 rejected budgets, 774 input reads and 53 early-publication/inherited-state
+cases. It includes pending/running MIVR work, failed writes that take effect,
+failed recovery cleanup, inherited sleep, invalid MIVR selectors, raw readback
+that differs from the software request, and input requests racing shutdown.
+Twenty-eight faulty input-path variants fail runtime assertions.
+Bus transactions, IRQ execution, scheduling and elapsed time are modeled.
+Actual input isolation, USB suspend timing and battery/system-rail behavior
+still require hardware measurements. The USB budget bridge and charge policy
+are not yet connected, and the charger node remains disabled.
+With that node disabled, charger settings remain inherited from earlier firmware.
 
 ### Android charging-speed setting
 

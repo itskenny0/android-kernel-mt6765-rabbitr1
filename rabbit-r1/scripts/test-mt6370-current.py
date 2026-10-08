@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise MT6370 current transitions, bus faults and probe lifetime with models."""
+"""Exercise MT6370 current, input-path, bus-fault and lifetime behavior with models."""
 import argparse
 import hashlib
 import json
@@ -59,6 +59,7 @@ assert keys == [0x96, 0x69, 0xc3, 0x3c]
 assert value('MT6370_AICR_MIN') == 100000 and value('MT6370_AICR_STEP') == 50000
 assert value('MT6370_MASK_AICR') == 0xfc and value('MT6370_SHIFT_AICR') == 2
 assert value('MT6370_SHIFT_AICR_EN') == 1 and value('MT6370_SHIFT_ILIM_EN') == 0
+assert value('MT6370_SHIFT_FORCE_SLEEP') == 3 and value('MT6370_MIVR_MAX') == 13400000
 initial = function('mt6370_chg_init_setting', vendor)
 select = initial.index('MT6370_IINLMTSEL_AICR')
 settle = initial.index('mdelay(5);')
@@ -209,7 +210,8 @@ static struct workqueue_struct wq;
 static unsigned int regs[0x200], errors[256], nops, unlocks, closes, stops;
 static bool gate, apply_failed_write, settings_done, published, irq_active;
 static unsigned int irq_live, irq_depth[MT6370_IRQ_MAX], irq_disables, wake_refs;
-static bool run_mivr_on_cancel, inject_irq_callback;
+static bool run_mivr_on_cancel, inject_irq_callback, registration_input_zero, inherited_input_sleep;
+static unsigned int inherited_mivr=82;
 static unsigned int partial_key, slept_us;
 struct bus_op { char type; unsigned int reg, value, thread; };
 static struct bus_op trace[20000];
@@ -282,9 +284,17 @@ static int regmap_field_write(struct regmap_field *f, unsigned int val)
     return regmap_update_bits(&map,r->reg,GENMASK(r->msb,r->lsb),val << r->lsb);
 }
 '''
+body += r'''
+static void enable_irq(unsigned int irq);
+static void disable_irq(unsigned int irq);
+static void pm_relax(struct device *dev);
+static bool cancel_delayed_work_sync(struct delayed_work *work);
+'''
 for name in ('mt6370_chg_field_get', 'mt6370_chg_field_set', 'mt6370_chg_init_ichg',
              'mt6370_chg_stop', 'mt6370_chg_program_ichg', 'mt6370_chg_set_ichg',
              'mt6370_chg_set_behaviour', 'mt6370_chg_get_behaviour',
+             'mt6370_chg_cancel_mivr', 'mt6370_chg_pause_mivr', 'mt6370_chg_suspend_input',
+             'mt6370_chg_set_input', 'mt6370_chg_get_input', 'mt6370_chg_set_mivr',
              'mt6370_chg_set_online', 'mt6370_chg_set_property', 'mt6370_chg_init_setting',
              'mt6370_chg_bc12_work_func'):
     body += function(name)
@@ -368,9 +378,19 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
     assert(p->bc12_work.pending);
     if (p->ichg_workaround) {
         val.intval=POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO;
-        assert(!desc->set_property(&psy,POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,&val));
+        /* Also exercise inherited sleep without a userspace write repairing it. */
+        if (!inherited_input_sleep) {
+            int expected=p->input_suspended ? -EAGAIN : 0;
+            assert(desc->set_property(&psy,POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,&val) == expected);
+        }
         assert(!desc->get_property(&psy,POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,&val));
-        assert(val.intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO && (regs[0x112]&1));
+        assert(val.intval == (p->input_suspended ? POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE : POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO));
+        assert(!!(regs[0x112]&1) == !p->input_suspended);
+    }
+    if (registration_input_zero && p->ichg_workaround) {
+        val.intval=0;
+        assert(!desc->set_property(&psy,POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,&val));
+        assert(p->input_suspended && !p->mivr_irq_paused && !p->num_irqs);
     }
     publication_calls++; return &psy;
 }
@@ -379,9 +399,14 @@ static void enable_irq(unsigned int irq)
 static void pm_relax(struct device *dev) { assert(wake_refs); wake_refs--; }
 static bool cancel_delayed_work_sync(struct delayed_work *w)
 {
-    assert(published && wq.active && w->work.initialized && priv.stopping);
-    assert(!priv.psy_lock.owner);
-    for (unsigned int i=0; i<irq_live; i++) assert(irq_depth[i]);
+    assert(published && wq.active && w->work.initialized);
+    if (priv.stopping) {
+        assert(!priv.psy_lock.owner);
+        for (unsigned int i=0; i<irq_live; i++) assert(irq_depth[i]);
+    } else {
+        assert(priv.input_suspended && priv.mivr_irq_paused && priv.psy_lock.owner == thread_id);
+        assert(irq_depth[MT6370_IRQ_MIVR]);
+    }
     bool pending=w->work.pending;
     if (run_mivr_on_cancel && pending) {
         /* Model a running MIVR worker completing its own IRQ/wake cleanup. */
@@ -409,16 +434,18 @@ static int devm_request_threaded_irq(struct device *d, int irq, void *top,
     irqreturn_t (*fn)(int,void *), int flags, const char *name, void *arg)
 {
     int ret=step(); if (ret) return ret;
+    assert(priv.psy_lock.owner == thread_id);
     assert(irq == (int)(100+irq_live) && irq_live<MT6370_IRQ_MAX && arg == &priv);
     irq_depth[irq_live++]=0; add(RES_IRQ); irq_active=true; return 0;
 }
 static void disable_irq(unsigned int irq)
 {
-    assert(irq >= 100 && irq-100<irq_live && !priv.psy_lock.owner);
-    assert(priv.stopping);
+    assert(irq >= 100 && irq-100<irq_live);
+    if (priv.stopping) assert(!priv.psy_lock.owner);
+    else assert(priv.input_suspended && irq == 100+MT6370_IRQ_MIVR && priv.psy_lock.owner == thread_id);
     irq_depth[irq-100]++; irq_disables++;
     /* synchronize_irq may finish a handler that calls the power-supply API. */
-    if (inject_irq_callback) {
+    if (inject_irq_callback && irq != 100+MT6370_IRQ_MIVR) {
         union power_supply_propval v={.intval=1}; unsigned int start=nops;
         assert(mt6370_chg_set_property(&psy,POWER_SUPPLY_PROP_ONLINE,&v) == -ESHUTDOWN);
         assert(nops == start);
@@ -497,13 +524,16 @@ static void reset_bus(unsigned int vendor, bool open, unsigned int current, unsi
 {
     nops=unlocks=closes=stops=slept_us=0; notifications=0; memset(errors,0,sizeof(errors));
     apply_failed_write=false; partial_key=0;
-    priv.stopping=false; run_mivr_on_cancel=inject_irq_callback=false;
+    priv.stopping=false; priv.input_suspended=false; priv.mivr_irq_paused=false;
+    priv.mivr_request=4400000; run_mivr_on_cancel=inject_irq_callback=false;
     irq_disables=0;
     for (unsigned int i=0; i<ARRAY_SIZE(regs); i++) regs[i]=0xa5;
     regs[0x100]=vendor; gate=open;
     regs[STOCK_CURRENT_REG]=(current/100000-1)*4+3;
     regs[STOCK_HIDDEN_REG]=(regs[STOCK_HIDDEN_REG]&~0x60)|protection;
     regs[0x112]|=1;
+    if (inherited_input_sleep) regs[0x111]|=8;
+    regs[0x116]=(inherited_mivr<<1)|1;
 }
 static void setup(unsigned int vendor, bool open, unsigned int current, unsigned int protection)
 {
@@ -545,7 +575,7 @@ static void release_probe(void)
     while (nr_resources) switch (resources[--nr_resources]) {
     case RES_IRQ:
         assert(priv.stopping && !priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
-        assert(irq_live && irq_depth[irq_live-1] == 1); irq_live--; irq_active=!!irq_live; break;
+        assert(irq_live && irq_depth[irq_live-1] == 1U+(priv.mivr_irq_paused && irq_live-1 == MT6370_IRQ_MIVR)); irq_live--; irq_active=!!irq_live; break;
     case RES_QUIESCE: mt6370_chg_quiesce(&priv); break;
     case RES_PSY:
         assert(published && !priv.bc12_work.pending && !priv.mivr_dwork.work.pending);
@@ -769,6 +799,189 @@ static void shutdown_probe(struct platform_device *pdev, unsigned int model)
     regs[0x14a]=saved; nops=0;
     inject_irq_callback=true;
 }
+
+static int input_set(enum power_supply_property property, int value)
+{
+    union power_supply_propval v={.intval=value};
+    return mt6370_chg_psy_desc.set_property(&psy,property,&v);
+}
+static int input_get(int *ua)
+{
+    union power_supply_propval v={.intval=*ua};
+    int ret=mt6370_chg_psy_desc.get_property(&psy,POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,&v);
+    *ua=v.intval; return ret;
+}
+static void clear_io(void)
+{ nops=slept_us=0; memset(errors,0,sizeof(errors)); apply_failed_write=false; }
+static void check_powerpath(void)
+{
+    unsigned int transitions=0, faults=0, rejects=0, reads=0, early=0;
+    for (unsigned int model=0; model<2; model++)
+    for (unsigned int selector=0; selector<64; selector++)
+    for (unsigned int work=0; work<3; work++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,model ? 0x80 : 0xe0);
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4400001));
+        assert(priv.mivr_request == 4500000);
+        unsigned int ctrl1=regs[0x111];
+        unsigned int changed=notifications;
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+        assert((regs[0x112]&1) && !irq_disables && notifications == changed+1);
+        if (work) {
+            priv.mivr_dwork.work.pending=true; irq_depth[MT6370_IRQ_MIVR]++; wake_refs++;
+            run_mivr_on_cancel=work == 2;
+        }
+        clear_io(); changed=notifications;
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+        assert(notifications == changed+1);
+        assert(trace[0].type == 'r' && trace[0].reg == 0x111);
+        assert(trace[1].type == 'w' && trace[1].reg == 0x111 && trace[1].value == (ctrl1|8));
+        assert(priv.input_suspended && priv.mivr_irq_paused && irq_disables == 1);
+        assert(regs[0x111] == (ctrl1|8) && !(regs[0x112]&1));
+        assert((regs[0x116]>>1) == 95 && !wake_refs && !priv.mivr_dwork.work.pending);
+        assert(irq_depth[MT6370_IRQ_MIVR] == 1 && !irq_depth[0] && !irq_depth[1]);
+        int ua=-1; assert(!input_get(&ua) && ua == 0); reads++;
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0) && irq_disables == 1);
+        assert(!set_current(500000));
+        unsigned int before=nops;
+        assert(set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) == -EAGAIN && nops == before);
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4600001));
+        assert(nops == before && priv.mivr_request == 4700000 && (regs[0x116]>>1) == 95);
+        unsigned int request=100000+selector*50000;
+        if (selector<63) request+=49999;
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,request));
+        assert(!priv.input_suspended && !priv.mivr_irq_paused && !irq_depth[MT6370_IRQ_MIVR]);
+        assert(regs[0x111] == ctrl1 && !(regs[0x112]&1));
+        assert((regs[0x116]>>1) == 8 && (regs[0x113]>>2) == selector);
+        assert(!input_get(&ua) && ua == (int)(100000+selector*50000)); reads++;
+        assert(!set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) && (regs[0x112]&1));
+        release_probe(); transitions++;
+    }
+    const unsigned int ids[]={0xe0,0x80,0x90,0xa0,0xb0,0xf0};
+    const int bad[]={INT_MIN,-1,1,2000,99999,3250001,INT_MAX};
+    for (unsigned int model=0; model<ARRAY_SIZE(ids); model++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,ids[model]);
+        for (unsigned int i=0; i<ARRAY_SIZE(bad); i++) {
+            clear_io();
+            assert(input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,bad[i]) == (bad[i]<0 ? -EINVAL : -ERANGE));
+            assert(!nops); rejects++;
+        }
+        if (model>=2) {
+            assert(input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0) == -ERANGE && !nops); rejects++;
+        }
+        release_probe();
+    }
+    /* Fail every bus transaction during suspend, resume and an awake budget change. */
+    for (unsigned int mode=0; mode<3; mode++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        if (mode == 1) assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+        clear_io();
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,mode ? 500000 : 0));
+        unsigned int count=nops;
+        struct bus_op sequence[256]; assert(count<ARRAY_SIZE(sequence)); memcpy(sequence,trace,count*sizeof(*trace));
+        release_probe();
+        for (unsigned int fail=0; fail<count; fail++) {
+            if (sequence[fail].type == 'd') continue;
+            for (unsigned int effect=0; effect<2; effect++) {
+                shutdown_probe(&pdev,0xe0);
+                if (mode == 1) assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+                clear_io(); errors[fail]=EIO; apply_failed_write=effect;
+                assert(input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,mode ? 500000 : 0) == -EIO);
+                assert(priv.input_suspended && priv.mivr_irq_paused && irq_depth[MT6370_IRQ_MIVR] == 1);
+                unsigned int completed=nops;
+                struct bus_op failed[256]; assert(completed<ARRAY_SIZE(failed)); memcpy(failed,trace,completed*sizeof(*trace));
+                clear_io(); assert(!set_current(1000000)); unsigned int start=nops;
+                assert(set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) == -EAGAIN && nops == start);
+                assert(!input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4400000));
+                assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,100000));
+                assert(!priv.input_suspended && !(regs[0x111]&8) && !(regs[0x112]&1));
+                assert((regs[0x116]>>1) == 5 && !irq_depth[MT6370_IRQ_MIVR]);
+                release_probe(); faults++;
+                for (unsigned int second=fail+1; second<completed; second++) {
+                    if (failed[second].type == 'd') continue;
+                    shutdown_probe(&pdev,0xe0);
+                    if (mode == 1) assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+                    clear_io(); errors[fail]=EIO; errors[second]=ETIMEDOUT; apply_failed_write=effect;
+                    assert(input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,mode ? 500000 : 0) == -EIO);
+                    assert(priv.input_suspended && priv.mivr_irq_paused);
+                    clear_io(); assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,100000));
+                    assert(!priv.input_suspended && !(regs[0x112]&1));
+                    release_probe(); faults++;
+                }
+            }
+        }
+    }
+    for (unsigned int off=0; off<2; off++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        if (off) assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+        clear_io(); int ua=-1; assert(!input_get(&ua)); unsigned int count=nops;
+        for (unsigned int fail=0; fail<count; fail++) {
+            clear_io(); errors[fail]=EIO; ua=-1;
+            assert(input_get(&ua) == -EIO && ua == -1); reads++;
+        }
+        clear_io(); release_probe();
+    }
+
+    /* Read hardware isolation even when it disagrees with the software request. */
+    for (unsigned int via_auto=0; via_auto<2; via_auto++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        regs[0x111]|=8; assert(!priv.input_suspended);
+        int ua=-1; assert(!input_get(&ua) && ua == 0); reads++;
+        if (via_auto) {
+            assert(set_behaviour(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) == -EAGAIN);
+            assert(priv.input_suspended && !(regs[0x112]&1));
+            regs[0x111]&=~8U;
+            assert(!input_get(&ua) && ua == 100000); reads++;
+        }
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+        assert(!priv.input_suspended && !(regs[0x111]&8) && !(regs[0x112]&1));
+        release_probe(); transitions++;
+    }
+    /* A failed live MIVR change must not replace the last successful restore target. */
+    for (unsigned int failure=0; failure<2; failure++)
+    for (unsigned int effect=0; effect<2; effect++) {
+        struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4400000));
+        clear_io(); errors[failure]=EIO; apply_failed_write=effect;
+        assert(input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4500000) == -EIO);
+        assert(priv.mivr_request == 4400000);
+        clear_io();
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
+        assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,100000));
+        assert((regs[0x116]>>1) == 5);
+        release_probe(); faults++;
+    }
+    /* A request arriving while registration publishes callbacks predates IRQ allocation. */
+    registration_input_zero=true;
+    struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+    assert(priv.input_suspended && priv.mivr_irq_paused && irq_depth[MT6370_IRQ_MIVR] == 1);
+    assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+    assert(!priv.input_suspended && !irq_depth[MT6370_IRQ_MIVR]);
+    unsigned int stages=stage;
+    release_probe(); early++;
+    for (unsigned int fail=1; fail<=stages; fail++) {
+        settings_done=false; stage=0; fail_stage=fail; reset_bus(0xe0,false,1000000,0x40);
+        assert(mt6370_chg_probe(&pdev) < 0);
+        release_probe(); early++;
+    }
+    fail_stage=0; registration_input_zero=false;
+    inherited_input_sleep=true;
+    shutdown_probe(&pdev,0xe0);
+    assert(priv.input_suspended && priv.mivr_irq_paused && irq_depth[MT6370_IRQ_MIVR] == 1);
+    assert(!(regs[0x112]&1));
+    assert(!input_set(POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT,4400000));
+    assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,500000));
+    assert(!priv.input_suspended && !(regs[0x111]&8) && !(regs[0x112]&1));
+    release_probe(); early++; inherited_input_sleep=false;
+    for (unsigned int invalid=96; invalid<128; invalid++) {
+        inherited_mivr=invalid; settings_done=false; stage=0; reset_bus(0xe0,false,1000000,0x40);
+        unsigned int published_before=publication_calls;
+        assert(mt6370_chg_probe(&pdev) == -EINVAL && publication_calls == published_before);
+        release_probe(); early++;
+    }
+    inherited_mivr=82;
+    printf("PASS: %u input suspend/resume transitions, %u power-path faults/recoveries, %u rejected budgets, %u input reads and %u early-publication/inherited-state cases\n",transitions,faults,rejects,reads,early);
+}
+
 static unsigned int check_stopped_api(void)
 {
     unsigned int start=nops, changed=notifications, checks=0;
@@ -848,6 +1061,7 @@ static void check_initial_input(void)
     printf("PASS: %u inherited input-limit states and %u input initialization faults; selector, loop, pin limit and settling order checked\n",cases,faults);
 }
 static unsigned int shutdown_started;
+static bool property_finished;
 static void *property_racer(void *unused)
 {
     thread_id=2;
@@ -856,10 +1070,13 @@ static void *property_racer(void *unused)
         union power_supply_propval v={.intval=0};
         raced_result=mt6370_chg_psy_desc.get_property(&psy,POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,&v);
         raced_value=v.intval;
-    } else {
+    } else if (raced_property == 2) {
         union power_supply_propval v={.intval=0};
         raced_result=mt6370_chg_psy_desc.set_property(&psy,POWER_SUPPLY_PROP_ONLINE,&v);
-    }
+    } else raced_result=input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,raced_property == 3 ? 0 : 100000);
+    assert(!pthread_mutex_lock(&pause_lock));
+    property_finished=true; assert(!pthread_cond_broadcast(&pause_cond));
+    assert(!pthread_mutex_unlock(&pause_lock));
     return NULL;
 }
 static void *shutdown_racer(void *pdev)
@@ -917,16 +1134,18 @@ static void check_shutdown(void)
             memset(errors,0,sizeof(errors)); release_probe(); failures++;
         }
     }
-    for (int property=0; property<3; property++) {
+    for (int property=0; property<5; property++) {
         struct platform_device pdev={0}; shutdown_probe(&pdev,0xe0);
+        if (property == 4) assert(!input_set(POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,0));
         raced_property=property; raced_result=1; shutdown_started=0;
         assert(!pthread_mutex_lock(&pause_lock));
-        pause_active=true; pause_entered=pause_release=false;
+        pause_active=true; pause_entered=pause_release=property_finished=false;
         assert(!pthread_mutex_unlock(&pause_lock));
         pthread_t writer, stopper;
         assert(!pthread_create(&writer,NULL,property_racer,NULL));
         assert(!pthread_mutex_lock(&pause_lock));
-        while (!pause_entered) assert(!pthread_cond_wait(&pause_cond,&pause_lock));
+        while (!pause_entered && !property_finished) assert(!pthread_cond_wait(&pause_cond,&pause_lock));
+        assert(pause_entered && !property_finished);
         /* The entire admitted property operation must hold the API gate. */
         assert(pthread_mutex_trylock(&priv.psy_lock.raw) == EBUSY);
         assert(!pthread_create(&stopper,NULL,shutdown_racer,&pdev));
@@ -936,7 +1155,7 @@ static void check_shutdown(void)
         assert(!pthread_join(writer,NULL) && !pthread_join(stopper,NULL));
         assert(!raced_result && priv.stopping && !(regs[0x112]&1));
         if (property == 1) assert(raced_value == 1000000);
-        assert(irq_disables == 3 && !priv.bc12_work.pending && !wake_refs);
+        assert(irq_disables == (property>=3 ? 4U : 3U) && !priv.bc12_work.pending && !wake_refs);
         rejects+=check_stopped_api(); release_probe(); races++;
     }
     printf("PASS: %u shutdown/model/work cases, %u stopped API requests, %u shutdown I/O faults, %u property/shutdown races; actual driver callback and partial IRQ unwind checked\n",stops_checked,rejects,failures,races);
@@ -1088,6 +1307,7 @@ int main(void)
     }
     check_controls();
     check_shutdown();
+    check_powerpath();
     printf("PASS: %u model cases, %u current transitions, %u rejected requests, %u fault/recovery cases, 400 threaded transitions and %u probe/unwind cases\n",models,valid,rejects,failures,probes);
     return 0;
 }
@@ -1101,5 +1321,5 @@ subprocess.run(['gcc','-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror',
 subprocess.run([str(OUT/'host')],check=True,timeout=30)
 (ROOT/'out/mt6370-current-audit.json').write_text(json.dumps(dict(
     hardware_tested=False, source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-    scope='production input initialization, current/control helpers, properties, descriptor, probe, IRQ registration and registered shutdown callback; compiled Rabbit stop oracle; modeled I/O/time/IRQ/work/devres and pthread API/shutdown races; no electrical or battery-policy validation'
+    scope='production input initialization/suspend/restoration, current/control helpers, properties, descriptor, probe, IRQ registration and registered shutdown callback; compiled Rabbit stop oracle; modeled I/O/time/IRQ/work/devres and pthread API/shutdown races; no electrical or battery-policy validation'
 ),indent=2)+'\n')
