@@ -115,9 +115,11 @@ The LK build record marks `kernel_mmc_pinctrl_preserved`; packaging and flash
 preparation require that mark and check the four instruction bytes, rejecting
 older LK output even if a record incorrectly claims the fix.
 
-`test-lk-mmc-fixup.py` executes the caller at `0x1c28e..0x1c294`, the complete
+`test-lk-mmc-fixup.py` executes the caller at `0x1c282..0x1c294`, the complete
 stock fixup at `0x6bfc`, its string-swap helper and the shipped libfdt/libc
-instructions. Only logging and the MMIO-register read are modeled. The 34
+instructions. It also executes the weak-symbol availability check using the
+actual GOT entry at `0xb7908`, confirming the stock call is reachable.
+Only logging and the MMIO-register read are modeled. The 34
 fixtures include both compiled boot profiles, four register patterns, zero
 and named prior stack contents, the actual vendor FDT and a synthetic six-state
 node. The original code reproduces the bad rename; the patched caller leaves

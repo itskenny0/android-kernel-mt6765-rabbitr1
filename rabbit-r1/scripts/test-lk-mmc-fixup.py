@@ -26,7 +26,7 @@ resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 def emulate(image, dtb, mux, stale):
     bias, fdt, stack = 0x47fffe00, 0x50000000, 0x60008000
-    start, stop = bias+0x1c28e, bias+0x1c294
+    start, stop = bias+0x1c282, bias+0x1c294
     mmio = 0x100056f0
     uc = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
     uc.mem_map(bias & ~4095, 0x200000)
@@ -34,6 +34,13 @@ def emulate(image, dtb, mux, stale):
     bss_start, bss_end = struct.unpack_from('<II', image, 0x32c)
     assert (bss_start, bss_end) == (0x480b7874, 0x4816a594)
     uc.mem_write(bss_start, bytes(bss_end-bss_start))
+    # Recover r4 as the real boot_linux_fdt prologue does, then execute the
+    # weak-symbol availability check too. A null GOT entry would make the
+    # offending call unreachable, so do not assume it is linked in.
+    got = struct.unpack_from('<I', image, 0x1c828)[0]+0x1bc98
+    slot = struct.unpack_from('<I', image, 0x1c940)[0]
+    assert got == 0xb745c and got+slot == 0xb7908
+    assert struct.unpack('<I', uc.mem_read(bias+got+slot, 4))[0] == (bias+0x6bfc) | 1
     uc.mem_map(fdt, 0x80000)
     uc.mem_map(0x60000000, 0x10000)
     uc.mem_map(mmio & ~4095, 0x1000)
@@ -49,8 +56,10 @@ def emulate(image, dtb, mux, stale):
     if stale:
         for i in range(6):
             uc.mem_write(stack-0x7c+14*i, f'stale{i}'.encode().ljust(14, b'\0'))
-    for i, reg in enumerate(SAVED):
-        uc.reg_write(reg, fdt if reg == UC_ARM_REG_R8 else 0xa000+i)
+    saved = {reg: 0xa000+i for i, reg in enumerate(SAVED)}
+    saved.update({UC_ARM_REG_R4: bias+got, UC_ARM_REG_R8: fdt})
+    for reg, value in saved.items():
+        uc.reg_write(reg, value)
     uc.reg_write(UC_ARM_REG_SP, stack)
     uc.reg_write(UC_ARM_REG_LR, 0x70000001)
     calls, register_reads, dt_writes, visited_nodes = [], [], [], []
@@ -62,7 +71,7 @@ def emulate(image, dtb, mux, stale):
             uc.reg_write(UC_ARM_REG_R0, 0)
             uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
             return
-        assert (0x1c28e <= at < 0x1c294 or 0x6bd4 <= at < 0x6d80 or
+        assert (0x1c282 <= at < 0x1c294 or 0x6bd4 <= at < 0x6d80 or
                 0x2b000 <= at < 0x2d000 or 0x60800 <= at < 0x60900), hex(at)
         if at in (0x6bfc, 0x6bd4, 0x2ca4c, 0x2cafc):
             calls.append(at)
@@ -85,8 +94,8 @@ def emulate(image, dtb, mux, stale):
         f'calls={calls}; nodes={len(visited_nodes)}; '
         f'result={uc.reg_read(UC_ARM_REG_R0):#x}')
     assert uc.reg_read(UC_ARM_REG_SP) == stack
-    for i, reg in enumerate(SAVED):
-        assert uc.reg_read(reg) == (fdt if reg == UC_ARM_REG_R8 else 0xa000+i)
+    for reg, value in saved.items():
+        assert uc.reg_read(reg) == value
     return bytes(before), bytes(uc.mem_read(fdt, 0x80000)), {
         'calls': calls, 'register_reads': register_reads, 'fdt_writes': len(dt_writes),
         'result': uc.reg_read(UC_ARM_REG_R0), 'visited_nodes': len(visited_nodes),
