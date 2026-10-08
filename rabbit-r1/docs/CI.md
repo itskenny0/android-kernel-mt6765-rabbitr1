@@ -94,6 +94,9 @@ The workflow:
    corrected call path, and exercise later reservation writers with controlled
    boot arguments. Both packaging stages reject missing MMC/SCP/console fixes even if
    their metadata incorrectly claims the patch.
+   Stock display teardown fixtures reproduce ignored reset timeouts and clock
+   gating requests. These document an unresolved handoff requirement; they do
+   not validate a safe display shutdown.
 5. Builds both mtkclient boot profiles. Checks 40 console-rewrite fixtures and
    executes successive Linux FDT updates on the packaged images through final
    packing, with controlled firmware state. The resulting command line,

@@ -256,6 +256,36 @@ restore are modeled. EL3 entry, exception return, physical cache coherency,
 asynchronous firmware and DMA completion are outside the test. No host SMC
 or hardware write is performed.
 
+### Why the existing display suspend call is insufficient
+
+`test-lk-display-stop.py` executes the stock module-table initializer, stop and
+power-off dispatchers, and selected display callbacks. Eleven fixtures cover
+both overlays in idle states 1/2 or permanently non-idle, mixed overlay states,
+and an uninitialized display. Logging, delays, LCM suspend transport and MMIO
+are modeled. Driver callbacks and their indirect dispatch execute unchanged.
+
+The overlay power-off callback at `0xa648` calls reset at `0xa5e8`. Reset polls
+`FLOW_CTRL_DBG` at register offset `0x240`. With both low bits held clear,
+it waits 2,001 times for 10 microseconds, logs a timeout and returns zero.
+The caller then requests clock gating at MMSYS `0x14000104` despite that timeout.
+Both overlays reproduce this behavior. The top-level suspend function also
+returns zero and clears its powered-state bookkeeping after either reset fails.
+
+In the tested path after the modeled LCM suspend, RDMA's stop callback at
+`0xb128` clears enable and interrupt registers without resetting or waiting for
+completion. DSI's stop at `0xc500` changes the mode bits without polling BUSY.
+The test holds DSI BUSY high throughout the path, but clock-gate requests and
+PHY shutdown writes still occur. LCM transport may itself wait for commands;
+that excluded stage is not evidence of completion after the later stop writes.
+
+This reproduces the stock power-off behavior, which must not be treated as a
+checked Linux DMA handoff. No call to that function has been added to the Linux
+boot path. A replacement needs completion checks before clocks or memory
+ownership change, with an error path that does not continue into Linux after
+failed quiescence. Physical completion signals and the remaining panel supply
+mapping still need a device test. The report is `out/lk-display-stop-audit.json`;
+its successful execution means the limitation was reproduced, not resolved.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses

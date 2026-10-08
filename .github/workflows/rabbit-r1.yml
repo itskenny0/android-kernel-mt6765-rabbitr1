@@ -165,6 +165,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-lk.py 2>&1 | tee logs/lk-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-mmc-fixup.py 2>&1 | tee logs/lk-mmc-fixup-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-platform-fixup.py 2>&1 | tee logs/lk-platform-fixup-tests.log
+          toolchains/boot-tools/bin/python scripts/test-lk-display-stop.py 2>&1 | tee logs/lk-display-stop-tests.log
 
       - name: Build and check the mtkclient package
         run: |
