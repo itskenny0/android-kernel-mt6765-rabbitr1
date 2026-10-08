@@ -61,6 +61,7 @@ static void mutex_unlock(struct mutex *m) { assert(m->locked); m->locked=false; 
 static struct mutex *lock_guard(struct mutex *m) { mutex_lock(m); return m; }
 static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
 #define guard(type) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
+#define lockdep_assert_held(m) assert((m)->locked)
 static int regmap_write(struct regmap *map, unsigned int reg, unsigned int val)
 { assert(!"Unexpected hidden access on unvalidated variant"); return -EIO; }
 static int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *buf, size_t n)
@@ -74,10 +75,14 @@ enum power_supply_property {
     POWER_SUPPLY_PROP_ONLINE, POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
     POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
     POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT, POWER_SUPPLY_PROP_PRECHARGE_CURRENT,
-    POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT, POWER_SUPPLY_PROP_STATUS,
+    POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT, POWER_SUPPLY_PROP_STATUS, POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,
     POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX, POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX,
 };
+enum { POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE };
 struct power_supply { void *drvdata; };
+static void power_supply_changed(struct power_supply *psy) { }
+static void usleep_range(unsigned int lo, unsigned int hi) { assert(false); }
+static int regmap_field_read(struct regmap_field *f, unsigned int *out) { assert(false); return -EIO; }
 static void *power_supply_get_drvdata(struct power_supply *psy) { return psy->drvdata; }
 '''
 body = header[header.index('struct linear_range {'):header.index('unsigned int linear_range_values_in_range')]
@@ -92,7 +97,8 @@ struct mt6370_priv {
     struct mutex ichg_lock;
     struct regmap *regmap;
     bool ichg_workaround;
-    unsigned int ichg_min;
+    unsigned int ichg_min, ichg_request;
+    bool ichg_valid;
     int attach;
     struct workqueue_struct *wq;
     struct work_struct bc12_work;
@@ -114,7 +120,9 @@ static int regmap_field_write(struct regmap_field *field, unsigned int selector)
 '''
 body += function('mt6370_chg_field_set')
 if 'static int mt6370_chg_set_ichg(' in s:
-    body += function('mt6370_chg_set_ichg')
+    for name in ('mt6370_chg_field_get', 'mt6370_chg_stop', 'mt6370_chg_program_ichg',
+                 'mt6370_chg_set_ichg', 'mt6370_chg_set_behaviour'):
+        body += function(name)
 body += function('mt6370_chg_set_online')
 body += function('mt6370_chg_set_property')
 body += function('mt6370_chg_property_is_writeable')

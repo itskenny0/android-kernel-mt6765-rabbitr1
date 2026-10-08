@@ -1,0 +1,417 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Add MT6370 charge inhibit and resume
+
+Use the stock current ramp before stopping MT6370/RT5081 charging, with
+hardware readback and checked I/O. Serialize inhibit, resume and current
+changes, restore only a valid request, and expose the standard behaviour
+property only on the established models. Keep charging inhibited at probe
+and attempt to stop it during teardown. Avoid notifying an unpublished
+power-supply handle from early BC1.2 work.
+
+---
+ drivers/power/supply/mt6370-charger.c |  227 ++++++++++++++++++++++++++++++---
+ 1 file changed, 208 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/power/supply/mt6370-charger.c b/drivers/power/supply/mt6370-charger.c
+index 40f4faf65d..2a57d3d79d 100644
+--- a/drivers/power/supply/mt6370-charger.c
++++ b/drivers/power/supply/mt6370-charger.c
+@@ -8,6 +8,7 @@
+ #include <linux/bitfield.h>
+ #include <linux/bits.h>
+ #include <linux/cleanup.h>
++#include <linux/delay.h>
+ #include <linux/devm-helpers.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/iio/consumer.h>
+@@ -100,6 +101,7 @@ struct mt6370_priv {
+ 	struct mutex attach_lock;
+ 	struct mutex ichg_lock;
+ 	struct power_supply *psy;
++	struct power_supply_desc psy_desc;
+ 	struct regmap *regmap;
+ 	struct regmap_field *rmap_fields[F_MAX];
+ 	struct regulator_dev *rdev;
+@@ -112,6 +114,8 @@ struct mt6370_priv {
+ 	bool pwr_rdy;
+ 	bool ichg_workaround;
+ 	unsigned int ichg_min;
++	unsigned int ichg_request;
++	bool ichg_valid;
+ };
+ 
+ enum mt6370_usb_status {
+@@ -258,19 +262,69 @@ static int mt6370_chg_init_ichg(struct mt6370_priv *priv)
+ 	return 0;
+ }
+ 
+-static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
++/* Caller holds ichg_lock. Also used after a failed current transition. */
++static int mt6370_chg_stop(struct mt6370_priv *priv)
++{
++	const struct linear_range *range = &mt6370_chg_ranges[MT6370_RANGE_F_ICHG];
++	unsigned int enabled, selector, ramp_us;
++	int ret, err;
++
++	lockdep_assert_held(&priv->ichg_lock);
++	ret = mt6370_chg_field_get(priv, F_CHG_EN, &enabled);
++	if (!ret && !enabled)
++		return 0;
++
++	/* Read actual hardware state; firmware and failed writes can invalidate a cache. */
++	err = regmap_field_read(priv->rmap_fields[F_ICHG], &selector);
++	if (err) {
++		if (!ret)
++			ret = err;
++		goto disable;
++	}
++	if (selector > range->max_sel) {
++		if (!ret)
++			ret = -ERANGE;
++		goto disable;
++	}
++	if (selector > range->min_sel) {
++		/* Stock VSYS overshoot workaround: 2 ms per 50 mA down to 500 mA. */
++		ramp_us = (selector - range->min_sel) * range->step / 50000 * 2000;
++		err = mt6370_chg_field_set(priv, F_ICHG, range->min);
++		if (!ret)
++			ret = err;
++		/* A write reporting failure may still have started the ramp. */
++		usleep_range(ramp_us, ramp_us + 1000);
++	}
++disable:
++	/* Even failed reads or ramp writes must not prevent an attempt to stop. */
++	err = mt6370_chg_field_set(priv, F_CHG_EN, 0);
++	if (err)
++		dev_err(priv->dev, "Failed to inhibit charging: %d\n", err);
++	if (!ret)
++		ret = err;
++	if (ret)
++		priv->ichg_valid = false;
++
++	return ret;
++}
++
++/* Caller holds ichg_lock; the cached value is a request, not hardware readback. */
++static int mt6370_chg_program_ichg(struct mt6370_priv *priv, unsigned int ua)
+ {
+ 	static const u8 passcode[] = { 0x96, 0x69, 0xc3, 0x3c };
+ 	unsigned int protection;
+ 	int ret, lock_ret, stop_ret;
+ 
++	lockdep_assert_held(&priv->ichg_lock);
+ 	if (ua < priv->ichg_min ||
+ 	    ua > linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_ICHG]))
+ 		return -ERANGE;
+ 
+-	guard(mutex)(&priv->ichg_lock);
+-	if (!priv->ichg_workaround)
+-		return mt6370_chg_field_set(priv, F_ICHG, ua);
++	priv->ichg_valid = false;
++	if (!priv->ichg_workaround) {
++		ret = mt6370_chg_field_set(priv, F_ICHG, ua);
++		goto complete;
++	}
+ 
+ 	/* Establish a closed gate even if firmware or a failed write left it open. */
+ 	ret = regmap_write(priv->regmap, MT6370_REG_HIDDEN_PASSCODE, 0);
+@@ -294,11 +348,17 @@ static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
+ 		ret = lock_ret;
+ 	if (!ret)
+ 		ret = mt6370_chg_field_set(priv, F_ICHG, ua);
+-	if (!ret)
++complete:
++	if (!ret) {
++		priv->ichg_request = ua;
++		priv->ichg_valid = true;
+ 		return 0;
++	}
++	if (!priv->ichg_workaround)
++		return ret;
+ 
+ 	/* A failed transition may leave current and protection settings mismatched. */
+-	stop_ret = mt6370_chg_field_set(priv, F_CHG_EN, 0);
++	stop_ret = mt6370_chg_stop(priv);
+ 	if (stop_ret)
+ 		dev_err(priv->dev, "Failed to disable charging after current error: %d\n",
+ 			stop_ret);
+@@ -306,6 +366,61 @@ static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
+ 	return ret;
+ }
+ 
++static int mt6370_chg_set_ichg(struct mt6370_priv *priv, unsigned int ua)
++{
++	guard(mutex)(&priv->ichg_lock);
++
++	return mt6370_chg_program_ichg(priv, ua);
++}
++
++static int mt6370_chg_set_behaviour(struct mt6370_priv *priv, int behaviour)
++{
++	int ret, stop_ret;
++
++	if (behaviour != POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO &&
++	    behaviour != POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE)
++		return -EINVAL;
++	if (!priv->ichg_workaround)
++		return -EOPNOTSUPP;
++
++	guard(mutex)(&priv->ichg_lock);
++	if (behaviour == POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE)
++		return mt6370_chg_stop(priv);
++	if (!priv->ichg_valid)
++		return -EAGAIN;
++
++	/* Restore the last successful request and its protection before enabling. */
++	ret = mt6370_chg_program_ichg(priv, priv->ichg_request);
++	if (ret)
++		return ret;
++	ret = mt6370_chg_field_set(priv, F_CHG_EN, 1);
++	if (!ret)
++		return 0;
++
++	/* The failed enable write may have reached the device. */
++	priv->ichg_valid = false;
++	stop_ret = mt6370_chg_stop(priv);
++	if (stop_ret)
++		dev_err(priv->dev, "Failed to inhibit after enable error: %d\n", stop_ret);
++	return ret;
++}
++
++static int mt6370_chg_get_behaviour(struct mt6370_priv *priv, int *behaviour)
++{
++	unsigned int enabled;
++	int ret;
++
++	if (!priv->ichg_workaround)
++		return -EOPNOTSUPP;
++	guard(mutex)(&priv->ichg_lock);
++	ret = mt6370_chg_field_get(priv, F_CHG_EN, &enabled);
++	if (ret)
++		return ret;
++	*behaviour = enabled ? POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO :
++			      POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE;
++	return 0;
++}
++
+ enum {
+ 	MT6370_CHG_STAT_READY = 0,
+ 	MT6370_CHG_STAT_CHARGE_IN_PROGRESS,
+@@ -345,6 +460,7 @@ static void mt6370_chg_bc12_work_func(struct work_struct *work)
+ {
+ 	struct mt6370_priv *priv = container_of(work, struct mt6370_priv,
+ 						bc12_work);
++	struct power_supply *psy;
+ 	int ret;
+ 	bool rpt_psy = false;
+ 	unsigned int attach, usb_stat;
+@@ -396,8 +512,10 @@ static void mt6370_chg_bc12_work_func(struct work_struct *work)
+ bc12_work_func_out:
+ 	mutex_unlock(&priv->attach_lock);
+ 
+-	if (rpt_psy)
+-		power_supply_changed(priv->psy);
++	/* An ONLINE write can queue work before registration returns the handle. */
++	psy = READ_ONCE(priv->psy);
++	if (rpt_psy && psy)
++		power_supply_changed(psy);
+ }
+ 
+ static int mt6370_chg_toggle_cfo(struct mt6370_priv *priv)
+@@ -622,6 +740,9 @@ static int mt6370_chg_get_property(struct power_supply *psy,
+ 				   union power_supply_propval *val)
+ {
+ 	struct mt6370_priv *priv = power_supply_get_drvdata(psy);
++	enum mt6370_chg_reg_field fd;
++	unsigned int setting;
++	int ret;
+ 
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_ONLINE:
+@@ -631,29 +752,44 @@ static int mt6370_chg_get_property(struct power_supply *psy,
+ 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
+ 		return mt6370_chg_get_charge_type(priv, val);
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
+-		return mt6370_chg_field_get(priv, F_ICHG, &val->intval);
++		fd = F_ICHG;
++		break;
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
+ 		val->intval = linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_ICHG]);
+ 		return 0;
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
+-		return mt6370_chg_field_get(priv, F_VOREG, &val->intval);
++		fd = F_VOREG;
++		break;
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX:
+ 		val->intval = linear_range_get_max_value(&mt6370_chg_ranges[MT6370_RANGE_F_VOREG]);
+ 		return 0;
+ 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+-		return mt6370_chg_field_get(priv, F_IAICR, &val->intval);
++		fd = F_IAICR;
++		break;
+ 	case POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT:
+-		return mt6370_chg_field_get(priv, F_VMIVR, &val->intval);
++		fd = F_VMIVR;
++		break;
+ 	case POWER_SUPPLY_PROP_PRECHARGE_CURRENT:
+-		return mt6370_chg_field_get(priv, F_IPREC, &val->intval);
++		fd = F_IPREC;
++		break;
+ 	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+-		return mt6370_chg_field_get(priv, F_IEOC, &val->intval);
++		fd = F_IEOC;
++		break;
+ 	case POWER_SUPPLY_PROP_USB_TYPE:
+ 		val->intval = priv->psy_usb_type;
+ 		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
++		return mt6370_chg_get_behaviour(priv, &val->intval);
+ 	default:
+ 		return -EINVAL;
+ 	}
++
++	/* Do not expose the temporary current setting in the middle of a ramp. */
++	guard(mutex)(&priv->ichg_lock);
++	ret = mt6370_chg_field_get(priv, fd, &setting);
++	if (!ret)
++		val->intval = setting;
++	return ret;
+ }
+ 
+ static int mt6370_chg_set_property(struct power_supply *psy,
+@@ -664,11 +800,19 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ 	const struct linear_range *range;
+ 	enum mt6370_chg_reg_field fd;
+ 	unsigned int setting;
++	int ret;
+ 
+ 	if (val->intval < 0)
+ 		return -EINVAL;
+ 
+ 	switch (psp) {
++	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
++		ret = mt6370_chg_set_behaviour(priv, val->intval);
++		if (priv->ichg_workaround &&
++		    (val->intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO ||
++		     val->intval == POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE))
++			power_supply_changed(psy);
++		return ret;
+ 	case POWER_SUPPLY_PROP_ONLINE:
+ 		if (val->intval > 1)
+ 			return -EINVAL;
+@@ -701,8 +845,14 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ 	if (setting < range->min || setting > linear_range_get_max_value(range))
+ 		return -ERANGE;
+ 
+-	if (fd == F_ICHG)
+-		return mt6370_chg_set_ichg(priv, setting);
++	if (fd == F_ICHG) {
++		if (setting < priv->ichg_min)
++			return -ERANGE;
++		ret = mt6370_chg_set_ichg(priv, setting);
++		/* Errors can also change hardware state by inhibiting charging. */
++		power_supply_changed(psy);
++		return ret;
++	}
+ 
+ 	return mt6370_chg_field_set(priv, fd, setting);
+ }
+@@ -710,7 +860,11 @@ static int mt6370_chg_set_property(struct power_supply *psy,
+ static int mt6370_chg_property_is_writeable(struct power_supply *psy,
+ 					    enum power_supply_property psp)
+ {
++	struct mt6370_priv *priv = power_supply_get_drvdata(psy);
++
+ 	switch (psp) {
++	case POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR:
++		return priv->ichg_workaround;
+ 	case POWER_SUPPLY_PROP_ONLINE:
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
+ 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
+@@ -737,11 +891,15 @@ static enum power_supply_property mt6370_chg_properties[] = {
+ 	POWER_SUPPLY_PROP_PRECHARGE_CURRENT,
+ 	POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT,
+ 	POWER_SUPPLY_PROP_USB_TYPE,
++	/* Keep last: omitted on models whose disable sequence is not established. */
++	POWER_SUPPLY_PROP_CHARGE_BEHAVIOUR,
+ };
+ 
+ static const struct power_supply_desc mt6370_chg_psy_desc = {
+ 	.name = "mt6370-charger",
+ 	.type = POWER_SUPPLY_TYPE_USB,
++	.charge_behaviours = BIT(POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO) |
++			     BIT(POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE),
+ 	.properties = mt6370_chg_properties,
+ 	.num_properties = ARRAY_SIZE(mt6370_chg_properties),
+ 	.get_property = mt6370_chg_get_property,
+@@ -811,6 +969,13 @@ static int mt6370_chg_init_setting(struct mt6370_priv *priv)
+ {
+ 	int ret;
+ 
++	if (priv->ichg_workaround) {
++		/* Policy must explicitly enable charging after validating its inputs. */
++		ret = mt6370_chg_set_behaviour(priv, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE);
++		if (ret)
++			return ret;
++	}
++
+ 	/* Disable usb_chg_en */
+ 	ret = mt6370_chg_field_set(priv, F_USBCHGEN, 0);
+ 	if (ret) {
+@@ -865,15 +1030,23 @@ static int mt6370_chg_init_otg_regulator(struct mt6370_priv *priv)
+ 
+ static int mt6370_chg_init_psy(struct mt6370_priv *priv)
+ {
++	struct power_supply *psy;
+ 	struct power_supply_config cfg = {
+ 		.drv_data = priv,
+ 		.fwnode = dev_fwnode(priv->dev),
+ 	};
+ 
+-	priv->psy = devm_power_supply_register(priv->dev, &mt6370_chg_psy_desc,
+-					       &cfg);
++	priv->psy_desc = mt6370_chg_psy_desc;
++	if (!priv->ichg_workaround) {
++		priv->psy_desc.num_properties--;
++		priv->psy_desc.charge_behaviours = 0;
++	}
++	psy = devm_power_supply_register(priv->dev, &priv->psy_desc, &cfg);
++	if (IS_ERR(psy))
++		return PTR_ERR(psy);
++	WRITE_ONCE(priv->psy, psy);
+ 
+-	return PTR_ERR_OR_ZERO(priv->psy);
++	return 0;
+ }
+ 
+ static irqreturn_t mt6370_attach_i_handler(int irq, void *data)
+@@ -968,6 +1141,16 @@ static void mt6370_chg_cancel_work(void *data)
+ 	cancel_work_sync(&priv->bc12_work);
+ }
+ 
++static void mt6370_chg_inhibit(void *data)
++{
++	struct mt6370_priv *priv = data;
++	int ret;
++
++	ret = mt6370_chg_set_behaviour(priv, POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE);
++	if (ret)
++		dev_err(priv->dev, "Failed to inhibit charging during teardown: %d\n", ret);
++}
++
+ static int mt6370_chg_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1024,6 +1207,12 @@ static int mt6370_chg_probe(struct platform_device *pdev)
+ 		return dev_err_probe(dev, ret,
+ 				     "Failed to init mt6370 charger setting\n");
+ 
++	if (priv->ichg_workaround) {
++		ret = devm_add_action_or_reset(dev, mt6370_chg_inhibit, priv);
++		if (ret)
++			return ret;
++	}
++
+ 	ret = mt6370_chg_init_otg_regulator(priv);
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Failed to init OTG regulator\n");

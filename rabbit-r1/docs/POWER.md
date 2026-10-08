@@ -147,8 +147,8 @@ charge-disable operation.
 These are generic driver bounds, not the r1 battery's approved charging limits.
 MT6370 and RT5081 now support 500 mA using the stock workaround described below.
 The other supported variants retain their existing 900 mA minimum. Charging
-remains disabled in the device tree while charge-enable control, battery
-constraints and temperature policy are unfinished.
+remains disabled in the device tree while battery constraints, input-power
+limits and temperature policy are unfinished.
 
 `test-mt6370-limits.py` compiles the production property setter, ONLINE handler,
 register/range tables and kernel range helpers with ASan/UBSan. It checks
@@ -176,8 +176,9 @@ stock cached-current assumption would be unreliable after LK or a bus error.
 There are no other hidden-mode users in the current mainline MT6370 drivers.
 Any future user must share serialization at the MFD level.
 
-After an error it attempts to close the gate and disable charging, retaining
-the first error and logging cleanup failures. A failed bus transaction can
+After an error it attempts to close the gate and inhibit charging through the
+ramp-down helper described below, retaining the first error and logging cleanup
+failures. A failed bus transaction can
 leave hardware unchanged or partially changed, so charging cannot be guaranteed
 off when that disable fails. Successful current writes never re-enable it.
 Probe initializes locks, work items, model limits and hardware settings before
@@ -186,12 +187,73 @@ the power supply and workqueue.
 
 `test-mt6370-current.py` compiles the production helpers, setter, initialization
 and probe with the kernel's range helpers. It checks 257 identification cases,
-816 current transitions, 66 invalid requests, 176 fault/recovery cases, 400
-threaded transitions and 43 probe/unwind cases. The bus model covers partial
+816 current transitions, 66 invalid requests, 246 fault/recovery cases, 400
+threaded transitions and 48 probe/unwind cases. The bus model covers partial
 passcodes, failed writes that take effect, failed cleanup, stale protection and
 an inherited open gate. Fifteen faulty variants fail runtime assertions.
 ASan/UBSan and pthread locks check the host model; physical protection behavior,
 charging current and thermal response still require a device.
+
+### Charge enable and inhibit
+
+MT6370 and RT5081 now expose the standard `charge_behaviour` property with
+`auto` and `inhibit-charge`. Readback follows the hardware enable bit; `auto`
+means charging is permitted, not that current is flowing. The other supported
+PMIC models do not advertise this property because their stop sequence has not
+been established here. Unsupported modes and models return an error before I/O.
+
+Rabbit's active `mt6370_enable_charging()` lowers ICHG to 500 mA before clearing
+CHG_EN to avoid a VSYS overshoot. It waits 2 ms per 50 mA of reduction. The
+shipped kernel contains the same sequence. Mainline now derives the wait from
+the **actual current selector**, rather than a cached request. From 1 A this
+is 20 ms; the supported 5 A maximum takes 180 ms. It holds the current mutex
+across the reduction, wait and disable. The temporary reduction leaves the
+hidden protection setting unchanged, following the stock stop sequence.
+
+An already disabled charger needs no ramp. Inherited selectors at or below
+500 mA can be stopped directly. An unrecognized selector above the supported
+range returns `-ERANGE` and still attempts to clear charge enable. Failed
+reads and failed ramp writes also lead to a disable attempt. A ramp write
+reporting failure may have reached hardware, so the computed wait is retained.
+The first error survives later cleanup. Failed I/O can still leave charging
+active or prevent the intended ramp; software cannot guarantee an electrical
+shutdown in that condition.
+
+The driver retains the last successful current **request** separately from
+hardware readback. Inhibiting may leave the current register at 500 mA; `auto`
+restores the request and its model-specific protection before enabling. A
+current-programming or inhibit/enable I/O failure invalidates that request for
+resume. A fresh successful current-setting operation is then required; it
+never enables charging by itself. Invalid numeric requests leave the previous
+configuration intact. Current and behaviour reads share the transition mutex,
+and power-supply notifications cover successful changes and failed operations
+that may have changed hardware state.
+
+On these two models, probe inhibits charging before changing initial settings.
+It does not enable charging on successful registration. Managed teardown attempts
+to inhibit after draining driver work and unregistering the power supply, while
+the regmap and mutex still exist. BC1.2 work now checks that registration has
+published the power-supply handle before notifying it; early ONLINE writes
+must not cause a NULL-handle notification. The core supplies its initial
+notification after registration.
+
+This driver property is a control mechanism, not the Android UI's **Automatic**
+preference and not a complete charging policy. The future policy service must
+validate battery measurements and faults, apply battery/USB/current/voltage
+limits, then choose whether charging may run. The generic driver current range
+still extends to 5 A. The r1 charger node remains disabled while that service,
+watchdog handling and hardware validation are unfinished.
+
+The current harness compiles the actual control helpers, property callbacks,
+per-model descriptor, probe, cleanup and BC1.2 notification path. It compares
+normal stop writes and delays with the compiled Rabbit stop routine. Tests
+cover 256 inhibit/readback cases, 257 resumes, 73 rejected requests, 365 control
+fault/recovery cases, 520 reads and 600 threaded control/current operations,
+in addition to the current-transition cases above. The bus model permits a
+failed write to take effect and a failed read to overwrite its destination.
+Twenty-one control regressions and the existing 15 current regressions fail
+runtime assertions. Locks, time, I/O and device resources are modeled; neither
+VSYS transients nor real charge-enable behavior has been measured.
 
 ### Android charging-speed setting
 
@@ -220,7 +282,7 @@ entry in the current diagnostic image.
 
 The UI, service interface and persistence are still to be implemented with the
 Android device tree. Enabling this feature also depends on validated battery measurements,
-charge-enable control, policy enforcement and hardware testing.
+charging-policy integration and hardware testing.
 
 ## MT6357 battery-sense ADC
 

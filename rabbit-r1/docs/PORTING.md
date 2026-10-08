@@ -73,7 +73,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
 | USB | Peripheral DT, configfs functions, optional ACM initramfs | Enumeration, console and VBUS/charger interaction |
 | I2C | MT6765 interrupts, AP channels, native counters and hardware timeout; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
-| Charging / battery | MT6370 MFD/ADC and hwmon enabled; MT6357 current, voltage and compensated NTC measurements added; charger still disabled | Measurement validation, capacity and charge policy, charger detection and measured behavior |
+| Charging / battery | MT6370 MFD/ADC and hwmon enabled; MT6357 current/voltage/NTC measurements and MT6370 inhibit/resume control added; charger node still disabled | Measurement validation, capacity and charge policy, watchdog and USB detection, measured behavior |
 | Display | r1 panel, selected native DSI timings and native PHY setup/shutdown match stock offline; backlight settings corrected; [details](DISPLAY.md) | Remaining host startup, clocks, routing and panel power, then measured PLL/link behavior, scanout and brightness |
 | Touch | CST836 driver compiled and host-tested; stock wiring and I2C4 enabled for experimental probing; [details](TOUCH.md) | Host transfer validation, fitted-controller identification and evdev events on hardware |
 | GPU | No working accelerated r1 stack established | Kernel/userspace compatibility and rendering tests; software rendering first |
