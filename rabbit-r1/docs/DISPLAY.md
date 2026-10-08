@@ -218,10 +218,11 @@ display power-domain association remains a board-validation item.
 
 The DRM path shared with MT8183 is supported by the MT6765 routing tables:
 `OVL0 -> OVL0_2L -> RDMA0 -> COLOR0 -> CCORR0 -> AAL0 -> GAMMA0 -> DITHER0 -> DSI0`.
-Rabbit's default path additionally uses RSZ0 and places the overlays in a
-different order. The test passes the chosen mainline path to the shipped routing
-code, expanding its two virtual nodes between RDMA0 and COLOR0. It does not
-claim to reproduce the stock default path or its scaling behavior.
+Rabbit's Android kernel default path additionally uses RSZ0 and places the
+overlays in a different order. The test passes the chosen mainline path to the
+shipped Android routing code, expanding its two virtual nodes between RDMA0 and
+COLOR0. It does not claim to reproduce that default path or its scaling behavior.
+LK's primary route uses the same overlay order as mainline, as detailed below.
 
 The inherited routing table omitted three selector writes and used one-bit
 masks for two selectors with three inputs. The corrected route bypasses RSZ0,
@@ -236,7 +237,8 @@ This prevents a previous selector value of 2 becoming invalid value 3.
 | `0xf48` | `0x1` | `0x0` | RDMA0 output bypasses RSZ0 |
 | `0xf60` | `0x1` | `0x0` | RDMA virtual input bypasses RSZ0 |
 | `0xf4c` | `0x3` | `0x1` | RDMA virtual output to COLOR0 |
-| `0xf30` | `0x1` | `0x0` | CCORR0 input from COLOR0 |
+| `0xf30` | `0x1` | `0x0` | Android driver's COLOR-route selector, retained |
+| `0xf64` | `0x1` | `0x0` | LK's display selector: CCORR0 input from COLOR0 |
 | `0xf50` | `0x1` | `0x1` | DITHER0 to DSI0 |
 | `0xf68` | `0x1` | `0x1` | DSI0 input from DITHER0 |
 
@@ -267,6 +269,14 @@ exercise inherited selectors, unrelated-bit preservation, disconnect and
 reconnect. Stock writes whole selectors and clears only MOUT on disconnect;
 mainline uses masked updates and clears its selector fields on disconnect.
 The comparison accounts for those differences and checks the selected fields.
+It also runs `test-lk-display-path.py` and compares LK's primary route with
+the production callbacks. The kernel programs both the Android driver's
+`MDP_COLOR0_OUT_SEL_IN` at `0xf30` and LK's `DISP_COLOR0_OUT_SEL_IN` at `0xf64`.
+Rabbit's register header defines both addresses. The previous implementation
+left `0xf64` untouched, relying on firmware or reset state. The new write
+explicitly selects COLOR0 in that field while retaining Android's setup.
+The relationship between the two selectors still needs hardware confirmation;
+the offline comparison establishes their software programming, not pixel flow.
 It compares stock's four display mutex IDs and checks mainline add/remove for
 all ten handles. MT8183 DSI/OVL/RDMA and MT2712's second MOD register are covered
 as regressions. Nine deliberately broken route, mask, module and clock variants
@@ -276,7 +286,47 @@ MMIO, module base addresses, logging and profiling are modeled. This does not
 emulate CMDQ, hardware frame synchronization, clock waveforms or pixel flow.
 It also does not establish that every route left active by LK has been shut
 down: masked MOUT writes preserve unrelated outputs. Firmware path teardown,
-the remaining OVL plane paths, IOMMU and complete startup sequencing remain to audit.
+IOMMU and complete startup sequencing remain to audit.
+
+### LK routing evidence
+
+`test-lk-display-path.py` executes Thumb instructions from the checksum-verified
+stock `lk.img` (SHA256
+`534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e`).
+Its raw-file offsets include the 512-byte header; the address bias is
+`0x47fffe00`. The emulator clears BSS at `0x480b7874..0x4816a594`, following
+the bounds used by ARM startup at raw `0x2f8..0x30c`. The appended FDT overlaps
+these runtime addresses in the file and must not be mistaken for initialized
+display state.
+
+| Routine | Raw LK offset |
+| --- | --- |
+| Route-register pointer initialization | `0x9ca8` |
+| Scenario connect / disconnect | `0xa04c` / `0xa084` |
+| Module-list connect / disconnect | `0x9808` / `0x964c` |
+| Primary display initialization | `0x10a68` |
+| Path initialization boundary | `0x8a00` |
+
+The primary-init prefix selects scenario 0 and DSI0 for the modeled r1 DSI
+panel. The route table is read from LK without replacing its contents:
+
+`OVL0 -> OVL0_2L -> RDMA0 -> virtual0 -> virtual1 -> COLOR0 -> CCORR0 -> AAL0 -> GAMMA0 -> DITHER0 -> PWM0 -> DSI0`.
+
+The two virtual nodes represent selectors, and PWM0 is not a pixel-processing
+stage. Scenario 1 is the shorter RDMA-to-DSI path; scenario 2 routes the
+overlays to WDMA0; scenario 3 connects both primary and WDMA paths. All four
+scenarios run with four synthetic initial MMIO values, including disconnect
+and reconnect. Returned stack and callee-saved registers are checked.
+Traces and module names are saved in `out/lk-display-path-audit.json`.
+
+The primary-prefix test models LCM discovery, path allocation, destination and
+LCM-driver assignment, display-manager initialization and memset. It executes
+the mode selection and stops before path initialization, clocks and module
+callbacks. The separate route test then executes the stock scenario connector.
+It does not emulate a complete LK boot or prove the register state at Linux
+handoff. In particular, LK writes cached MOUT values as whole registers but
+does not clear unrelated RSZ routes in these fixtures. Stopping inherited DMA,
+reclaiming the firmware framebuffer and display IOMMU setup remain unresolved.
 
 ## Remaining acceptance work
 

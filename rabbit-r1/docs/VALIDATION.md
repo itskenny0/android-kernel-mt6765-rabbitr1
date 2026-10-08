@@ -42,6 +42,9 @@
 | Shared mutex and compiled RDMA clock | PASS: MT8183 DSI/OVL/RDMA, MT2712 MOD1, stock clock provider/ID/gate | `scripts/test-mt6765-display-path.py`; production callbacks with ASan/UBSan and compiled DT |
 | Missing routes, narrow masks, DSI module enable/removal, legacy MOD1 and RDMA clock regressions | All nine rejected at runtime | `logs/mt6765-display-path-regression-*.log` |
 | MMSYS, mutex and RDMA DT fixes | AArch64 objects and DTB compiled | `logs/mt6765-display-path-build.log` |
+| LK primary display route | PASS: primary-init prefix selects scenario 0/DSI0; 16 connect/disconnect/reconnect fixtures | `scripts/test-lk-display-path.py`, `out/lk-display-path-audit.json`; discovery/allocation and MMIO modeled, no full boot |
+| Display COLOR selector inherited from LK | PASS: production route callbacks match both LK and Android programming with four dirty-register seeds | `logs/lk-display-path-tests.log`; missing `0xf64` write fails the comparison; MMSYS object compiled |
+| Display COLOR route regressions | Four compiled variants rejected: wrong register, input, wide mask and empty mask | `logs/lk-display-path-mutations.log`; checks emitted writes and unrelated-bit preservation |
 | Native RDMA FIFO/QoS vs shipped instructions | PASS: 108 traces, direct/memory video input, vendor clock states and inherited registers; equivalent-pixel-rate fixtures for other refresh rates | `logs/mt6765-rdma-tests.log`, `out/mt6765-rdma-audit.json` |
 | RDMA reset, mode and clock handling | PASS: modeled reset transitions/timeouts, clock errors, IRQ-safe configuration, geometry/bandwidth bounds, queued writes, input transitions and MT8183 regression | `scripts/test-mt6765-rdma.py`; production callbacks with ASan/UBSan |
 | RDMA FIFO, mode, request flags, SRAM, clocks, reset, startup, width, pending depth and refresh-rate regressions | All twelve rejected at runtime | `logs/mt6765-rdma-regression-*.log` |

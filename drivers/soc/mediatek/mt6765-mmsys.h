@@ -11,6 +11,7 @@
 #define MT6765_DISP_DITHER0_MOUT_EN		0xf50
 #define MT6765_DISP_PATH0_SEL_IN		0xf54
 #define MT6765_DISP_RDMA0_RSZ0_SEL_IN		0xf60
+#define MT6765_DISP_COLOR0_OUT_SEL_IN		0xf64
 #define MT6765_DISP_DSI0_SEL_IN			0xf68
 
 static const struct mtk_mmsys_routes mmsys_mt6765_routing_table[] = {
@@ -37,6 +38,10 @@ static const struct mtk_mmsys_routes mmsys_mt6765_routing_table[] = {
 	}, {
 		DDP_COMPONENT_COLOR0, DDP_COMPONENT_CCORR,
 		MT6765_MDP_COLOR0_OUT_SEL_IN, BIT(0),
+		0
+	}, {
+		DDP_COMPONENT_COLOR0, DDP_COMPONENT_CCORR,
+		MT6765_DISP_COLOR0_OUT_SEL_IN, BIT(0),
 		0
 	}, {
 		DDP_COMPONENT_DITHER0, DDP_COMPONENT_DSI0,

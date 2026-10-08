@@ -32,6 +32,8 @@ for path in vars(args).values():
 STOCK_PATH = [0, 1, 3, 25, 26, 8, 9, 10, 11, 12, 13, -1]
 FIELDS = {0xf3c: 2, 0xf40: 1, 0xf48: 1, 0xf4c: 3, 0xf50: 1,
           0xf54: 3, 0xf60: 1, 0xf30: 1, 0xf68: 1}
+LK_FIELDS = {address: mask for address, mask in FIELDS.items() if address != 0xf30} | {0xf64: 1}
+NATIVE_FIELDS = FIELDS | LK_FIELDS
 MOUT = {0xf3c, 0xf40, 0xf50}
 
 
@@ -268,6 +270,10 @@ def compiled_clocks():
 def check():
     raw = (ROOT/'firmware/stock-v0.8.293/boot-unpacked/Image').read_bytes()
     assert hashlib.sha256(raw).hexdigest() == '71d9fd10bbf39272add38e94b993d17b81948e4978791e51bdaeb3f2736a431f'
+    spec = importlib.util.spec_from_file_location('lk_routes', Path(__file__).with_name('test-lk-display-path.py'))
+    lk_routes = importlib.util.module_from_spec(spec); spec.loader.exec_module(lk_routes)
+    lk_routes.check()
+    lk_raw = (ROOT/'firmware/stock-v0.8.293/lk.img').read_bytes()
     out = ROOT/'out/display-path-test'; out.mkdir(exist_ok=True)
     source = out/'harness.c'; binary = out/'harness'
     source.write_text(harness())
@@ -287,19 +293,27 @@ def check():
                 assert current not in sections
                 sections[current] = []
         old = Stock(raw, seed)
+        lk = lk_routes.StockLK(lk_raw, seed)
         case = {'initial_register_value': seed, 'route_phases': [], 'mutexes': []}
         for phase in range(3):
             stock_writes = old.routes(phase != 1)
+            lk_writes = lk.routes(phase != 1)
             reference = dict(stock_writes)
+            lk_reference = dict(lk_writes)
             actual = dict(sections['ROUTE', phase])
-            case['route_phases'].append({'phase': phase, 'stock': stock_writes,
+            case['route_phases'].append({'phase': phase, 'stock': stock_writes, 'lk': lk_writes,
                                         'mainline': sections['ROUTE', phase]})
-            assert len(sections['ROUTE', phase]) == len(FIELDS) and set(actual) == set(FIELDS)
+            assert len(sections['ROUTE', phase]) == len(NATIVE_FIELDS) and set(actual) == set(NATIVE_FIELDS)
             if phase != 1:
                 assert set(reference) == set(FIELDS), reference
+                assert set(lk_reference) == set(LK_FIELDS), lk_reference
+                for address in set(reference) & set(lk_reference):
+                    assert reference[address] == lk_reference[address]
             else:
                 assert set(reference) == MOUT, reference
-            for address, mask in FIELDS.items():
+                assert set(lk_reference) == MOUT, lk_reference
+            reference |= lk_reference
+            for address, mask in NATIVE_FIELDS.items():
                 value = reference[address] & mask if phase != 1 else 0
                 assert actual[address] == (seed & ~mask) | value, (seed,phase,hex(address),actual,reference)
         for n in range(10):
@@ -319,11 +333,12 @@ def check():
             assert len(removed) == 10 and removed[:2] == [(mod, (seed | 0x1fb80) & ~0x10000), (sof, 0)]
             assert dict(removed) == {mod: seed & ~0x1fb80, sof: 0}
         audit.append(case)
-    print('PASS: stock-instruction routing and mutex comparison; four initial states, reconnect/cleanup, ten mutex IDs')
+    print('PASS: stock Android and LK routing, mutex comparison; four initial states, reconnect/cleanup, ten mutex IDs')
     print('PASS: production callbacks under ASan/UBSan; MT8183 DSI/OVL/RDMA and MT2712 MOD1 behavior retained')
     compiled_clocks()
     (ROOT/'out/mt6765-display-path-audit.json').write_text(json.dumps({
         'stock_image_sha256': hashlib.sha256(raw).hexdigest(),
+        'lk_sha256': lk_routes.SHA256,
         'custom_stock_path': STOCK_PATH, 'cases': audit,
     }, indent=2)+'\n')
     print('No CMDQ, physical display, frame synchronization or clock waveform is emulated.')

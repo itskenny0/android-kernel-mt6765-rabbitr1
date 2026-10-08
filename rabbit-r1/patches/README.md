@@ -75,3 +75,8 @@ clipped geometry before component checks, and corrects async state/visibility
 handling. Patch 0033 adds native packed-YUV pair expansion and clipping, with
 field, row-pitch, allocation and 32-bit address bounds. Firmware handoff, IOMMU
 and real pixel output still need work; see `docs/DISPLAY.md`.
+
+Patch 0034 programs the display COLOR selector used by LK, alongside the
+existing selector copied from Android. LK primary-init and scenario traces
+now supplement the Android route comparison. Complete firmware handoff and
+physical display validation remain open; see `docs/DISPLAY.md`.
