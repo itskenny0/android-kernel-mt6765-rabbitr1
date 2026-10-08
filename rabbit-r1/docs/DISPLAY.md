@@ -113,6 +113,7 @@ match the shipped setup:
 | --- | --- |
 | `DSI_TXRX_CTRL` (`0x18`) | `0x0001000c` |
 | `DSI_PSCTRL` (`0x1c`) | `0x000305a0` |
+| `DSI_MEM_CONTI` (`0x90`) | `0x0000003c` |
 | `DSI_PHY_TIMECON0` (`0x110`) | `0x04040303` |
 | `DSI_PHY_TIMECON1` (`0x114`) | `0x060f040c` |
 | `DSI_PHY_TIMECON2` (`0x118`) | `0x040c0100` |
@@ -142,16 +143,33 @@ Image, with MMIO, logging and profiling calls modeled:
 | `DSI_PHY_TIMCONFIG` | `0x716540` |
 
 Production callbacks are compiled with ASan/UBSan and matched against those
-instructions for 12 D-PHY rates, 24 video/pixel-format combinations and eight
-lane/clock combinations. The actual r1 panel flags and native compatible
+instructions for 12 D-PHY rates, 24 video/pixel-format combinations and 24
+combinations of lane count, clock mode and initial memory-command value.
+The actual r1 panel flags and native compatible
 match table and DRM component lookup are included. Tests also cover the
 fractional r1 rate, invalid modes, early power failures and the unchanged
 MT8183 setup. The recorded
 `0x64 = 0x1234` is a preservation-test seed, not a hardware value.
 
+Native RX/TX setup explicitly programs `DSI_MEM_CONTI` with the DCS
+write-memory-continue command (`0x3c`). Previously it inherited that field from
+firmware or reset. The shipped `DSI_TXRX_Control` writes the same value twice;
+mainline writes it once during lane initialization. Three synthetic initial
+values check that the entire register is programmed, while the MT8183 path
+leaves it untouched.
+
+The test also executes the production lane-ready callback through power-on,
+checks that a second power reference or already-ready call does not repeat
+setup, and models lost controller state before another lane initialization.
+The memory command must be configured before the modeled D-PHY reset and
+lane-exit operations. Those operations and delays are stubs; this checks call
+ordering and register programming, not the physical startup waveform. Seven
+compiled variants with missing/incorrect writes, a legacy write, stale state
+or missing/late lane setup are rejected.
+
 This audit covers selected setup writes, not all controller registers or
-startup sequencing. It excludes the stock `MEM_CONTI` setup at `0x90`, packet
-transmission, the analog PHY/PLL, clocks, MMSYS routing and complete DRM path.
+startup sequencing. It excludes packet transmission, the analog PHY/PLL,
+clocks, MMSYS routing and complete DRM path.
 The separate native PHY and display-path audits are described below.
 
 An independent host API bug is fixed: successful writes now return `tx_len`

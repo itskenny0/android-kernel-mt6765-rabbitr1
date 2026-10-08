@@ -85,3 +85,8 @@ Patch 0035 clears native overlay SBCH reuse controls after successful reset,
 before IRQ enable. Mainline does not implement the layer-change tracking that
 this optimization needs. The stock direct/queued cleanup paths and native
 power-cycle ordering are checked; see `docs/DISPLAY.md`.
+
+Patch 0036 sets the native DSI write-memory-continue command during lane
+initialization. It follows the shipped RX/TX setup and removes another
+dependency on inherited controller state. See `docs/DISPLAY.md` for the
+dirty-register and lane-startup checks and their hardware limits.

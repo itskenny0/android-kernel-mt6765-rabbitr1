@@ -111,6 +111,8 @@
 #define DSI_RACK		0x84
 #define RACK				BIT(0)
 
+#define DSI_MEM_CONTI		0x90
+
 #define DSI_PHY_LCCON		0x104
 #define LC_HS_TX_EN			BIT(0)
 #define LC_ULPM_EN			BIT(1)
@@ -432,6 +434,8 @@ static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
 		regval |= DIS_EOT;
 
 	writel(regval, dsi->regs + DSI_TXRX_CTRL);
+	if (dsi->driver_data->mt6765_regs)
+		writel(MIPI_DCS_WRITE_MEMORY_CONTINUE, dsi->regs + DSI_MEM_CONTI);
 }
 
 static void mtk_dsi_ps_control(struct mtk_dsi *dsi, bool config_vact)

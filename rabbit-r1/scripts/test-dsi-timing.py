@@ -23,13 +23,15 @@ if len(sys.argv)==2:
     if not source.is_relative_to(ROOT): raise SystemExit('Source must be under /rabbitr1')
 
 
-def stock_setup(raw,params,function,end,width=480,height=640,seed=0x1234):
+def stock_setup(raw,params,function,end,width=480,height=640,seed=0x1234,
+                conti_seed=0x7654a5a5,trace=False):
     uc=Uc(UC_ARCH_ARM64,UC_MODE_ARM)
     bias,obj,mmio,stop=0x1000000,0x20000000,0x30000000,0x40000000
     uc.mem_map(bias,0x2000000); uc.mem_write(bias,raw)
     uc.mem_map(obj,0x10000); uc.mem_map(mmio,0x1000); uc.mem_map(stop,0x1000)
     uc.mem_write(obj,bytes(params))
     uc.mem_write(mmio+0x64,struct.pack('<I',seed))
+    uc.mem_write(mmio+0x90,struct.pack('<I',conti_seed))
     # DSI_REG[0] is zero-initialized BSS, normally set during host probe.
     uc.mem_write(bias+0x1a06960,struct.pack('<Q',mmio))
     for reg,value in [(UC_ARM64_REG_SP,obj+0x8000),(UC_ARM64_REG_X30,stop),
@@ -57,7 +59,7 @@ def stock_setup(raw,params,function,end,width=480,height=640,seed=0x1234):
     assert uc.reg_read(UC_ARM64_REG_SP)==obj+0x8000
     assert bytes(uc.mem_read(obj,len(params)))==bytes(params)
     assert struct.unpack('<I',uc.mem_read(mmio+0x64,4))[0]==seed
-    return dict(writes)
+    return writes if trace else dict(writes)
 
 
 prelude=r'''
@@ -69,6 +71,7 @@ prelude=r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "/rabbitr1/src/mainline/include/video/mipi_display.h"
 typedef uint8_t u8;
 typedef uint32_t u32;
 typedef uint64_t u64;
@@ -88,7 +91,6 @@ typedef uint64_t u64;
 #define fallthrough __attribute__((fallthrough))
 #define DRM_WARN(...) ((void)0)
 #define dev_err(dev,...) ((void)(dev))
-#define usleep_range(...) ((void)0)
 #define container_of(p,t,m) ((t *)((char *)(p)-offsetof(t,m)))
 struct videomode { u64 pixelclock; u32 hactive,hfront_porch,hsync_len,hback_porch;
     u32 vactive,vfront_porch,vsync_len,vback_porch; };
@@ -113,13 +115,18 @@ struct mtk_dsi { u8 *regs; int format; unsigned int lanes; unsigned long mode_fl
     u32 data_rate; struct videomode vm; struct mtk_phy_timing phy_timing;
     const struct mtk_dsi_driver_data *driver_data;
     struct mipi_dsi_host host; struct drm_bridge bridge;
-    int refcount; void *phy,*hs_clk,*engine_clk,*digital_clk;
+    int refcount; void *phy,*hs_clk,*engine_clk,*digital_clk; bool lanes_ready;
 };
 static u8 regs[0x400];
 static unsigned int writes,clk_sets,phy_ons,clock_ons;
+static unsigned int conti_writes,lane_resets,lane_delays;
 static int fail_clock,fail_phy;
 static u32 readl(const void *p) { u32 v; memcpy(&v,p,4); return v; }
-static void writel(u32 v,void *p) { assert((u8 *)p>=regs && (u8 *)p+4<=regs+sizeof(regs)); memcpy(p,&v,4); writes++; }
+static void writel(u32 v,void *p) {
+    assert((u8 *)p>=regs && (u8 *)p+4<=regs+sizeof(regs));
+    if ((u8 *)p==regs+0x90) conti_writes++;
+    memcpy(p,&v,4); writes++;
+}
 static int mipi_dsi_pixel_format_to_bpp(int format)
 { const int bpp[]={24,24,18,16,30}; return format>=0 && format<5?bpp[format]:-EINVAL; }
 static struct mtk_dsi *bridge_to_dsi(struct drm_bridge *b) { return container_of(b,struct mtk_dsi,bridge); }
@@ -132,8 +139,17 @@ static void mtk_dsi_enable(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_reset_engine(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_set_vm_cmd(struct mtk_dsi *d) { (void)d; }
 static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *d) { (void)d; }
-static void mtk_dsi_lane_ready(struct mtk_dsi *d) { (void)d; }
-static void mtk_dsi_clk_hs_mode(struct mtk_dsi *d,int hs) { (void)d; assert(hs==1); }
+static void mtk_dsi_reset_dphy(struct mtk_dsi *d) {
+    assert(d->lanes_ready);
+    if (d->driver_data->mt6765_regs) assert(readl(regs+0x90)==0x3c);
+    lane_resets++;
+}
+static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *d) { assert(d->lanes_ready); }
+static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *d) { assert(d->lanes_ready); }
+static void usleep_range(unsigned int lo,unsigned int hi) {
+    assert((lo==30 && hi==100) || (lo==1000 && hi==3000)); lane_delays++;
+}
+static void mtk_dsi_clk_hs_mode(struct mtk_dsi *d,int hs) { (void)d; assert(hs==0 || hs==1); }
 '''
 main=r'''
 static void check_modes(struct mtk_dsi *d,struct drm_display_mode good)
@@ -165,7 +181,7 @@ static const struct mtk_dsi_driver_data *match(const char *name)
 }
 int main(int argc,char **argv)
 {
-    assert(argc==17);
+    assert(argc==18); u32 conti_seed=strtoul(argv[17],NULL,0);
     struct mtk_dsi d={ .regs=regs };
     struct device_node node={ .compatible="mediatek,mt6765-dsi" };
     enum mtk_ddp_comp_type component;
@@ -205,15 +221,25 @@ int main(int argc,char **argv)
         fail_clock=0; fail_phy=-EIO;
         assert(mtk_dsi_poweron(&d)==-EIO && d.refcount==0 && phy_ons==1 && !clock_ons && !writes);
         fail_phy=0; phy_ons=0;
+        memcpy(regs+0x90,&conti_seed,4);
         assert(mtk_dsi_poweron(&d)==0 && d.refcount==1 && phy_ons==1 && clock_ons==2);
+        assert(conti_writes==1 && lane_resets==1 && lane_delays==2 && readl(regs+0x90)==0x3c);
+        unsigned int before=writes;
         assert(mtk_dsi_poweron(&d)==0 && d.refcount==2 && phy_ons==1 && clock_ons==2);
+        mtk_dsi_lane_ready(&d);
+        assert(writes==before && conti_writes==1 && lane_resets==1 && lane_delays==2);
+        /* Model controller-state loss before a later lane initialization. */
+        d.lanes_ready=false;memcpy(regs+0x90,&conti_seed,4);mtk_dsi_lane_ready(&d);
+        assert(conti_writes==2 && lane_resets==2 && lane_delays==4 && readl(regs+0x90)==0x3c);
         puts("power:pass"); return 0;
     }
     printf("status:%d\n",mtk_dsi_bridge_mode_valid(&d.bridge,NULL,&dm));
     writel(0x1234,regs+DSI_HSTX_CKL_WC);
+    memcpy(regs+0x90,&conti_seed,4);
     mtk_dsi_phy_timconfig(&d); mtk_dsi_ps_control(&d,true);
     mtk_dsi_rxtx_control(&d); mtk_dsi_config_vdo_timing(&d);
-    const unsigned int offsets[]={0x18,0x1c,0x20,0x24,0x28,0x2c,0x38,0x50,0x54,0x58,0x5c,0x64,0x110,0x114,0x118,0x11c};
+    assert(conti_writes==d.driver_data->mt6765_regs);
+    const unsigned int offsets[]={0x18,0x1c,0x20,0x24,0x28,0x2c,0x38,0x50,0x54,0x58,0x5c,0x64,0x90,0x110,0x114,0x118,0x11c};
     for (unsigned int i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++)
         printf("%x:%x\n",offsets[i],readl(regs+offsets[i]));
 }
@@ -238,7 +264,7 @@ def build_harness():
     functions=['mtk_dsi_phy_timing','mt6765_dsi_phy_timing','mtk_dsi_phy_timconfig',
         'mtk_dsi_rxtx_control','mtk_dsi_ps_control','mtk_dsi_config_vdo_timing_per_frame_lp',
         'mtk_dsi_config_vdo_timing_per_line_lp','mt6765_dsi_config_vdo_timing','mtk_dsi_config_vdo_timing',
-        'mt6765_dsi_mode_valid','mtk_dsi_bridge_mode_valid','mtk_dsi_poweron',
+        'mt6765_dsi_mode_valid','mtk_dsi_bridge_mode_valid','mtk_dsi_lane_ready','mtk_dsi_poweron',
         'mt2701_dsi_driver_data','mt8173_dsi_driver_data','mt6765_dsi_driver_data',
         'mt8183_dsi_driver_data','mt8186_dsi_driver_data','mt8188_dsi_driver_data','mtk_dsi_of_match']
     panel=(ROOT/'src/mainline/drivers/gpu/drm/panel/panel-rabbit-r1.c').read_text()
@@ -264,8 +290,9 @@ def main_test():
     assert hashlib.sha256(raw).hexdigest()==panel.IMAGE_SHA256
     _,full=panel.stock_trace(raw,0x6eed08); original=full[472:]
     binary=build_harness()
-    def host(rate=260000000,fmt=0,lanes=2,mode=1,nc=1,timing=(480,20,20,20,640,2,14,26),native=1,board=0,checks=0):
-        args=[native,rate,fmt,lanes,mode,nc,*timing,board,checks]
+    def host(rate=260000000,fmt=0,lanes=2,mode=1,nc=1,timing=(480,20,20,20,640,2,14,26),native=1,board=0,checks=0,
+             conti_seed=0x7654a5a5):
+        args=[native,rate,fmt,lanes,mode,nc,*timing,board,checks,conti_seed]
         lines=subprocess.check_output([str(binary),*map(str,args)],text=True).splitlines()
         if checks: assert lines==['modes:pass','power:pass']; return
         assert lines[0]=='status:0',lines[0]
@@ -287,7 +314,8 @@ def main_test():
     board=host(rate=260004000,board=1)
     assert {k:board[k] for k in exact}==exact
     assert board[0x64]==0x1234
-    assert board[0x18]==stock_setup(raw,original,0x713024,0x71396c)[0x18]
+    rxtx=stock_setup(raw,original,0x713024,0x71396c)
+    assert {k:board[k] for k in rxtx}==rxtx
     assert struct.unpack_from('<I',original,232)[0]==0
     cases=0
     for timing in [(480,20,20,20,640,2,14,26),(640,17,31,27,960,3,16,29)]:
@@ -299,11 +327,16 @@ def main_test():
                 actual=host(fmt=fmt,mode=mode,timing=timing)
                 assert {k:actual[k] for k in expected}==expected,(fmt,mode,actual,expected)
                 cases+=1
+    txrx_cases=[]
     for lanes in range(1,5):
         for nc in (0,1):
-            expected=stock_setup(raw,params_for(lanes=lanes,nc=nc),0x713024,0x71396c)
-            actual=host(lanes=lanes,nc=nc)
-            assert actual[0x18]==expected[0x18]
+            for seed in (0,0xffffffff,0x7654a5a5):
+                trace=stock_setup(raw,params_for(lanes=lanes,nc=nc),0x713024,0x71396c,conti_seed=seed,trace=True)
+                assert [write for write in trace if write[0]==0x90]==[(0x90,0x3c)]*2
+                expected=dict(trace);actual=host(lanes=lanes,nc=nc,conti_seed=seed)
+                assert {k:actual[k] for k in expected}==expected
+                assert host(lanes=lanes,nc=nc,native=0,conti_seed=seed)[0x90]==seed
+                txrx_cases.append({'lanes':lanes,'noncontinuous_clock':nc,'seed':seed,'stock_writes':trace})
     assert host(mode=4)==host(mode=3), 'Burst mode must take precedence over sync-pulse flag'
     host(checks=1)
     # Known pre-change MT8183 values at 260.004 Mbit/s, r1-size mode.
@@ -312,10 +345,11 @@ def main_test():
     assert [legacy[x] for x in (0x110,0x114,0x118,0x11c)]==[0x04040302,0x05080406,0x02080100,0x00040a02]
     assert host(fmt=1,native=0)[0x1c]>>16==2 and host(fmt=2,native=0)[0x1c]>>16==1
     result={'stock_image_sha256':panel.IMAGE_SHA256,'dphy_rates_mbps':rates,'video_pixel_cases':cases,
-            'lane_clock_cases':8,'r1_registers':{hex(k):hex(v) for k,v in board.items()},
+            'lane_clock_cases':24,'txrx_cases':txrx_cases,'r1_registers':{hex(k):hex(v) for k,v in board.items()},
             'scope':'selected stock setup instructions and production callbacks with modeled MMIO; no PHY or panel hardware'}
     (ROOT/'out/dsi-timing-audit.json').write_text(json.dumps(result,indent=2)+'\n')
-    print('PASS: 12 D-PHY rates, 24 video/pixel cases and eight lane/clock cases match shipped setup')
+    print('PASS: 12 D-PHY rates, 24 video/pixel cases and 24 lane/clock/dirty-MEM_CONTI cases match shipped setup')
+    print('PASS: native memory-continue programming through lane startup and repeated initialization; MT8183 preserves the register')
     print('PASS: r1 fractional rate, burst precedence, mode bounds, early power failures and MT8183 regression')
     print('No PLL, analog PHY, physical link or display pipeline was emulated or tested.')
 
