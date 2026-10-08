@@ -9,7 +9,9 @@ creating the mtkclient ZIP. No device commands run during the build.
 The input is **only** RabbitOS v0.8.293 LK, SHA256
 `534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e`.
 An unknown image is rejected before patching. The output keeps the original
-864,000-byte length and MTK header. No new bootloader is compiled from source.
+864,000-byte length and MTK header. The small display handoff guard is assembled
+from `configs/lk-display-handoff.S` with `binutils-arm-linux-gnueabihf`; the rest
+of the bootloader remains the patched stock binary.
 
 ## Relock protection
 
@@ -38,7 +40,7 @@ protection has not been hardware-tested.
 The upstream orange-state patch removes the warning text and its five-second
 delay. Its dm-verity patch suppresses the corruption screen. Upstream's verifier
 checks the exact 102 changed bytes and disassembles the affected control flow.
-That check runs before the separate DT handoff patch below.
+That check runs before the separate Linux handoff patches below.
 
 These patches suppress UI and delay behavior. They do not unlock the bootloader,
 forge green state, or remove all signature enforcement. The flashing preparer
@@ -249,9 +251,10 @@ This is **not proof of a safe display handoff**. The AArch64
 [boot protocol](https://www.kernel.org/doc/html/latest/arch/arm64/booting.html)
 requires DMA-capable devices to be quiescent before entering Linux. GIC cleanup
 and access-permission changes do not establish that condition. LK's normal
-handoff has no observed direct call to `primary_display_suspend` (`0x107a4`);
-its power-off path does. Display remains disabled pending teardown and panel
-power work. No speculative shutdown call is added by this audit.
+stock handoff has no observed direct call to `primary_display_suspend`
+(`0x107a4`); its power-off path does. The checked display guard below now runs
+before GIC cleanup. Display remains disabled pending physical handoff validation
+and panel power work.
 
 The ATF mapping resolves its linked GOT and relative addresses; it is a fixture,
 not a live memory map. System-register reads, logging, MMIO and secure-context
@@ -283,11 +286,58 @@ that excluded stage is not evidence of completion after the later stop writes.
 
 This reproduces the stock power-off behavior, which must not be treated as a
 checked Linux DMA handoff. No call to that function has been added to the Linux
-boot path. A replacement needs completion checks before clocks or memory
-ownership change, with an error path that does not continue into Linux after
-failed quiescence. Physical completion signals and the remaining panel supply
-mapping still need a device test. The report is `out/lk-display-stop-audit.json`;
-its successful execution means the limitation was reproduced, not resolved.
+boot path. The separate guard below checks completion before continuing.
+Physical completion signals and the remaining panel supply mapping still need
+a device test. The report is `out/lk-display-stop-audit.json`; its successful
+execution means the stock limitation was reproduced.
+
+### Checked display handoff
+
+The call at raw offset `0x1d4d0` now enters a 176-byte guard at
+`0x287c8..0x28878`. This occupies the unused tail of the old Fastboot lock
+handler: mtklkzap's 64-byte refusal at `0x28788` already tail-calls
+`fastboot_fail`, so it cannot fall through into the new code. The refusal,
+message and FAIL wrapper remain intact. The final patched image executes the
+refusal in nine relocation/argument fixtures. A conservative scan finds no
+external direct branch or aligned absolute pointer into the reused tail in
+the exact stock image; arbitrary computed jumps are outside that scan.
+
+The guard masks IRQ and FIQ, then requires an initialized display, a non-null
+powered path, and primary scenario 0. Other scenarios can include WDMA and are
+rejected before touching display registers. It calls the actual stock stop
+dispatcher with immediate writes, then requires RDMA0's enable and memory-mode
+bits to be clear. This supports the direct-input primary path only; it does
+not attempt a memory-mode RDMA shutdown.
+
+Both overlays run their stock reset sequences. The guard reads each
+`FLOW_CTRL_DBG` register afterward and requires a nonzero low-two-bit state,
+regardless of the reset function's return value. DSI0 is reset through its stock
+callback, followed by up to 2,000 BUSY reads separated by 10-microsecond delays.
+Only after BUSY clears does a barrier precede the original GIC-cleanup tail
+call. Callee-saved registers and the caller's stack are preserved on this path.
+
+Unsupported state or failed completion prints `R1: DMA handoff failed` through
+LK's logger and waits indefinitely, possibly until a watchdog reset. It never
+returns to the Linux boot path. Clocks, PHY and panel power remain enabled;
+there is no call to stock `primary_display_suspend` or its clock-gating path.
+This failure happens before the kernel starts, so kernel `expdb` logging cannot
+capture it. LK's logger and watchdog behavior still need physical verification.
+
+`test-lk-display-handoff.py` executes the new hook and guard plus the shipped
+dispatcher/reset instructions. Its 33 fixtures cover immediate and delayed
+completion, both overlay idle bits, late completion after a stock timeout,
+persistent failures, missing context, wrong scenarios, memory-mode RDMA and an
+enable bit that refuses to clear. Five altered instruction sequences must fail
+the execution assertions independently of the image checksum checks. The test
+permits only the intended display-register and stack writes during handoff;
+clock-gate and power-release writes are forbidden.
+
+MMIO, timing, logging and the GIC tail-call boundary are modeled. These checks
+do not establish physical DMA completion, complete boot, or quiescence of other
+devices. The report is `out/lk-display-handoff-audit.json`. Build format 6 records
+the guard, and both packaging stages require its exact hook, payload and relock
+prefix, even if stale metadata claims it is present. The assembler output must
+match the reviewed checksum before it can be inserted into LK.
 
 ## LineageOS splash
 

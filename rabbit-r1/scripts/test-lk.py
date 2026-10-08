@@ -50,8 +50,24 @@ subprocess.run([sys.executable, str(build.ZAP/'tests/test_relock.py'), '-v'], ch
                env=dict(os.environ, MTKLKZAP_TEST_LK=str(build.STOCK/'lk.img')))
 relock = (build.OUT/'relock.bin').read_bytes()
 profile = json.loads((build.ZAP/'profiles/lk/rabbit-r1-v0.8.293.json').read_text())
-assert patched[profile['handler']:profile['handler_end']] == relock[profile['handler']:profile['handler_end']]
+assert patched[profile['handler']:build.display.START] == relock[profile['handler']:build.display.START]
+assert build.display.END == profile['handler_end']
+assert build.display.has_display_guard(patched)
 assert patched[profile['fastboot_fail']:profile['fastboot_fail']+16] == stock[profile['fastboot_fail']:profile['fastboot_fail']+16]
+sys.path.insert(0, str(build.ZAP))
+relock_tests = load('relock_tests', build.ZAP/'tests/test_relock.py')
+for bias in (0x100000, 0x48000000, 0x47fffe00):
+    for argument in (0, 1, 0xffffffff):
+        relock_tests.emulate(patched, profile, bias, argument)
+for offset in (profile['handler'], build.display.START):
+    bad = bytearray(warnings)
+    bad[offset] ^= 1
+    try:
+        build.patch_handoff(stock, bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Changed relock guard or occupied code slot accepted')
 print('PASS: relock guard survives warning and mainline handoff patches')
 assert patched[0x211bc:0x212e8] == stock[0x211bc:0x212e8]  # shared overlay function
 assert patched[0x3e064:0x3e3d0] == stock[0x3e064:0x3e3d0]  # early LK caller

@@ -8,6 +8,7 @@ import shlex
 import shutil
 import struct
 import zlib
+from lk_handoff import has_display_guard
 
 ROOT = Path('/rabbitr1')
 SIZES = {'boot': 32*1024*1024, 'dtbo': 8*1024*1024, 'vbmeta': 8*1024*1024,
@@ -144,6 +145,9 @@ def prepare(args):
     if manifest.get('lk_build', {}).get('kernel_console_preserved') is not True or \
             local(args.package/'lk.bin').read_bytes()[0x1cb70:0x1cb74] != bytes.fromhex('002000bf'):
         raise ValueError('Package lacks the LK console fix; rebuild it')
+    if manifest.get('lk_build', {}).get('kernel_display_guard') is not True or not has_display_guard(
+            local(args.package/'lk.bin').read_bytes()):
+        raise ValueError('Package lacks the checked LK display handoff; rebuild it')
     for name, facts in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('Invalid package filename')
@@ -182,7 +186,8 @@ def prepare(args):
         raise ValueError('Requires an already unlocked bootloader; vbmeta flags do not unlock it')
     args.out.mkdir(parents=True, exist_ok=False)
     shutil.copyfile(gpt_path, args.out/'gpt.bin')
-    shutil.copyfile(Path(__file__), args.out/'prepare-flash.py')
+    for name in ['prepare-flash.py', 'lk_handoff.py']:
+        shutil.copyfile(Path(__file__).with_name(name), args.out/name)
     for part, path in backups.items():
         shutil.copyfile(path, args.out/(part+'-restore.img'))
     shutil.copyfile(args.package/f'boot-{args.profile}.img', args.out/'boot-new.img')

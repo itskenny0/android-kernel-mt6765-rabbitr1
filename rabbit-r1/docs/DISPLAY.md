@@ -748,7 +748,9 @@ callbacks. The separate route test then executes the stock scenario connector.
 It does not emulate a complete LK boot or prove the register state at Linux
 handoff. In particular, LK writes cached MOUT values as whole registers but
 does not clear unrelated RSZ routes in these fixtures. Stopping inherited DMA,
-reclaiming the firmware framebuffer and display IOMMU setup remain unresolved.
+reclaiming the firmware framebuffer and display IOMMU setup are not validated
+by this routing test. The later checked LK guard is documented in
+[LK.md](LK.md#checked-display-handoff); physical DMA completion remains untested.
 
 ## SMI port translation
 

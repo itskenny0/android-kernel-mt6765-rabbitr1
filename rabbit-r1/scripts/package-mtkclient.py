@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import zipfile
+from lk_handoff import has_display_guard
 
 ROOT = Path('/rabbitr1')
 OUT = ROOT/'out/package'
@@ -81,6 +82,9 @@ def main():
     if lk_record.get('kernel_console_preserved') is not True or \
             (ROOT/'dist/lk/lk.bin').read_bytes()[0x1cb70:0x1cb74] != bytes.fromhex('002000bf'):
         raise ValueError('Rebuild LK to preserve the mainline console')
+    if lk_record.get('kernel_display_guard') is not True or not has_display_guard(
+            (ROOT/'dist/lk/lk.bin').read_bytes()):
+        raise ValueError('Rebuild LK with the checked display handoff')
     if lk_record['stock_lk_sha256'] != sha(STOCK/'lk.img'):
         raise ValueError('LK build uses a different stock image')
     for name, facts in lk_record['files'].items():
@@ -126,7 +130,7 @@ def main():
         profiles[profile] = {'image': image.name, 'emmc': profile == 'expdb',
                              'expdb_logging': profile == 'expdb', 'cmdline': cmdline,
                              'dtb_sha256': sha(dtb)}
-    for name in ['prepare-flash.py', 'decode-expdb.py']:
+    for name in ['prepare-flash.py', 'decode-expdb.py', 'lk_handoff.py']:
         shutil.copyfile(ROOT/'scripts'/name, DIST/name)
     shutil.copyfile(ROOT/'docs/FLASHING.md', DIST/'README.md')
     manifest = {

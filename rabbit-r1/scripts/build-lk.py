@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import lk_handoff as display
 
 ROOT = Path('/rabbitr1')
 STOCK = ROOT/'firmware/stock-v0.8.293'
@@ -24,6 +25,7 @@ HANDOFF_PATCHES = [
     (0x4a44, bytes.fromhex('10f0d0f8'), bytes.fromhex('002000bf')),
     (0x1c290, bytes.fromhex('eaf7b4fc'), bytes.fromhex('002000bf')),
     (0x1cb70, bytes.fromhex('2df0defd'), bytes.fromhex('002000bf')),
+    (display.HOOK, display.BEFORE, display.AFTER),
     (0x2138e, bytes.fromhex('fff715ff044650bb'), bytes.fromhex('cdf80880002400bf')),
     (0x213da, bytes.fromhex('0298'), bytes.fromhex('0020')),
 ]
@@ -46,12 +48,33 @@ def patch_handoff(stock, warnings):
     check_stock(stock)
     if len(stock) != len(warnings):
         raise ValueError('LK length changed')
+    if display.digest(warnings[display.RELOCK_START:display.START]) != display.RELOCK_SHA:
+        raise ValueError('Display handoff requires the intact relock guard')
+    if warnings[display.START:display.END] != stock[display.START:display.END]:
+        raise ValueError('Display handoff code slot has changed')
+    payload = (OUT/'display-handoff.bin').read_bytes()
+    if not display.valid_payload(payload):
+        raise ValueError('Unexpected assembled display handoff')
     output = bytearray(warnings)
     for offset, before, after in HANDOFF_PATCHES:
         if output[offset:offset+len(before)] != before:
             raise ValueError(f'Unexpected handoff instructions at {offset:#x}')
         output[offset:offset+len(after)] = after
+    output[display.START:display.END] = payload
+    assert display.has_display_guard(output)
     return bytes(output)
+
+
+def assemble_display_handoff():
+    # Fixed, reviewed image offsets; the payload itself uses relative calls.
+    run('arm-linux-gnueabihf-as', '-o', OUT/'display-handoff.o',
+        ROOT/'configs/lk-display-handoff.S')
+    run('arm-linux-gnueabihf-ld', '-Ttext=0x287c8', '--entry=handoff',
+        '-o', OUT/'display-handoff.elf', OUT/'display-handoff.o')
+    run('arm-linux-gnueabihf-objcopy', '-O', 'binary', '--only-section=.text',
+        OUT/'display-handoff.elf', OUT/'display-handoff.bin')
+    if not display.valid_payload((OUT/'display-handoff.bin').read_bytes()):
+        raise ValueError('Assembled display handoff differs from reviewed bytes')
 
 
 def logo_slots(blob):
@@ -87,6 +110,7 @@ def main():
     # Upstream checks the exact warning diff, before our separate DT handoff edit.
     run(sys.executable, ZAP/'verify-lk.py', OUT/'relock.bin', OUT/'warnings.bin')
     warnings = (OUT/'warnings.bin').read_bytes()
+    assemble_display_handoff()
     patched = patch_handoff(stock, warnings)
     (DIST/'lk.bin').write_bytes(patched)
     run(sys.executable, ZAP/'make-splash.py', '--width', '480', '--height', '640',
@@ -99,7 +123,7 @@ def main():
     if len(before) != 60 or len(after) != 60 or [i for i in range(60) if before[i] != after[i]] != [0,38]:
         raise ValueError('Unexpected logo slot changes')
     report = {
-        'format': 5, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
+        'format': 6, 'stock_lk_sha256': STOCK_SHA, 'stock_lk_bytes': len(stock),
         'mtklkzap_commit': revision, 'warning_bytes_changed': sum(a != b for a,b in zip(relock,warnings)),
         'handoff_patches': [{'file_offset': offset, 'before': before.hex(), 'after': after.hex()}
                             for offset,before,after in HANDOFF_PATCHES],
@@ -114,6 +138,15 @@ def main():
         'kernel_mmc_pinctrl_preserved': True,
         'kernel_scp_fixup_bypassed': True,
         'kernel_console_preserved': True,
+        'kernel_display_guard': True,
+        'display_handoff': {
+            'file_offset': display.START, 'bytes': display.END-display.START,
+            'sha256': display.PAYLOAD_SHA,
+            'scope': 'initialized, powered primary scenario 0 with direct-input RDMA',
+            'checks': 'both overlay reset states and DSI busy after reset',
+            'failure': 'log and halt; no Linux handoff or clock/power release',
+            'clocks_and_panel_power': 'retained',
+        },
         'lk_overlay': 'stock DTBO; shared overlay function and early caller unchanged',
         'logo': {'width': 480, 'height': 640, 'color_model': 'bgrabe', 'changed_slots': [0,38]},
         'verified_boot': 'warnings suppressed; unlocking and vbmeta policy remain separate',

@@ -54,7 +54,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            bc bison build-essential device-tree-compiler flex \
+            bc binutils-arm-linux-gnueabihf bison build-essential device-tree-compiler flex \
             gcc-aarch64-linux-gnu libc6-dev-arm64-cross libelf-dev libssl-dev \
             python3 python3-venv qemu-user zstd
 
@@ -167,6 +167,7 @@ jobs:
           toolchains/boot-tools/bin/python scripts/test-lk-mmc-fixup.py 2>&1 | tee logs/lk-mmc-fixup-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-platform-fixup.py 2>&1 | tee logs/lk-platform-fixup-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-display-stop.py 2>&1 | tee logs/lk-display-stop-tests.log
+          toolchains/boot-tools/bin/python scripts/test-lk-display-handoff.py 2>&1 | tee logs/lk-display-handoff-tests.log
 
       - name: Build and check the mtkclient package
         run: |

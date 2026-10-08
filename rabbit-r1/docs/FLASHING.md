@@ -23,6 +23,13 @@ LineageOS splash are built with pinned mtklkzap tools; see
 The handoff is checked by emulation, but patched LK acceptance and booting still
 need a device test. Restore LK and boot together when returning to RabbitOS.
 
+Before entering Linux, patched LK stops the supported primary display path
+and checks overlay/DSI reset completion. Failed completion or an unsupported
+display state halts boot with `R1: DMA handoff failed` in LK's logger; a watchdog
+may reset the device. Kernel `expdb` logging has not started at that point.
+This guard has passed emulation tests, but has not run on an r1. Native Linux
+display support remains disabled.
+
 | Image | Use |
 | --- | --- |
 | `boot-expdb.img` | eMMC enabled; kernel console logs written to `expdb` after storage starts |
