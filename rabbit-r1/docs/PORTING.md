@@ -151,6 +151,28 @@ At the initial kernel milestone about 226 GiB remained; a complete Android sync
 and build require a new capacity check. No files or caches should be moved
 outside `/rabbitr1` to work around space limits.
 
+## Compressed memory
+
+CRAM is not currently an r1 integration target. Gregory Price's
+[LPC 2026 presentation](https://lpc.events/event/20/contributions/2424/)
+describes compressed-memory hardware with directly mapped, byte-addressable
+reads. This differs from a software compression algorithm or an ordinary
+zRAM swap device. No compatible MT6765 hardware interface or implementation
+has been identified in the checked sources or
+[MediaTek's P35 specifications](https://www.mediatek.com/products/smartphones/mediatek-helio-p35).
+That is a feasibility assessment, not a proof about undocumented silicon.
+The presentation also says its benchmark tiers were DRAM-backed to isolate
+fault overhead, and flags an unrelated reclaim stall in the zswap comparison;
+those charts do not predict performance on the r1.
+
+Evaluate [zRAM](https://docs.kernel.org/admin-guide/blockdev/zram.html) once
+Android runs: compare no compressed swap with LZ4 and the default compressor,
+then measure foreground latency, app reloads, memory pressure, actual RAM used
+by compressed pages, CPU load and battery consumption. Choose size and reclaim
+settings from those measurements. Mainline already enables MGLRU in this tree;
+zRAM and zswap remain disabled in the diagnostic build. No CRAM patches or
+speculative memory-performance claims are part of the current package.
+
 ## First device session
 
 Obtain a full stock boot log, live DT, partition map, active slot/unlock state and
