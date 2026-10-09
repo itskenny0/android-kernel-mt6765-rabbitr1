@@ -90,6 +90,54 @@
           }
         }
       }
+    },
+    {
+      "id": "003",
+      "kernel_source_commit": "7e95bf4afd05a8161d2f3842060625f0960b3517",
+      "host_source_commit": "1d3811d5063f7f8ee4b844d37754c96b2c4509f7",
+      "boot_partition_sha256": "7a7eafb9d84e1244471a851aa4347c5ecb90bbfa783a5a97c9780e8f7264015c",
+      "change": "Pstore cleaner teardown fix and an opt-in diagnostic worker that verifies an expdb checkpoint before poweroff.",
+      "extra_cmdline": "r1.log_shutdown=1",
+      "partitions_written": [
+        "boot_a"
+      ],
+      "full_partition_readback_matched": true,
+      "write_finished_utc": "2026-10-09T21:39:07.125925+00:00",
+      "boot_request": "One HOME_SCREEN request after fresh primary identity match.",
+      "host_observation": "Repeated USB descriptor/address errors (-71); no identified diagnostic gadget or ACM console during the 180-second observation.",
+      "observer_windows_utc": [
+        [
+          "2026-10-09T21:39:15.067180+00:00",
+          "2026-10-09T21:42:15.074169+00:00"
+        ]
+      ],
+      "linux_execution_confirmed": false,
+      "shutdown_worker_execution_confirmed": false,
+      "firmware_poweroff_verified": false,
+      "retained_checkpoint_verified": false,
+      "recovery": "Fresh-cache read-only recovery listener started; expdb capture pending a primary reconnect.",
+      "private_evidence": {
+        "write-result.json": {
+          "bytes": 395,
+          "sha256": "f1a24e72222631dbb198211bcf832aa4466bf0311eb4749c877d69bf01c0fc1b"
+        },
+        "boot-request.json": {
+          "bytes": 736,
+          "sha256": "eccaa403a0128523380576319203aee9bc59893f9121b6455f425675659d83bf"
+        },
+        "observer.json": {
+          "bytes": 1799,
+          "sha256": "62afa9b9d3365d6533832b7a91b066a8831c6adb231c05d6bd7cb76a75dc5dc3"
+        },
+        "console-observer.json": {
+          "bytes": 832,
+          "sha256": "fe29c0c55f742078aff5209bde3360c3629876b31f4acad7559c429cadffc705"
+        },
+        "host-dmesg.txt": {
+          "bytes": 61404,
+          "sha256": "f8504b5598f0103ea858bddbbb5841257a0150c70d4feb5398f46306324a716b"
+        }
+      }
     }
   ],
   "limits": [

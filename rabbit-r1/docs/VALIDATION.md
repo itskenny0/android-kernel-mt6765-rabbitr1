@@ -3,8 +3,8 @@
 ## Hardware attempts — 2026-10-09
 
 The [diagnostic boot-attempt record](../tests/boot-attempt-20261009.json) records
-successful full partition readback and two unconfirmed Linux boot attempts.
-Both produced USB descriptor/address errors (`-71`) without an ACM console.
+successful full partition readback and three unconfirmed Linux boot attempts.
+All three produced USB descriptor/address errors (`-71`) without an ACM console.
 Selecting the USB clock parent did not resolve that symptom. A user observed
 the patched splash followed by a black screen with the backlight on during the
 first attempt; LK intentionally stops display output at its handoff, so that
@@ -16,6 +16,13 @@ The second recovery added no saved kernel records. Fresh reads of `para`,
 regions found invalid printk structures and a fresh preloader log with no LK
 bytes. The log reports a cold boot without DDR retention. These results do not
 locate the preceding boot failure.
+
+The third image adds the [verified-checkpoint shutdown mode](LOG-SHUTDOWN.md)
+and the pstore cleaner teardown fix. Its complete `boot_a` readback matched.
+The following 180-second observation found no diagnostic USB gadget or console;
+worker execution, firmware power-off and retained expdb logs remain unconfirmed.
+The [build record](../tests/expdb-shutdown-build.json) includes exact image hashes
+and the completed offline checks. A fresh expdb recovery capture is pending.
 
 ## Offline validation — 2026-10-08
 

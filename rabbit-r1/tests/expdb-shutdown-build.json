@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "haretic",
-  "status": "compiled-and-host-checked-not-boot-tested",
+  "status": "compiled-packaged-and-host-checked-physical-checkpoint-unconfirmed",
   "kernel_commit": "7e95bf4afd05a8161d2f3842060625f0960b3517",
   "kernel_release": "7.1.0-rabbit-r1-bringup+",
   "kernel_artifacts": {
@@ -62,5 +62,34 @@
     "shutdown_policy_controls": 28,
     "USB_controls": 46
   },
-  "scope": "Teardown and diagnostic checkpoint support. Physical logging and poweroff remain unverified."
+  "scope": "Teardown and diagnostic checkpoint support. Image was flashed with full boot_a readback; Linux execution, retained logs and firmware poweroff remain unconfirmed.",
+  "host_commit": "1d3811d5063f7f8ee4b844d37754c96b2c4509f7",
+  "package": {
+    "manifest_sha256": "2d7d05ec49407d130d3d0f5d7df1b983a97f6435c08c3e80326b3c766a582977",
+    "archive_sha256": "bdb145c284a4c4827bd85b43d6b6f9d76e41e4f7541bdc20485c3b329c8a27c8",
+    "initramfs_sha256": "45fd86e53ec68e3972b87a35b6f578e140459cf05a5abfed6310400db3777e2c",
+    "boot_profiles": {
+      "boot-ram.img": {
+        "bytes": 33554432,
+        "sha256": "6b86f54396f859a163d63743fb66bebcc38adc337385216fa260ba53be3d9cc0"
+      },
+      "boot-expdb.img": {
+        "bytes": 33554432,
+        "sha256": "5d04d639bd70c1320c52ffac98bb48e3e69273e66cc58014913401da71c4e65e"
+      }
+    },
+    "image_checks": "Both profiles: boot headers, SHA1 ID, load addresses, padding, kernel/DT/initramfs, modules, exact helper/worker sources and AOSP unpack. Bundled transport source checker passed.",
+    "installer_checks": "Unchanged installer simulations were not repeated locally for this image rebuild; full package verifier remains in CI."
+  },
+  "shutdown_variant": {
+    "boot_sha256": "7a7eafb9d84e1244471a851aa4347c5ecb90bbfa783a5a97c9780e8f7264015c",
+    "boot_bytes": 33554432,
+    "base_sha256": "5d04d639bd70c1320c52ffac98bb48e3e69273e66cc58014913401da71c4e65e",
+    "cmdline": "bootopt=64S3,32N2,64N2 buildvariant=userdebug earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused rdinit=/init loglevel=8 ignore_loglevel r1.usb=1 r1.expdb=1 r1.log_shutdown=1",
+    "only_cmdline_changed": true,
+    "aosp_unpack_matches": true,
+    "sha1_header_valid": true,
+    "physical_checkpoint_verified": false,
+    "firmware_poweroff_verified": false
+  }
 }
