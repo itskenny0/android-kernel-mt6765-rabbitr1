@@ -339,6 +339,57 @@ the guard, and both packaging stages require its exact hook, payload and relock
 prefix, even if stale metadata claims it is present. The assembler output must
 match the reviewed checksum before it can be inserted into LK.
 
+## Kernel load address and reservation constraints
+
+The v0.8.293 loader uses the Android boot header's `kernel_addr`, subject to
+its memory-reservation checks. At raw LK offsets `0x3cbbe`/`0x3cbc0`, it copies
+header field `+0x0c` to `g_boot_info+0x28`; `0x3cc24` validates/reserves the
+layout before republishing that address. Getter `0x3c944` returns it to the
+normal-storage boot path. The gzip destination at `0x1bd02` and final kernel
+argument at `0x1d5f2` use that same address. This path does not relocate the
+Image using its ARM64 `text_offset`. These instructions are unchanged in the
+patched-stock LK.
+
+The reservation function at `0x1b714` allocates the DTB first, then a fixed
+`0x07800000` (120 MiB) kernel region, then a 64 MiB ramdisk region. For 64-bit
+boot, kernel alignment is 512 KiB and its allocation limit is the requested
+address plus 120 MiB. It checks the returned kernel address and explicitly
+requires the normal DTB address `0x47880000`. The current kernel reservation
+`[0x40080000,0x47880000)` ends exactly at that DTB address.
+
+A bounded replay executes the actual reservation function and mblock allocator
+from stock and patched-stock LK with a controlled contiguous 4 GiB RAM map.
+Logging, verbosity and mutexes are modeled; allocator returns are not. With
+ramdisk address `0x51b00000`, the results are:
+
+| Kernel | DTB | Result on the controlled fresh-state path |
+| --- | --- | --- |
+| `0x40080000` | `0x47880000` | Reservations accepted |
+| `0x40200000` | `0x47880000` | Kernel allocation falls back to `0x40080000`; address check asserts |
+| `0x40200000` | `0x47a00000` | Allocations fit, but fixed-DTB-address check asserts |
+| `0x40000000` | `0x47880000` | Reservations accepted in this fixture |
+
+Existing initialized-address shortcuts and physical firmware memory ownership
+are outside this fixture. Acceptance at `0x40000000` does not establish that
+the first 512 KiB is free of live boot arguments, compressed input or other
+transient data before decompression. Changing either address needs that
+lifetime review, not just an Image-size check.
+
+The ARM64 boot protocol requires `load_address - text_offset` to be 2 MiB
+aligned and at least `image_size` bytes free from the Image start. Stock uses
+`text_offset=0x80000` with load address `0x40080000`. The e98 mainline Image
+uses `text_offset=0`, while the diagnostic package retains `0x40080000`:
+this is a placement-contract mismatch. Its `image_size=0x2d80000` still fits
+below the current DTB; decompressed file length alone is not the required
+free-memory extent.
+
+This mismatch is not a demonstrated boot failure. The current relocatable
+kernel derives the low virtual KASLR displacement from its physical placement
+in `arch/arm64/kernel/pi/map_kernel.c`, and `arch/arm64/kernel/setup.c` warns
+about non-2-MiB placement. The existing load address is retained pending
+firmware-memory review and physical boot evidence. Raising the kernel to
+`0x40200000`, or raising the DTB with it, is not a validated correction.
+
 ## LineageOS splash
 
 The splash belongs to the shared `logo` partition, not inside LK. The build uses
