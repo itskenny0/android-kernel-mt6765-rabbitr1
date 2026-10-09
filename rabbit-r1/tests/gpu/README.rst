@@ -182,3 +182,10 @@ The subsequent full SOC-enabled kernel build is recorded in
 ``mt6765-power-build.json``. It passed at source ``0d14e48318`` with PowerVR
 still disabled. The earlier source-contract record retains its original
 translation-unit-only scope; the full build does not establish hardware support.
+
+``mt6765-diagnostic-package.json`` records the subsequent diagnostic package
+using that kernel and host tooling ``6a07c408e2``. Both boot profiles and the
+initramfs passed the existing image/module checks, 145 transfer-failure cases
+and 15 checker controls. The manifest identifies the kernel; the execution
+record separately pins the host tooling. BusyBox compilation retained four
+warnings. No device was accessed, and this is not a complete Android image set.

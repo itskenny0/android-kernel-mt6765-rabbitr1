@@ -37,6 +37,11 @@ The subsequent [SOC kernel build](../tests/gpu/mt6765-power-build.json) at
 PowerVR remains disabled. This build did not restage Android or regenerate
 the diagnostic boot images.
 
+A later [diagnostic package build](../tests/gpu/mt6765-diagnostic-package.json)
+rebuilt the initramfs and both boot profiles with that kernel and host tooling
+`6a07c408e2`. Image, module and simulated flash-failure checks passed. The package
+has not booted on a device, and Android still uses the earlier staged kernel.
+
 The generic helpers still ignore individual register-write errors. Shared
 VCORE voting, mux order, hardware APM/CORE0 ownership and GPU enablement remain
 separate work; no voltage, OPP, GPU node or firmware change is included.

@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "status": "packaged-and-offline-validated-not-boot-tested",
+  "ended_at": "2026-10-09T14:51:36.884948+00:00",
+  "host_tooling_commit": "6a07c408e224794de242e049717699f446fbf410",
+  "kernel_commit": "0d14e4831896eb0dfebaa7b77a71bd0fd716528a",
+  "experimental_soc_enabled": true,
+  "powervr_enabled": false,
+  "hardware_tested": false,
+  "complete_android_firmware": false,
+  "archive": {
+    "path": "dist/rabbit-r1-mainline-mtkclient.zip",
+    "bytes": 28530225,
+    "sha256": "35fef8d60d692d3ccf114cefc07362ff99390d8c7e3ac2c2cde3555aa241d790"
+  },
+  "manifest_sha256": "6909b9c49c0e7cf93ca6ec90229c403fad42f87468b8bcdf3778333bff23a97e",
+  "initramfs_sha256": "1bb97384e936cd31045443dd07e6c6198e5a5288189930c5515610343e0fe552",
+  "kernel_build_sha256": "61e4dba2a8802c9bf4b78de19e3731c3306b94da96757c36cc463d485c6be435",
+  "package_members": {
+    "README.md": {
+      "bytes": 13141,
+      "sha256": "7e225a6f5d6bd552aba0fe01dc202dcf67d0f4a1630fa58f7caaf3d1be153163"
+    },
+    "SHA256SUMS": {
+      "bytes": 1131,
+      "sha256": "1858928a800acfe7c4442226fa7ac6fe341bad5733f208d4fd3c007b02cbe64c"
+    },
+    "boot-expdb.img": {
+      "bytes": 33554432,
+      "sha256": "0b8a619d898066da69c3a30af702947b0039c14cb867c384e09723e98a343fcc"
+    },
+    "boot-ram.img": {
+      "bytes": 33554432,
+      "sha256": "1e0f6a9765b3548f6c62d48f8952bc958fe4df7a6f993aba9d719edfdef19c3c"
+    },
+    "decode-expdb.py": {
+      "bytes": 2031,
+      "sha256": "c90be70ae49f0c91a5ce9c762a225a8bba53f2f83ce0ce442620a7cca6dd298b"
+    },
+    "dtbo.img": {
+      "bytes": 8388608,
+      "sha256": "de91deb66ca18aada0e3fd1ad3766cc7d3e96c578cd02c35e9d88bffa815be2e"
+    },
+    "lk.bin": {
+      "bytes": 864000,
+      "sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0"
+    },
+    "lk_handoff.py": {
+      "bytes": 1031,
+      "sha256": "2a9b892dc432b626dc2a2fa5409f3dd0d6620ee56ae3a289ef4a49fe6885375a"
+    },
+    "logo.bin": {
+      "bytes": 1460959,
+      "sha256": "f08895b8a03caa2c36e20b9e82a1f0fe0b6ee55aae38c4a7508045146dcc484d"
+    },
+    "manifest.json": {
+      "bytes": 10732,
+      "sha256": "6909b9c49c0e7cf93ca6ec90229c403fad42f87468b8bcdf3778333bff23a97e"
+    },
+    "mtkclient-transport.json": {
+      "bytes": 1416,
+      "sha256": "dc9e43fb6ce0cf0c0f19a39106f844b443d28680f1653b0a9613a0fee6691e37"
+    },
+    "mtkclient-transport.patch": {
+      "bytes": 31145,
+      "sha256": "0e75f67941e756a89459bad84a07bcd29fccc39576dcbd0572b62040dfa0dbd9"
+    },
+    "prepare-flash.py": {
+      "bytes": 16709,
+      "sha256": "751914c1c5ad28c74fd389944784e22f42eef15a2ce2b29d45050428d16ff821"
+    },
+    "prepare-mtkclient.py": {
+      "bytes": 11139,
+      "sha256": "90dd3030ae858a4cfaeb2a1631067d2921c8e1f8ab97c2333370454ae3f46087"
+    },
+    "splash.png": {
+      "bytes": 15738,
+      "sha256": "a6027fe2f968200fc095b0818ade06f5e5dad369fdeb21f248ec7f4ce94e0f44"
+    }
+  },
+  "checks": {
+    "image_layout_and_kernel_initramfs_modules": "PASS for both ram and expdb profiles",
+    "stale_LK_rejections": 36,
+    "transport_metadata_and_old_tree_rejections": 6,
+    "ordered_transfer_failure_cases": 145,
+    "checker_failure_and_package_pin_controls": 15,
+    "actual_bundled_source_checker": "PASS; 1164 files and 40 directories",
+    "source_stock_LK_and_Android_installer_stamp_unchanged": true,
+    "preserved_old_outputs_verified": true
+  },
+  "stages": [
+    {
+      "stage": "initramfs",
+      "command": [
+        "bash",
+        "/rabbitr1/scripts/build-initramfs.sh"
+      ],
+      "started_at": "2026-10-09T14:37:43.687239+00:00",
+      "ended_at": "2026-10-09T14:38:00.449257+00:00",
+      "exit_code": 0,
+      "output_eof": true,
+      "capture_error": null,
+      "storage_stop": null,
+      "minimum_sampled_available_bytes": 1882267648,
+      "log_sha256": "dde0646438373012d98a820dfc8ffa0d56561e7a7951612b3315ad8dc2bf7c62"
+    },
+    {
+      "stage": "package",
+      "command": [
+        "python3",
+        "/rabbitr1/scripts/package-mtkclient.py"
+      ],
+      "started_at": "2026-10-09T14:38:02.444270+00:00",
+      "ended_at": "2026-10-09T14:38:06.406792+00:00",
+      "exit_code": 0,
+      "output_eof": true,
+      "capture_error": null,
+      "storage_stop": null,
+      "minimum_sampled_available_bytes": 1775648768,
+      "log_sha256": "25597698b1d0449acc87ca48423026c089cf5525b03e59e332a7ceec3d77c02c"
+    },
+    {
+      "stage": "bundled-checker",
+      "command": [
+        "python3",
+        "/rabbitr1/dist/mtkclient/prepare-mtkclient.py",
+        "--manifest",
+        "/rabbitr1/dist/mtkclient/mtkclient-transport.json",
+        "--patch",
+        "/rabbitr1/dist/mtkclient/mtkclient-transport.patch",
+        "--archive",
+        "/rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz",
+        "--destination",
+        "/rabbitr1/src/mtkclient-haretic",
+        "--check"
+      ],
+      "started_at": "2026-10-09T14:38:08.544032+00:00",
+      "ended_at": "2026-10-09T14:38:10.392691+00:00",
+      "exit_code": 0,
+      "output_eof": true,
+      "capture_error": null,
+      "storage_stop": null,
+      "minimum_sampled_available_bytes": 1775640576,
+      "log_sha256": "3049b5267f2584323666ed3cb19410567caf1b2f87b1d38677bbabd22358dec3"
+    },
+    {
+      "stage": "package-tests",
+      "command": [
+        "python3",
+        "/rabbitr1/scripts/test-flash-package.py",
+        "--package",
+        "/rabbitr1/dist/mtkclient",
+        "--scripts",
+        "/rabbitr1/scripts"
+      ],
+      "started_at": "2026-10-09T14:38:10.393245+00:00",
+      "ended_at": "2026-10-09T14:51:32.902665+00:00",
+      "exit_code": 0,
+      "output_eof": true,
+      "capture_error": null,
+      "storage_stop": null,
+      "minimum_sampled_available_bytes": 1334837248,
+      "log_sha256": "8972435e7523a6e9e4f41f992efdeb8194eb96b8f93cfa287dae957ced7cb3a3"
+    }
+  ],
+  "evidence": {
+    "execution_result": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/execution/result.json",
+      "sha256": "37676d386cb9120b21d77a821d429a415904d84f19bbcb4fdcda7d474242377b"
+    },
+    "execution_start": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/execution/start.json",
+      "sha256": "10cda8fdc23e3b3d53a66c13d572fe85460fcbaec1f869d5cd230e3b2043a930"
+    },
+    "frozen_inputs": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/inputs.json",
+      "sha256": "d74d08f2de0286f270ea33f602e8912bc853854dcfb37ea56a6874c9f4082862"
+    },
+    "runner": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/run.py",
+      "sha256": "d9d60816f0e5398304dc949df5af3332500d74354408298c1e9be02e71424cc8"
+    },
+    "package_checks": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/package_checks.py",
+      "sha256": "2f919d01bc5360e82cf09d20d923c0c194bc527ffb89e918a6ecec8e9fe04003"
+    },
+    "preflight": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/preflight.json",
+      "sha256": "c11345dc38b04fa9300afd05f259cbecf0a4e91d57b8a8f8554a2131cffb9635"
+    },
+    "plan_review": {
+      "path": "out/gpu-review/mt6765-bus-protection-integration/diagnostic-package/independent-review/provenance.json",
+      "sha256": "3b3d436b6f767955eb84bacb9904b62bcfc236cf92f63fdb5101a0275a4771e4"
+    }
+  },
+  "warnings": [
+    "BusyBox compilation retained four warnings: three ignored return values and one return-local-addr diagnostic."
+  ],
+  "limits": [
+    "The manifest source_commit identifies the compiled kernel. Host tooling provenance is recorded separately in this record and the pinned execution inputs/result.",
+    "Packaging checks the Android installer stamp only. Android remains staged with f725; its full image build stopped under the storage guard.",
+    "Flash failure controls use simulated device commands; no device was discovered, accessed or flashed.",
+    "This diagnostic package does not establish physical boot, MFG power operation, persistent logging, GPU rendering or beta readiness."
+  ]
+}
