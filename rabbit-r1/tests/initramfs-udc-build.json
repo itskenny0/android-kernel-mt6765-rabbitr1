@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "status": "packaged-and-offline-validated-not-boot-tested",
+  "scope": "Diagnostic initramfs/package rebuild with bounded UDC wait and logging; kernel remains unchanged.",
+  "host_source_commit": "a0c8cf9a7f60376c57a9a89ec9de126734aa604c",
+  "kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "kernel_build_record": {
+    "bytes": 3428,
+    "sha256": "ccded58a70d9dfff20bda522b46dce72ade1d2fc0089498787df8729e695476c"
+  },
+  "init_sha256": "a247ddd0445eca30a38240fad562bbac683cd61f97f70cc72fac420300eacf3d",
+  "initramfs": {
+    "bytes": 885997,
+    "sha256": "a319f10b16ed230e08b55225ccab655454ad679b5b7e0aa5bc60de24f330b052"
+  },
+  "package_manifest": {
+    "bytes": 10732,
+    "sha256": "b139281f2c6dcff34ecfc13244a8553fd8b17f5383a413668151663ff023fc64"
+  },
+  "images": {
+    "boot-ram.img": {
+      "bytes": 33554432,
+      "sha256": "a8dd6251f4d17743e1928a6001cfd39e47ad67d943e577a292244ced6510959d"
+    },
+    "boot-expdb.img": {
+      "bytes": 33554432,
+      "sha256": "245404754aa67435f04fccfccb6403687c175dad4ca13f015d2aad04cd109f9a"
+    },
+    "dtbo.img": {
+      "bytes": 8388608,
+      "sha256": "de91deb66ca18aada0e3fd1ad3766cc7d3e96c578cd02c35e9d88bffa815be2e"
+    },
+    "lk.bin": {
+      "bytes": 864000,
+      "sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0"
+    },
+    "logo.bin": {
+      "bytes": 1460959,
+      "sha256": "f08895b8a03caa2c36e20b9e82a1f0fe0b6ee55aae38c4a7508045146dcc484d"
+    },
+    "splash.png": {
+      "bytes": 15738,
+      "sha256": "a6027fe2f968200fc095b0818ade06f5e5dad369fdeb21f248ec7f4ce94e0f44"
+    }
+  },
+  "archive": {
+    "name": "rabbit-r1-mainline-mtkclient.zip",
+    "bytes": 28538572,
+    "sha256": "4bdfc94866289e4e29e250250948975702ee57891792d006fb54f31b745ded2b"
+  },
+  "stages": {
+    "initramfs": {
+      "exit_code": 0,
+      "output_eof": true,
+      "record": {
+        "bytes": 427,
+        "sha256": "46b20f9b995e9c34574535b559a71304dbbee777ab2990ae813ff08a948c8cf5"
+      },
+      "log": {
+        "bytes": 39563,
+        "sha256": "38459dedb503e3363e99acdae5773b1178b019a7efff92dd4e587b64d946b61f"
+      }
+    },
+    "package": {
+      "exit_code": 0,
+      "output_eof": true,
+      "record": {
+        "bytes": 430,
+        "sha256": "843ba68b4bbf6ade23cc3a3d53308aa664bdd75d1f8c7039440e06547753ad6f"
+      },
+      "log": {
+        "bytes": 63,
+        "sha256": "b517a01888eb810a93cbb25a6e66f7892e6730d29f65f4908a3838fdbed28401"
+      }
+    },
+    "bundled-checker": {
+      "exit_code": 0,
+      "output_eof": true,
+      "record": {
+        "bytes": 766,
+        "sha256": "6d4b1be1245b6dfb13e3312bd5e40cee77a121d338419102fad19a7fa8dd4445"
+      },
+      "log": {
+        "bytes": 305,
+        "sha256": "995aa7f6428cca119c5fb77ca0cad2c827cc4080d0a626f4a421b6041c30d0fb"
+      }
+    },
+    "package-tests": {
+      "exit_code": 0,
+      "output_eof": true,
+      "record": {
+        "bytes": 528,
+        "sha256": "2baaceea2e5c61be91091b3177332575f372f460e53eafab67f8ce9383ece6cd"
+      },
+      "log": {
+        "bytes": 1019,
+        "sha256": "2475df18c223813f1f8ce331f755ae2f904d2ecbdd8970c2a969d041cae83930"
+      }
+    }
+  },
+  "component_checks": {
+    "result": {
+      "bytes": 2641,
+      "sha256": "862d8b7ce305df273637a0e8d61cf0a0739501209eb9f13a0f8e9181779d9920"
+    },
+    "embedded_init_matches_committed_source": true,
+    "only_init_file_contents_changed_in_cpio": true,
+    "kernel_dtb_table_lk_payloads_unchanged": true,
+    "boot_v2_header_invariants_and_SHA1_id_pass": true,
+    "pstore_modules_match_e98": true
+  },
+  "package_suite": {
+    "status": "pass",
+    "runs": 1,
+    "mode": "normal-current-kernel-and-ramdisk",
+    "record": {
+      "bytes": 528,
+      "sha256": "2baaceea2e5c61be91091b3177332575f372f460e53eafab67f8ce9383ece6cd"
+    },
+    "log": {
+      "bytes": 1019,
+      "sha256": "2475df18c223813f1f8ce331f755ae2f904d2ecbdd8970c2a969d041cae83930"
+    },
+    "reported_control_counts": {
+      "stale_lk_packaging_preparation": 36,
+      "stale_missing_transport_metadata_and_old_tree": 6,
+      "ordered_transfer_preflight_readback_failures": 145,
+      "checker_failure_and_package_pins": 15
+    },
+    "additional_checks": [
+      "Both boot profiles: v2 headers, SHA1 IDs, addresses, zero padding, DT tables, initramfs and AOSP unpack",
+      "Flat transport input copies and post-admission checker-copy rejection",
+      "GPT CRC/bounds rejection, AVB flags, wrong paths, backup preparation, dry run and simulated restore"
+    ],
+    "physical_hardware_accessed": false
+  },
+  "hardware_unconfirmed": true,
+  "device_boot_tested": false,
+  "limitations": [
+    "This rebuilt diagnostic image has not been flashed or boot-tested; hardware behavior remains unconfirmed.",
+    "A bounded UDC wait does not establish that the USB controller probes or that the kernel reaches init.",
+    "The flash/restore regression suite uses simulated device I/O; passing it does not establish physical installation or recovery.",
+    "BusyBox compilation completed with four warnings retained in the build log."
+  ],
+  "completed_at": "2026-10-09T19:56:15.577071+00:00",
+  "execution_result": {
+    "bytes": 5077,
+    "sha256": "b157a2990c981f28403655d8ebbf5ff383f4e6fde6340d55503d86dd393a2d78"
+  },
+  "execution_source": {
+    "bytes": 5689,
+    "sha256": "1ceccf94987238b7f3353d6438cce093885edfa224be2ef4742c5fa9336052cf"
+  },
+  "bundled_source_check": {
+    "status": "checked",
+    "files": 1164,
+    "directories": 40,
+    "manifest_sha256": "ebe5e9ccaac5919a2e5a7b9ef4ffac84fb1ac56c210d6dce15b515654bec59e4",
+    "patch_sha256": "774119aa80af7f2ae5d198c9470e922bf8f8da048f02bd7fe2b2b38a44cfe9d0"
+  },
+  "protected_kernel_lk_android_inputs_unchanged": true,
+  "previous_outputs_preserved": true,
+  "busybox_compiler_warnings": {
+    "count": 4,
+    "diagnostics": [
+      "ignoring return value of 'write' declared with attribute 'warn_unused_result' [-Wunused-result]",
+      "ignoring return value of 'chown' declared with attribute 'warn_unused_result' [-Wunused-result]",
+      "ignoring return value of 'fchown' declared with attribute 'warn_unused_result' [-Wunused-result]",
+      "function may return address of local variable [-Wreturn-local-addr]"
+    ],
+    "log_sha256": "38459dedb503e3363e99acdae5773b1178b019a7efff92dd4e587b64d946b61f"
+  }
+}
