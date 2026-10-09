@@ -119,6 +119,9 @@ jobs:
           python3 scripts/test-mtkclient-xflash-read.py \
             --source /rabbitr1/src/mtkclient-haretic \
             --out /rabbitr1/out/mtkclient-xflash-read-tests 2>&1 | tee logs/mtkclient-xflash-read-tests.log
+          python3 scripts/test-mtkclient-cid.py \
+            --source /rabbitr1/src/mtkclient-haretic \
+            --out /rabbitr1/out/mtkclient-cid-tests 2>&1 | tee logs/mtkclient-cid-tests.log
 
       - name: Check source and logging helpers
         run: |

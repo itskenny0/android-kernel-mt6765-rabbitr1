@@ -9,8 +9,8 @@
   },
   "patch": {
     "path": "patches/mtkclient/0001-guard-bulk-transfers.patch",
-    "sha256": "7661c68f98dfa8934cba028523de05c481ba5a50b18d2459ccd4d08fba8f6514",
-    "bytes": 32252
+    "sha256": "82472cbedf690e306d41754a54a73caf4392b66b83f2e5ef7e6f59e408955ab8",
+    "bytes": 36340
   },
   "files": [
     {
@@ -33,6 +33,20 @@
       "after_sha256": "96aa1ef4e6cd219e0cc5bd80c43f2946623e40fc9d2ad9f5dc0fa6b94453c54f",
       "before_bytes": 53694,
       "after_bytes": 58503
+    },
+    {
+      "path": "mtk.py",
+      "before_sha256": "2017afadfed662ae83c059e45c269ed20ccd65b4baf31775e7494a2839742bc5",
+      "after_sha256": "b3eebe27e75948906a9ca2e5d4440348fdd87927b5dffc47f73f45c26b136cc7",
+      "before_bytes": 16928,
+      "after_bytes": 17569
+    },
+    {
+      "path": "mtkclient/Library/DA/mtk_da_handler.py",
+      "before_sha256": "ecc611aed426316ac75b07f6bb76e05918bce8cc574d04d2f407a121f2cdb7c4",
+      "after_sha256": "80cdf6dd5c007d21ba25cce9861983cd8d862435af0c94eb24ba0e5d274a67dc",
+      "before_bytes": 76597,
+      "after_bytes": 78918
     }
   ]
 }

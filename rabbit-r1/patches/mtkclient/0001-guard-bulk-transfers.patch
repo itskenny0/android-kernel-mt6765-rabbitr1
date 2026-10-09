@@ -720,3 +720,91 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
                  return False
          if fh:
              fh.close()
+diff --git a/mtk.py b/mtk.py
+--- a/mtk.py
++++ b/mtk.py
+@@ -49,6 +49,15 @@
+ }
+ 
+ 
++def parse_emmc_cid(value):
++    """An explicit full eMMC CID, never a VID/PID, prefix, or cached identity."""
++    if (type(value) is not str or len(value) != 32 or
++            any(c not in "0123456789abcdefABCDEF" for c in value) or
++            bytes.fromhex(value) in (bytes(16), b"\xff" * 16)):
++        raise argparse.ArgumentTypeError("expected eMMC CID must be 32 nonblank hex digits")
++    return value.lower()
++
++
+ # ================== Argument Groups ==================
+ 
+ def add_connection_group(parser):
+@@ -150,6 +159,10 @@
+         cmd_parsers[cmd] = add_common_flash_cmd(
+             subparsers, cmd, CMDS_HELP.get(cmd, cmd), base
+         )
++        if cmd in ("gpt", "r", "w"):
++            cmd_parsers[cmd].add_argument(
++                "--expected-emmc-cid", type=parse_emmc_cid,
++                help="Require this freshly queried XFlash eMMC CID before dispatch")
+ 
+     # Specific positional/required arguments
+     # Read partition(s)
+diff --git a/mtkclient/Library/DA/mtk_da_handler.py b/mtkclient/Library/DA/mtk_da_handler.py
+--- a/mtkclient/Library/DA/mtk_da_handler.py
++++ b/mtkclient/Library/DA/mtk_da_handler.py
+@@ -1239,10 +1239,54 @@
+         if self.mtk.daloader.poke(addr=addr, data=data):
+             self.info(f"Successfully wrote data to {hex(addr)}, length {hex(len(data))}")
+ 
++    def _check_expected_emmc_cid(self, mtk, expected):
++        # Dispatch helpers use self.mtk: check that exact connected owner.
++        if mtk is not self.mtk:
++            raise ValueError("CID guard and command have different connected owners")
++        if (type(expected) is not str or len(expected) != 32 or
++                any(c not in "0123456789abcdefABCDEF" for c in expected)):
++            raise ValueError("Expected eMMC CID must be exactly 32 hex digits")
++        wanted = bytes.fromhex(expected)
++        if wanted in (bytes(16), b"\xff" * 16):
++            raise ValueError("Blank expected eMMC CID")
++        if (mtk.daloader.flashmode != DAmodes.XFLASH or
++                mtk.daloader.daconfig.storage.flashtype != "emmc"):
++            raise ValueError("CID guard requires XFlash eMMC")
++        cdc = mtk.port.cdc
++        cdc.check_io()
++        try:
++            # Always query AFTER configure_da/reinit (including its reconnect).
++            # Neither .state/config.cid nor the earlier emmc object is evidence.
++            emmc = mtk.daloader.da.get_emmc_info(display=False)
++        except Exception:
++            cdc.check_io()  # Preserve an underlying swallowed transport failure.
++            raise
++        cdc.check_io()
++        if (emmc is None or type(emmc.type) is not int or emmc.type <= 0 or
++                type(emmc.block_size) is not int or emmc.block_size != 512 or
++                type(emmc.user_size) is not int or emmc.user_size <= 0 or
++                emmc.user_size % emmc.block_size or
++                type(emmc.cid) not in (bytes, bytearray) or len(emmc.cid) != 16):
++            raise ValueError("Missing or malformed fresh eMMC identity")
++        if bytes(emmc.cid) != wanted:
++            raise ValueError("Fresh eMMC CID differs from expected device")
++
+     def handle_da_cmds(self, mtk, cmd: str, args):
+         if mtk is None or mtk.daloader is None:
+             self.error("Error on running da, aborting :(")
+             sys.exit(1)
++        expected = getattr(args, "expected_emmc_cid", None)
++        if expected is not None:
++            try:
++                if cmd not in ("gpt", "r", "w"):
++                    raise ValueError("CID guard only supports gpt, r, and w")
++                self._check_expected_emmc_cid(mtk, expected)
++            except Exception:
++                try:
++                    mtk.port.close(reset=False)
++                except Exception:
++                    pass  # Cleanup must not replace the primary admission error.
++                raise
+         if mtk.daloader.config.generatekeys and mtk.daloader.is_patched():
+             mtk.daloader.keys()
+         if cmd == "gpt":
