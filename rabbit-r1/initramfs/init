@@ -19,10 +19,21 @@ usb_status()
 {
     printf '%s\n' "$1" > /run/usb-start.status || :
     printf '<6>r1: USB ACM %s\n' "$1" > /dev/kmsg || :
+    if [ "${usb_beacon:-0}" -eq 1 ]; then
+        usb_beacon_uptime=unavailable
+        IFS=' ' read -r usb_beacon_uptime usb_beacon_idle < /proc/uptime || usb_beacon_uptime=unavailable
+        printf 'uptime=%s USB beacon: %s\n' "$usb_beacon_uptime" "$1"
+        printf 'uptime=%s USB beacon: %s\n' "$usb_beacon_uptime" "$1" >> /run/usb-beacon.log || :
+        printf '<6>r1: USB beacon uptime=%s %s\n' "$usb_beacon_uptime" "$1" > /dev/kmsg || :
+    fi
 }
 
 usb_start()
 {
+    usb_beacon=0
+    case " $(cat /proc/cmdline) " in
+      *' r1.usb_beacon=1 '*) usb_beacon=1 ;;
+    esac
     usb_status 'setup-started'
     if ! mount -t configfs configfs /sys/kernel/config; then
         usb_status 'failed: configfs mount'
@@ -53,6 +64,13 @@ usb_start()
         for controller in /sys/class/udc/*; do
             [ -e "$controller" ] || continue
             controller=${controller##*/}
+            if [ "$usb_beacon" -eq 1 ]; then
+                usb_status 'beacon: waiting 20s before first bind'
+                if ! sleep 20; then
+                    usb_status 'failed: beacon pre-bind wait'
+                    return 1
+                fi
+            fi
             if ! printf '%s\n' "$controller" > "$gadget/UDC"; then
                 usb_status "failed: bind $controller"
                 return 1
@@ -63,6 +81,25 @@ usb_start()
                 return 1
             fi
             usb_status "bound: $controller"
+            if [ "$usb_beacon" -eq 1 ]; then
+                usb_status 'beacon: bound window 10s'
+                if ! sleep 10; then
+                    usb_status 'failed: beacon bound wait; no unbind requested'
+                    return 1
+                fi
+                usb_status "beacon: unbind requested: $controller"
+                if ! printf '\n' > "$gadget/UDC"; then
+                    usb_status "failed: beacon unbind $controller"
+                    return 1
+                fi
+                bound=unknown
+                if ! IFS= read -r bound < "$gadget/UDC" || [ -n "$bound" ]; then
+                    usb_status "failed: beacon unbind readback $controller"
+                    return 1
+                fi
+                usb_status 'beacon complete: unbound; no rebind'
+                return 0
+            fi
             while :; do
                 getty -L -n -l /bin/sh ttyGS0 115200
                 sleep 2

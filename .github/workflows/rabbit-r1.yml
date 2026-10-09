@@ -134,7 +134,7 @@ jobs:
           source scripts/env.sh
           python3 scripts/test-install-layout.py \
             --out /rabbitr1/out/install-layout-tests 2>&1 | tee logs/install-layout-tests.log
-          python3 scripts/test-initramfs-usb.py \
+          python3 scripts/test-initramfs-usb-beacon.py \
             --out /rabbitr1/out/initramfs-usb-tests 2>&1 | tee logs/initramfs-usb-tests.log
           python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
           python3 scripts/test-android-patches.py 2>&1 | tee logs/android-patches-tests.log
