@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "status": "compiled-and-validated-not-boot-tested",
+  "scope": "Incremental ARM64 compilation and full kernel relink after bus-protection command-error correction",
+  "source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+  "ended_at": "2026-10-09T15:22:26.817417+00:00",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "config_sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f",
+  "experimental_soc_enabled": true,
+  "powervr_enabled": false,
+  "hardware_tested": false,
+  "command": "JOBS=8 bash scripts/build-mainline.sh --experimental-soc",
+  "artifacts": {
+    "Image": {
+      "bytes": 35342344,
+      "sha256": "7aa0119f27b9c9e97a2150451b79febd9897565bf5f1eda2cd3479c431ee7c81"
+    },
+    "Image.gz": {
+      "bytes": 12561038,
+      "sha256": "10fac5406cb87cdad1a61a141353c470cb63220e0cb3747aad6ec14744f6647c"
+    },
+    "Module.symvers": {
+      "bytes": 858554,
+      "sha256": "606c9dd4852439725db907e37ba89999774b1025d40fb2d881a44cbe2c14a322"
+    },
+    "System.map": {
+      "bytes": 7711006,
+      "sha256": "d9cb7ad5b8661182a5ab185947a4ebadea3171eda25bfcc58920450d60c0b623"
+    },
+    "config": {
+      "bytes": 195221,
+      "sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f"
+    },
+    "defconfig": {
+      "bytes": 17429,
+      "sha256": "935c68830d98de62f693eaf9b4e5e4b2bc8538223320926a373960a687c9a1cb"
+    },
+    "modules.tar.gz": {
+      "bytes": 24229,
+      "sha256": "be537642bbbd7ba74441ac95896d6dbeeec2301171d41ccc7babe707c1014761"
+    },
+    "mt6765-rabbit-r1.dtb": {
+      "bytes": 28113,
+      "sha256": "9592be73f9be84c7e37ad764a54d4948a4871f49d3b94ca56610b52da89ab19c"
+    },
+    "vmlinux": {
+      "bytes": 45048112,
+      "sha256": "4963e8a026ed5188801ce33312d6cba9a9133222b8db7beeae9dfaee4a587520"
+    }
+  },
+  "module_count": 10,
+  "checks": {
+    "kernel_validator": "PASS",
+    "recorded_artifact_and_module_hashes": "PASS",
+    "source_and_77_staged_Android_files_unchanged": true,
+    "log_output_eof": true,
+    "capture_error": null,
+    "storage_stop": null
+  },
+  "evidence": {
+    "build_record": {
+      "path": "dist/mainline/build.json",
+      "sha256": "ccded58a70d9dfff20bda522b46dce72ade1d2fc0089498787df8729e695476c"
+    },
+    "runner_result": {
+      "path": "out/gpu-review/mt6765-bus-errors/kernel-build/result.json",
+      "sha256": "cdcb3c206371500ba3942ee36b0b4fa9257ae34f5afc7e94ca89d96526a7c11b"
+    },
+    "runner_start": {
+      "path": "out/gpu-review/mt6765-bus-errors/kernel-build/start.json",
+      "sha256": "175c2f9d1724d1185d20481f94892f02fcf76a1c362a056e46a27d0f18a4224e"
+    },
+    "log": {
+      "path": "out/gpu-review/mt6765-bus-errors/kernel-build/build.log",
+      "sha256": "0b9673cae18ce9a438fd9d26ed5f9e7b36a34639e9e7de21bcf7562e4bbe090d"
+    },
+    "runner_review": {
+      "path": "out/gpu-review/mt6765-bus-errors/kernel-build/independent-review/provenance.json",
+      "sha256": "9f61ee0f4c1fcf86279a5979cc150065fd2d8e3f014fd1af74128998a7ac2561"
+    },
+    "old_kernel_preservation": {
+      "path": "out/storage-review/gpu-bus-errors/execution/result.json",
+      "sha256": "70b3b05a7f286194b053efc2a26c56a4fc58c1df84595e3b75799da7bbd5bd75"
+    }
+  },
+  "limits": [
+    "This records compilation and artifact validation, not physical power transitions, boot or GPU rendering.",
+    "Android remains staged with f725. The stopped full Android build is not validated by this kernel build.",
+    "Diagnostic package validation is recorded separately after its own build and checks."
+  ]
+}

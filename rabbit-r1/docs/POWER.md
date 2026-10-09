@@ -49,7 +49,10 @@ branches remain unchanged: an error may leave earlier protection stages or a
 partially powered domain behind. This does not implement complete recovery.
 [Focused checks](../tests/gpu/mt6765-bus-errors.json) cover the API errors and
 caller paths with modeled resources, plus an ARM64 translation-unit compile.
-The kernel and diagnostic package recorded above predate this correction.
+The subsequent [kernel build](../tests/gpu/mt6765-bus-errors-build.json) and
+[diagnostic package](../tests/gpu/mt6765-bus-errors-package.json) include this
+correction at `e98ffe5fce`. Compilation, relinking and offline package checks
+passed. Physical power transitions and boot remain untested.
 
 Other power-control, SRAM and secondary cleanup errors remain outside this
 change. Shared VCORE voting, mux order, hardware APM/CORE0 ownership and GPU

@@ -196,3 +196,10 @@ initramfs passed the existing image/module checks, 145 transfer-failure cases
 and 15 checker controls. The manifest identifies the kernel; the execution
 record separately pins the host tooling. BusyBox compilation retained four
 warnings. No device was accessed, and this is not a complete Android image set.
+
+``mt6765-bus-errors-build.json`` and ``mt6765-bus-errors-package.json`` record
+the subsequent kernel rebuild and diagnostic package at ``e98ffe5fce`` with
+patch 0080 included. The kernel relink, nine artifact and ten module checks,
+both boot profiles, and the complete offline package suite passed. The prior
+kernel and diagnostic package are preserved separately. Android remains staged
+with f725; GPU acceleration and physical boot remain unvalidated.
