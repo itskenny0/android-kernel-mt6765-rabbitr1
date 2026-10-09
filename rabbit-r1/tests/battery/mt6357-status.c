@@ -211,6 +211,8 @@ static int devm_mutex_init(struct device *d, struct mutex *m)
     if (m == &gauge.lock) measure_lock_init=true; else status_lock_init=true;
     return 0;
 }
+/* Diagnostics are disabled in this existing STATUS-specific fixture. */
+static void mt6357_gauge_live_diagnostic(struct mt6357_gauge *g) { }
 static int mt6357_gauge_init_adc(struct mt6357_gauge *g)
 {
     /* Existing current suite covers the real ADC init; isolate supplier probe. */

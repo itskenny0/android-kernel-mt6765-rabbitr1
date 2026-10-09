@@ -138,6 +138,12 @@ prelude = r'''
 typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
+#define U64_MAX UINT64_MAX
+typedef struct { int64_t value; } atomic64_t;
+#define ATOMIC64_INIT(x) { (x) }
+static int64_t atomic64_inc_return(atomic64_t *v) { return __atomic_add_fetch(&v->value,1,__ATOMIC_SEQ_CST); }
+#define lockdep_assert_held(m) assert((m)->owner == thread_id)
+
 typedef int64_t ktime_t;
 #define BIT(n) (1U << (n))
 #define GENMASK(h,l) ((~0U << (l)) & (~0U >> (31-(h))))
@@ -180,6 +186,7 @@ static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
 #define guard(kind) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
 static u64 now;
 static ktime_t ktime_get(void) { return now; }
+static u64 ktime_get_boottime_ns(void) { return now * 1000; }
 static ktime_t ktime_add_us(ktime_t t, u64 n) { return t+n; }
 static int ktime_compare(ktime_t a, ktime_t b) { return (a>b)-(a<b); }
 static void usleep_range(unsigned int lo, unsigned int hi) { assert(lo && lo<=hi); now+=hi; }
@@ -277,6 +284,7 @@ static int mt6357_gauge_read_temperature(struct mt6357_gauge *g, int *out) { ret
 '''
 body += model
 for name in ('mt6357_gauge_convert', 'mt6357_gauge_convert_charge', 'mt6357_gauge_release',
+             'mt6357_gauge_live_word', 'mt6357_gauge_init_fg', 'mt6357_gauge_latch_locked',
              'mt6357_gauge_read_raw', 'mt6357_gauge_read_current', 'mt6357_gauge_read_charge',
              'mt6357_gauge_get_property'):
     body += function(name, s)
@@ -350,6 +358,7 @@ static void *worker(void *arg)
 }
 int main(void)
 {
+    (void)mt6357_live_generation; /* Used by the probe extension in the STATUS suite. */
     unsigned int comparisons=0, samples=0, failures=0;
     assert(!pthread_mutex_init(&gauge.lock.raw,NULL));
     setup(false,0);

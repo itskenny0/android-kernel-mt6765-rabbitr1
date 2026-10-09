@@ -1,0 +1,581 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Capture bracketed MT6357 live battery measurements
+
+Pair current and charge in each fuel-gauge latch around raw voltage,
+thermistor and reference ADC reads. Keep per-field errors and timing,
+including independent battery presence and cleanup failures. Link the
+ADC supplier lifetime and optionally report one acquisition during probe.
+No capacity estimate or charging configuration is changed.
+
+diff --git a/drivers/power/supply/mt6357-gauge.c b/drivers/power/supply/mt6357-gauge.c
+--- a/drivers/power/supply/mt6357-gauge.c
++++ b/drivers/power/supply/mt6357-gauge.c
+@@ -1,15 +1,19 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /* MT6357 battery current, charge counter, voltage and thermistor sensing. */
+ 
++#include <linux/atomic.h>
+ #include <linux/bitfield.h>
+ #include <linux/cleanup.h>
+ #include <linux/iio/consumer.h>
++#include <linux/iio/iio.h>
++#include <linux/ktime.h>
+ #include <linux/math64.h>
+ #include <linux/mfd/mt6357/registers.h>
+ #include <linux/mfd/mt6397/core.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/power_supply.h>
+ #include <linux/property.h>
+@@ -34,6 +38,44 @@
+ 	u32 resistance;
+ };
+ 
++/* Private observations, not a power-supply ABI or an accepted SOC seed. */
++struct mt6357_live_value {
++	int value;
++	int error;
++};
++
++enum mt6357_fg_word {
++	MT6357_LIVE_ENGINE, MT6357_LIVE_CLOCK, MT6357_LIVE_CURRENT,
++	MT6357_LIVE_CAR_LOW, MT6357_LIVE_CAR_HIGH, MT6357_LIVE_BATON,
++	MT6357_LIVE_WORDS,
++};
++
++struct mt6357_live_fg {
++	u64 started_ns, ready_ns, finished_ns;
++	struct mt6357_live_value words[MT6357_LIVE_WORDS];
++	int prepare_error, latch_error, release_error;
++	struct mt6357_live_value current_ua, charge_uah, present;
++};
++
++struct mt6357_live_adc {
++	u64 started_ns, finished_ns;
++	struct mt6357_live_value raw, mv;
++	int scale_type, scale_numerator, scale_denominator, scale_error;
++};
++
++struct mt6357_live_observation {
++	u64 generation, sequence, started_ns, finished_ns;
++	struct mt6357_live_fg fg[2];
++	/* ISENSE, BAT_TEMP, VBIF in each bracketed ADC set. */
++	struct mt6357_live_adc adc[2][3];
++	struct mt6357_live_value temperature_decic[2];
++	int error;
++};
++
++#define MT6357_READ_CURRENT BIT(0)
++#define MT6357_READ_CAR BIT(1)
++#define MT6357_READ_BATON BIT(2)
++
+ struct mt6357_gauge {
+ 	struct device *dev;
+ 	struct regmap *regmap;
+@@ -41,6 +83,7 @@
+ 	u32 shunt_uohms;
+ 	u32 gain_permille;
+ 	bool needs_release;
++	u64 live_generation, live_sequence;
+ 	const struct power_supply_desc *desc;
+ 	struct notifier_block status_nb;
+ 	struct power_supply *charger;
+@@ -60,6 +103,8 @@
+ 	u32 series_uohms;
+ };
+ 
++static atomic64_t mt6357_live_generation = ATOMIC64_INIT(0);
++
+ static int mt6357_gauge_convert(struct mt6357_gauge *gauge, unsigned int raw,
+ 				int *current_ua)
+ {
+@@ -134,32 +179,52 @@
+ 	return ret;
+ }
+ 
+-static int mt6357_gauge_read_raw(struct mt6357_gauge *gauge, bool counter,
+-				  unsigned int *raw)
+-{
+-	unsigned int state, low, high = 0;
+-	int ret, release_ret;
+-
+-	guard(mutex)(&gauge->lock);
+-
+-	/* Do not report retained samples from a stopped measurement engine. */
+-	ret = regmap_read(gauge->regmap, MT6357_FGADC_CON0, &state);
+-	if (ret)
+-		return ret;
+-	if (!(state & MT6357_FG_ON))
+-		return -EAGAIN;
+-	ret = regmap_read(gauge->regmap, MT6357_BM_TOP_CKPDN_CON0, &state);
+-	if (ret)
+-		return ret;
+-	if (state & MT6357_FG_CLOCK_PD)
+-		return -EAGAIN;
+-
+-	/* Clear inherited state, or recover a previous incomplete release. */
+-	if (gauge->needs_release) {
++static int mt6357_gauge_live_word(struct mt6357_gauge *gauge, unsigned int reg,
++				 struct mt6357_live_value *word)
++{
++	unsigned int raw;
++
++	word->error = regmap_read(gauge->regmap, reg, &raw);
++	if (!word->error)
++		word->value = raw & 0xffff;
++	return word->error;
++}
++
++static void mt6357_gauge_init_fg(struct mt6357_live_fg *sample)
++{
++	unsigned int i;
++
++	*sample = (struct mt6357_live_fg) {};
++	for (i = 0; i < MT6357_LIVE_WORDS; i++)
++		sample->words[i].error = -ENODATA;
++	sample->prepare_error = sample->latch_error = sample->release_error = -ENODATA;
++	sample->current_ua.error = sample->charge_uah.error = sample->present.error = -ENODATA;
++}
++
++/* The same transaction serves ordinary properties and paired live samples. */
++static int mt6357_gauge_latch_locked(struct mt6357_gauge *gauge, unsigned int fields,
++				    struct mt6357_live_fg *sample)
++{
++	unsigned int state;
++	int ret, err;
++
++	lockdep_assert_held(&gauge->lock);
++	mt6357_gauge_init_fg(sample);
++	sample->started_ns = ktime_get_boottime_ns();
++	ret = mt6357_gauge_live_word(gauge, MT6357_FGADC_CON0,
++				     &sample->words[MT6357_LIVE_ENGINE]);
++	if (!ret && !(sample->words[MT6357_LIVE_ENGINE].value & MT6357_FG_ON))
++		ret = -EAGAIN;
++	if (!ret)
++		ret = mt6357_gauge_live_word(gauge, MT6357_BM_TOP_CKPDN_CON0,
++					     &sample->words[MT6357_LIVE_CLOCK]);
++	if (!ret && (sample->words[MT6357_LIVE_CLOCK].value & MT6357_FG_CLOCK_PD))
++		ret = -EAGAIN;
++	if (!ret && gauge->needs_release)
+ 		ret = mt6357_gauge_release(gauge);
+-		if (ret)
+-			return ret;
+-	}
++	sample->prepare_error = ret;
++	if (ret)
++		goto done;
+ 
+ 	gauge->needs_release = true;
+ 	ret = regmap_update_bits(gauge->regmap, MT6357_FGADC_CON1,
+@@ -168,24 +233,65 @@
+ 		ret = regmap_read_poll_timeout(gauge->regmap, MT6357_FGADC_CON1, state,
+ 					       state & MT6357_FG_LATCH_READY,
+ 					       MT6357_FG_POLL_US, MT6357_FG_TIMEOUT_US);
++	sample->latch_error = ret;
++	if (!ret) {
++		sample->ready_ns = ktime_get_boottime_ns();
++		if (fields & MT6357_READ_CURRENT)
++			ret = mt6357_gauge_live_word(gauge, MT6357_FGADC_CUR_CON0,
++						     &sample->words[MT6357_LIVE_CURRENT]);
++		if (fields & MT6357_READ_CAR) {
++			err = mt6357_gauge_live_word(gauge, MT6357_FGADC_CAR_CON0,
++						     &sample->words[MT6357_LIVE_CAR_LOW]);
++			if (!ret)
++				ret = err;
++			/* Preserve the legacy single-counter failure/read ordering. */
++			if (!err || (fields & MT6357_READ_CURRENT)) {
++				err = mt6357_gauge_live_word(gauge, MT6357_FGADC_CAR_CON1,
++							     &sample->words[MT6357_LIVE_CAR_HIGH]);
++				if (!ret)
++					ret = err;
++			}
++		}
++		if (fields & MT6357_READ_BATON) {
++			err = mt6357_gauge_live_word(gauge, MT6357_BATON_ANA_CON0,
++						     &sample->words[MT6357_LIVE_BATON]);
++			sample->present.error = err;
++			if (!err) {
++				state = sample->words[MT6357_LIVE_BATON].value;
++				if (!(state & BIT(0)))
++					sample->present.error = -EAGAIN;
++				else
++					sample->present.value = !(state & BIT(1));
++			}
++		}
++	}
++
++	sample->release_error = mt6357_gauge_release(gauge);
++	if (sample->release_error)
++		dev_err_ratelimited(gauge->dev, "Failed to release gauge latch: %d\n",
++				    sample->release_error);
+ 	if (!ret)
+-		ret = regmap_read(gauge->regmap,
+-				  counter ? MT6357_FGADC_CAR_CON0 : MT6357_FGADC_CUR_CON0,
+-				  &low);
+-	if (!ret && counter)
+-		ret = regmap_read(gauge->regmap, MT6357_FGADC_CAR_CON1, &high);
+-
+-	release_ret = mt6357_gauge_release(gauge);
+-	if (release_ret)
+-		dev_err_ratelimited(gauge->dev, "Failed to release gauge latch: %d\n",
+-				    release_ret);
+-	if (ret)
+-		return ret;
+-	if (release_ret)
+-		return release_ret;
+-
++		ret = sample->release_error;
++done:
++	sample->finished_ns = ktime_get_boottime_ns();
++	return ret;
++}
++
++static int mt6357_gauge_read_raw(struct mt6357_gauge *gauge, bool counter,
++				  unsigned int *raw)
++{
++	struct mt6357_live_fg sample;
++	int ret;
++
++	guard(mutex)(&gauge->lock);
++	ret = mt6357_gauge_latch_locked(gauge,
++			counter ? MT6357_READ_CAR : MT6357_READ_CURRENT, &sample);
++	if (ret)
++		return ret;
+ 	/* Publish only a sample whose complete transaction succeeded. */
+-	*raw = (low & 0xffff) | (high << 16);
++	*raw = counter ? (unsigned int)sample.words[MT6357_LIVE_CAR_LOW].value |
++			 ((unsigned int)sample.words[MT6357_LIVE_CAR_HIGH].value << 16) :
++			 (unsigned int)sample.words[MT6357_LIVE_CURRENT].value;
+ 	return 0;
+ }
+ 
+@@ -265,6 +371,185 @@
+ 	}
+ 	*temperature = gauge->table[gauge->num_points - 1].temperature_mc / 100;
+ 	return 0;
++}
++
++static int mt6357_gauge_live_pair(struct mt6357_gauge *gauge,
++				 struct mt6357_live_fg *sample)
++{
++	unsigned int raw;
++	int ret;
++
++	ret = mt6357_gauge_latch_locked(gauge, MT6357_READ_CURRENT | MT6357_READ_CAR |
++				       MT6357_READ_BATON, sample);
++	sample->current_ua.error = sample->charge_uah.error = ret;
++	if (ret)
++		return ret;
++	sample->current_ua.error = mt6357_gauge_convert(gauge,
++		sample->words[MT6357_LIVE_CURRENT].value, &sample->current_ua.value);
++	raw = (unsigned int)sample->words[MT6357_LIVE_CAR_LOW].value |
++	      ((unsigned int)sample->words[MT6357_LIVE_CAR_HIGH].value << 16);
++	sample->charge_uah.error = mt6357_gauge_convert_charge(gauge, raw,
++							    &sample->charge_uah.value);
++	return sample->current_ua.error ?: sample->charge_uah.error;
++}
++
++static void mt6357_gauge_init_adc_sample(struct mt6357_live_adc *sample)
++{
++	*sample = (struct mt6357_live_adc) {};
++	sample->raw.error = sample->mv.error = sample->scale_error = -ENODATA;
++}
++
++static int mt6357_gauge_live_adc(struct iio_channel *channel,
++				struct mt6357_live_adc *sample)
++{
++	const struct iio_chan_spec *spec;
++	int ret, raw, numerator = 0, denominator = 0;
++	s64 mv;
++
++	mt6357_gauge_init_adc_sample(sample);
++	sample->started_ns = ktime_get_boottime_ns();
++	ret = -ENODATA;
++	if (!channel)
++		goto done;
++	spec = channel->channel;
++	/* This bounded reader supports the actual unsigned, offset-free r1 ADCs. */
++	ret = -EOPNOTSUPP;
++	if (spec->scan_type.sign != 'u' || !spec->scan_type.realbits ||
++	    spec->scan_type.realbits > 31 || iio_channel_has_info(spec, IIO_CHAN_INFO_OFFSET))
++		goto done;
++	ret = iio_read_channel_raw(channel, &raw);
++	sample->raw.error = ret < 0 ? ret : (ret == IIO_VAL_INT ? 0 : -EOPNOTSUPP);
++	ret = sample->raw.error;
++	if (ret)
++		goto done;
++	sample->raw.value = raw;
++	ret = -ERANGE;
++	if (raw < 0 || (unsigned int)raw >= (1U << spec->scan_type.realbits))
++		goto done;
++	ret = iio_read_channel_scale(channel, &numerator, &denominator);
++	sample->scale_type = ret;
++	sample->scale_error = ret < 0 ? ret :
++			      (ret == IIO_VAL_FRACTIONAL ? 0 : -EOPNOTSUPP);
++	if (ret >= 0) {
++		sample->scale_numerator = numerator;
++		sample->scale_denominator = denominator;
++	}
++	ret = sample->scale_error;
++	if (ret)
++		goto done;
++	ret = -ERANGE;
++	if (numerator <= 0 || denominator <= 0)
++		goto done;
++	/* Two nonnegative signed-int operands fit the signed 64-bit product. */
++	mv = div_s64((s64)raw * numerator, denominator);
++	if (mv > INT_MAX / 1000)
++		goto done;
++	sample->mv.value = mv;
++	ret = 0;
++done:
++	sample->mv.error = ret;
++	sample->finished_ns = ktime_get_boottime_ns();
++	return ret;
++}
++
++/*
++ * Publish diagnostic evidence even on error, never a partial successful bundle.
++ * Callers own the driver lifetime (probe now, drained in-driver work later).
++ */
++static int mt6357_gauge_collect_live(struct mt6357_gauge *gauge,
++				    struct mt6357_live_observation *out)
++{
++	struct mt6357_live_observation sample = {};
++	struct iio_channel *channels[] = { gauge->voltage, gauge->thermistor, gauge->reference };
++	unsigned int set, channel;
++	int ret, err;
++
++	if (!out)
++		return -EINVAL;
++	sample.started_ns = ktime_get_boottime_ns();
++	for (set = 0; set < 2; set++) {
++		mt6357_gauge_init_fg(&sample.fg[set]);
++		sample.temperature_decic[set].error = -ENODATA;
++		for (channel = 0; channel < 3; channel++)
++			mt6357_gauge_init_adc_sample(&sample.adc[set][channel]);
++	}
++	mutex_lock(&gauge->lock);
++	sample.generation = gauge->live_generation;
++	ret = -EOVERFLOW;
++	if (gauge->live_sequence == U64_MAX)
++		goto done;
++	sample.sequence = ++gauge->live_sequence;
++	ret = mt6357_gauge_live_pair(gauge, &sample.fg[0]);
++	if (ret)
++		goto done;
++	for (set = 0; set < 2; set++) {
++		for (channel = 0; channel < 3; channel++) {
++			unsigned int index = set ? 2 - channel : channel;
++
++			err = mt6357_gauge_live_adc(channels[index], &sample.adc[set][index]);
++			if (!err && !index && !sample.adc[set][index].mv.value)
++				err = sample.adc[set][index].mv.error = -ERANGE;
++			if (!ret)
++				ret = err;
++		}
++	}
++	err = mt6357_gauge_live_pair(gauge, &sample.fg[1]);
++	if (!ret)
++		ret = err;
++	for (set = 0; set < 2; set++) {
++		/* Use only this bracket's current, never a hidden third latch. */
++		err = sample.fg[set].current_ua.error ?: sample.adc[set][1].mv.error ?:
++		      sample.adc[set][2].mv.error;
++		if (!err)
++			err = mt6357_gauge_temperature(gauge, sample.adc[set][1].mv.value,
++					sample.adc[set][2].mv.value, sample.fg[set].current_ua.value,
++					&sample.temperature_decic[set].value);
++		sample.temperature_decic[set].error = err;
++		if (!ret)
++			ret = err;
++		/* PRESENT is independent: successful absence remains value zero. */
++		if (!ret)
++			ret = sample.fg[set].present.error;
++	}
++done:
++	sample.error = ret;
++	sample.finished_ns = ktime_get_boottime_ns();
++	mutex_unlock(&gauge->lock);
++	*out = sample;
++	return ret;
++}
++
++static void mt6357_gauge_live_diagnostic(struct mt6357_gauge *gauge)
++{
++	struct mt6357_live_observation sample;
++	unsigned int set, channel;
++
++	if (!IS_ENABLED(CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS))
++		return;
++	mt6357_gauge_collect_live(gauge, &sample);
++	dev_info(gauge->dev, "live acquisition generation=%llu sequence=%llu ns=%llu..%llu error=%d (not SOC)\n",
++		 sample.generation, sample.sequence, sample.started_ns, sample.finished_ns, sample.error);
++	for (set = 0; set < 2; set++) {
++		const struct mt6357_live_fg *fg = &sample.fg[set];
++
++		dev_info(gauge->dev, "live FG%u ns=%llu/%llu/%llu prepare/latch/release=%d/%d/%d current_uA=%d/%d charge_uAh=%d/%d present=%d/%d temp_deciC=%d/%d\n",
++			 set, fg->started_ns, fg->ready_ns, fg->finished_ns,
++			 fg->prepare_error, fg->latch_error, fg->release_error,
++			 fg->current_ua.value, fg->current_ua.error, fg->charge_uah.value,
++			 fg->charge_uah.error, fg->present.value, fg->present.error,
++			 sample.temperature_decic[set].value, sample.temperature_decic[set].error);
++		for (channel = 0; channel < MT6357_LIVE_WORDS; channel++)
++			dev_info(gauge->dev, "live FG%u word%u=%04x/%d (raw/errno)\n",
++				 set, channel, fg->words[channel].value, fg->words[channel].error);
++		for (channel = 0; channel < 3; channel++) {
++			const struct mt6357_live_adc *adc = &sample.adc[set][channel];
++
++			dev_info(gauge->dev, "live ADC%u/%u ns=%llu..%llu raw=%d/%d scale=%d:%d/%d error=%d mV=%d/%d\n",
++				 set, channel, adc->started_ns, adc->finished_ns, adc->raw.value,
++				 adc->raw.error, adc->scale_type, adc->scale_numerator,
++				 adc->scale_denominator, adc->scale_error, adc->mv.value, adc->mv.error);
++		}
++	}
+ }
+ 
+ static int mt6357_gauge_read_temperature(struct mt6357_gauge *gauge, int *temperature)
+@@ -442,23 +727,66 @@
+ 
+ #undef MT6357_GAUGE_DESC
+ 
+-static int mt6357_gauge_get_channel(struct device *dev, const char *name,
+-				   struct iio_channel **channel)
+-{
++static int mt6357_gauge_get_channel(struct mt6357_gauge *gauge, const char *name,
++				    struct iio_channel **channel)
++{
++	struct device *dev = gauge->dev;
++	struct of_phandle_args args;
++	struct platform_device *provider;
+ 	struct iio_channel *chan;
+ 	enum iio_chan_type type;
+-	int ret;
+-
++	int ret, index;
++
++	/* Resolve the same named OF input as IIO, with an owned supplier ref. */
++	index = of_property_match_string(dev->of_node, "io-channel-names", name);
++	if (index < 0)
++		return index;
++	ret = of_parse_phandle_with_args(dev->of_node, "io-channels", "#io-channel-cells",
++					 index, &args);
++	if (ret)
++		return ret;
++	provider = of_find_device_by_node(args.np);
++	of_node_put(args.np);
++	if (!provider)
++		return -EPROBE_DEFER;
++	ret = -EINVAL;
++	if (&provider->dev == dev)
++		goto put_provider;
++	/* Never wait for a supplier whose unbind may be waiting for this probe. */
++	ret = -EPROBE_DEFER;
++	if (!device_trylock(&provider->dev))
++		goto put_provider;
++	if (!device_is_bound(&provider->dev) ||
++	    READ_ONCE(provider->dev.links.status) != DL_DEV_DRIVER_BOUND)
++		goto unlock_provider;
++	ret = -ENOMEM;
++	if (!device_link_add(dev, &provider->dev, DL_FLAG_AUTOREMOVE_CONSUMER))
++		goto unlock_provider;
++
++	/*
++	 * Link before lookup: neither initial metadata nor a raw parent is pinned
++	 * by a retained IIO device reference alone after provider removal.
++	 */
+ 	chan = devm_iio_channel_get(dev, name);
+-	if (IS_ERR(chan))
+-		return PTR_ERR(chan);
++	if (IS_ERR(chan)) {
++		ret = PTR_ERR(chan);
++		goto unlock_provider;
++	}
++	ret = -EINVAL;
++	if (chan->indio_dev->dev.parent != &provider->dev)
++		goto unlock_provider;
+ 	ret = iio_get_channel_type(chan, &type);
+-	if (ret)
+-		return ret;
+-	if (type != IIO_VOLTAGE)
+-		return -EINVAL;
+-	*channel = chan;
+-	return 0;
++	if (ret == -ENODEV)
++		ret = -EPROBE_DEFER;
++	if (!ret && type != IIO_VOLTAGE)
++		ret = -EINVAL;
++	if (!ret)
++		*channel = chan;
++unlock_provider:
++	device_unlock(&provider->dev);
++put_provider:
++	put_device(&provider->dev);
++	return ret;
+ }
+ 
+ static int mt6357_gauge_init_adc(struct mt6357_gauge *gauge)
+@@ -470,13 +798,13 @@
+ 
+ 	if (!device_property_present(dev, "io-channels"))
+ 		return 0;
+-	ret = mt6357_gauge_get_channel(dev, "battery-voltage", &gauge->voltage);
+-	if (ret)
+-		return ret;
+-	ret = mt6357_gauge_get_channel(dev, "battery-thermistor", &gauge->thermistor);
+-	if (ret)
+-		return ret;
+-	ret = mt6357_gauge_get_channel(dev, "thermistor-reference", &gauge->reference);
++	ret = mt6357_gauge_get_channel(gauge, "battery-voltage", &gauge->voltage);
++	if (ret)
++		return ret;
++	ret = mt6357_gauge_get_channel(gauge, "battery-thermistor", &gauge->thermistor);
++	if (ret)
++		return ret;
++	ret = mt6357_gauge_get_channel(gauge, "thermistor-reference", &gauge->reference);
+ 	if (ret)
+ 		return ret;
+ 	ret = device_property_read_u32(dev, "mediatek,thermistor-pullup-ohms", &gauge->pullup_ohms);
+@@ -590,6 +918,8 @@
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Invalid battery charger supplier\n");
+ 	gauge->needs_release = true;
++	gauge->live_generation = atomic64_inc_return(&mt6357_live_generation);
++	mt6357_gauge_live_diagnostic(gauge);
+ 	config.drv_data = gauge;
+ 	config.fwnode = dev_fwnode(dev);
+ 	psy = devm_power_supply_register(dev, gauge->desc, &config);
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -439,6 +439,16 @@
+ 	  of charge or control charging.
+ 
+ 	  This driver can also be built as a module, called mt6357-gauge.
++
++config BATTERY_MT6357_LIVE_DIAGNOSTICS
++	bool "MT6357 probe-time live measurement diagnostics"
++	depends on BATTERY_MT6357
++	default n
++	help
++	  Capture one bracketed current/counter and ADC observation at probe and
++	  log its raw values, timing and errors. This is diagnostic evidence, not
++	  a state-of-charge estimate. No active load or charging change is made.
++	  Leave disabled unless collecting bringup evidence.
+ 
+ config BATTERY_MAX17040
+ 	tristate "Maxim MAX17040/17041/17043 family Fuel Gauge"
+diff --git a/arch/arm64/configs/rabbit_r1_defconfig b/arch/arm64/configs/rabbit_r1_defconfig
+--- a/arch/arm64/configs/rabbit_r1_defconfig
++++ b/arch/arm64/configs/rabbit_r1_defconfig
+@@ -387,6 +387,7 @@
+ CONFIG_MFD_MT6370=y
+ CONFIG_MFD_MT6397=y
+ CONFIG_BATTERY_MT6357=y
++CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS=y
+ CONFIG_MFD_WM8994=y
+ CONFIG_MFD_ROHM_BD718XX=y
+ CONFIG_MFD_WCD934X=y

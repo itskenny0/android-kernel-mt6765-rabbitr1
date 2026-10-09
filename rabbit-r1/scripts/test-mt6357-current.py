@@ -86,6 +86,12 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef int64_t s64;
 typedef uint64_t u64;
+#define U64_MAX UINT64_MAX
+typedef struct { int64_t value; } atomic64_t;
+#define ATOMIC64_INIT(x) { (x) }
+static int64_t atomic64_inc_return(atomic64_t *v) { return __atomic_add_fetch(&v->value,1,__ATOMIC_SEQ_CST); }
+#define lockdep_assert_held(m) assert((m)->owner == thread_id)
+
 typedef int64_t ktime_t;
 #define BIT(n) (1U << (n))
 #define GENMASK(h,l) ((~0U << (l)) & (~0U >> (31-(h))))
@@ -104,9 +110,14 @@ typedef int64_t ktime_t;
 #define GFP_KERNEL 0
 #define PTR_ERR_OR_ZERO(p) ((intptr_t)(p) < 0 ? (int)(intptr_t)(p) : 0)
 #define ERR_PTR(e) ((void *)(intptr_t)(e))
-struct device { void *of_node; struct device *parent; void *driver_data; struct regmap *regmap; };
+#define DL_DEV_DRIVER_BOUND 0
+#define DL_DEV_UNBINDING 1
+#define READ_ONCE(x) (x)
+struct device { struct { int status; } links; void *of_node; struct device *parent; void *driver_data; struct regmap *regmap; };
 struct mt6397_chip { struct regmap *regmap; };
 struct platform_device { struct device dev; };
+struct device_node { int index; };
+struct of_phandle_args { struct device_node *np; };
 struct mutex { pthread_mutex_t raw; unsigned int owner; bool initialized; };
 struct regmap { int unused; };
 struct power_supply { void *drvdata; struct device dev; };
@@ -122,7 +133,20 @@ struct power_supply_desc {
     int (*get_property)(struct power_supply *, enum power_supply_property, union power_supply_propval *);
 };
 enum iio_chan_type { IIO_VOLTAGE, IIO_CURRENT, IIO_TEMP };
-struct iio_channel { unsigned int id; enum iio_chan_type type; };
+struct iio_chan_spec { struct { char sign; unsigned int realbits; } scan_type; bool has_offset; };
+struct iio_dev { struct device dev; };
+struct iio_channel { unsigned int id; enum iio_chan_type type; struct iio_dev *indio_dev; const struct iio_chan_spec *channel; };
+#define IIO_CHAN_INFO_OFFSET 3
+#define IIO_VAL_INT 1
+#define IIO_VAL_FRACTIONAL 10
+#define CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS 0
+#define IS_ENABLED(x) (x)
+static void mock_dev_info(const char *fmt, ...) { }
+#define dev_info(d,...) ((void)(d),mock_dev_info(__VA_ARGS__))
+static bool iio_channel_has_info(const struct iio_chan_spec *spec, int info) { assert(info == IIO_CHAN_INFO_OFFSET); return spec->has_offset; }
+static int iio_read_channel_raw(struct iio_channel *chan, int *v) { assert(false); return -EIO; }
+static int iio_read_channel_scale(struct iio_channel *chan, int *n, int *d) { assert(false); return -EIO; }
+
 struct power_supply_config { void *drv_data; void *fwnode; };
 static void *power_supply_get_drvdata(struct power_supply *p) { return p->drvdata; }
 static _Thread_local unsigned int thread_id=1;
@@ -136,6 +160,7 @@ static void unlock_guard(struct mutex **m) { mutex_unlock(*m); }
 #define guard(kind) struct mutex *held __attribute__((cleanup(unlock_guard))) = lock_guard
 static u64 now;
 static ktime_t ktime_get(void) { return now; }
+static u64 ktime_get_boottime_ns(void) { return now * 1000; }
 static ktime_t ktime_add_us(ktime_t t, u64 n) { return t+n; }
 static int ktime_compare(ktime_t a, ktime_t b) { return (a>b)-(a<b); }
 static void usleep_range(unsigned int lo, unsigned int hi) { assert(lo && lo<=hi); now+=hi; }
@@ -166,7 +191,11 @@ static int mod_delayed_work(void *q, struct delayed_work *w, unsigned long delay
 static void cancel_delayed_work_sync(struct delayed_work *w) { assert(false); }
 static int of_count_phandle_with_args(void *n, const char *p, void *a) { assert(false); return 0; }
 static struct power_supply *devm_power_supply_get_by_reference(struct device *d, const char *p) { assert(false); return NULL; }
-static void *device_link_add(struct device *c, struct device *s, unsigned int flags) { assert(false); return NULL; }
+static bool provider_busy, provider_unbound, provider_locked;
+static int device_trylock(struct device *d) { assert(!provider_locked); if (provider_busy) return 0; provider_locked=true; return 1; }
+static bool device_is_bound(struct device *d) { assert(provider_locked); return !provider_unbound; }
+static void device_unlock(struct device *d) { assert(provider_locked); provider_locked=false; }
+static void *device_link_add(struct device *c, struct device *s, unsigned int flags);
 static int devm_add_action_or_reset(struct device *d, void (*fn)(void *), void *data) { assert(false); return -EIO; }
 '''
 prelude += f'\n#include "{SRC}/include/linux/mfd/mt6357/registers.h"\n'
@@ -246,12 +275,47 @@ static int table_count=42, table_count_error, table_read_error;
 static u32 property_table[128];
 static struct mt6357_thermistor_point table_storage[64];
 static struct iio_channel channels[3];
+static struct platform_device adc_platform;
+#define adc_provider adc_platform.dev
+static struct iio_dev adc_iio={.dev={.parent=&adc_provider}};
+static struct iio_chan_spec adc_specs[3]={{{'u',15},false},{{'u',12},false},{{'u',12},false}};
+
 static int channel_order[3]={0,1,2}, channel_get_error[3], channel_type_error[3];
 static int adc_values[3]={3800,669,1800}, adc_errors[3], adc_success;
 static unsigned int adc_reads[3];
 static unsigned int property_shunt=10000, property_gain=1000, stage, fail_stage, registrations;
 static bool gain_present, shunt_present=true, malformed_gain, fail_registration;
 static int step(void) { return ++stage == fail_stage ? -ENOMEM : 0; }
+static void *device_link_add(struct device *c, struct device *s, unsigned int flags)
+{ assert(s == &adc_provider && flags == DL_FLAG_AUTOREMOVE_CONSUMER); return step() ? NULL : s; }
+
+static unsigned int provider_refs, node_refs;
+static int of_name_error, of_parse_error;
+static bool missing_provider, self_provider;
+static struct device_node input_nodes[3]={{0},{1},{2}};
+static int of_property_match_string(void *node, const char *property, const char *name)
+{
+    int ret=step(); if (ret || of_name_error) return ret ?: of_name_error;
+    assert(node && !strcmp(property,"io-channel-names"));
+    const char *names[]={"battery-voltage","battery-thermistor","thermistor-reference"};
+    for (unsigned int i=0; i<3; i++) if (!strcmp(name,names[i])) return i;
+    return -EINVAL;
+}
+static int of_parse_phandle_with_args(void *node, const char *property, const char *cells,
+                                     int index, struct of_phandle_args *args)
+{
+    int ret=step(); if (ret || of_parse_error) return ret ?: of_parse_error;
+    assert(node && !strcmp(property,"io-channels") && !strcmp(cells,"#io-channel-cells"));
+    assert(index>=0 && index<3); args->np=&input_nodes[index]; node_refs++; return 0;
+}
+static struct platform_device *of_find_device_by_node(struct device_node *node)
+{
+    assert(node>=input_nodes && node<input_nodes+3 && node_refs);
+    if (step() || missing_provider) return NULL;
+    provider_refs++; return self_provider ? (struct platform_device *)gauge.dev : &adc_platform;
+}
+static void of_node_put(struct device_node *node) { assert(node && node_refs); node_refs--; }
+static void put_device(struct device *device) { assert((device == &adc_provider || (self_provider && device == gauge.dev)) && provider_refs); provider_refs--; }
 static void *devm_kzalloc(struct device *d, size_t size, int flags)
 { if (step()) return NULL; assert(size == sizeof(gauge)); memset(&gauge,0,size); return &gauge; }
 static void *dev_get_drvdata(struct device *d) { return step() ? NULL : d->driver_data; }
@@ -469,7 +533,7 @@ static void adc_setup(void)
     gauge.table=table_storage; gauge.num_points=ARRAY_SIZE(stock_table);
     gauge.pullup_ohms=16900; gauge.series_uohms=10000;
     for (unsigned int i=0; i<3; i++) {
-        channels[i]=(struct iio_channel){.id=i,.type=IIO_VOLTAGE}; channel_order[i]=i;
+        channels[i]=(struct iio_channel){.id=i,.type=IIO_VOLTAGE,.indio_dev=&adc_iio,.channel=&adc_specs[i]}; channel_order[i]=i;
         channel_get_error[i]=channel_type_error[i]=adc_errors[i]=0; adc_reads[i]=0;
     }
     adc_values[0]=3800; adc_values[1]=669; adc_values[2]=1800;
@@ -576,7 +640,7 @@ static void check_temperature(void)
         retry(); failures++;
     }
     destroy_lock();
-    struct platform_device pdev={.dev={.parent=&pmic_dev}};
+    struct platform_device pdev={.dev={.parent=&pmic_dev,.of_node=&adc_provider}};
     adc_present=true; gain_present=true; fail_stage=0;
     setup(false,0); adc_setup(); regs[STOCK_ON_REG]=0; stage=0;
     assert(!mt6357_gauge_probe(&pdev)); unsigned int stages=stage; destroy_lock(); probes++;
@@ -733,7 +797,7 @@ int main(void)
         transactions++;
     }
     assert(transactions == 200); destroy_lock();
-    struct platform_device pdev={.dev={.parent=&pmic_dev}};
+    struct platform_device pdev={.dev={.parent=&pmic_dev,.of_node=&adc_provider}};
     setup(false,0); regs[STOCK_ON_REG]=0; stage=0; gain_present=true;
     assert(!mt6357_gauge_probe(&pdev)); unsigned int stages=stage; destroy_lock(); probes++;
     for (unsigned int f=1; f<=stages; f++) {

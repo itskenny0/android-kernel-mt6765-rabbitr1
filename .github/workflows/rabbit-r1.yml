@@ -104,6 +104,7 @@ jobs:
           python3 scripts/test-mt6357-imp.py 2>&1 | tee logs/mt6357-imp-tests.log
           python3 scripts/test-mt6357-current.py 2>&1 | tee logs/mt6357-current-tests.log
           python3 scripts/test-mt6357-status.py 2>&1 | tee logs/mt6357-status-tests.log
+          python3 scripts/test-mt6357-live.py 2>&1 | tee logs/mt6357-live-tests.log
           python3 scripts/test-mt6357-rtc-nvmem.py 2>&1 | tee logs/mt6357-rtc-nvmem-tests.log
           python3 scripts/test-mt6357-boot-snapshot.py 2>&1 | tee logs/mt6357-boot-snapshot-tests.log
           python3 battery/tests/run.py 2>&1 | tee logs/battery-profile-tests.log

@@ -98,3 +98,13 @@ capacity estimate or make Android firmware beta-ready.
 probe and alarm operations with the separately pinned stock register mapping.
 See [RTC-NVMEM.md](../../docs/RTC-NVMEM.md) for the byte layout, optional compiled
 DT/config checks, lifetime behavior and unresolved retained-state validity.
+
+# MT6357 live collector
+
+`python3 scripts/test-mt6357-live.py` compiles the actual complete gauge body with
+ASan/UBSan for diagnostics disabled and enabled. It reuses the existing stock
+pin checks, polling macros, calibration and probe fixture, then adds paired
+current/counter latch and raw ADC models. No hardware is accessed. See
+[MT6357-LIVE.md](../../docs/MT6357-LIVE.md) for interpretation, reference/locking
+rules, error publication and the remaining runtime estimator work. The suite
+checks acquisition completeness, not SOC acceptance or physical coherency.

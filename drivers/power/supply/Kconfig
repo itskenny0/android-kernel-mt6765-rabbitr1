@@ -440,6 +440,16 @@ config BATTERY_MT6357
 
 	  This driver can also be built as a module, called mt6357-gauge.
 
+config BATTERY_MT6357_LIVE_DIAGNOSTICS
+	bool "MT6357 probe-time live measurement diagnostics"
+	depends on BATTERY_MT6357
+	default n
+	help
+	  Capture one bracketed current/counter and ADC observation at probe and
+	  log its raw values, timing and errors. This is diagnostic evidence, not
+	  a state-of-charge estimate. No active load or charging change is made.
+	  Leave disabled unless collecting bringup evidence.
+
 config BATTERY_MAX17040
 	tristate "Maxim MAX17040/17041/17043 family Fuel Gauge"
 	depends on I2C && IIO
