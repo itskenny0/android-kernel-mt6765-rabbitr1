@@ -1,8 +1,11 @@
 # LineageOS 24 build integration
 
 The initial r1 product is tracked under `android/device`; the charging UI and
-service remain under `android/charging`. The native build and full policy build
-are not verified yet. No Android image has been produced or added to the
+service remain under `android/charging`. The six integration targets, including
+native services and the SELinux policy aggregate, built successfully on
+2026-10-09. Artifact checks passed for the ARM64 binaries, charging APK,
+init/VINTF files and compiled policy. [Results and hashes](../android/targeted-build.json)
+record their scope. No Android image has been produced or added to the
 mtkclient package.
 
 `android/local_manifests/r1.xml` pins the common mainline device tree and its ten
@@ -46,8 +49,13 @@ and builds charging controls, the expdb logger, both boot services and policy.
 It defaults to eight jobs (`R1_ANDROID_JOBS` overrides this) and accepts explicit
 Android build targets as arguments. Logs remain under `/rabbitr1/logs`.
 
-The product has not yet passed this build. Build the full images after resolving
-product, HAL and policy errors, then inspect the generated boot header, DT table,
+The product passed this targeted build. Recovery policy remains a separate
+`sepolicy.recovery` target. The vendor boot service linked against the normal
+LLNDK stub; the full product still needs its real system `libbinder_ndk` and
+linker namespace checks. The APK has a valid platform test signature and
+16 KiB-aligned, uncompressed ARM64 JNI libraries. Policy checks confirm the r1
+domain definitions; current boot arguments still request global permissive mode.
+Build the full images next, then inspect the generated boot header, DT table,
 module hashes, super metadata, partition sizes and AVB configuration. The stock
 layout evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
@@ -100,8 +108,9 @@ complete backup, layout and restore validation before distribution.
 
 The [boot-control adapter](BOOT-CONTROL.md) implements the stock A/B record
 format, eMMC boot-region selection and clearing the `avbbctl` flag. Its core
-and storage boundary have host tests. The product selects its Android and
-recovery services; their Soong, SELinux and device checks are still required.
+and storage boundary have host tests. Both services now pass their Android
+build and artifact checks; image dependencies, recovery policy and device
+operation remain to be checked.
 
 The `r1-expdb` service starts asynchronously after `post-fs` when the fixed build
 property `ro.vendor.r1.expdb.enabled=1` is set. It verifies the 20 MiB `expdb`

@@ -1,0 +1,473 @@
+{
+  "checks": [
+    {
+      "name": "completed targeted build",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/logs/android-targeted-build.log",
+        "bytes": 519966,
+        "sha256": "d0862d926b2b50655b167dd6f1dd44066eea319760c5f2729e96e22b4b49eab3"
+      }
+    },
+    {
+      "name": "r1-charging",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/out/android/target/product/r1/system_ext/bin/r1-charging",
+        "bytes": 51784,
+        "sha256": "cd74d224ada6448d9c6a2e701b98d3dbc248631db0f64a088768dfe49e208b61",
+        "needed": [
+          "libbase.so",
+          "liblog.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ],
+        "installed_dependency_candidates": {
+          "libbase.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libbase.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libbase.so"
+          ],
+          "liblog.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/liblog.so"
+          ],
+          "libc++.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libc++.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libc++.so"
+          ],
+          "libc.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+          ],
+          "libm.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+          ],
+          "libdl.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+          ]
+        },
+        "namespace_resolution_verified": false
+      }
+    },
+    {
+      "name": "r1-expdb",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/out/android/target/product/r1/vendor/bin/r1-expdb",
+        "bytes": 68768,
+        "sha256": "1a07fa34c2d6afc0e1e8177ec1f5a4835a01995a03d13780678c7cdfdc065c3c",
+        "needed": [
+          "libbase.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ],
+        "installed_dependency_candidates": {
+          "libbase.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libbase.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libbase.so"
+          ],
+          "libc++.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libc++.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libc++.so"
+          ],
+          "libc.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+          ],
+          "libm.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+          ],
+          "libdl.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+          ]
+        },
+        "namespace_resolution_verified": false
+      }
+    },
+    {
+      "name": "android.hardware.boot-service.r1",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/out/android/target/product/r1/vendor/bin/hw/android.hardware.boot-service.r1",
+        "bytes": 136312,
+        "sha256": "575c41719a8c45cf698578ce63b24a27eac044aa272505d8c4373c2ad6e9260c",
+        "needed": [
+          "liblog.so",
+          "libbase.so",
+          "libbinder_ndk.so",
+          "android.hardware.boot-V1-ndk.so",
+          "android.hardware.boot@1.1.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ],
+        "installed_dependency_candidates": {
+          "liblog.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/liblog.so"
+          ],
+          "libbase.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libbase.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libbase.so"
+          ],
+          "libbinder_ndk.so": [],
+          "android.hardware.boot-V1-ndk.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/android.hardware.boot-V1-ndk.so"
+          ],
+          "android.hardware.boot@1.1.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/android.hardware.boot@1.1.so"
+          ],
+          "libc++.so": [
+            "/rabbitr1/out/android/target/product/r1/vendor/lib64/libc++.so",
+            "/rabbitr1/out/android/target/product/r1/system/lib64/libc++.so"
+          ],
+          "libc.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+          ],
+          "libm.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+          ],
+          "libdl.so": [
+            "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+          ]
+        },
+        "namespace_resolution_verified": false
+      }
+    },
+    {
+      "name": "android.hardware.boot-service.r1_recovery",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.boot-service.r1_recovery",
+        "bytes": 136496,
+        "sha256": "43be882429950254bade95ac78fedccd668ea7ddb77e9d62a513c9d8ac09481b",
+        "needed": [
+          "liblog.so",
+          "libbase.so",
+          "libbinder_ndk.so",
+          "android.hardware.boot-V1-ndk.so",
+          "android.hardware.boot@1.1.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ],
+        "installed_dependency_candidates": {
+          "liblog.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/liblog.so"
+          ],
+          "libbase.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libbase.so"
+          ],
+          "libbinder_ndk.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libbinder_ndk.so"
+          ],
+          "android.hardware.boot-V1-ndk.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/android.hardware.boot-V1-ndk.so"
+          ],
+          "android.hardware.boot@1.1.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/android.hardware.boot@1.1.so"
+          ],
+          "libc++.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libc++.so"
+          ],
+          "libc.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libc.so"
+          ],
+          "libm.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libm.so"
+          ],
+          "libdl.so": [
+            "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/libdl.so"
+          ]
+        },
+        "namespace_resolution_verified": false
+      }
+    },
+    {
+      "name": "R1ChargingSettings",
+      "status": "pass",
+      "details": {
+        "path": "/rabbitr1/out/android/target/product/r1/system_ext/priv-app/R1ChargingSettings/R1ChargingSettings.apk",
+        "bytes": 1521795,
+        "sha256": "12b967c560a2dcb780aa731bcfc3a06fc4481dc79df34be2b0c0a28b5f77180a",
+        "native_libraries": [
+          {
+            "path": "/rabbitr1/out/android-build-review/apk-libs/libbase.so",
+            "bytes": 234920,
+            "sha256": "f64d7ced8ea4629653a912b1810961f237a96c961a3eaa61ee7a5bc91e4ab8fd",
+            "needed": [
+              "liblog.so",
+              "libc++.so",
+              "libc.so",
+              "libm.so",
+              "libdl.so"
+            ],
+            "installed_dependency_candidates": {
+              "liblog.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/liblog.so"
+              ],
+              "libc++.so": [
+                "/rabbitr1/out/android/target/product/r1/vendor/lib64/libc++.so",
+                "/rabbitr1/out/android/target/product/r1/system/lib64/libc++.so"
+              ],
+              "libc.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+              ],
+              "libm.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+              ],
+              "libdl.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+              ]
+            },
+            "namespace_resolution_verified": false
+          },
+          {
+            "path": "/rabbitr1/out/android-build-review/apk-libs/libc++.so",
+            "bytes": 1152760,
+            "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
+            "needed": [
+              "libc.so",
+              "libm.so",
+              "libdl.so"
+            ],
+            "installed_dependency_candidates": {
+              "libc.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+              ],
+              "libm.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+              ],
+              "libdl.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+              ]
+            },
+            "namespace_resolution_verified": false
+          },
+          {
+            "path": "/rabbitr1/out/android-build-review/apk-libs/libr1_charging_jni.so",
+            "bytes": 35552,
+            "sha256": "bfab95228ed9011550980e25bf8805038a9c71f88a79167027dab737a95c1593",
+            "needed": [
+              "libbase.so",
+              "liblog.so",
+              "libc++.so",
+              "libc.so",
+              "libm.so",
+              "libdl.so"
+            ],
+            "installed_dependency_candidates": {
+              "libbase.so": [
+                "/rabbitr1/out/android/target/product/r1/vendor/lib64/libbase.so",
+                "/rabbitr1/out/android/target/product/r1/system/lib64/libbase.so"
+              ],
+              "liblog.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/liblog.so"
+              ],
+              "libc++.so": [
+                "/rabbitr1/out/android/target/product/r1/vendor/lib64/libc++.so",
+                "/rabbitr1/out/android/target/product/r1/system/lib64/libc++.so"
+              ],
+              "libc.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libc.so"
+              ],
+              "libm.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libm.so"
+              ],
+              "libdl.so": [
+                "/rabbitr1/out/android/target/product/r1/system/lib64/bootstrap/libdl.so"
+              ]
+            },
+            "namespace_resolution_verified": false
+          }
+        ],
+        "dex_entries": [
+          "classes.dex"
+        ],
+        "platform_certificate_sha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8"
+      }
+    },
+    {
+      "name": "installed init and VINTF files",
+      "status": "pass",
+      "details": [
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/init/r1-charging.rc",
+          "bytes": 298,
+          "sha256": "a76d222b187492d36aa2c7bdcf2a6214adf58e5ac250ffadde81f75a980f6dd6"
+        },
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/init/r1-expdb.rc",
+          "bytes": 231,
+          "sha256": "f2e3459039cb17e70fbd464d99379bbabc9bb9b9ca44707847b71b3f8232eb2b"
+        },
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/init/android.hardware.boot-service.r1.rc",
+          "bytes": 209,
+          "sha256": "bf8e7423ff28c5f13f48fd2521d35431b31b78a2d16ef0c45073d182db1f5ac9"
+        },
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/etc/init/android.hardware.boot-service.r1_recovery.rc",
+          "bytes": 253,
+          "sha256": "65bdc0238912bbd04d1f74ca092adf91d0e85d09a403fdef80252521a21fd311"
+        },
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/vintf/manifest/android.hardware.boot-service.r1.xml",
+          "bytes": 262,
+          "sha256": "b87e929140a310e38c8e9c96b52b715e19a7e2b103f8802ffd5c7b261c6a895e"
+        },
+        {
+          "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/etc/vintf/manifest/android.hardware.boot-service.r1.xml",
+          "bytes": 262,
+          "sha256": "b87e929140a310e38c8e9c96b52b715e19a7e2b103f8802ffd5c7b261c6a895e"
+        }
+      ]
+    },
+    {
+      "name": "selinux_policy",
+      "status": "pass",
+      "details": {
+        "binary_policies": [
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/precompiled_sepolicy",
+            "bytes": 916741,
+            "sha256": "647b9e056725adc47e5fcc71fa6d5f24eb46fa4969e3f880f9112c5130bc78f1",
+            "per_domain_permissive_declarations": [
+              "su",
+              "backuptool"
+            ],
+            "attributes": {
+              "hal_bootctl_r1": [
+                "domain",
+                "halserverdomain",
+                "hal_bootctl_server"
+              ],
+              "r1_expdb": [
+                "domain"
+              ],
+              "r1_charging": [
+                "domain",
+                "coredomain"
+              ],
+              "r1_charging_app": [
+                "domain",
+                "appdomain",
+                "coredomain",
+                "gpu_sphal_domain"
+              ]
+            }
+          }
+        ],
+        "contexts": [
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/vendor_property_contexts",
+            "bytes": 3137,
+            "sha256": "69147bf9a37890594968ab8089923dc9e9a964abe89b3c93c9468d8856ce3d93"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/selinux/system_ext_property_contexts",
+            "bytes": 2743,
+            "sha256": "83905fee66338caf1a92d539d2e5438497769bab4d3076f2d77c5159c5bf9171"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/selinux/system_ext_seapp_contexts",
+            "bytes": 532,
+            "sha256": "b36098bd48427cbc0fa3ff2ec713465584c61167ae4e1764952c959e2894fa0d"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/vendor_file_contexts",
+            "bytes": 29603,
+            "sha256": "8060a77f060d3be4d9e9b6f5085856f40c28c9a5d0bef94cd0376aafc08c7124"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/selinux/system_ext_file_contexts",
+            "bytes": 918,
+            "sha256": "6d6d53a938c88d834819973a4df93045f1d686a91bcd178cd323dfe7db51e13c"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/system/etc/selinux/plat_sepolicy.cil",
+            "bytes": 3463953,
+            "sha256": "86da9dee1a874e908ff080a53782abe53336305030002c343ad60ebc381dfc8c"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/selinux/system_ext_sepolicy.cil",
+            "bytes": 127863,
+            "sha256": "085cec1054a317177803e9cdeff8d62273c5c84783bb92bc1973ea0311ca7105"
+          },
+          {
+            "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/vendor_sepolicy.cil",
+            "bytes": 292629,
+            "sha256": "620d92efd8546529e64adba0f63444ab0d8f2d55d889e0407f259f4102aba7fa"
+          }
+        ]
+      }
+    }
+  ],
+  "hardware_tested": false,
+  "target_binaries_executed": false,
+  "runtime_selinux_enforcement_verified": false,
+  "selinux_limitation": "Binary policy checks detect per-domain permissive declarations only. Current product boot arguments request global permissive mode; absence of per-domain declarations does not mean runtime enforcement.",
+  "scope": "Six targeted module outputs; no image, boot, linker-namespace or enforcing-device validation",
+  "recovery_policy": {
+    "path": "/rabbitr1/out/android/target/product/r1/recovery/root/sepolicy",
+    "required_by_six_target_set": false,
+    "exists": false
+  },
+  "device_max_page_size_supported": 16384,
+  "source_provenance": {
+    "canonical_mainline_head": "645837da0dd9eb3839aab6d960e70702cff85c46",
+    "device/rabbit/r1": {
+      "head": null
+    },
+    "device/rabbit/r1/charging": {
+      "head": null
+    },
+    "system/sepolicy": {
+      "head": "d61fd80832f558d52de026097d30d695634e8b0f"
+    },
+    "hardware/interfaces": {
+      "head": "1b92b77fe1f2f2c820c51b0b1e366c17d6b9911b"
+    },
+    "external/mesa": {
+      "head": "400e673cf8ba515d3aace56ed3acc3bb300869a5"
+    },
+    "/rabbitr1/src/mainline/rabbit-r1/sources.lock.json": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/sources.lock.json",
+      "bytes": 16493,
+      "sha256": "ec8f5fbeff8060cdd6148865aebd234f83f5e634e82ec9af3d2943abd03e8320"
+    },
+    "/rabbitr1/src/mainline/rabbit-r1/android/patches/series.json": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/android/patches/series.json",
+      "bytes": 32047,
+      "sha256": "82c4cdf153b8b71b6b473ab685915ee08c352d48775c1a85b392afeaa09c3bde"
+    },
+    "/rabbitr1/logs/android-targeted-build.log": {
+      "path": "/rabbitr1/logs/android-targeted-build.log",
+      "bytes": 519966,
+      "sha256": "d0862d926b2b50655b167dd6f1dd44066eea319760c5f2729e96e22b4b49eab3"
+    },
+    "/rabbitr1/out/android/target/product/r1/build_fingerprint-lineage_r1.txt": {
+      "path": "/rabbitr1/out/android/target/product/r1/build_fingerprint-lineage_r1.txt",
+      "bytes": 74,
+      "sha256": "e38fa6fc11b4c0914778d013a2e5c113e32166406e37087eb19ef96e460ca772"
+    }
+  },
+  "success": true,
+  "review_notes": {
+    "checker_correction": "Initial run assumed the older aapt2 sdkVersion label. Current aapt2 prints minSdkVersion. Both binary manifest and build-fixed XML show minSdkVersion=35. Parser corrected; original failed result preserved.",
+    "no_production_failure_found": true,
+    "vendor_boot_runtime_dependency": "libbinder_ndk.so is an LLNDK dependency. The targeted build produced its vendor link stub and recovery runtime library; the normal system runtime is not installed in this six-target output. base_system.mk explicitly includes libbinder_ndk for the full product. This is a build-scope limitation, not a proven product dependency omission; full image/linker namespace validation remains pending.",
+    "recovery_policy": "recovery/root/sepolicy is absent, consistent with sepolicy.recovery not being part of the six-target request.",
+    "policy": "The four r1 domains have no per-domain permissive declarations. Main compiled policy lists upstream su and backuptool as permissive. Current global permissive boot arguments still prevent claiming runtime enforcement.",
+    "build_output_mutated": false,
+    "checker_sha256": "4301fd8b92785cbdf570644f7607c400dab0cae75a780734660bdc307670ece9"
+  },
+  "verified_as_of": "2026-10-09",
+  "original_workspace_report": {
+    "path": "/rabbitr1/out/android-build-review/results.json",
+    "sha256": "dea8e03f8384492bc46507375905bc8b107d4108f147f1a5f6cf869b7ee8d3a2"
+  },
+  "kernel_source_commit": "9ab2d3454215448b413014946061b673a1967a6b"
+}
