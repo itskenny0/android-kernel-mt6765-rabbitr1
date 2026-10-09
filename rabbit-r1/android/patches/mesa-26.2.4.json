@@ -1,0 +1,63 @@
+{
+  "lineage_repository": "https://github.com/LineageOS/android_external_mesa.git",
+  "lineage_base": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
+  "upstream_repository": "https://gitlab.freedesktop.org/mesa/mesa.git",
+  "upstream_from": "31e9a6b2e95e30d84bf3177d1f497d063e59b6b2",
+  "upstream_to": "96cb43121031992b85767f9c1be8f3f48e22b1d2",
+  "upstream_tag": "mesa-26.2.4",
+  "official_tarball_sha256": "bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9",
+  "complete_release_delta": true,
+  "official_files_omitted": [],
+  "already_present_files": [
+    "docs/relnotes/26.2.3.rst"
+  ],
+  "lineage_integration_unchanged": [
+    {
+      "path": "android/Android.mk",
+      "sha256": "f3e48e113675e703a6184dbca637e8e2090ff23cfce42128887a7f940069f9af"
+    },
+    {
+      "path": "android/mesa3d_cross.mk",
+      "sha256": "92961b6a8f463c3cbecded9a99cd317c68d66d0493f1945b17ebc71e4324f22c"
+    },
+    {
+      "path": "lineage.dependencies",
+      "sha256": "1e6faf5173a4b0b777ce246d545fd9aa5ed5f62476222e026a74593783b1bcf8"
+    },
+    {
+      "path": "src/egl/drivers/dri2/egl_dri2.c",
+      "sha256": "5867683827e9ee9e244ee289170cfd6aa9f1cfd282d9a6015a4b5c101ecc496f"
+    },
+    {
+      "path": "src/gallium/drivers/svga/svga_format.c",
+      "sha256": "76a7465e17efde25f86aef8eda2fa7c0078458f064d315d7656c1b8c5725ec50"
+    },
+    {
+      "path": "src/gallium/targets/lavapipe/meson.build",
+      "sha256": "6da26ec15763e9d90f52eb628750bb0ff6b32208e57438576c4dffea641cd1cf"
+    }
+  ],
+  "retained_lineage_delta_sha256": "a411dc64d526432c2f8a1c3e25eb2aed0fb953085b0bb72e376776cacce94250",
+  "patch_sha256": "59756d6f6329c211d4db1c73bb5f3f6dab65ca136a0e5e189cc7a04a17154923",
+  "patch_bytes": 529786,
+  "changed_files": 115,
+  "new_files": [
+    "docs/relnotes/26.2.4.rst"
+  ],
+  "new_files_supported_by_current_patch_runner": true,
+  "whitespace_note": "Upstream release adds a space-only line at src/asahi/compiler/agx_nir_algebraic.py:41. Kept byte-for-byte; git diff --check reports it.",
+  "hardware_tested": false,
+  "android_target_built": false,
+  "validation": {
+    "patch_cli_tests": 40,
+    "test_log": "/rabbitr1/logs/android-patches-new-file-tests.log",
+    "test_log_sha256": "a7b4eeac5beb848429980404d59275a2e16c6a1bdec861f79645a3ba0b0d7b6f",
+    "fresh_checkout": "/rabbitr1/out/gpu-review/apply-validation/external/mesa",
+    "fresh_check_apply_repeat_passed": true,
+    "all_115_result_file_hashes_verified": true,
+    "helper_sha256": "c8f95eb63ad7772f95b642b98f39665af6ded940f91d720567544ca072856231",
+    "tests_sha256": "4b9113c13fdbc8254600497c770d81e81b8af45fbd65139e396e861ba95c95c9"
+  },
+  "canonical_patch_and_helper_modified": true,
+  "running_android_tree_modified": false
+}

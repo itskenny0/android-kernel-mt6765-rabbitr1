@@ -94,14 +94,19 @@ def load_series(series):
             if name in names:
                 raise ValueError('Duplicate touched file: ' + name)
             names.add(name)
-            hex_value(item['before_sha256'], 64)
+            # None pins absence in both HEAD and the index for a new text file.
+            if item['before_sha256'] is not None:
+                hex_value(item['before_sha256'], 64)
             hex_value(item['after_sha256'], 64)
             if item['before_sha256'] == item['after_sha256']:
                 raise ValueError('Touched file must change: ' + name)
-        # This series supports modifications to existing regular text files only.
-        if re.search(rb'^(?:old mode |new mode |new file mode |deleted file mode |'
+        # New files must be ordinary non-executable text files. Other operations
+        # still require an explicit source update instead of this patch helper.
+        if (re.search(rb'^(?:old mode |new mode |deleted file mode |'
                      rb'rename from |rename to |copy from |copy to |GIT binary patch|'
-                     rb'Binary files )', record['data'], re.M):
+                     rb'Binary files )', record['data'], re.M) or
+                any(mode != b'100644' for mode in re.findall(
+                    rb'^new file mode ([^\n]+)$', record['data'], re.M))):
             raise ValueError('Unsupported patch operation: ' + record['patch'])
     return records
 
@@ -137,6 +142,35 @@ def state(tree, record):
     for item in record['files']:
         name = item['path']
         path = confined(project / name)
+        if item['before_sha256'] is None:
+            if git(project, 'ls-tree', '-z', 'HEAD', '--', name):
+                raise ValueError('New file already exists in base: ' + name)
+            if git(project, 'ls-files', '--stage', '-z', '--', name):
+                raise ValueError('Preserving indexed new file: ' + name)
+            # Creating a child must not replace a removed tracked file or gitlink
+            # with a directory. Check both HEAD and index, including staged parents.
+            for parent in PurePosixPath(name).parents:
+                if str(parent) == '.':
+                    break
+                parent_path = confined(project / parent)
+                if parent_path.exists() and not parent_path.is_dir():
+                    raise ValueError('New-file parent is not a directory: ' + str(parent))
+                entry = git(project, 'ls-tree', '-z', 'HEAD', '--', str(parent))
+                if entry and not entry.startswith(b'040000 tree '):
+                    raise ValueError('New-file parent is not a base directory: ' + str(parent))
+                indexed = git(project, 'ls-files', '--stage', '-z', '--', str(parent))
+                if any(row.endswith(b'\t' + str(parent).encode())
+                       for row in indexed.rstrip(b'\0').split(b'\0')):
+                    raise ValueError('Preserving indexed new-file parent: ' + str(parent))
+            originals[name] = None
+            if not path.exists():
+                states.add('ready')
+                continue
+            if (not stat.S_ISREG(path.stat().st_mode) or path.stat().st_mode & 0o111 or
+                    digest(path.read_bytes()) != item['after_sha256']):
+                raise ValueError('Preserving existing new-file path: ' + name)
+            states.add('already-applied')
+            continue
         if not path.is_file() or not stat.S_ISREG(path.stat().st_mode):
             raise ValueError('Touched file is not a regular file: ' + str(path))
         tracked = git(project, 'ls-files', '--stage', '-z', '--', name).split(b'\0')
@@ -170,6 +204,8 @@ def check_result(record, originals):
         scratch = Path(name)
         git(scratch, 'init', '-q')
         for path, content in originals.items():
+            if content is None:
+                continue
             dest = scratch / path
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(content)

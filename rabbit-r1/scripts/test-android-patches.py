@@ -101,6 +101,20 @@ class PatchTests(unittest.TestCase):
         record['sha256'] = digest(path.read_bytes())
         self.save()
 
+    def add_new_file(self, number=1, name='docs/relnotes/release.rst', only=False):
+        record = self.records[number]
+        content = b'New release\n===========\n\nA complete release note.\n'
+        if only:
+            record['files'] = []
+            (self.series_dir / record['patch']).write_bytes(b'')
+        record['files'].append({'path': name, 'before_sha256': None,
+                                'after_sha256': digest(content)})
+        patch = (f'diff --git a/{name} b/{name}\nnew file mode 100644\n' +
+                 ''.join(difflib.unified_diff([], content.decode().splitlines(True),
+                                             fromfile='/dev/null', tofile='b/' + name))).encode()
+        self.change_patch(number, lambda data: data + patch)
+        return self.tree / record['project'] / name, content
+
     def test_default_and_explicit_check_do_not_apply(self):
         for flags in ((), ('--check',)):
             result = self.run_helper(*flags)
@@ -299,6 +313,150 @@ class PatchTests(unittest.TestCase):
         self.save()
         self.assertIn('must declare its touched files', self.run_helper('--apply', success=False).stderr)
         self.assert_original()
+
+    def test_new_file_check_apply_and_repeat(self):
+        path, content = self.add_new_file()
+        self.run_helper('--check')
+        self.assertFalse(path.parent.exists())
+        self.assert_original()
+        self.run_helper('--apply')
+        self.assertEqual(path.read_bytes(), content)
+        self.assertEqual(path.stat().st_mode & 0o111, 0)
+        checkout = self.tree / self.records[1]['project']
+        self.assertEqual(self.git(checkout, 'ls-files', '--', 'docs/relnotes/release.rst'), b'')
+        for flags in (('--check',), ('--apply',)):
+            result = self.run_helper(*flags)
+            self.assertEqual(result.stdout.count('ALREADY-APPLIED:'), 2)
+            self.assertEqual(path.read_bytes(), content)
+
+    def test_new_file_exact_existing_content_is_idempotent(self):
+        path, content = self.add_new_file(only=True)
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)
+        result = self.run_helper('--apply')
+        self.assertIn('ALREADY-APPLIED: external/project1', result.stdout)
+        self.assertEqual(path.read_bytes(), content)
+
+    def test_new_file_collision_is_preserved_and_preflight_is_global(self):
+        path, _ = self.add_new_file()
+        path.parent.mkdir(parents=True)
+        path.write_text('Untracked user content\n')
+        self.assertIn('Preserving existing new-file path',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertEqual(path.read_text(), 'Untracked user content\n')
+        self.assert_original()
+
+    def test_new_file_wrong_after_hash_fails_before_any_changes(self):
+        path, _ = self.add_new_file()
+        self.records[1]['files'][-1]['after_sha256'] = '0' * 64
+        self.save()
+        self.assertIn('Patch result hash mismatch',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertFalse(path.parent.exists())
+        self.assert_original()
+
+    def test_new_file_partial_application_is_preserved(self):
+        path, content = self.add_new_file()
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)
+        self.assertIn('Partially applied patch',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertEqual(path.read_bytes(), content)
+        self.assert_original()
+
+    def test_new_file_cannot_replace_base_file_even_if_removed(self):
+        path, _ = self.add_new_file(name='unrelated.txt', only=True)
+        path.unlink()
+        self.assertIn('New file already exists in base',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertFalse(path.exists())
+        self.assert_original()
+
+    def test_new_file_index_and_intent_to_add_are_preserved(self):
+        path, content = self.add_new_file()
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)
+        checkout = self.tree / self.records[1]['project']
+        for flag in ('--intent-to-add', '--all'):
+            self.git(checkout, 'add', flag, 'docs/relnotes/release.rst')
+            index = self.git(checkout, 'ls-files', '--stage')
+            self.run_helper('--apply', success=False)
+            self.assertEqual(self.git(checkout, 'ls-files', '--stage'), index)
+            self.assertEqual(path.read_bytes(), content)
+            self.assert_original()
+
+    def test_new_file_symlink_and_directory_are_preserved(self):
+        path, _ = self.add_new_file()
+        path.parent.mkdir(parents=True)
+        target = self.root / 'nonexistent-target'
+        path.symlink_to(target)
+        self.assertIn('Symlink path', self.run_helper('--apply', success=False).stderr)
+        self.assertTrue(path.is_symlink())
+        self.assertFalse(target.exists())
+        path.unlink()
+        path.mkdir()
+        (path / 'keep').write_text('Directory contents\n')
+        self.assertIn('Preserving existing new-file path',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertEqual((path / 'keep').read_text(), 'Directory contents\n')
+        self.assert_original()
+
+    def test_new_file_parent_symlink_is_preserved(self):
+        path, _ = self.add_new_file()
+        target = self.root / 'elsewhere'
+        target.mkdir()
+        (self.tree / self.records[1]['project'] / 'docs').symlink_to(target)
+        self.assertIn('Symlink path', self.run_helper('--apply', success=False).stderr)
+        self.assertEqual(list(target.iterdir()), [])
+        self.assert_original()
+
+    def test_new_file_cannot_replace_removed_tracked_parent(self):
+        path, _ = self.add_new_file(name='unrelated.txt/release.rst')
+        path.parent.unlink()
+        self.assertIn('New-file parent is not a base directory',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertFalse(path.parent.exists())
+        self.assert_original()
+
+    def test_new_file_cannot_replace_staged_parent(self):
+        path, _ = self.add_new_file(name='new-parent/release.rst')
+        path.parent.write_text('Staged user file\n')
+        checkout = self.tree / self.records[1]['project']
+        self.git(checkout, 'add', 'new-parent')
+        index = self.git(checkout, 'ls-files', '--stage')
+        path.parent.unlink()
+        self.assertIn('Preserving indexed new-file parent',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertEqual(self.git(checkout, 'ls-files', '--stage'), index)
+        self.assertFalse(path.parent.exists())
+        self.assert_original()
+
+    def test_new_file_modes_are_restricted(self):
+        path, content = self.add_new_file()
+        original = (self.series_dir / self.records[1]['patch']).read_bytes()
+        for mode in (b'100755', b'120000', b'160000'):
+            self.change_patch(1, lambda _, mode=mode: original.replace(b'new file mode 100644',
+                                                                      b'new file mode ' + mode))
+            self.assertIn('Unsupported patch operation',
+                          self.run_helper('--apply', success=False).stderr)
+            self.assertFalse(path.exists())
+            self.assert_original()
+        self.change_patch(1, lambda _: original)
+        path.parent.mkdir(parents=True)
+        path.write_bytes(content)
+        path.chmod(0o755)
+        self.assertIn('Preserving existing new-file path',
+                      self.run_helper('--apply', success=False).stderr)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o755)
+        self.assert_original()
+
+    def test_new_file_reverse_check_detects_inconsistent_patch(self):
+        path, content = self.add_new_file()
+        self.run_helper('--apply')
+        self.change_patch(1, lambda data: data.replace(b'+A complete release note.',
+                                                      b'+Incorrect release note.'))
+        self.assertIn('--reverse', self.run_helper('--check', success=False).stderr)
+        self.assertEqual(path.read_bytes(), content)
 
 
 if __name__ == '__main__':

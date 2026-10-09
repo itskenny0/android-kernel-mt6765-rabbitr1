@@ -48,8 +48,8 @@ Android build targets as arguments. Logs remain under `/rabbitr1/logs`.
 
 The product has not yet passed this build. Build the full images after resolving
 product, HAL and policy errors, then inspect the generated boot header, DT table,
-module hashes, super metadata, partition sizes and AVB configuration. The stock layout evidence is
-recorded in [stock-android-layout.json](research/stock-android-layout.json).
+module hashes, super metadata, partition sizes and AVB configuration. The stock
+layout evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
@@ -58,13 +58,30 @@ config directory, while Soong test packaging rejects paths containing `..`.
 The source-relative alias satisfies both and keeps the cache in the workspace.
 
 The pinned vendor image libraries need vendor builds of several dependencies.
-The tracked patches enable only the required library variants. Patch
+The compatibility patches enable the required library variants. Patch
 application checks repository commits, patch hashes and exact touched-file
 contents before changing anything; it accepts its already-applied changes and
 refuses unrecognized edits. A resolved manifest identifies repository commits;
 the patch series records the intentional differences from those commits.
 Unrelated local edits are preserved; review and record them separately before
-a release build.
+a release build. New text files require pinned absence in the base and index,
+a fixed resulting hash, and a regular non-executable file; conflicting local
+files are preserved. The helper completes all project checks before applying
+any patch.
+
+The graphics sources include the complete [Mesa 26.2.4 release](https://docs.mesa3d.org/relnotes/26.2.4.html)
+delta on the pinned Lineage tree. Its six Android/integration differences remain
+byte-for-byte unchanged. [Source provenance](../android/patches/mesa-26.2.4.json)
+records the upstream revisions, release checksum and retained delta. Source
+application and repeat checks passed; target compilation remains pending.
+
+The r1 GPU is PowerVR Rogue GE8320, BVNC `22.87.104.18`. This revision is absent
+from Mesa 26.2.4's device table and the kernel's documented supported GPU list.
+Matching upstream firmware exists, but the current kernel reports unhandled
+firmware feature and errata bits. Mesa also lacks the required Android native
+buffer/AHardwareBuffer integration for this driver, and the r1 GPU board wiring
+is not implemented. The Android product continues to use SwiftShader. Updating
+Mesa does not establish working hardware acceleration.
 
 The [device notes](../android/device/README.md) track the current hardware and
 release gates, including missing battery capacity (which can trigger Android's
