@@ -1,0 +1,18 @@
+Subject: [PATCH] arm64: dts: mediatek: select the r1 USB controller clock parent
+
+Select UNIVPLL3_D4 for USB_TOP_SEL before the MUSB driver enables its
+clocks, matching the official MT6765 USB clock preparation path.
+Enabling both clocks alone leaves the mux dependent on firmware state.
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+--- a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -299,6 +299,8 @@
+ };
+ 
+ &usb2 {
++	assigned-clocks = <&topckgen CLK_TOP_USB_TOP_SEL>;
++	assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL3_D4>;
+ 	dr_mode = "peripheral";
+ 	status = "okay";
+ };

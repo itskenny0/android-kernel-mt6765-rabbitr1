@@ -299,6 +299,8 @@
 };
 
 &usb2 {
+	assigned-clocks = <&topckgen CLK_TOP_USB_TOP_SEL>;
+	assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL3_D4>;
 	dr_mode = "peripheral";
 	status = "okay";
 };

@@ -151,3 +151,8 @@ MMU slaves before clearing, and acknowledges before callbacks can trigger new
 faults. A readback completes the posted clear. Empty and non-translation status
 no longer produces a stale translation report. See `docs/DISPLAY.md` for coverage
 and the remaining power, firmware-handoff and hardware requirements.
+
+Patch 0081 selects UNIVPLL3_D4 as the r1 USB controller clock parent before
+MUSB probe, matching the official MT6765 clock preparation path. This removes
+an implicit dependency on firmware mux state. The compiled DT is checked;
+USB enumeration and the cause of observed host protocol errors remain unproved.
