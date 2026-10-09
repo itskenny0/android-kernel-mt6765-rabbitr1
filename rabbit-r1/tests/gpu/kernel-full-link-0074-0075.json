@@ -1,0 +1,303 @@
+{
+  "source_commit": "83cbd9b71f3c7e8248eea9dddf0af34e843416fb",
+  "source_commit_after": "bf9db58538d913f1438a9dc1bd71e24a35cca11a",
+  "command": "make -C /rabbitr1/src/mainline O=/rabbitr1/out/powervr-check ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8 W=1 vmlinux modules Image",
+  "exit_code": 0,
+  "architecture": "AArch64",
+  "compiler": "aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "build_environment": {
+    "SOURCE_DATE_EPOCH": "1791518607",
+    "KBUILD_BUILD_TIMESTAMP": "Fri Oct 09 04:03:27 UTC 2026",
+    "KBUILD_BUILD_USER": "r1-builder",
+    "KBUILD_BUILD_HOST": "r1-workspace",
+    "KBUILD_BUILD_VERSION": "1"
+  },
+  "kernel_source_fingerprint": {
+    "algorithm": "SHA256 of sorted compact JSON path-to-SHA256 map; symlink values hash b\"symlink\\0\" plus the link text",
+    "files": 82923,
+    "exclusions": [
+      "rabbit-r1/",
+      "Documentation/",
+      ".github/"
+    ],
+    "before": "bb0f1508dfc9cd4368d915a467fc0be5c5e18588f52b9049985e7123a7021d5f",
+    "after": "bb0f1508dfc9cd4368d915a467fc0be5c5e18588f52b9049985e7123a7021d5f",
+    "unchanged": true
+  },
+  "raw_snapshot_comparison": {
+    "before": "12d0f415b0b915bc0403d641f911e6709ea03abeaad19b251773ac1318d7117c",
+    "after": "29f9eb49ae433ca17495846c9b1223a76dee0d80879bcd2c1452aa91fa237a46",
+    "unchanged": false,
+    "differences": {
+      ".github/workflows/rabbit-r1.yml": {
+        "before": "5525d8d6ed7311a491edd84a9e564b42f7bb716c55e8e91d5da687521be22e9c",
+        "after": "fbf84623547a5927c422a559d60cf04b7c51f85a01533cf851dea58e1d26212d"
+      }
+    },
+    "explanation": "Root updated source-download CI tooling during this build. The broad initial snapshot included .github metadata; its only changed member is the workflow YAML, which is not a Kbuild input. Raw before/after snapshots and mismatch are retained. No compiled source changed; make exited0. The wrapper exited1 solely because its original broad equality guard included the changed workflow."
+  },
+  "config_sha256_before": "d63b7077dafed56315c39abe35e1fd8a7b41075c83d85bf72416ad1967b183e1",
+  "config_sha256_after": "d63b7077dafed56315c39abe35e1fd8a7b41075c83d85bf72416ad1967b183e1",
+  "config_unchanged": true,
+  "required_enabled_config": [
+    "ARM64",
+    "MODULES",
+    "DRM_POWERVR",
+    "DEBUG_FS",
+    "BATTERY_MT6357",
+    "BATTERY_MT6357_LIVE_DIAGNOSTICS"
+  ],
+  "scope": "Full ARM64 W=1 scratch vmlinux, modules and Image build, including 0074 MT6357 live collector/provider calls and 0075 PowerVR scheduler timeout backport; shipping configuration unchanged. No GPU execution, physical gauge validation or Android rendering claim.",
+  "changes": {
+    "0074": {
+      "patch": "patches/mainline/0074-capture-mt6357-live-measurements.patch",
+      "patch_sha256": "aac3090c08afb5317259904a59422bcfd56b30e33b5226b900fa97723ca95779",
+      "gauge_sha256": "240d3956079ddef69eb76bb6315e1b9779539cd80b0a1f1d43d50bf9f38e4eff"
+    },
+    "0075": {
+      "upstream_commit": "2224d6642136767ec01d146d48ffc881b55b32f7",
+      "upstream_url": "https://github.com/torvalds/linux/commit/2224d6642136767ec01d146d48ffc881b55b32f7",
+      "patch": "patches/mainline/0075-powervr-scheduler-timeout.patch",
+      "patch_sha256": "329180bfe7606de579ac707220f020cc6ecb63aeda0c343ed3e206d78f08710d",
+      "files": [
+        {
+          "path": "drivers/gpu/drm/imagination/pvr_queue.c",
+          "before_sha256": "2525659553a95e8987a7d9948c12ffa73ee3049a879c308a6a92fbdf5a12e58d",
+          "after_sha256": "4e7d96283f2e3c94dc3590af959350c83293494a4206552dc0da07432463816b"
+        }
+      ]
+    }
+  },
+  "upstream_driver_commit": "5fce161649b4d779d1b76d9fcd52dc77779774b8",
+  "pinned_source_files_verified": 79,
+  "pinned_kernel_base": "cceb223d0c2d7ce52fade7bb6b9ef679c560bea7",
+  "artifacts": {
+    "Module.symvers": {
+      "bytes": 861491,
+      "sha256": "e94db961dc60e529d720f8c12feeeaeb417ab5fa37a6934d5d9a3542c90fc2d2"
+    },
+    "System.map": {
+      "bytes": 7740957,
+      "sha256": "1f1e630d40bde0a539db77f6faabd68c48805e7c02dbf41a90ae239d3fefa2c9"
+    },
+    "arch/arm64/boot/Image": {
+      "bytes": 35543048,
+      "sha256": "35a885f41a1d06de3ef1477d92d93309a1f315e2e9c275f2e2274c067b7770c9"
+    },
+    "drivers/clk/mediatek/clk-mt8196-disp0.ko": {
+      "bytes": 18496,
+      "sha256": "2253212a3e6cbc95be2024bb6db616f6ad91f8021ad141d80703da172315afe7"
+    },
+    "drivers/clk/mediatek/clk-mt8196-disp1.ko": {
+      "bytes": 19064,
+      "sha256": "6f1ecf26031e6c994d5049a2322c9ada9e8e6dccdfa7c2c75254767b3e3e7b8f"
+    },
+    "drivers/clk/mediatek/clk-mt8196-mfg.ko": {
+      "bytes": 9712,
+      "sha256": "bc3e7bbefca7cce68a102b5a11a40098de72dff866a87b551e52f72f37692189"
+    },
+    "drivers/clk/mediatek/clk-mt8196-ovl0.ko": {
+      "bytes": 19408,
+      "sha256": "b6315d3309193914f35e6578092d3ff6215d02924903983d789a0bd4dc0f0b3f"
+    },
+    "drivers/clk/mediatek/clk-mt8196-ovl1.ko": {
+      "bytes": 19640,
+      "sha256": "5e5e413692456a8f5d8d1ad7ed4e31343d2ff2d0f1b8d18fa6320420a3d93806"
+    },
+    "drivers/clk/mediatek/clk-mt8196-vdec.ko": {
+      "bytes": 12112,
+      "sha256": "7e5e4c8633a1323beda19da0ad43694764876d9d1674e66dcaebc5acc57c3336"
+    },
+    "drivers/clk/mediatek/clk-mt8196-vdisp_ao.ko": {
+      "bytes": 8112,
+      "sha256": "48a06a1560024b27c29d19956559875b2906c7bb0b5d0b780e09872466400f1c"
+    },
+    "drivers/clk/mediatek/clk-mt8196-venc.ko": {
+      "bytes": 13760,
+      "sha256": "c03e9d3a2cb4c2c4921378b0c8d51e3b39c64a286f5eed4b9040ed1e304c3f2d"
+    },
+    "drivers/gpu/drm/imagination/built-in.a": {
+      "bytes": 2142,
+      "sha256": "fa22144a5ad2cf06e37ecb9569721382948f9dce902ee35df311b80d23a47917"
+    },
+    "drivers/power/supply/mt6357-gauge.o": {
+      "bytes": 22440,
+      "sha256": "ef16da17a2249827816422348079df8c8ef4fb5f2696b0089421b921c04148f1"
+    },
+    "fs/pstore/pstore_blk.ko": {
+      "bytes": 18024,
+      "sha256": "fc8264d7bf5322a823fef8f830ef96a2d2375f4cb6612994b9815998b2f1e4d5"
+    },
+    "fs/pstore/pstore_zone.ko": {
+      "bytes": 21128,
+      "sha256": "c1efcae655d9a448252a73b4e37b88b0ae092104be2502f41244ed946759dd51"
+    },
+    "modules.builtin": {
+      "bytes": 28710,
+      "sha256": "0d22f7a33e3fac9ee86bb965a3d9fce8c42430fd03da3af91a79e6e129a70688"
+    },
+    "modules.order": {
+      "bytes": 364,
+      "sha256": "99a478427ad770134f2621bb102f0788c714fbec53e4ad8cd0e7f7dace5441e7"
+    },
+    "vmlinux": {
+      "bytes": 45288040,
+      "sha256": "34f4220eb08957f860a721fd5128a32e8438cf8f11db63697ea62cd860280ff7"
+    },
+    "vmlinux.symvers": {
+      "bytes": 861057,
+      "sha256": "6a152d8c2b7b5888e367083a3f815349faa63af4faa7481fb156da505f43992e"
+    }
+  },
+  "required_linked_symbols": [
+    "mt6357_gauge_probe",
+    "pvr_probe",
+    "pvr_driver_init",
+    "of_find_device_by_node",
+    "device_is_bound",
+    "__tracepoint_pvr_job_submit_ioctl",
+    "__tracepoint_pvr_job_submit_fw",
+    "__tracepoint_pvr_job_done"
+  ],
+  "undefined_symbols": [],
+  "live_diagnostic_format_present": true,
+  "module_checks": {
+    "count": 10,
+    "all_aarch64": true,
+    "all_vermagic_match_release": "7.1.0-rabbit-r1-bringup+",
+    "modpost_succeeded": true
+  },
+  "warnings": {
+    "total": 1071,
+    "compiler_errors": 0,
+    "counts_by_diagnostic": {
+      "kernel-doc": 20,
+      "-Woverride-init": 1048,
+      "-Wformat-truncation=": 3
+    },
+    "counts_by_file": {
+      "/rabbitr1/src/mainline/ipc/sem.c": 1,
+      "/rabbitr1/src/mainline/arch/arm64/kernel/sys.c": 472,
+      "/rabbitr1/src/mainline/arch/arm64/kernel/traps.c": 44,
+      "/rabbitr1/src/mainline/arch/arm64/kernel/cpu_errata.c": 3,
+      "/rabbitr1/src/mainline/arch/arm64/include/asm/cpufeature.h": 2,
+      "/rabbitr1/src/mainline/arch/arm64/kernel/sys32.c": 472,
+      "/rabbitr1/src/mainline/arch/arm64/kernel/machine_kexec.c": 10,
+      "/rabbitr1/src/mainline/kernel/locking/lockdep_proc.c": 1,
+      "/rabbitr1/src/mainline/lib/rhashtable.c": 4,
+      "/rabbitr1/src/mainline/drivers/pmdomain/mediatek/mtk-mfg-pmdomain.c": 1,
+      "/rabbitr1/src/mainline/net/8021q/vlan.c": 2,
+      "/rabbitr1/src/mainline/fs/f2fs/segment.c": 2,
+      "/rabbitr1/src/mainline/drivers/scsi/mpt3sas/mpt3sas_ctl.c": 1,
+      "/rabbitr1/src/mainline/drivers/hid/hid-lg-g15.c": 1,
+      "/rabbitr1/src/mainline/include/linux/perf/arm_pmuv3.h": 49,
+      "/rabbitr1/src/mainline/drivers/perf/arm_pmuv3.c": 6
+    },
+    "all_warning_files_unchanged_from_pinned_base": true,
+    "source_provenance": {
+      "arch/arm64/include/asm/cpufeature.h": {
+        "current_sha256": "e292d3d4aa4da4293cd0244b692abc033104e117b40260c266d4894d41eb34af",
+        "pinned_base_sha256": "e292d3d4aa4da4293cd0244b692abc033104e117b40260c266d4894d41eb34af",
+        "unchanged_from_pinned_base": true
+      },
+      "arch/arm64/kernel/cpu_errata.c": {
+        "current_sha256": "9154e9cd0184bbdf037ebc5ee65b0365610a363c210a3733bdbf6a2a649895b4",
+        "pinned_base_sha256": "9154e9cd0184bbdf037ebc5ee65b0365610a363c210a3733bdbf6a2a649895b4",
+        "unchanged_from_pinned_base": true
+      },
+      "arch/arm64/kernel/machine_kexec.c": {
+        "current_sha256": "f7035e6703b771ed81bcc1f5133bbbe76801aa47255529e6f01f85852c4690e3",
+        "pinned_base_sha256": "f7035e6703b771ed81bcc1f5133bbbe76801aa47255529e6f01f85852c4690e3",
+        "unchanged_from_pinned_base": true
+      },
+      "arch/arm64/kernel/sys.c": {
+        "current_sha256": "f052e58e829fd4a977f7a52ce96a774051430c3a677e6d8b805694b8d466da9c",
+        "pinned_base_sha256": "f052e58e829fd4a977f7a52ce96a774051430c3a677e6d8b805694b8d466da9c",
+        "unchanged_from_pinned_base": true
+      },
+      "arch/arm64/kernel/sys32.c": {
+        "current_sha256": "c4d4cd83b8538072b300d31cac98c2b8cd2698c9f639dfba37db940d3d04b4ef",
+        "pinned_base_sha256": "c4d4cd83b8538072b300d31cac98c2b8cd2698c9f639dfba37db940d3d04b4ef",
+        "unchanged_from_pinned_base": true
+      },
+      "arch/arm64/kernel/traps.c": {
+        "current_sha256": "42a761c76c28a507e5f30c3e2d4045463dbc2655f4705a023b1379c75450ce95",
+        "pinned_base_sha256": "42a761c76c28a507e5f30c3e2d4045463dbc2655f4705a023b1379c75450ce95",
+        "unchanged_from_pinned_base": true
+      },
+      "drivers/hid/hid-lg-g15.c": {
+        "current_sha256": "6cfa7db217971072564e1542694a7c6e4dfaada03897777eda12c991406020d6",
+        "pinned_base_sha256": "6cfa7db217971072564e1542694a7c6e4dfaada03897777eda12c991406020d6",
+        "unchanged_from_pinned_base": true
+      },
+      "drivers/perf/arm_pmuv3.c": {
+        "current_sha256": "82a4c3f9179612ce4aec5738f391468236db037e7a6d3be51e22c19e2f64e956",
+        "pinned_base_sha256": "82a4c3f9179612ce4aec5738f391468236db037e7a6d3be51e22c19e2f64e956",
+        "unchanged_from_pinned_base": true
+      },
+      "drivers/pmdomain/mediatek/mtk-mfg-pmdomain.c": {
+        "current_sha256": "105458c98ae174227c19acd719138002cf3681470b13c730513a90e0bf14fea0",
+        "pinned_base_sha256": "105458c98ae174227c19acd719138002cf3681470b13c730513a90e0bf14fea0",
+        "unchanged_from_pinned_base": true
+      },
+      "drivers/scsi/mpt3sas/mpt3sas_ctl.c": {
+        "current_sha256": "a47f3a9421cdd45857305938d57f07af6e034d55ba29f3d9b9d2ebe10c855436",
+        "pinned_base_sha256": "a47f3a9421cdd45857305938d57f07af6e034d55ba29f3d9b9d2ebe10c855436",
+        "unchanged_from_pinned_base": true
+      },
+      "fs/f2fs/segment.c": {
+        "current_sha256": "49326a55d1bac0e9506b8155f55d2d3399a54fe5add81691071b7a2710115608",
+        "pinned_base_sha256": "49326a55d1bac0e9506b8155f55d2d3399a54fe5add81691071b7a2710115608",
+        "unchanged_from_pinned_base": true
+      },
+      "include/linux/perf/arm_pmuv3.h": {
+        "current_sha256": "482325fbabeee9bb7f57733bcc0feb7ab33b258ad21d5fa40b7cfac1729f4d68",
+        "pinned_base_sha256": "482325fbabeee9bb7f57733bcc0feb7ab33b258ad21d5fa40b7cfac1729f4d68",
+        "unchanged_from_pinned_base": true
+      },
+      "ipc/sem.c": {
+        "current_sha256": "85526eabd2283b87bb16dd3546d2d579407d85eed0ec035f1451e9fce59963d5",
+        "pinned_base_sha256": "85526eabd2283b87bb16dd3546d2d579407d85eed0ec035f1451e9fce59963d5",
+        "unchanged_from_pinned_base": true
+      },
+      "kernel/locking/lockdep_proc.c": {
+        "current_sha256": "5fcf966b0ee0898eb9feaf53e3efb1ea374b968bb7787848ed4125cdeafb56e2",
+        "pinned_base_sha256": "5fcf966b0ee0898eb9feaf53e3efb1ea374b968bb7787848ed4125cdeafb56e2",
+        "unchanged_from_pinned_base": true
+      },
+      "lib/rhashtable.c": {
+        "current_sha256": "d5c86e755fa0436544e2f9f794d714286c8f61c40239c678cbd29e017320a313",
+        "pinned_base_sha256": "d5c86e755fa0436544e2f9f794d714286c8f61c40239c678cbd29e017320a313",
+        "unchanged_from_pinned_base": true
+      },
+      "net/8021q/vlan.c": {
+        "current_sha256": "3b148f7b80dbdfaf8a40f2ebddb3af498718c5ae229f652648bf7ee486ce40d5",
+        "pinned_base_sha256": "3b148f7b80dbdfaf8a40f2ebddb3af498718c5ae229f652648bf7ee486ce40d5",
+        "unchanged_from_pinned_base": true
+      }
+    },
+    "gauge_iio_device_core_powervr_diagnostics": [],
+    "review": "Inherited ARM64 override-initializer warnings, inherited snprintf truncation warnings, and kernel-doc parser/comment warnings are recorded; embedded error text inside a Warning wrapper is not a compiler error. No blanket zero-warning claim."
+  },
+  "build_log_sha256": "6bb2a03b977efeec10cd207001d1094f05555e86b4b78cd19020f4f6b081f290",
+  "evidence_sha256": {
+    "audit.json": "b291aa9109cb5543cf825507b5bb4021f08257026b1a410e673b69dfacbcf54b",
+    "before.json": "c775ff7699dd62b9a13c3549f00614acda8549a24125a7f8f56beda0ccf88f99",
+    "after.json": "a79cb01cc42bf97d8bfb4b933468129eb2e06d8fd369199c4778180efeaff4e0",
+    "fingerprint-review.json": "b42d1df93328986015175b1f55822e691ee6c64f262ca7b5fbc1dfa9881f54c0",
+    "diagnostics.json": "a556ccdc02fde847ef5d3c71a7716ba00378994c54aae4ed8f4249801b2ae536",
+    "elf-header.txt": "327671af74fb1a414572ee2a54d4e7ce9625966777c8fb0bf89b39b34ccc71e7",
+    "undefined-symbols.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "linked-symbols.txt": "7ffd1f9b9e1eb52555d3e65392f1174d374abb99e7672b1729d811568f1d6447",
+    "run.py": "f33297a305ffb035dfdd78f774676f0b09fbf34b5968b52eba3d34245f971773",
+    "review.py": "22547376531938a3a86c7ac01b5f5549156498d145aae72b72ff485ccc7a9ff0"
+  },
+  "original_workspace_evidence": "/rabbitr1/out/powervr-check/full-link-0074-0075",
+  "prior_subtree_evidence_unchanged": true,
+  "production_config_sha256": {
+    "arch/arm64/configs/rabbit_r1_defconfig": "a436585b8f22d8aa441ea013adb4f4bdaeed5cc9fcfe1157424547bf14152dc8",
+    "rabbit-r1/configs/mainline-r1.config": "e15fd814eaf60cb116b5d7d93c3237d9b20214b4c881b693d700951b54cbb747"
+  },
+  "production_powervr_enabled": false,
+  "hardware_tested": false
+}

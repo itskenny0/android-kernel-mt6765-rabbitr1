@@ -50,7 +50,7 @@ are substituted for hardware validation.
 The timeout backport also passed all 28 ARM64 objects with ``W=1`` and no
 warnings. ``powervr-timeout-build.json`` records the exact source pins, compiler
 and logs. This run used the pending MT6357 diagnostic config option but did
-not compile the gauge; full-link results below still apply to the baseline.
+not compile the gauge. The later full-link check below includes both changes.
 
 Additional compile results
 --------------------------
@@ -67,6 +67,16 @@ After the subtree check above, repeat this optional link check with::
 
 CI runs the 28-object subtree check. The full-link artifact remains in its
 separate output directory and is not included in the flash package.
+
+A subsequent full ARM64 ``W=1`` build at
+``83cbd9b71f3c7e8248eea9dddf0af34e843416fb`` includes the scheduler fix and
+MT6357 live collector. ``kernel-full-link-0074-0075.json`` records the linked
+kernel, Image and ten modules, with the required gauge/PowerVR symbols and
+no undefined kernel symbols. It produced 1,071 warnings in 16 unchanged
+base-kernel files, with none in the gauge, IIO, device core or PowerVR.
+Compiled inputs and config stayed unchanged. The initial broader source
+guard also covered a concurrently updated CI workflow; its mismatch is
+preserved separately from the successful build and compiled-input check.
 
 Mesa 26.2.4's PowerVR Vulkan shared library also compiled and linked through
 613 Ninja actions, with zero Mesa compiler warnings. This was an x86_64
