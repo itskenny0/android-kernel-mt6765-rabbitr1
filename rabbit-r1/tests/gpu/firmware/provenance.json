@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "verified_as_of": "2026-10-09",
+  "target": {
+    "gpu": "PowerVR GE8320",
+    "bvnc": "22.87.104.18"
+  },
+  "scope": "Read-only source and metadata audit. No firmware execution, rendering, packaging or GPU enablement.",
+  "sources": {
+    "kernel": {
+      "tag": "v7.2.9",
+      "commit": "5fce161649b4d779d1b76d9fcd52dc77779774b8",
+      "source_manifest": "../powervr-7.2.9.json"
+    },
+    "mesa": {
+      "tag": "mesa-26.2.4",
+      "commit": "96cb43121031992b85767f9c1be8f3f48e22b1d2"
+    }
+  },
+  "inputs": {
+    "kernel_abi": {
+      "source_path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_dev_info.h",
+      "sha256": "d3d9c39a514a0b90dcd8756e9058e89e059fc51c19670766ed30d9d0cc4c84a5",
+      "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/imagination/pvr_rogue_fwif_dev_info.h?id=5fce161649b4d779d1b76d9fcd52dc77779774b8"
+    },
+    "kernel_mapping": {
+      "source_path": "drivers/gpu/drm/imagination/pvr_device_info.c",
+      "sha256": "8fa613f77f42c651135fa208a74c0d68ec01f827976bf895ef277139a0fc6ac2",
+      "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/imagination/pvr_device_info.c?id=5fce161649b4d779d1b76d9fcd52dc77779774b8"
+    },
+    "mesa_header": {
+      "source_path": "src/imagination/common/pvr_device_info.h",
+      "sha256": "4485393f868591d1c1e73c14160dfb5c7ad2ece3cd135ef076c97b221d637ef5",
+      "url": "https://gitlab.freedesktop.org/mesa/mesa/-/blob/96cb43121031992b85767f9c1be8f3f48e22b1d2/src/imagination/common/pvr_device_info.h"
+    }
+  },
+  "firmwares": {
+    "current": {
+      "version": "1.1.OS@6976702",
+      "bytes": 118784,
+      "sha256": "8483f650788da9fee0e26ef43c2a97248579280a77db56a24aeb3bf815ca3c9b",
+      "commit": "8a58f81883f7be458daa34e418cc4079f995b279",
+      "url": "https://gitlab.freedesktop.org/imagination/linux-firmware/-/blob/8a58f81883f7be458daa34e418cc4079f995b279/powervr/rogue_22.87.104.18_v1.fw"
+    },
+    "previous": {
+      "version": "1.0.OS@6889268",
+      "bytes": 118784,
+      "sha256": "290df3fe00f22a92c8634b255394d6b13a7c57c34df7c757383e4396020b3ed6",
+      "commit": "79a956339d2251bfbca518936abc9610a1c3c197",
+      "url": "https://gitlab.freedesktop.org/imagination/linux-firmware/-/blob/79a956339d2251bfbca518936abc9610a1c3c197/powervr/rogue_22.87.104.18_v1.fw"
+    }
+  },
+  "vendor_search": {
+    "linux_branches": [
+      "dev/bxs",
+      "powervr-next"
+    ],
+    "dev_bxs_abi_sha256": "d3d9c39a514a0b90dcd8756e9058e89e059fc51c19670766ed30d9d0cc4c84a5",
+    "dev_bxs_abi_url": "https://gitlab.freedesktop.org/imagination/linux/-/blob/187d87dfe3ed38a3f16d895f89ac23b9ec228585/drivers/gpu/drm/imagination/pvr_rogue_fwif_dev_info.h",
+    "device_info_commit": "e6ff7bda35818039e6e51fd2c09ebb5dbbd5c20d",
+    "device_info_url": "https://gitlab.freedesktop.org/imagination/mesa/-/blob/e6ff7bda35818039e6e51fd2c09ebb5dbbd5c20d/src/imagination/common/pvr_device_info.c",
+    "exact_bvnc_table_found": false,
+    "unknown_bit_producer_definitions_found": false
+  },
+  "stock_source_search": {
+    "original_workspace_roots": [
+      "/rabbitr1/src/kernel",
+      "/rabbitr1/src/modules",
+      "/rabbitr1/src/xiaomi",
+      "/rabbitr1/src/xiaomi-devs"
+    ],
+    "exact_bvnc_headers_found": "Kernel-mode only",
+    "candidate_um_headers_found": 0,
+    "missing_numeric_rgx_feature_name_matches_in_gpu_c_and_headers": 0,
+    "limit": "Bounded search of these local trees; not a claim that no licensed source exists elsewhere."
+  },
+  "independent_tester_report": {
+    "author": "Dinolek",
+    "date": "2025-08-15",
+    "url": "https://gitlab.freedesktop.org/imagination/linux-firmware/-/issues/7",
+    "summary": "Tester reported firmware v1.0 build 6734358 booted; substituting GE8300 features/enhancements/quirks then produced black screen running vkcubepp and unknown FWCCB command 2abc0069. This is the tester report, not our result and not proof of the cause."
+  },
+  "official_support_policy_url": "https://docs.mesa3d.org/drivers/powervr.html",
+  "original_workspace_evidence_note": "These files are outside the repository and are not bundled or required to run decode-metadata.py. Paths identify original investigation artifacts only.",
+  "original_workspace_evidence": [
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/metadata-coverage.json",
+      "sha256": "83ecb5b2bc81fd695d5a12f6012f2ad4fab6690fa21099f634a600b2e07c0293"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/initial-query-provenance.json",
+      "sha256": "e6b659f34f126108962c0284bca3cd50b19fa08649332d0e791fdb3b25cc482a"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/second-query-provenance.json",
+      "sha256": "5501d8f62c054abc5433a7d4d6aa9e96d0ef1e5de18b0320e28cc8d340d669b0"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/third-query-provenance.json",
+      "sha256": "c849f1127465a3f7ff19e47e5a78da029f56f5d186b15aca3376748ac19f5607"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/stock-header-search.json",
+      "sha256": "bc5e884b75027b3ba1b385711648e963030bb516d4e2798f32c97acef809f465"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/stock-um-feature-search.json",
+      "sha256": "d37b3838d68144e8ff17bd0485dc04dc9c04f9d6e21f256f9d5c022b19e52047"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/producer-investigation/issue7-graphql.txt",
+      "sha256": "e96157b894f65738ba8639ebc45bf3313223b6fbcaa9c5a0d559e717fe990531"
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/r1-gpu-audit/fw-diagnostic-results.json",
+      "sha256": "3f05f8a4c2f6c9174a061e6a878b31534c4c066a043e60f2c9e7c61bd63cabfd"
+    }
+  ]
+}

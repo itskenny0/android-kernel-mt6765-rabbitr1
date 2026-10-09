@@ -44,6 +44,8 @@ An exact-BVNC mainline firmware exists, but the production decoder reports
 unsupported BRN bits 26, 28 and 30, ERN bit 8, and feature bit 102. The
 firmware decoder and those warnings are unchanged by this driver update.
 Their meanings and required workarounds remain unresolved.
+The `firmware audit <firmware/README.rst>`_ records source pins, numeric
+coverage and a reproducible metadata decoder.
 
 Patch 0072 supplies upstream query, bounds, MMU, context cleanup, paired-job
 and tracing improvements. It does not enable the GPU, add a DT node or

@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "firmware_sha256": "8483f650788da9fee0e26ef43c2a97248579280a77db56a24aeb3bf815ca3c9b",
+  "firmware_version": "1.1.OS@6976702",
+  "bvnc": "22.87.104.18",
+  "masks": {
+    "BRN": {
+      "words": [
+        "0x54000610"
+      ],
+      "known_set": {
+        "4": "49927",
+        "9": "63553",
+        "10": "66011"
+      },
+      "unsupported_indices": [
+        26,
+        28,
+        30
+      ]
+    },
+    "ERN": {
+      "words": [
+        "0x1a5"
+      ],
+      "known_set": {
+        "0": "35421",
+        "2": "38748",
+        "5": "42606",
+        "7": "57596"
+      },
+      "unsupported_indices": [
+        8
+      ]
+    },
+    "FEATURE": {
+      "words": [
+        "0x9219dd57fdb6005b",
+        "0x4000000004"
+      ],
+      "known_set": {
+        "0": "AXI_ACELITE",
+        "1": "CDM_CONTROL_STREAM_FORMAT",
+        "3": "COMMON_STORE_SIZE_IN_DWORDS",
+        "4": "COMPUTE",
+        "6": "COMPUTE_OVERLAP",
+        "17": "GPU_VIRTUALISATION",
+        "18": "GS_RTA_SUPPORT",
+        "20": "ISP_MAX_TILES_IN_FLIGHT",
+        "21": "ISP_SAMPLES_PER_PIXEL",
+        "23": "LAYOUT_MARS",
+        "24": "MAX_PARTITIONS",
+        "26": "META_COREMEM_SIZE",
+        "27": "MIPS",
+        "28": "NUM_CLUSTERS",
+        "29": "NUM_ISP_IPP_PIPES",
+        "30": "NUM_OSIDS",
+        "31": "NUM_RASTER_PIPES",
+        "32": "PBE2_IN_XE",
+        "33": "PBVNC_COREID_REG",
+        "34": "PERFBUS",
+        "36": "PHYS_BUS_WIDTH",
+        "38": "ROGUEXE",
+        "40": "SIMPLE_INTERNAL_PARAMETER_FORMAT",
+        "42": "SIMPLE_PARAMETER_FORMAT_VERSION",
+        "43": "SLC_BANKS",
+        "44": "SLC_CACHE_LINE_SIZE_BITS",
+        "46": "SLC_SIZE_IN_KILOBYTES",
+        "47": "SOC_TIMER",
+        "48": "SYS_BUS_SECURE_RESET",
+        "51": "TILE_SIZE_X",
+        "52": "TILE_SIZE_Y",
+        "57": "USC_MIN_OUTPUT_REGISTERS_PER_PIX",
+        "60": "VIRTUAL_ADDRESS_SPACE_BITS",
+        "63": "XE_ARCHITECTURE",
+        "66": "XPU_MAX_REGBANKS_ADDR_WIDTH"
+      },
+      "unsupported_indices": [
+        102
+      ]
+    }
+  },
+  "feature_parameters": [
+    1,
+    19456,
+    7,
+    1,
+    0,
+    10,
+    0,
+    1,
+    7,
+    8,
+    1,
+    36,
+    1,
+    1,
+    512,
+    64,
+    16,
+    16,
+    2,
+    40,
+    1,
+    19
+  ],
+  "numeric_coverage": {
+    "decoded_known_values": {
+      "cdm_control_stream_format": 1,
+      "common_store_size_in_dwords": 19456,
+      "isp_max_tiles_in_flight": 7,
+      "isp_samples_per_pixel": 1,
+      "layout_mars": 0,
+      "max_partitions": 10,
+      "meta_coremem_size": 0,
+      "num_clusters": 1,
+      "num_isp_ipp_pipes": 7,
+      "num_osids": 8,
+      "num_raster_pipes": 1,
+      "phys_bus_width": 36,
+      "simple_parameter_format_version": 1,
+      "slc_banks": 1,
+      "slc_cache_line_size_bits": 512,
+      "slc_size_in_kilobytes": 64,
+      "tile_size_x": 16,
+      "tile_size_y": 16,
+      "usc_min_output_registers_per_pix": 2,
+      "virtual_address_space_bits": 40,
+      "xe_architecture": 1,
+      "xpu_max_regbanks_addr_width": 19
+    },
+    "parameters_present": 22,
+    "known_parameters_consumed": 22,
+    "unused_parameter_tail": false,
+    "mesa_numeric_fields_not_defined_in_published_abi": [
+      "max_instances_per_pds_task",
+      "max_multisample",
+      "max_usc_tasks",
+      "tpu_parallel_instances",
+      "unified_store_depth",
+      "usc_itr_parallel_instances",
+      "usc_slots",
+      "uvs_banks",
+      "uvs_pba_entries",
+      "uvs_vtx_entries",
+      "vdm_cam_size"
+    ],
+    "other_mesa_numeric_fields_defined_but_unset": [
+      "fbcdc_algorithm",
+      "xpu_max_slaves"
+    ],
+    "qualification": "The 11 unrepresented numeric fields cannot be recovered from an unused parameter tail. Some properties may be derivable with authoritative hardware documentation; this audit does not invent those derivations."
+  },
+  "mesa_same_name_flags_set_by_firmware": [
+    "common_store_size_in_dwords",
+    "compute",
+    "compute_overlap",
+    "gs_rta_support",
+    "isp_max_tiles_in_flight",
+    "isp_samples_per_pixel",
+    "max_partitions",
+    "num_clusters",
+    "num_raster_pipes",
+    "pbe2_in_xe",
+    "roguexe",
+    "simple_internal_parameter_format",
+    "simple_parameter_format_version",
+    "slc_cache_line_size_bits",
+    "tile_size_x",
+    "tile_size_y",
+    "usc_min_output_registers_per_pix"
+  ],
+  "flag_scope": "Only direct same-name matches are listed. Derived or renamed features are not determined by this comparison.",
+  "prior_firmware_metadata_identical": true,
+  "ge8300_mismatch": {
+    "ge8320_firmware_common_store_dwords": 19456,
+    "mesa_ge8300_common_store_dwords": 16384,
+    "ge8320_firmware_isp_max_tiles_in_flight": 7,
+    "mesa_ge8300_isp_max_tiles_in_flight": 4
+  },
+  "validation_scope": "Published ABI metadata decoding only; unknown indices remain unresolved and success is not proof of hardware support."
+}
