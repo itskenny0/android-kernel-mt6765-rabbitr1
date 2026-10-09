@@ -81,6 +81,57 @@ dump on failure and creates successful dumps with mode `0600`. Use ordinary
 directories and regular, single-link files; symlink paths and paths containing
 `..` are rejected. Packet-size queries must succeed; the old fallback is removed.
 
+An optional runtime file separates local preparation from execution on another
+host. Keep the package, backups and `--out` under `/rabbitr1`; pass a local JSON
+file with `--runtime` when preparing scripts for a host such as `/opt/rabbit`:
+
+```json
+{
+  "schema": 1,
+  "workspace": "/opt/rabbit",
+  "directory": "/opt/rabbit/prepared/diagnostic-a",
+  "archive": "/opt/rabbit/downloads/mtkclient-v2.1.4.1.tar.gz",
+  "destination": "/opt/rabbit/mtkclient-haretic-cid",
+  "python": "/opt/rabbit/venv-mtkclient/bin/python",
+  "tmpdir": "/opt/rabbit/.tmp",
+  "cache": "/opt/rabbit/.cache",
+  "config": "/opt/rabbit/.cache/config",
+  "data": "/opt/rabbit/.cache/data"
+}
+```
+
+These are execution paths, not local filesystem lookups. They must be canonical
+absolute paths within the chosen workspace. `/`, traversal and control
+characters are rejected. Existing source trees next to the selected destination
+are permitted; the workspace's original `src/mtkclient` remains protected.
+
+Preparation records the runtime in `plan.json` and `runtime.json`. Both scripts
+bind the latter's exact hash. A local preview prints the commands without
+entering or inspecting the remote directory. When explicitly run with `--write`
+on the execution host, each script enters that directory, checks its files and
+runtime paths, and checks the pinned source before every mtkclient invocation.
+Copy the complete prepared directory there and supply the exact pinned archive,
+source tree, interpreter and existing temporary/cache directories first.
+Directory and archive symlinks are rejected; a venv interpreter may link to its
+base Python. The metadata selects that interpreter path, not its executable bytes
+or installed dependencies.
+
+The bundled source checker accepts `--workspace /opt/rabbit` together with
+explicit `--manifest`, `--patch`, `--archive` and `--destination` paths. Its source
+hash/mode checks and refusal to overwrite an existing tree are unchanged.
+Runtime preparation requires the matching workspace-aware checker in the
+package; refresh only the host tooling in a separately verified package before
+using this option. Omitting `--runtime` keeps the existing `/rabbitr1` behavior.
+This option grants no device action or bootloader-state assertion.
+
+The runtime may also include `expected_emmc_cid`, set to an independently
+observed 32-digit hexadecimal eMMC CID. Preparation normalizes it to lowercase
+and appends `--expected-emmc-cid` after every generated `gpt`, `r` and `w` command.
+The [CID guard](MTKCLIENT-CID.md) checks a fresh report inside that same connected
+DA process before dispatch. GPT matching verifies only the header and partition
+layout. The expected CID is device-specific metadata for the private prepared
+directory; do not use the synthetic values from tests or commit a device's CID.
+
 Host USB access and the connection sequence must work before attempting a write.
 Follow the [mtkclient usage guide](https://github.com/bkerler/mtkclient/blob/v2.1.4.1/README-USAGE.md)
 and Rabbit's [flashing documentation](https://github.com/rabbit-hmi-oss/community-wiki/blob/main/docs/flashing.md).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare or check the exact patched mtkclient tree offline (Linux, /rabbitr1)."""
+"""Prepare or check the exact patched mtkclient tree offline in an explicit workspace (Linux)."""
 import argparse
 import ctypes
 import hashlib
@@ -23,12 +23,22 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def local_path(value):
+def workspace_path(value):
+    text = str(value)
+    path = PurePosixPath(text)
+    require(path.is_absolute() and str(path) == text and text != '/' and not text.startswith('//') and
+            '..' not in path.parts and not any(ord(c) < 32 or ord(c) == 127 for c in text),
+            'workspace must be a canonical absolute non-root path')
+    return Path(text)
+
+
+def local_path(value, workspace=ROOT):
     """Reject symlink components, including dangling links, without resolving them."""
     path = Path(os.path.abspath(value))
-    require(path.is_relative_to(ROOT) and path != ROOT, 'path must be under /rabbitr1')
+    require(path.is_relative_to(workspace) and path != workspace,
+            'path must be under ' + str(workspace))
     for component in [*reversed(path.parents), path]:
-        if component.is_relative_to(ROOT):
+        if component.is_relative_to(workspace):
             try:
                 require(not stat.S_ISLNK(component.lstat().st_mode),
                         f'symlink path component: {component}')
@@ -66,8 +76,8 @@ def pin(data, spec, label, prefix=''):
     require(len(data) == size and digest(data) == expected, f'{label} pin mismatch')
 
 
-def read_inputs(manifest_path, archive_override=None, patch_override=None):
-    manifest_bytes = regular_bytes(local_path(manifest_path))
+def read_inputs(manifest_path, archive_override=None, patch_override=None, *, workspace=ROOT):
+    manifest_bytes = regular_bytes(local_path(manifest_path, workspace))
     manifest = json.loads(manifest_bytes)
     require(set(manifest) == {'schema', 'archive', 'patch', 'files'} and
             type(manifest['schema']) is int and manifest['schema'] == 1,
@@ -82,8 +92,8 @@ def read_inputs(manifest_path, archive_override=None, patch_override=None):
     prefix = archive_spec['prefix']
     require(isinstance(prefix, str) and prefix.endswith('/') and
             '/' not in relative(prefix[:-1]), 'invalid archive prefix')
-    archive = regular_bytes(local_path(archive_override or ROOT / 'downloads' / filename))
-    patch = regular_bytes(local_path(patch_override or PROJECT / patch_spec['path']))
+    archive = regular_bytes(local_path(archive_override or workspace / 'downloads' / filename, workspace))
+    patch = regular_bytes(local_path(patch_override or PROJECT / patch_spec['path'], workspace))
     pin(archive, archive_spec, 'archive')
     pin(patch, patch_spec, 'patch')
     require(isinstance(manifest['files'], list) and len(manifest['files']) == 5,
@@ -211,14 +221,16 @@ def main():
     parser.add_argument('--manifest', type=Path, default=PROJECT / 'mtkclient/transport.json')
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--patch', type=Path)
-    parser.add_argument('--destination', type=Path, default=ROOT / 'src/mtkclient-haretic')
+    parser.add_argument('--destination', type=Path)
+    parser.add_argument('--workspace', type=workspace_path, default=ROOT)
     parser.add_argument('--check', action='store_true', help='validate only; never repair')
     args = parser.parse_args()
-    destination = local_path(args.destination)
-    original = ROOT / 'src/mtkclient'
+    workspace = args.workspace
+    destination = local_path(args.destination or workspace / 'src/mtkclient-haretic', workspace)
+    original = workspace / 'src/mtkclient'
     require(not destination.is_relative_to(original) and not original.is_relative_to(destination),
             'original mtkclient tree is protected')
-    manifest, patch, files, directories, changes = read_inputs(args.manifest, args.archive, args.patch)
+    manifest, patch, files, directories, changes = read_inputs(args.manifest, args.archive, args.patch, workspace=workspace)
     if args.check:
         verify_tree(destination, files, directories, changes)
     else:

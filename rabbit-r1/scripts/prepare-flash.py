@@ -3,7 +3,9 @@
 import argparse
 import hashlib
 import json
-from pathlib import Path
+import os
+import stat
+from pathlib import Path, PurePosixPath
 import shlex
 import shutil
 import struct
@@ -40,10 +42,73 @@ def transport_metadata(package):
                       for name in TRANSPORT_FILES}}
 
 
-def local(value):
+RUNTIME_KEYS = {'schema', 'workspace', 'directory', 'archive', 'destination',
+                'python', 'tmpdir', 'cache', 'config', 'data'}
+
+
+def runtime_metadata(value):
+    """Validate future host paths lexically; never inspect the remote filesystem."""
+    if not isinstance(value, dict) or set(value) not in (RUNTIME_KEYS, RUNTIME_KEYS | {'expected_emmc_cid'}) or type(value['schema']) is not int or value['schema'] != 1:
+        raise ValueError('Invalid runtime metadata')
+    paths = {}
+    for name in RUNTIME_KEYS - {'schema'}:
+        text = value[name]
+        if not isinstance(text, str) or any(ord(c) < 32 or ord(c) == 127 for c in text):
+            raise ValueError('Invalid runtime path: ' + name)
+        path = PurePosixPath(text)
+        if not path.is_absolute() or str(path) != text or '..' in path.parts or text == '/' or text.startswith('//'):
+            raise ValueError('Runtime paths must be canonical absolute non-root paths: ' + name)
+        paths[name] = path
+    root = paths['workspace']
+    for name, path in paths.items():
+        if name != 'workspace' and (path == root or not path.is_relative_to(root)):
+            raise ValueError('Runtime path escapes workspace: ' + name)
+    original = root / 'src/mtkclient'
+    destination = paths['destination']
+    if destination.is_relative_to(original) or original.is_relative_to(destination):
+        raise ValueError('Original runtime mtkclient tree is protected')
+    if paths['directory'].is_relative_to(destination) or destination.is_relative_to(paths['directory']):
+        raise ValueError('Runtime output and source directories must not overlap')
+    if paths['archive'].name != Path(TRANSPORT_ARCHIVE).name:
+        raise ValueError('Unexpected runtime archive filename')
+    result = dict(value)
+    if 'expected_emmc_cid' in result:
+        cid = result['expected_emmc_cid']
+        if not isinstance(cid, str) or len(cid) != 32 or any(c not in '0123456789abcdefABCDEF' for c in cid):
+            raise ValueError('Expected eMMC CID must contain exactly 32 hexadecimal characters')
+        if cid.lower() in ('0'*32, 'f'*32):
+            raise ValueError('Expected eMMC CID must not be all zero or all FF')
+        result['expected_emmc_cid'] = cid.lower()
+    return result
+
+
+def check_runtime(value):
+    """Host-side path check, run only when the generated script is executed."""
+    value = runtime_metadata(value)
+    root = Path(value['workspace'])
+    for name in RUNTIME_KEYS - {'schema'}:
+        path = Path(value[name])
+        for component in [*reversed(path.parents), path]:
+            if component.is_relative_to(root):
+                info = component.lstat()
+                # Venv Python commonly links to its base interpreter. Its chosen
+                # path is bound by metadata; interpreter provenance is separate.
+                if stat.S_ISLNK(info.st_mode) and not (name == 'python' and component == path):
+                    raise ValueError('Runtime symlink path: ' + str(component))
+        if name in ('archive', 'python'):
+            if not path.is_file():
+                raise ValueError('Runtime file missing: ' + name)
+        elif not path.is_dir():
+            raise ValueError('Runtime directory missing: ' + name)
+    if Path.cwd() != Path(value['directory']):
+        raise ValueError('Execution directory differs from runtime metadata')
+    return value
+
+
+def local(value, workspace=ROOT):
     path = Path(value).resolve()
-    if not path.is_relative_to(ROOT):
-        raise ValueError('Paths must stay under /rabbitr1')
+    if not path.is_relative_to(workspace):
+        raise ValueError('Paths must stay under ' + str(workspace))
     return path
 
 
@@ -113,17 +178,52 @@ def partition_name(part, slot):
     return part if part in ['expdb', 'logo'] else f'{part}_{slot}'
 
 
-def shell_script(out, slot, restore=False, *, transport):
+def shell_script(out, slot, restore=False, *, transport, runtime=None):
     """Use exact fresh reads and verify every write before advancing."""
     if transport_metadata(out) != transport:
         raise ValueError('Copied transport inputs differ from admitted package metadata')
+    runtime = runtime_metadata(runtime) if runtime is not None else None
+    execution_directory = runtime['directory'] if runtime else str(out)
     names = ','.join(partition_name(part, slot) for part in WRITE_PARTS)
     mode = 'restore' if restore else 'flash'
     suffix = 'restore' if restore else 'new'
+    cid_option = (' --expected-emmc-cid ' + shlex.quote(runtime['expected_emmc_cid'])) \
+        if runtime and 'expected_emmc_cid' in runtime else ''
+    if runtime:
+        q = shlex.quote
+        environment = [
+            'export TMPDIR=' + q(runtime['tmpdir']) + ' XDG_CACHE_HOME=' + q(runtime['cache']),
+            'export XDG_CONFIG_HOME=' + q(runtime['config']) + ' XDG_DATA_HOME=' + q(runtime['data']),
+            'export PYTHONDONTWRITEBYTECODE=1',
+        ]
+        tools = [
+            'mtk=(' + q(runtime['python']) + ' ' + q(str(PurePosixPath(runtime['destination']) / 'mtk.py')) + ')',
+            'checker=(' + ' '.join(q(x) for x in [runtime['python'], 'prepare-mtkclient.py',
+                '--manifest', 'mtkclient-transport.json', '--patch', 'mtkclient-transport.patch',
+                '--workspace', runtime['workspace'], '--archive', runtime['archive'],
+                '--destination', runtime['destination'], '--check']) + ')',
+        ]
+        runtime_digest = hashlib.sha256((json.dumps(runtime, indent=2)+'\n').encode()).hexdigest()
+        runtime_check = [
+            'printf "%s\\n" ' + q(runtime_digest + '  runtime.json') + ' | sha256sum -c -',
+            q(runtime['python']) + ' prepare-flash.py check-runtime runtime.json',
+        ]
+    else:
+        environment = [
+            'export TMPDIR=/rabbitr1/.tmp XDG_CACHE_HOME=/rabbitr1/.cache',
+            'export XDG_CONFIG_HOME=/rabbitr1/.cache/config XDG_DATA_HOME=/rabbitr1/.cache/data',
+            'export PYTHONDONTWRITEBYTECODE=1',
+        ]
+        tools = [
+            'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient-haretic/mtk.py)',
+            'checker=(python3 prepare-mtkclient.py --manifest mtkclient-transport.json --patch mtkclient-transport.patch',
+            '         --archive /rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz --destination /rabbitr1/src/mtkclient-haretic --check)',
+        ]
+        runtime_check = []
     # Everything is prepared locally. Running --write is a separate device action.
     lines = [
         '#!/usr/bin/env bash', 'set -euo pipefail',
-        f'cd {shlex.quote(str(out))}',
+        *([f'cd {shlex.quote(execution_directory)}'] if runtime is None else []),
         f'echo {shlex.quote(mode + " slot " + slot + ": " + names)}',
         'echo "Do not relock until the complete stock firmware package, including every LK slot, is restored."',
         'if [[ ${1:-} != --write ]]; then',
@@ -131,21 +231,17 @@ def shell_script(out, slot, restore=False, *, transport):
     ]
     for part in WRITE_PARTS:
         lines.append('    echo ' + shlex.quote(
-            f'mtk.py w {partition_name(part, slot)} {part}-{suffix}.img --parttype user'))
+            f'mtk.py w {partition_name(part, slot)} {part}-{suffix}.img --parttype user' + cid_option))
     lines += [
         '    exit 0', 'fi',
-        'export TMPDIR=/rabbitr1/.tmp XDG_CACHE_HOME=/rabbitr1/.cache',
-        'export XDG_CONFIG_HOME=/rabbitr1/.cache/config XDG_DATA_HOME=/rabbitr1/.cache/data',
-        'export PYTHONDONTWRITEBYTECODE=1',
-        'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient-haretic/mtk.py)',
-        'checker=(python3 prepare-mtkclient.py --manifest mtkclient-transport.json --patch mtkclient-transport.patch',
-        '         --archive /rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz --destination /rabbitr1/src/mtkclient-haretic --check)',
-        'sha256sum -c SHA256SUMS',
+        *([f'cd {shlex.quote(execution_directory)}'] if runtime else []),
+        *environment, *tools,
+        'sha256sum -c SHA256SUMS', *runtime_check,
         'run_mtk() {',
         '    printf "%s\\n" ' + ' '.join(shlex.quote(facts['sha256']+'  '+name)
                                               for name, facts in transport['files'].items()) + ' | sha256sum -c - || return',
         '    "${checker[@]}" || return',
-        '    "${mtk[@]}" "$@"',
+        '    "${mtk[@]}" "$@"' + cid_option,
         '}',
         'check_size() {',
         '    local path=$1 expected=$2',
@@ -168,9 +264,9 @@ def shell_script(out, slot, restore=False, *, transport):
     for part in WRITE_PARTS:
         lines.append(f'check_size {part}-{suffix}.img {SIZES[part]}')
     lines += [
-        f'run=$(mktemp -d /rabbitr1/.tmp/r1-{mode}.XXXXXXXX)',
+        'run=$(mktemp -d ' + shlex.quote(str(PurePosixPath(runtime['tmpdir'] if runtime else '/rabbitr1/.tmp') / f'r1-{mode}.XXXXXXXX')) + ')',
         'run_mtk gpt "$run"',
-        'python3 prepare-flash.py check-gpt gpt.bin "$run/gpt.bin"',
+        ((shlex.quote(runtime['python']) + ' prepare-flash.py check-gpt --workspace ' + shlex.quote(runtime['workspace'])) if runtime else 'python3 prepare-flash.py check-gpt') + ' gpt.bin "$run/gpt.bin"',
     ]
     for part in WRITE_PARTS:
         lines.append(f'read_partition {partition_name(part, slot)} "$run/{part}-before.img" '
@@ -194,6 +290,7 @@ def shell_script(out, slot, restore=False, *, transport):
 
 
 def prepare(args):
+    runtime = runtime_metadata(json.loads(args.runtime.read_text())) if getattr(args, 'runtime', None) else None
     manifest = json.loads((args.package/'manifest.json').read_text())
     if manifest.get('format') != 2:
         raise ValueError('Requires the LK-aware package format 2')
@@ -223,6 +320,8 @@ def prepare(args):
     for name, facts in expected_transport['files'].items():
         if manifest['files'].get(name) != facts:
             raise ValueError('Transport input is not covered by the package manifest: ' + name)
+    if runtime and sha(args.package/'prepare-mtkclient.py') != sha(Path(__file__).with_name('prepare-mtkclient.py')):
+        raise ValueError('Runtime preparation requires the matching workspace-aware checker; refresh host tooling')
     gpt_path = local(args.backup/'gpt.bin')
     gpt = parse_gpt(gpt_path.read_bytes())
     backups = {}
@@ -269,8 +368,10 @@ def prepare(args):
     # Keep the device's trailing LK partition bytes; payload edits are same-size.
     (args.out/'lk-new.img').write_bytes(lk_payload + backups['lk'].read_bytes()[len(lk_payload):])
     (args.out/'logo-new.img').write_bytes(logo_payload.ljust(SIZES['logo'], b'\0'))
-    (args.out/'flash.sh').write_text(shell_script(args.out, args.slot, transport=expected_transport))
-    (args.out/'restore.sh').write_text(shell_script(args.out, args.slot, restore=True, transport=expected_transport))
+    (args.out/'flash.sh').write_text(shell_script(args.out, args.slot, transport=expected_transport, runtime=runtime))
+    (args.out/'restore.sh').write_text(shell_script(args.out, args.slot, restore=True, transport=expected_transport, runtime=runtime))
+    if runtime:
+        (args.out/'runtime.json').write_text(json.dumps(runtime, indent=2)+'\n')
     (args.out/'plan.json').write_text(json.dumps({
         'slot': args.slot, 'profile': args.profile, 'gpt': gpt,
         'write_partitions': [partition_name(p, args.slot) for p in WRITE_PARTS],
@@ -283,6 +384,7 @@ def prepare(args):
         'expdb_restore': 'manual only, after retrieving logs; not done by restore.sh',
         'slot_activation': 'unchanged; choose and verify explicitly before booting',
         'mtkclient_transport': expected_transport,
+        **({'runtime': runtime} if runtime else {}),
     }, indent=2)+'\n')
     (args.out/'SHA256SUMS').write_text(''.join(f'{sha(p)}  {p.name}\n'
         for p in sorted(args.out.iterdir()) if p.name != 'SHA256SUMS'))
@@ -300,16 +402,25 @@ def main():
     p.add_argument('--slot', choices=['a', 'b'], required=True)
     p.add_argument('--profile', choices=['ram', 'expdb'], default='expdb')
     p.add_argument('--bootloader-unlocked', action='store_true')
+    p.add_argument('--runtime', type=local, help='Optional local JSON binding future execution-host paths')
     p = commands.add_parser('check-gpt')
-    p.add_argument('original', type=local)
-    p.add_argument('current', type=local)
+    p.add_argument('--workspace', default=str(ROOT))
+    p.add_argument('original', type=Path)
+    p.add_argument('current', type=Path)
+    p = commands.add_parser('check-runtime')
+    p.add_argument('metadata', type=Path)
     args = parser.parse_args()
     if args.command == 'prepare':
         prepare(args)
-    elif parse_gpt(args.original.read_bytes()) != parse_gpt(args.current.read_bytes()):
-        raise ValueError('Live GPT/device identity differs from backup')
+    elif args.command == 'check-runtime':
+        check_runtime(json.loads(args.metadata.read_text()))
     else:
-        print('Live GPT identity and partition layout match the backup')
+        workspace = PurePosixPath(str(args.workspace))
+        if not workspace.is_absolute() or str(workspace) != args.workspace or workspace == PurePosixPath('/') or '..' in workspace.parts or args.workspace.startswith('//') or any(ord(c) < 32 or ord(c) == 127 for c in args.workspace):
+            raise ValueError('Invalid check-gpt workspace')
+        if parse_gpt(local(args.original, workspace).read_bytes()) != parse_gpt(local(args.current, workspace).read_bytes()):
+            raise ValueError('Live GPT header or partition layout differs from backup')
+        print('Live GPT header and partition layout match the backup')
 
 
 if __name__ == '__main__':

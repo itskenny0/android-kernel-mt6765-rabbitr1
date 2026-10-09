@@ -111,6 +111,8 @@ jobs:
           python3 scripts/prepare-mtkclient.py --check 2>&1 | tee logs/mtkclient-check.log
           python3 scripts/test-mtkclient-preparer.py \
             --out /rabbitr1/out/mtkclient-preparer-tests 2>&1 | tee logs/mtkclient-preparer-tests.log
+          python3 scripts/test-runtime-workspace.py \
+            --out /rabbitr1/out/runtime-workspace-tests 2>&1 | tee logs/runtime-workspace-tests.log
           python3 scripts/test-mtkclient-transport.py \
             --original /rabbitr1/src/mtkclient \
             --candidate /rabbitr1/src/mtkclient-haretic \
