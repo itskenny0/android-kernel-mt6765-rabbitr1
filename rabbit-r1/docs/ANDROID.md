@@ -5,11 +5,11 @@ service remain under `android/charging`. The native build and full policy build
 are not verified yet. No Android image has been produced or added to the
 mtkclient package.
 
-`android/local_manifests/r1.xml` pins the common mainline device tree and its six
-dependencies. Use it with the LineageOS manifest commit in `sources.lock.json`.
+`android/local_manifests/r1.xml` pins the common mainline device tree and its ten
+direct and transitive dependencies. Use it with the LineageOS manifest commit in `sources.lock.json`.
 The upstream manifest uses the Android 17 release tag for AOSP projects and
 moving Lineage branches for other projects; record a resolved manifest after
-sync before treating an Android build as reproducible.
+sync and account for any local source edits when recording build provenance.
 
 The current workspace has an initialized checkout at `/rabbitr1/src/android`.
 The repo launcher is `/rabbitr1/toolchains/git-repo/repo`. Keep its configuration
@@ -48,8 +48,7 @@ Android build targets as arguments. Logs remain under `/rabbitr1/logs`.
 
 The product has not yet passed this build. Build the full images after resolving
 product, HAL and policy errors, then inspect the generated boot header, DT table,
-module hashes, super
-metadata, partition sizes and AVB configuration. The stock layout evidence is
+module hashes, super metadata, partition sizes and AVB configuration. The stock layout evidence is
 recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 Keep `OUT_DIR` relative to the Android source root. The pinned Siso build tool
@@ -62,6 +61,8 @@ application checks repository commits, patch hashes and exact touched-file
 contents before changing anything; it accepts its already-applied changes and
 refuses unrecognized edits. A resolved manifest identifies repository commits;
 the patch series records the intentional differences from those commits.
+Unrelated local edits are preserved; review and record them separately before
+a release build.
 
 The [device notes](../android/device/README.md) track the current hardware and
 release gates, including missing battery capacity (which can trigger Android's

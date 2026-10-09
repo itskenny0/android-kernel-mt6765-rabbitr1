@@ -3,9 +3,16 @@
   <!-- Use with the LineageOS manifest pinned in sources.lock.json. -->
   <project path="device/mainline/common" name="LineageOS/android_device_mainline_common" remote="github" revision="1cd4a6850df2ce31d4e5c77a41210e2c590325ab" clone-depth="1" />
   <project path="external/drm_hwcomposer-upstream" name="LineageOS/android_external_drm_hwcomposer-upstream" remote="github" revision="30e7b376bbccc4977a17e38ee881aa08580a6a7a" clone-depth="1" />
+  <!-- Required by drm_hwcomposer-upstream/lineage.dependencies. -->
+  <project path="external/libdisplay-info-upstream" name="LineageOS/android_external_libdisplay-info-upstream" remote="github" revision="dffa9dee319f956c94a2cb4a853f9d55ff84a560" clone-depth="1" />
   <project path="external/minigbm-upstream" name="LineageOS/android_external_minigbm-upstream" remote="github" revision="0111c9e1033106dc85899eea1076e4579200d75b" clone-depth="1" />
   <project path="external/linux-firmware-mainline" name="LineageOS/android_external_linux-firmware-mainline" remote="github" revision="ef88d24dfc10e30826789b82fca417d6f913ee2a" clone-depth="1" />
   <project path="external/mesa" name="LineageOS/android_external_mesa" remote="github" revision="400e673cf8ba515d3aace56ed3acc3bb300869a5" clone-depth="1" />
+  <!-- Mesa's declared build-tool dependency. -->
+  <project path="prebuilts/mesa-build-dep" name="LineageOS/android_prebuilts_mesa-build-dep" remote="github" revision="d68b27515a9298010c945f44353d5aec6c53eedd" clone-depth="1" />
   <project path="hardware/mainline/common" name="LineageOS/android_hardware_mainline_common" remote="github" revision="28ab6d3a90ba7a910f44d121c5497e6931fdd929" clone-depth="1" />
+  <!-- Audio dependencies declared by hardware/mainline/common. -->
+  <project path="external/alsa-lib" name="LineageOS/android_external_alsa-lib" remote="github" revision="533b21f75eb2bd3fe46e9259dccf1628e318f859" clone-depth="1" />
+  <project path="external/alsa-ucm-conf" name="LineageOS/android_external_alsa-ucm-conf" remote="github" revision="b695e87520201d31a9207a1108648c3f83f71e11" clone-depth="1" />
   <project path="vendor/mainline" name="LineageOS/android_vendor_mainline" remote="github" revision="a3baa61e40ab74294ca0063b81155f259c855e6b" clone-depth="1" />
 </manifest>
