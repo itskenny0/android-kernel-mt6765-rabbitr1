@@ -102,7 +102,8 @@ def main():
     for name, data in files.items():
         dest = tree / name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
+        if not dest.exists() or dest.read_bytes() != data:
+            dest.write_bytes(data)
     stamp.write_text(json.dumps({
         'format': 1, 'kernel_source_commit': record['source_commit'],
         'hardware_tested': False,
