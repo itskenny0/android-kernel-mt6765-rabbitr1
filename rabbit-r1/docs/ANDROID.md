@@ -18,7 +18,11 @@ configuration, not finalized `REL`. The [version review](../android/version-stat
 traces these values to the pinned release flags. New builds default to the
 finalized `cp2a` configuration: `REL`, preview SDK 0 and vendor API 202604.
 This changes vendor API and feature flags and requires a new build and audit;
-the earlier development build does not validate it. That `trunk_staging` build
+the earlier development build does not validate it. The experimental SOC
+product's [targeted `cp2a` build](../android/health-product-build.json) now passes
+Health service/helper/recovery linkage, installed init/VINTF, compiled split and
+recovery policy, and boot kernel/Health ramdisk checks. Complete `cp2a` filesystem
+images and hardware validation remain outstanding. That `trunk_staging` build
 declared June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
 and declares October 1, 2026, overriding the AOSP-only flag values. These are
 configuration values; the security-patch property alone does not establish
@@ -260,9 +264,14 @@ shutdown if initialization fails. The existing runtime cache and Android's
 empty-battery shutdown remain unchanged. Recovery and charger mode retain their
 existing paths. The 30/35/40-second startup budgets and battery model are
 engineering values requiring physical validation. [Review and test evidence](../tests/battery/health-startup.json)
-covers host checks, ARM64 compilation and scoped policy checks; actual Soong
-linkage, installed init/VINTF contents, enforcing runtime behavior and battery
-calibration remain open.
+covers the host and compilation checks. The actual `lineage_r1_soc cp2a userdebug`
+[targeted build and audit](../android/health-product-build.json) also pass:
+all three Health executables link as ARM64, normal/recovery init and VINTF remain
+separate, compiled policy grants the required access, and the boot image contains
+the attested SOC kernel and checked recovery Health files. This verifies vendor
+installation staging, not membership in a completed SOC vendor image. The earlier
+full-image audit covers the default product with SOC disabled. Physical startup,
+enforcing runtime behavior, battery calibration and complete SOC images remain open.
 
 Patch 0009 now also includes the Health priming wrapper, and patch 0010 adds
 the internal BatteryMonitor method. An existing checkout with the older

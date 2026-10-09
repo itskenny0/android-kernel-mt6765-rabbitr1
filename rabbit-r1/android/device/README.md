@@ -44,17 +44,19 @@ initial capacity and requests shutdown if initialization fails. It retains real
 zero and normal runtime shutdown behavior. The live stock-profile model and
 charge-counter integration have offline tests, but are uncalibrated. Physical
 validation, hidden counter resets and persistence remain open. The SOC Health
-service and readiness helper have host tests and ARM64 compilation checks;
-their actual product build, link, split policy and packaging checks remain
-pending. See
+service, readiness helper and recovery service now pass their actual `cp2a`
+product build and [offline artifact checks](../health-product-build.json),
+including ARM64 linkage, installed init/VINTF, compiled split/recovery policy and
+the SOC kernel/recovery Health files in boot. Complete SOC filesystem images and
+physical startup remain unverified. See
 [Android integration](../../docs/ANDROID.md) for selection and validation scope.
 
 The asynchronous `r1-expdb` service validates the partition and its bounded
 18 MiB mapping before loading pstore. Its mocked discovery, mapping, attachment
-and failure tests, Android build and compiled policy checks pass. The completed
-vendor-image audit also verified module membership and hashes against the
-staged kernel. Runtime labels, module attachment and persistence remain
-unverified.
+and failure tests, Android build and compiled policy checks pass. The default
+product's completed vendor-image audit also verified module membership and
+hashes against the kernel used for that build. Runtime labels, module attachment
+and persistence remain unverified.
 
 The [six integration targets](../targeted-build.json) and the subsequent
 [boot/DTBO, recovery-policy and Binder targets](../boot-build.json) passed
@@ -66,10 +68,11 @@ the default product's `trunk_staging` build, with experimental SOC Health off.
 
 `scripts/build-android.sh` now defaults to the finalized Android 17 `cp2a`
 release configuration. Set `R1_ANDROID_RELEASE=trunk_staging` to reproduce the
-earlier development configuration. The `cp2a` configuration, including the
-explicit `lineage_r1_soc` product, still needs its own build and artifact audit;
-the earlier results do not cover that change. No runtime service test has
-completed. Before distributing an Android image, finish the complete flashing
+earlier development configuration. The explicit `lineage_r1_soc` product has
+passed its `cp2a` Health, policy, boot and DTBO targets and the scoped checks
+above. Complete `cp2a` filesystem images still need their own build and audit;
+the earlier full-image results do not cover that change. No runtime service test
+has completed. Before distributing an Android image, finish the complete flashing
 package, validate the bounded `expdb` logger, and test the LK/DT handoff, boot
 and recovery on an r1. Storage, graphics,
 battery health, charging, temperature limits, input, audio, wireless, cameras,

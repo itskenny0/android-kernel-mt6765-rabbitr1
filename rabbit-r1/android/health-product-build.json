@@ -1,0 +1,368 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "result": "pass",
+  "scope": "Completed experimental SOC Health/cp2a targeted build and offline artifacts; no complete cp2a filesystem image, flash or hardware validation.",
+  "build_source_commit": "f72592a467a1e289ffbfd0fbee6adac5093bf6db",
+  "kernel_source_commit": "f72592a467a1e289ffbfd0fbee6adac5093bf6db",
+  "evidence_head_before_record": "8702e52d51f98490ca0658d212217cdb5e72a802",
+  "product": "lineage_r1_soc",
+  "release_configuration": "cp2a",
+  "variant": "userdebug",
+  "experimental_soc_health": true,
+  "hardware_tested": false,
+  "full_cp2a_images_verified": false,
+  "complete_flash_package": false,
+  "build_session": "17639",
+  "audit_session": "96327",
+  "build_completed_utc": "2026-10-09T09:11:29.072348+00:00",
+  "targets": [
+    "android.hardware.health-service.r1",
+    "r1-health-initial-ready",
+    "android.hardware.health-service.example_recovery",
+    "selinux_policy",
+    "sepolicy.recovery",
+    "bootimage",
+    "dtboimage"
+  ],
+  "build_start": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/retry-clang/build-start.json",
+    "bytes": 1940,
+    "sha256": "006f4ecaa9c71fe0bfffc1bdf43e41a4f9fe9e1f1d9713f43d28c0af54a4ea5e"
+  },
+  "build_result": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/retry-clang/build-result.json",
+    "bytes": 957,
+    "sha256": "6ec909e69704c900a76ae52dbdc1055f97e4ae506860be81b70c5a9b3ffa4486"
+  },
+  "wrapper_log": {
+    "path": "/rabbitr1/logs/android-soc-cp2a-f72592a467-restored-clang.log",
+    "bytes": 5102,
+    "sha256": "029e997d73e839c3f29afb1b050224ea754d00d624a899a3c468c64cb94c46d5"
+  },
+  "target_build_log": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/retry-clang/android-targeted-build.log",
+    "bytes": 1728881,
+    "sha256": "5f6531bbb64918792936eb78b44077c12bcf96c292252f80227ac49325178c76"
+  },
+  "lunch_log": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/retry-clang/android-lunch.log",
+    "bytes": 2575,
+    "sha256": "bae787ab5c4a0e19993fd573f3305f2a626250de307ac7953c163f2ceb2e29ad"
+  },
+  "build_runner": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/retry-clang/run.py",
+    "bytes": 6667,
+    "sha256": "e9be6223c352715221c3736bfafb68dfa54d4f9067b1f51d2476664bc0bd57d4"
+  },
+  "installer": {
+    "path": "/rabbitr1/src/android/.r1-install.json",
+    "bytes": 9499,
+    "sha256": "c3b63738ca8e4764d54375f8f2fc79bb64e8a625c8722528f5c879a264d5bde3"
+  },
+  "inputs": {
+    "installer_sha256": "c3b63738ca8e4764d54375f8f2fc79bb64e8a625c8722528f5c879a264d5bde3",
+    "installed_files": 77,
+    "templates_verified": 60,
+    "android_patch_projects": 10,
+    "android_patch_files": 135,
+    "kernel_source_commit": "f72592a467a1e289ffbfd0fbee6adac5093bf6db",
+    "kernel_record_sha256": "0b0f825fd7d8a26c2af547b254f3ae5413cd8043f62fd744086ddb6546fa08a3",
+    "webview_sha256": "3b98460ccd41b2a1851c5a46e6dec6f86f1d14302ff2fa4deeb1d781e32f89a4"
+  },
+  "detailed_results": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification-v2/result.json",
+    "bytes": 15527,
+    "sha256": "5775b98516594eaebff51f03b5de29905eaf149101c8b7f08f85b8ecc7381fe0"
+  },
+  "verifier": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification-v2/verify.py",
+    "bytes": 23706,
+    "sha256": "9c53700b4b36db0301004613c5a0af0e4fd442226d3fe3cd6b480a8c71de7b84"
+  },
+  "summarizer": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification-v2/summarize.py",
+    "bytes": 5670,
+    "sha256": "ab1c48234ef429651cc647e4d822491b4886ac29bf094d55d7ac06f7082e06fb"
+  },
+  "checks": [
+    {
+      "name": "terminal success and unchanged build inputs",
+      "status": "pass"
+    },
+    {
+      "name": "generated cp2a product flags and embedded SOC kernel config",
+      "status": "pass"
+    },
+    {
+      "name": "actual linked ARM64 Health executables",
+      "status": "pass"
+    },
+    {
+      "name": "installed init and VINTF separation",
+      "status": "pass"
+    },
+    {
+      "name": "boot kernel and packaged recovery Health correspondence",
+      "status": "pass"
+    },
+    {
+      "name": "actual compiled split/recovery policy and contexts",
+      "status": "pass"
+    },
+    {
+      "name": "artifact immutability during audit",
+      "status": "pass"
+    }
+  ],
+  "configuration": {
+    "generated_variables": {
+      "path": "/rabbitr1/out/android/soong/soong.lineage_r1_soc.variables",
+      "bytes": 176429,
+      "sha256": "1e85f70c40bf12f47d6f5f1cc54800e08e3d64950e386b9518c60ecab103d652"
+    },
+    "values": {
+      "DeviceProduct": "lineage_r1_soc",
+      "DeviceName": "r1",
+      "Platform_version_name": "17",
+      "Platform_sdk_version": 37,
+      "Platform_sdk_codename": "REL",
+      "Platform_sdk_final": true,
+      "Platform_preview_sdk_version": "0",
+      "VendorApiLevel": "202604",
+      "Platform_security_patch": "2026-10-01"
+    },
+    "policy_versions": {
+      "BoardSepolicyVers": "202604",
+      "PlatformSepolicyVersion": "202604"
+    },
+    "resolved_clang_build_flag": "clang-r596125",
+    "compiler_evidence_scope": "Resolved build configuration. Installed ELFs have no .comment section; no compiler inference from those sections.",
+    "declared_spl_is_not_security_coverage_proof": true
+  },
+  "kernel": {
+    "build_record": {
+      "path": "/rabbitr1/src/android/device/rabbit/r1/prebuilt/kernel-build.json",
+      "bytes": 3428,
+      "sha256": "0b0f825fd7d8a26c2af547b254f3ae5413cd8043f62fd744086ddb6546fa08a3"
+    },
+    "mode": {
+      "product": "lineage_r1_soc",
+      "experimental_soc_health": true,
+      "soc_config": "y",
+      "config_sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f",
+      "image_sha256": "f42baa92d5e0816dfd1165b07fa3603bfc4d9ca30426c67b0a9bb8c7cd48ca24",
+      "image_gz_sha256": "7a7b67c7880103112237557624c4730641e8e563d82c20e03676e44e94f4b4b6",
+      "embedded_config_verified": true
+    },
+    "boot_payload_matches_attested_prebuilt": true
+  },
+  "elfs": {
+    "vendor-service": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/bin/hw/android.hardware.health-service.r1",
+      "bytes": 239072,
+      "sha256": "360756dd8e53b2f6ade9e12fae7f2755d300aced55d55b395fc2b63c396d8166",
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libpng.so",
+        "libbase.so",
+        "libbinder_ndk.so",
+        "libcutils.so",
+        "liblog.so",
+        "libutils.so",
+        "android.hardware.health-V5-ndk.so",
+        "libhidlbase.so",
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ]
+    },
+    "initial-readiness": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/bin/r1-health-initial-ready",
+      "bytes": 52568,
+      "sha256": "33e6c13e92d55c67de3738c3f2dda0d80d2b23874252a134560285b4cbecf2ac",
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libbase.so",
+        "libbinder_ndk.so",
+        "liblog.so",
+        "android.hardware.health-V5-ndk.so",
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ]
+    },
+    "recovery-service": {
+      "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.health-service.example_recovery",
+      "bytes": 136952,
+      "sha256": "d6149641cb0bdee2c37b70a0238d5697f5d4e7a4dafece58c639873012337bd8",
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libbase.so",
+        "libbinder_ndk.so",
+        "libcutils.so",
+        "liblog.so",
+        "libutils.so",
+        "android.hardware.health-V5-ndk.so",
+        "libhidlbase.so",
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ]
+    }
+  },
+  "installed_init_vintf": {
+    "vendor_init": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/init/health.r1.rc",
+      "bytes": 929,
+      "sha256": "4fc14d55f19936b3f48cf41067895c8bcbeb2ed4cd28af96f8944686f9587d7d"
+    },
+    "recovery_init": {
+      "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/etc/init/android.hardware.health-service.example_recovery.rc",
+      "bytes": 243,
+      "sha256": "e5d645a4ca1167ba4c2ce1885febc93957e55de67fe8a1adfe95c9e90b44e1b1"
+    },
+    "vendor_vintf": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/vintf/manifest/health.r1.xml",
+      "bytes": 267,
+      "sha256": "300cf04641748b5f96bdee644e18ffead5d0d04ca80d403cf1cb4879526e16ae"
+    },
+    "recovery_vintf": {
+      "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/etc/vintf/manifest/android.hardware.health-service.example.xml",
+      "bytes": 313,
+      "sha256": "56fb94fe88596561b53458ccb8d565b200a2b4f308704e56474993ee7668e91b"
+    },
+    "normal_boot_readiness_only": true
+  },
+  "images": {
+    "boot": {
+      "path": "/rabbitr1/out/android/target/product/r1/boot.img",
+      "bytes": 33554432,
+      "sha256": "4bdd0af4435cff377dc55ef9423f6981131eb23492b68e41ea40850c324487b1"
+    },
+    "dtbo": {
+      "path": "/rabbitr1/out/android/target/product/r1/dtbo.img",
+      "bytes": 8388608,
+      "sha256": "3e1e4da1e36a79ca1b8c5cf6fa7570e8f4de3a7ecb02014df8007f694cbe45a5"
+    }
+  },
+  "boot_health_validation": {
+    "recovery_members": {
+      "system/bin/hw/android.hardware.health-service.example_recovery": {
+        "bytes": 136952,
+        "sha256": "d6149641cb0bdee2c37b70a0238d5697f5d4e7a4dafece58c639873012337bd8"
+      },
+      "system/etc/init/android.hardware.health-service.example_recovery.rc": {
+        "bytes": 243,
+        "sha256": "e5d645a4ca1167ba4c2ce1885febc93957e55de67fe8a1adfe95c9e90b44e1b1"
+      },
+      "system/etc/vintf/manifest/android.hardware.health-service.example.xml": {
+        "bytes": 313,
+        "sha256": "56fb94fe88596561b53458ccb8d565b200a2b4f308704e56474993ee7668e91b"
+      },
+      "sepolicy": {
+        "bytes": 929021,
+        "sha256": "1a2156d401d0c75ac32843ad0148cb8fa5188c678539a183ca76fadc1c367fcf"
+      }
+    },
+    "scope": "Header/kernel/Health ramdisk correspondence only; no repeat of full AVB/DT audit"
+  },
+  "policy": {
+    "compiled": {
+      "normal": {
+        "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/precompiled_sepolicy",
+        "bytes": 910206,
+        "sha256": "d9f835c891242b84fa42b913b9774bde9b1f692ce62adf78dd3c57a6d4a7c5ef",
+        "per_domain_permissive_declarations": [
+          "su",
+          "backuptool"
+        ]
+      },
+      "recovery": {
+        "path": "/rabbitr1/out/android/target/product/r1/recovery/root/sepolicy",
+        "bytes": 929021,
+        "sha256": "1a2156d401d0c75ac32843ad0148cb8fa5188c678539a183ca76fadc1c367fcf",
+        "per_domain_permissive_declarations": [
+          "recovery",
+          "su",
+          "backuptool"
+        ]
+      }
+    },
+    "split_cil_and_mapping_digests": {
+      "system": "9cea8de8357c11f7202d149ac610a19663849d291df57015e15d72d0d44cf188",
+      "system_ext": "b6a9d1753d879e758eeee71d998a87ce96e05acc14de35d69df60dcf044ce2ad",
+      "product": "75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070"
+    },
+    "vendor_cil": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/vendor_sepolicy.cil",
+      "bytes": 295119,
+      "sha256": "4c18bfafb65544f1441ec019af0b44d60efe3ba7914f4acb76a09d4469b12b18"
+    },
+    "vendor_file_contexts": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor/etc/selinux/vendor_file_contexts",
+      "bytes": 29859,
+      "sha256": "7fdc9095c6dec9cb65625a9a37cdf753873bc6c1c1c55a618ecddb4215770473"
+    },
+    "compiled_normal_label_and_access_checks": true,
+    "literal_genfs_prefix_capability_checked": true,
+    "recovery_rootfs_permission_presence_queries": [
+      "neverallow hal_health_default rootfs:file entrypoint;",
+      "neverallow init hal_health_default:process transition;"
+    ],
+    "health_context_lookup": {
+      "exit_code": 2,
+      "matched_test_paths": true,
+      "untested_context_rules": 269,
+      "scope": "Both requested Health paths matched; unrelated context rules are outside this two-path fixture"
+    },
+    "global_permissive_boot_requested": true,
+    "runtime_enforcement_verified": false
+  },
+  "checker_correction": {
+    "reason": "Original checkfc -t handling rejected exit2 for untested unrelated context expressions. Corrected handling accepts only exact coverage diagnostics; full context/policy validation and incorrect/missing-label failures remain.",
+    "original_verifier": {
+      "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification/verify.py",
+      "bytes": 22391,
+      "sha256": "75b8eff1283559815e0e2ad0fcacc7afd4b842a4c2bcd9acba17c4a32393a536"
+    },
+    "original_failed_result": {
+      "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification/result.json",
+      "bytes": 14037,
+      "sha256": "0650b96dc926c58881705b86087fc7540ba281e8a6e5b8286a8c39861344857c"
+    },
+    "checkfc_source": {
+      "path": "/rabbitr1/src/android/system/sepolicy/tools/checkfc.c",
+      "bytes": 15469,
+      "sha256": "bbbfc84a71b5e9bbe8ab517a07f51d50c976d0097cf00bf992314fcef1dc9e57"
+    },
+    "checkfc_binary": {
+      "path": "/rabbitr1/out/android/soong/.intermediates/system/sepolicy/tools/checkfc/linux_glibc_x86_64/checkfc",
+      "bytes": 1210104,
+      "sha256": "1cb3e413a95c3a169203fdd9bb27b83a38025bc2516733bd683c89063ab287bf"
+    },
+    "focused_controls": {
+      "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification-v2/controls-result.json",
+      "bytes": 3242,
+      "sha256": "89aea2816187455fd4b4b475d1d364c3fc8fb627483d4cf400b34004218df2a8"
+    },
+    "control_runner": {
+      "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification-v2/controls.py",
+      "bytes": 3898,
+      "sha256": "7e9861b2abe878d30b2f323c35bea76b7fa677dc934dc332ceb9b469bfc292fb"
+    },
+    "actual_control_count": 5,
+    "negative_controls": "Wrong expected type at each Health path and an unmatched path each returned1 with the exact expected diagnostic and were rejected."
+  },
+  "limitations": [
+    "This is a targeted build/artifact audit, not a full-image, flash, boot or physical battery calibration result.",
+    "Vendor files are inspected in build installation staging; no vendor.img or full-ROM membership is claimed.",
+    "ELF linkage and policy permissions do not prove runtime linker namespaces, init ordering or Binder behavior.",
+    "Product boot arguments request global permissive SELinux. Per-domain permissive checks do not prove enforcement.",
+    "The kernel SOC model remains experimental; genuine zero and existing runtime shutdown semantics remain unchanged.",
+    "No target program, driver or device is executed or accessed. No Ninja graph is parsed."
+  ]
+}
