@@ -70,7 +70,7 @@
     "project": "external/mesa",
     "base_commit": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
     "patch": "0005-update-mesa-26.2.4.patch",
-    "sha256": "7740ab534dba11a98c5eb7dd720f1a6fa896f24cddf54a572000d7d425dd3034",
+    "sha256": "2438fc0c4ddb150d7e064255c31036788f663eef60b7b931ddae5f7dfb000796",
     "files": [
       {
         "path": ".pick_status.json",
@@ -478,6 +478,11 @@
         "after_sha256": "92f21ab9e987c9b87796306de9b8ba6371d921625ae5203e46452110cba0edf8"
       },
       {
+        "path": "src/imagination/vulkan/meson.build",
+        "before_sha256": "385da3310098328d4ae8c896bf593444b1865508231817a8bc7e928a0ea1b059",
+        "after_sha256": "e8764f24f1338e390a8176d0b1a4dfec45691129d44f1eb793a7f6fecaddd214"
+      },
+      {
         "path": "src/imagination/vulkan/pvr_device.c",
         "before_sha256": "271845c2699f80c409ecadc5991674718611a664f0c44a66853328e2c68120b8",
         "after_sha256": "8b625923869a4e0ab6a567d95b32f6a96653c905458f3ff3087da629b4832805"
@@ -618,6 +623,11 @@
         "after_sha256": "d12cecd1168e44374bfa39e669734e8500e7b177b230462f4f582c4e51f04dde"
       },
       {
+        "path": "src/util/u_gralloc/meson.build",
+        "before_sha256": "16b94f931f4115252030f627e28309362718edfe66d45d2eabd90202f68c2c06",
+        "after_sha256": "9b3b5aa2c49d17b4c494cf7c9443cbf31f1ef0bc65de9e74c190d6642791f055"
+      },
+      {
         "path": "src/util/u_pack_color.h",
         "before_sha256": "eb3c34794d8fbd741b56a7c86ab0da2af88fbd1c3f54ab74f37560e2909c9b28",
         "after_sha256": "695dbdfb1d4643a117d9b42586aa770e0f33ded0e7e460d63d54f697b4ed0717"
@@ -700,6 +710,19 @@
         "path": "model/PublicVolume.cpp",
         "before_sha256": "0e17fccedefabb20e2d8650252af8c765af68378a1d853e0fbaa6a8bd1ea67fd",
         "after_sha256": "8ef0d44dd9acdaf718c6fe174826bf3e43a4246714e60ec8c21f67867301f97e"
+      }
+    ]
+  },
+  {
+    "project": "hardware/interfaces",
+    "base_commit": "1b92b77fe1f2f2c820c51b0b1e366c17d6b9911b",
+    "patch": "0009-include-audio-scheduler-header.patch",
+    "sha256": "8e7c8798b190691b4ab2ae366cb3060c0c52df6f1f2a225d0cc414c8f3faee18",
+    "files": [
+      {
+        "path": "audio/aidl/default/include/core-impl/ChildInterface.h",
+        "before_sha256": "f831161cff6610e2936fa25200905333cdb7ba6f3cc7db1a3754be8e9f0c3652",
+        "after_sha256": "5829d631947957a8b83b30f7d3ac1d3abef824d2c165daa6d39d515f38a77f42"
       }
     ]
   }

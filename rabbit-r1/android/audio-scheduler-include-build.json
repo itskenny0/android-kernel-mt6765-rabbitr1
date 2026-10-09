@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "scope": "Exact failed ARM64 vendor-APEX C++ translation unit compiled with the missing public scheduler header; no service link, image, runtime, or hardware validation.",
+  "failed_build": {
+    "session": 52950,
+    "terminal_exit_code": 1,
+    "log": "logs/android-full-images-14834f07aa.log",
+    "log_sha256": "4a41d3bfb3cf74dce3e3fbd9422cfe62d34467677331c744c2be1ad964d5877f"
+  },
+  "source": {
+    "project": "hardware/interfaces",
+    "base_commit": "1b92b77fe1f2f2c820c51b0b1e366c17d6b9911b",
+    "path": "audio/aidl/default/include/core-impl/ChildInterface.h",
+    "before_sha256": "f831161cff6610e2936fa25200905333cdb7ba6f3cc7db1a3754be8e9f0c3652",
+    "after_sha256": "5829d631947957a8b83b30f7d3ac1d3abef824d2c165daa6d39d515f38a77f42",
+    "before_mode": "0o644",
+    "after_mode": "0o644",
+    "only_change": "Direct #include <sched.h> after #pragma once; no scheduler policy or warning changes."
+  },
+  "defining_headers": [
+    {
+      "path": "bionic/libc/include/sched.h",
+      "sha256": "73cec7e89c5d5103bc5b02e39f43c16bfc11b1f803f9ce39e381ea9357c10a2f"
+    },
+    {
+      "path": "bionic/libc/kernel/uapi/linux/sched.h",
+      "sha256": "e899d47d4e7adc9e14706691554c992beae313b277be56c16c555344a67a0932"
+    }
+  ],
+  "compiler": {
+    "path": "prebuilts/clang/host/linux-x86/clang-r584948b/bin/clang++",
+    "sha256": "15261046b6ea9504da0ae57b9d65ebc869ab1942aecb1af2819762b9b5251957",
+    "target": "aarch64-linux-android37",
+    "vendor_api_level": 202704,
+    "variant": "android_vendor_arm64_armv8-a_cortex-a53_apex10000",
+    "unchanged_flags": [
+      "-Werror",
+      "-flto=thin",
+      "-fsplit-lto-unit"
+    ]
+  },
+  "original_command_sha256": "f2afb3e0e01ffaa44d6a9cdf52cf231dd0e9d0b673cf29051524346a0924f986",
+  "baseline": {
+    "phase": "baseline",
+    "cwd": "/rabbitr1/src/android",
+    "preserved_build_PWD": "/proc/self/cwd",
+    "returncode": 1,
+    "elapsed_seconds": 12.472,
+    "only_argv_changes": [
+      {
+        "flag": "-o",
+        "old": "out/soong/.intermediates/hardware/mainline/common/interfaces/audio/mainline/android.hardware.audio.service-aidl.mainline/android_vendor_arm64_armv8-a_cortex-a53_apex10000/obj/hardware/mainline/common/interfaces/audio/mainline/main.o",
+        "new": "/rabbitr1/out/android-build-review/audio-scheduler-include/baseline.o"
+      },
+      {
+        "flag": "-MF",
+        "old": "out/soong/.intermediates/hardware/mainline/common/interfaces/audio/mainline/android.hardware.audio.service-aidl.mainline/android_vendor_arm64_armv8-a_cortex-a53_apex10000/obj/hardware/mainline/common/interfaces/audio/mainline/main.o.d",
+        "new": "/rabbitr1/out/android-build-review/audio-scheduler-include/baseline.o.d"
+      }
+    ],
+    "command_sha256": "eb9563f17543fcdcdc84df40e6fb7f8a02433248c69a40e2cea187774f4721cd",
+    "log_sha256": "e76793c77d3a0fb450fb5ae60a69bcb7d4b3bbbe7b2b174bd5b3414045519828",
+    "log_bytes": 465
+  },
+  "private_include_replay": {
+    "phase": "private",
+    "compiler_returncode": 0,
+    "returncode_evidence": "Initial runner reached its success-only artifact assertion. That assertion incorrectly expected ELF; original command has -flto=thin -fsplit-lto-unit. No compiler failure occurred. Matching llvm-dis decoded both unchanged bitcode modules.",
+    "initial_runner_sha256": "940d77820e947d82cb949e6ea6fc0f68b6a4c266e52bea6f72889cd03ea61570",
+    "command_sha256": "16c23c3707d770c05ecfaa033652bea98aef7ccac0eeab6259d136a8daca8930",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "log_bytes": 0,
+    "object": {
+      "format": "LLVM ThinLTO bitcode",
+      "target_triples": [
+        "aarch64-unknown-linux-android37",
+        "aarch64-unknown-linux-android37"
+      ],
+      "sha256": "29d12655b629b5dccf51b77ac351d6c9aba444982cf5ee9fdc80923e112197c4",
+      "bytes": 758804,
+      "ir_module_sha256": {
+        "private.ll.0": "075dec6634e74fbbc31856cd807555181a2c1ec97bfdfac1e0574d5cbdcff9da",
+        "private.ll.1": "e75c401a8bc6b48bde4cb753173131920d4d4deba1515bef5a52c25b41a8441f"
+      }
+    },
+    "dependency_files_confirmed": [
+      "private override ChildInterface.h",
+      "bionic/libc/include/sched.h",
+      "bionic/libc/kernel/uapi/linux/sched.h"
+    ]
+  },
+  "installed_header_replay": {
+    "phase": "installed",
+    "cwd": "/rabbitr1/src/android",
+    "preserved_build_PWD": "/proc/self/cwd",
+    "returncode": 0,
+    "elapsed_seconds": 14.12,
+    "only_argv_changes": [
+      {
+        "flag": "-o",
+        "old": "out/soong/.intermediates/hardware/mainline/common/interfaces/audio/mainline/android.hardware.audio.service-aidl.mainline/android_vendor_arm64_armv8-a_cortex-a53_apex10000/obj/hardware/mainline/common/interfaces/audio/mainline/main.o",
+        "new": "/rabbitr1/out/android-build-review/audio-scheduler-include/installed.o"
+      },
+      {
+        "flag": "-MF",
+        "old": "out/soong/.intermediates/hardware/mainline/common/interfaces/audio/mainline/android.hardware.audio.service-aidl.mainline/android_vendor_arm64_armv8-a_cortex-a53_apex10000/obj/hardware/mainline/common/interfaces/audio/mainline/main.o.d",
+        "new": "/rabbitr1/out/android-build-review/audio-scheduler-include/installed.o.d"
+      }
+    ],
+    "command_sha256": "7cddc37f76eec4256107abd0d8bcf66ec46ba1338ebe1352fb574a397e42a3c9",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "log_bytes": 0,
+    "object": {
+      "bytes": 758784,
+      "sha256": "eee9308d8926b7427b3f2c54fca04472650e2c1bfc9c3227bfedae11f7faef31",
+      "format": "LLVM ThinLTO bitcode",
+      "target_triple": "aarch64-unknown-linux-android37",
+      "llvm_dis_sha256": "098633259c4acc8c7560374370d93ab3d2bfaa67239e036ef4a872abc060b399",
+      "ir_modules_sha256": {
+        "installed.ll.0": "34c0e5b29c320471b5b7c9b9616bd7b440957813112902e0f119a8b6ee7062ea",
+        "installed.ll.1": "d65e0ade2bb222683efb104d73b5dc3c1ba1b31f2530d9b87f73598d896d96ef"
+      }
+    }
+  },
+  "installed_dependencies": {
+    "depfile_sha256": "b408da6a5fdb32bd75335bf363aab4900383f1e48689b11eeb67e33d7fb050d0",
+    "actual_edited_header_present": true,
+    "public_and_uapi_sched_headers_present": true,
+    "scratch_include_override_absent": true
+  },
+  "patch": {
+    "path": "0009-include-audio-scheduler-header.patch",
+    "sha256": "8e7c8798b190691b4ab2ae366cb3060c0c52df6f1f2a225d0cc414c8f3faee18",
+    "series_entry": "series-entry.json",
+    "series_entry_sha256": "b0578d13edfd1e43cb3e5b47617010b1cae7bf6c459bd1589bf44afce8e7ccee",
+    "clean_base_scratch_apply_matches_after_hash": true
+  },
+  "checker_correction": "Original compiler produces split ThinLTO bitcode, not ELF; successful private compile was initially rejected by an ELF-only checker assumption. Both modules decoded with the matching llvm-dis and have the expected ARM64 Android37 triple. Initial runner and diagnostics retained.",
+  "replay_script_sha256": "0d2635a539dccf42224cb4c38e7bddd51aa609538588351ffe9a155cc5a86c28",
+  "mutations": [
+    "One authorized include addition to src/android/hardware/interfaces/audio/aidl/default/include/core-impl/ChildInterface.h",
+    "Private verification outputs under this audit directory"
+  ],
+  "canonical_series_modified": false,
+  "soong_launched": false,
+  "original_workspace_directory": "/rabbitr1/out/android-build-review/audio-scheduler-include",
+  "canonical_integration": {
+    "patch": "patches/0009-include-audio-scheduler-header.patch",
+    "note": "Original private replay record retained below; patch is now in the canonical series. The successful replay is not a complete image build."
+  }
+}

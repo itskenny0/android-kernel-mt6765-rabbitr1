@@ -103,15 +103,23 @@ target. No shared library was produced, and no cancellation shim or Mesa source
 patch was added. ``mesa-android-build-attempt.json`` records the failed build
 and its verified inputs; this is distinct from the successful Linux host build.
 
-The next build needs ``platforms=android`` and its real vendor dependencies,
-including currently missing libhardware and libui outputs. Patch 0005 now maps
-Android's ``imagination`` selection to the ``powervr_mesa`` library suffix.
-The patch applies to all 116 declared files, and Make expands the actual target
-rule to ``libvulkan_powervr_mesa.so`` and HAL name ``vulkan.powervr_mesa.so``.
-``android-library-mapping.json`` records the added change and validation.
-This packaging correction is not an Android build or link result. Image build
-``6555dd117c`` retains the earlier patch and does not validate this mapping.
-Android buffer-sharing support remains necessary. Production uses SwiftShader.
+The subsequent ``platforms=android`` build compiled and linked against the
+actual ARM64 vendor dependencies and passed a private Meson installation.
+``mesa-android-platform-build.json`` records its source and input hashes,
+retained warnings, failure history and verified artifacts. The installed
+library has no RPATH/RUNPATH and exports Android's ``HMI``. No target code was
+executed, and the private install prefix is not Android product packaging.
+
+Two dependency corrections from that build are now in patch 0005: libui
+exports for imapper5, and libdrm plus conditional Android exports for PowerVR's
+per-architecture target. All 118 declared outputs match a fresh patch replay.
+The earlier 116-file ``android-library-mapping.json`` remains the separate
+Make check for ``imagination`` mapping to ``libvulkan_powervr_mesa.so`` and
+``vulkan.powervr_mesa.so``. That Android.mk mapping was not in the private
+Meson source snapshot and was not an input to its compilation. Image build
+``6555dd117c`` retains the earlier patch and does not validate the mapping.
+Android buffer-sharing support and hardware tests remain necessary.
+Production uses SwiftShader.
 
 The r1 GPU remains disabled
 -------------------------

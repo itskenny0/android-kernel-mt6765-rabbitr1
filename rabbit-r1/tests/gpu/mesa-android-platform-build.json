@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "mesa_version": "26.2.4",
+  "result": "ARM64 Android-platform shared compilation, full link and private Meson install passed",
+  "target": {
+    "architecture": "AArch64",
+    "os": "Android/bionic",
+    "compiler_api": 37,
+    "vendor_api": 202704,
+    "cpu": "cortex-a53",
+    "platforms": [
+      "android"
+    ],
+    "backend": "PowerVR mainline DRM",
+    "parallel_jobs": 2
+  },
+  "source": {
+    "lineage_repository": "https://github.com/LineageOS/android_external_mesa.git",
+    "lineage_base": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
+    "upstream_repository": "https://gitlab.freedesktop.org/mesa/mesa.git",
+    "upstream_to": "96cb43121031992b85767f9c1be8f3f48e22b1d2",
+    "upstream_tag": "mesa-26.2.4",
+    "official_tarball_sha256": "bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9"
+  },
+  "source_validation": {
+    "original_source_file_count": 12816,
+    "baseline_matches_existing_validated_source": true,
+    "baseline_full_manifest": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/source-before.json",
+      "sha256": "0b4b3a0530de0a44b8ba021276f31282715a7b62b574e26c235eedd13e611cd3",
+      "bytes": 1482834
+    },
+    "exact_two_file_adjustments": [
+      {
+        "path": "src/util/u_gralloc/meson.build",
+        "before_sha256": "16b94f931f4115252030f627e28309362718edfe66d45d2eabd90202f68c2c06",
+        "after_sha256": "9b3b5aa2c49d17b4c494cf7c9443cbf31f1ef0bc65de9e74c190d6642791f055",
+        "patch": "/rabbitr1/out/gpu-review/android-build/android-platform/u-gralloc-libui-dependency.patch",
+        "patch_sha256": "0e675bb1161d209ef0ae5900fff6ae05ca441fdadbb4715dbd09bc82f89dc8b9",
+        "reason": "Propagate the selected libui dependency to the imapper5 source compilation and static-library dependency chain."
+      },
+      {
+        "path": "src/imagination/vulkan/meson.build",
+        "before_sha256": "385da3310098328d4ae8c896bf593444b1865508231817a8bc7e928a0ea1b059",
+        "after_sha256": "e8764f24f1338e390a8176d0b1a4dfec45691129d44f1eb793a7f6fecaddd214",
+        "patch": "/rabbitr1/out/gpu-review/android-build/android-platform/pvr-per-arch-dependencies.patch",
+        "patch_sha256": "3be4cda535dd94f73c8bb602dbe7323eb7d085f7aed93ad9e45a662e9579b266",
+        "reason": "Per-architecture sources include xf86drm.h through pvr_device.h and cutils/native_handle.h through Android Vulkan headers; inherit actual dep_libdrm and conditional dep_android exports."
+      }
+    ],
+    "combined_patch": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/mesa-android-dependencies.patch",
+      "sha256": "3709c5833b46a21d528b3b8d47ce56a30407f17e3da3cdbc9677d573ccdfa974",
+      "bytes": 854
+    },
+    "combined_patch_apply_check": "passed against /rabbitr1/out/gpu-review/apply-validation/external/mesa",
+    "baseline_scope": "Previously validated apply-validation Mesa tree; not byte-identical to the subsequently updated canonical/Android Android.mk integration mapping.",
+    "android_makefile_note": {
+      "private_and_prior_validated_sha256": "f3e48e113675e703a6184dbca637e8e2090ff23cfce42128887a7f940069f9af",
+      "current_android_checkout_sha256": "340899802abd768882efe85fe47032a63d9ee3ce6283fe16c6d448202b833253",
+      "difference": "Current canonical imagination-to-powervr_mesa mapping is absent from the private older Android.mk baseline. This Meson-only build does not consume Android.mk.",
+      "private_source_changed_for_this_note": false
+    },
+    "file_count_note": {
+      "prior_comparison_paths": 12818,
+      "hashed_regular_or_file_symlink_entries": 12816,
+      "directory_symlinks_without_file_hash": {
+        ".gitlab-ci/bin": "../bin/ci",
+        ".gitlab-ci/docs": "../docs/ci"
+      },
+      "source_symlink_manifest": {
+        "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/source-symlinks.json",
+        "sha256": "5be01387cc69134a1c8ba9608ba0d90df8e3a3aa62826626ed3796197b238f44",
+        "bytes": 687
+      }
+    }
+  },
+  "dependencies": {
+    "shared_libraries": 31,
+    "copied_header_files": 4397,
+    "target_files_including_crt_archives": 36,
+    "aarch64_elf_members": 324,
+    "actual_ninja_dependency_paths": 1927,
+    "normal_vendor_variants_only": true,
+    "official_llndk_files_are_link_interfaces_not_runtime_implementations": true,
+    "source_export_inventory": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/exports-and-libraries.json",
+      "sha256": "7cab7656e5ebf439791abdb293a210882e1e291293bc56e2f13a033c621cd7fb",
+      "bytes": 446685
+    },
+    "snapshot_manifest": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/inputs-before.json",
+      "sha256": "a752453c260da3501f48b66af67d8ed29fb8fde3a269011578126a903fe7578d",
+      "bytes": 36386
+    },
+    "post_build_verification": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/inputs-after.json",
+      "sha256": "d86e462bceda0a726659b079a86d69f68ac55bf99ce548bda7334281892d3e1c",
+      "bytes": 23097
+    },
+    "elf_verification": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/target-elf-verification.json",
+      "sha256": "884be6ba36bb03444fe768d1af49cac641a1c993106e606a5c38a318372430e9",
+      "bytes": 9344
+    },
+    "native_opencl_header_provenance": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/generator-header-provenance.json",
+      "sha256": "0b23deb00f0eefd86102320a152b9b01e89a8c388c5c8be86664fc9bfe04a4bf",
+      "bytes": 1451
+    },
+    "native_opencl_scope": "Two standard OpenCL headers from pinned mesa-build-dep commit, used only by mesa_clc to create pco_usclib.spv; excluded from target C/C++ ABI headers."
+  },
+  "attempts": [
+    {
+      "stage": "unchanged_source",
+      "result": "failed",
+      "cause": "libui selected for imapper5 but missing from its Meson dependencies; real BufferUsage.h export absent from compile argv",
+      "record": {
+        "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/unchanged-source-attempt/result.json",
+        "sha256": "da163e43d87fd844722c3077f4385cf0c621a7c5b0b2d71ff008a9bf84dad5f4",
+        "bytes": 4581
+      }
+    },
+    {
+      "stage": "libui_dependency_fixed",
+      "result": "failed",
+      "cause": "PowerVR per-architecture target lacks libdrm and Android exports required by its included headers",
+      "record": {
+        "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/libui-only-attempt/result.json",
+        "sha256": "5e584fa8a66a7df3c08ee7a4eda15c027c646fa2eda2fc104cf1df70aa0f9cd2",
+        "bytes": 6546
+      }
+    },
+    {
+      "stage": "both_source_dependencies_fixed",
+      "result": "compiled_all_target_sources_link_failed",
+      "cause": "Inherited Meson executable-probe entry setting requested main for shared link",
+      "record": {
+        "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/shared-entry-attempt/result.json",
+        "sha256": "8e55442e6cc7506503cba0b101fcd82603a7e4bef6af4ba00708c093c2115e23",
+        "bytes": 7190
+      }
+    },
+    {
+      "stage": "shared_link_probe_scope_corrected",
+      "result": "passed",
+      "record": {
+        "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/result.json",
+        "sha256": "dbec5efa6e8125d628a5be3d5131a3e1ff5caa238b4cb5b304ac66aa7294d1c6",
+        "bytes": 9075
+      }
+    }
+  ],
+  "private_control_correction": {
+    "record": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/control-adjustments.json",
+      "sha256": "7c553277cb16d158e424b5d1fb3cf6a788926b20e0fde0ace65ed83cbf56c2b4",
+      "bytes": 966
+    },
+    "scope": "Compiler wrapper removes -Wl,-e,main only when -shared is present; records both requested and effective argv. Non-executed executable probes retain their explicit entry setting."
+  },
+  "build_tree_artifact": {
+    "path": "/rabbitr1/out/gpu-review/android-build/android-platform/build/src/imagination/vulkan/libvulkan_powervr_mesa.so",
+    "sha256": "0905d534c40d8a8f2f2d8d1c22e24c9c1f8bf349886801b47701055de157849e",
+    "bytes": 13178776,
+    "machine": "AArch64",
+    "needed": [
+      "libc++.so",
+      "libc.so",
+      "libm.so",
+      "libdl.so",
+      "libdrm.so",
+      "liblog.so",
+      "libhardware.so",
+      "libsync.so",
+      "libnativewindow.so",
+      "libui.so"
+    ],
+    "runpath_or_rpath": [
+      "/rabbitr1/out/gpu-review/android-build/android-platform/target-deps"
+    ],
+    "non_deployable_build_tree_path": true,
+    "defined_dynamic_exports": [
+      "HMI"
+    ],
+    "export_contract": "Android vulkan-android.sym exposes HMI; desktop ICD symbols are intentionally local"
+  },
+  "installed_artifact": {
+    "path": "/rabbitr1/out/gpu-review/android-build/android-platform/install/usr/local/lib/libvulkan_powervr_mesa.so",
+    "sha256": "38ca1c1853cf4cce5379192e12f7f65c627b9de75c1dfbceec7f5b96e942d840",
+    "bytes": 12461560,
+    "machine": "AArch64",
+    "needed": [
+      "libc++.so",
+      "libc.so",
+      "libm.so",
+      "libdl.so",
+      "libdrm.so",
+      "liblog.so",
+      "libhardware.so",
+      "libsync.so",
+      "libnativewindow.so",
+      "libui.so"
+    ],
+    "defined_dynamic_exports": [
+      "HMI"
+    ],
+    "rpath_or_runpath": []
+  },
+  "installation": {
+    "normal_meson_install": true,
+    "private_destdir_only": true,
+    "configured_aosp_target_strip_used": true,
+    "build_tree_unchanged": true,
+    "record": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/installed-verification.json",
+      "sha256": "e82d39ffa3f0655afe53bb6f7984c249f7fc8eb23a938136ac6921d29684484a",
+      "bytes": 2868
+    },
+    "commands": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/install-commands.json",
+      "sha256": "c8c060b4fd97749a440df4ac5ce54c247dce4f5211049fb71254974f1954c2a8",
+      "bytes": 1102
+    },
+    "prefix_note": "Default /usr/local metadata is private installation evidence, not Android product packaging."
+  },
+  "configuration": {
+    "platforms": [
+      "android"
+    ],
+    "android-stub": false,
+    "android-libbacktrace": "disabled",
+    "android-libperfetto": "disabled",
+    "expat": "disabled",
+    "gallium-drivers": [],
+    "vulkan-drivers": [
+      "imagination"
+    ],
+    "imagination-srv": false,
+    "shader-cache": "disabled",
+    "llvm": "disabled",
+    "build-tests": false,
+    "platform-sdk-version": 37,
+    "zstd": "disabled",
+    "zlib": "disabled",
+    "display-info": "disabled",
+    "xmlconfig": "disabled",
+    "mesa-clc": "system",
+    "precomp-compiler": "system"
+  },
+  "commands": {
+    "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/commands.json",
+    "sha256": "57789a96e7760d11c63c48f1c8feacd889d4aef9a10400ad35744840ed3d5302",
+    "bytes": 1982
+  },
+  "compiler_linker_invocations": {
+    "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/compiler-invocations.jsonl",
+    "sha256": "e2a5e0737f61bd38afaadb4d445db83f4b3ff183618aea57eb8806dac86b35d9",
+    "bytes": 4747501
+  },
+  "final_linker_command": {
+    "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/final-linker-command.json",
+    "sha256": "60beb7c88d7d1c1607bc0d80871b9d5aa10f2b48e4e32fa0ab6f7fcc55d9d7c8",
+    "bytes": 16397
+  },
+  "configuration_review": {
+    "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/configuration-review.json",
+    "sha256": "42db57a066ef421722567a6d41dc0f4bfd5a3f69b1e921fbb242ebde52791df4",
+    "bytes": 20362
+  },
+  "verification_helpers": [
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/prepare-platform.py",
+      "sha256": "572fc7bb6d889cc83327cf15ccded6b9a1cd9fbe0a79012b68e7db62886fec88",
+      "bytes": 11839
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/inventory-exports.py",
+      "sha256": "09e676433e04ac17041df6f0f68a1a0da777958acfafb7afd63b81319805dad5",
+      "bytes": 4548
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/verify-platform.py",
+      "sha256": "f3e343cd615f4a074ad1d9a338a704580080dc3cfccab8617173e02365ddcd1d",
+      "bytes": 7657
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/verify-install.py",
+      "sha256": "9c47b93d4e25f7ffd97c1b2cc8b6ca16232e321ec150d3f127ff28abb2e07cb5",
+      "bytes": 2511
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/run-install.py",
+      "sha256": "c2dd5e75d23f62495e46fd310eb8b5ac8e66fb325b1e8f0c49d8beb9b0972b63",
+      "bytes": 1431
+    },
+    {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/fix-shared-link-probe.py",
+      "sha256": "07e1748fd8b6acea5d390868950ffc3462c4a8175ddde9831446f96677acd76d",
+      "bytes": 2464
+    }
+  ],
+  "warnings": {
+    "source": "Four bionic strtok deprecation diagnostics in upstream vk_rmv_exporter.c",
+    "link_driver": "Unused -pthread argument reported by AOSP clang++; shared link passed",
+    "record": {
+      "original_workspace_path": "/rabbitr1/out/gpu-review/android-build/android-platform/build-warnings.json",
+      "sha256": "0ed4a4970641f82cc774d377e8ae9d52813fab1a1cf00b8f58f466d4a066f4b6",
+      "bytes": 1086
+    }
+  },
+  "scope_limits": {
+    "target_code_executed": false,
+    "gpu_or_device_io": false,
+    "hardware_tested": false,
+    "canonical_or_android_sources_modified": false,
+    "driver_enabled": false,
+    "android_buffer_runtime_verified": false,
+    "missing_ge8320_numeric_limits": 11,
+    "product_renderer_changed": false
+  },
+  "evidence_location_note": "All original_workspace_path references are local /rabbitr1/out evidence; this record does not imply those files are committed.",
+  "canonical_integration": {
+    "patch": "android/patches/0005-update-mesa-26.2.4.patch",
+    "patch_sha256": "2438fc0c4ddb150d7e064255c31036788f663eef60b7b931ddae5f7dfb000796",
+    "touched_files": 118,
+    "verified": "Complete patch replay against pinned base matches all118 after hashes; actual Android checkout passes canonical patch checker. Private Meson source snapshot excludes separately verified Android.mk mapping; see source_validation."
+  },
+  "provenance_note": "Files named under /rabbitr1/out are original local evidence and are not bundled in this repository."
+}

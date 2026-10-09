@@ -5,7 +5,8 @@ Apply the complete upstream stable release delta from 31e9a6b2e95e30d84bf3177d1f
 to 96cb43121031992b85767f9c1be8f3f48e22b1d2 on the pinned Lineage tree.
 Preserve its Android build and integration changes. The 26.2.3 release
 checksums were already present. Map the imagination build option to its
-PowerVR library name in Android. This update does not enable PowerVR.
+PowerVR library name in Android. Propagate libui, libdrm and Android
+headers to the targets that use them. This update does not enable PowerVR.
 
 diff --git a/.pick_status.json b/.pick_status.json
 index 5265290b3d3f55f180000f803949382402d5d02d..8ea374167308e422bd00cad7b59f7dca80fc244d 100644
@@ -13515,3 +13516,35 @@ index bc82d1a280e4228fa647b1fb2404a09c75a0141e..04b40e79fb9fb9374b31bb37d7056a27
  MESA_VK_LIB_SUFFIX_freedreno := freedreno
  MESA_VK_LIB_SUFFIX_broadcom := broadcom
  MESA_VK_LIB_SUFFIX_panfrost := panfrost
+--- a/src/util/u_gralloc/meson.build
++++ b/src/util/u_gralloc/meson.build
+@@ -19,6 +19,7 @@
+ 
+ if dep_android_ui.found()
+   files_u_gralloc += files('u_gralloc_imapper5_api.cpp')
++  deps_for_u_gralloc += dep_android_ui
+   c_args_for_u_gralloc += '-DUSE_IMAPPER4_METADATA_API'
+   cpp_args_for_u_gralloc += '-DUSE_IMAPPER4_METADATA_API'
+   options_for_u_gralloc += 'cpp_std=c++17'
+--- a/src/imagination/vulkan/meson.build
++++ b/src/imagination/vulkan/meson.build
+@@ -138,6 +138,11 @@
+   'rogue/pvr_dump_csb.c',
+ )
+ 
++pvr_per_arch_deps = [dep_libdrm]
++if with_platform_android
++  pvr_per_arch_deps += dep_android
++endif
++
+ powervr_per_arch_libs = []
+ 
+ foreach arch : ['rogue']
+@@ -157,6 +162,7 @@
+       inc_src,
+     ],
+     dependencies : [
++      pvr_per_arch_deps,
+       dep_valgrind,
+       idep_nir_headers,
+       idep_pco_uscgen_programs_headers,

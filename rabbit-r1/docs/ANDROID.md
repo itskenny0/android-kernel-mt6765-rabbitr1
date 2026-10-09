@@ -113,6 +113,12 @@ The next full-image attempt reached 66% before `system/vold` failed to compile:
 targeted compile are recorded in [vold-include-build.json](../android/vold-include-build.json).
 This fixes the compilation error; it does not establish a completed image build.
 
+The following attempt stopped in the audio HAL: `ChildInterface.h` uses
+`SCHED_NORMAL` without including `<sched.h>`. Patch 0009 adds that public header.
+The [compiler replay](../android/audio-scheduler-include-build.json) reproduced
+the failure and then compiled the actual translation unit without diagnostics.
+The complete image build remains outstanding.
+
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
 by stopping before the build. The pinned Siso tool cannot load an absolute
@@ -136,15 +142,24 @@ delta on the pinned Lineage tree. The [initial import record](../android/patches
 preserves its six Android/integration differences and records that original
 patch hash. The later [PowerVR filename mapping](../tests/gpu/android-library-mapping.json)
 adds `imagination` → `powervr_mesa` to `android/Android.mk`; its source and patch
-hashes are separate from the initial import. The current 116-file patch applies
-and its output hashes match. Make resolves the correct library and HAL names. The PowerVR Vulkan library also passed
-a separate x86_64 Linux host build; Android/ARM64 userspace compilation remains
-pending. [Compile evidence](../tests/gpu/mesa-host-build.json) records its scope.
-A separate ARM64/bionic attempt reached a direct-display backend that requires
-unsupported pthread cancellation. The [failed build record](../tests/gpu/mesa-android-build-attempt.json)
-pins its inputs; the next attempt needs Mesa's Android platform configuration
-and its remaining vendor library dependencies. No GPU library from this attempt
-is installed in the product.
+hashes are separate from the initial import. The current 118-file patch also
+propagates libui, libdrm and Android headers to the targets that use them; all
+declared output hashes match a fresh patch replay. Make resolves the correct
+library and HAL names.
+
+The PowerVR Vulkan library passed an ARM64/Android build, full shared-library
+link and private Meson installation against the actual vendor dependencies.
+The installed library has no runtime search path and exports Android's `HMI`.
+The [build record](../tests/gpu/mesa-android-platform-build.json) pins its sources,
+dependencies, warnings and artifacts. It records a private Meson build, not an
+Android image installation or hardware test. The separately checked Android
+filename mapping was not an input to that Meson build.
+
+Earlier [Linux host compilation](../tests/gpu/mesa-host-build.json) and the
+[failed ARM64 direct-display attempt](../tests/gpu/mesa-android-build-attempt.json)
+remain separate evidence. The latter selected a backend requiring unsupported
+pthread cancellation; the successful build uses `platforms=android`. No PowerVR
+library is installed in the product.
 
 The kernel PowerVR driver uses the complete Linux 7.2.9 subtree, including
 its unchanged UAPI, plus the upstream scheduler timeout fix in patch 0075.
