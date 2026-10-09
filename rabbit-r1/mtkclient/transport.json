@@ -9,8 +9,8 @@
   },
   "patch": {
     "path": "patches/mtkclient/0001-guard-bulk-transfers.patch",
-    "sha256": "82472cbedf690e306d41754a54a73caf4392b66b83f2e5ef7e6f59e408955ab8",
-    "bytes": 36340
+    "sha256": "774119aa80af7f2ae5d198c9470e922bf8f8da048f02bd7fe2b2b38a44cfe9d0",
+    "bytes": 38323
   },
   "files": [
     {
@@ -47,6 +47,13 @@
       "after_sha256": "80cdf6dd5c007d21ba25cce9861983cd8d862435af0c94eb24ba0e5d274a67dc",
       "before_bytes": 76597,
       "after_bytes": 78918
+    },
+    {
+      "path": "mtkclient/Library/partition.py",
+      "before_sha256": "53536c41ed87c117d2b2f144460a55479fe02ddb7a756a1317e58b69d6eb98b9",
+      "after_sha256": "806fdf4ded6982dcfc5d170c506d880b780b7d393a582b292366cecb3f945b7a",
+      "before_bytes": 9462,
+      "after_bytes": 10735
     }
   ]
 }

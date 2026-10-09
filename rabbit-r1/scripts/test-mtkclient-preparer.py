@@ -165,6 +165,15 @@ class Tests(unittest.TestCase):
         self.assertFalse(destination.exists())
         self.assertFalse(list(WORK.glob('.mtkclient-prepare-*')))
         control('wrong after pin rejects staged tree and removes only own staging')
+        for count in (5, 7):
+            changed = json.loads(json.dumps(manifest))
+            changed['files'] = (changed['files'] + changed['files'])[:count]
+            bad = WORK / ('bad-count-' + str(count) + '.json')
+            bad.write_text(json.dumps(changed))
+            destination = WORK / ('bad-count-' + str(count))
+            self.assertNotEqual(run(destination, manifest=bad).returncode, 0)
+            self.assertFalse(destination.exists())
+            control('wrong patched-file count rejected: ' + str(count))
 
     def test_05_paths(self):
         linked = WORK / 'linked-archive'

@@ -124,6 +124,10 @@ jobs:
           python3 scripts/test-mtkclient-cid.py \
             --source /rabbitr1/src/mtkclient-haretic \
             --out /rabbitr1/out/mtkclient-cid-tests 2>&1 | tee logs/mtkclient-cid-tests.log
+          python3 scripts/test-mtkclient-gpt.py \
+            --source /rabbitr1/src/mtkclient-haretic \
+            --original /rabbitr1/src/mtkclient \
+            --out /rabbitr1/out/mtkclient-gpt-tests 2>&1 | tee logs/mtkclient-gpt-tests.log
 
       - name: Check source and logging helpers
         run: |

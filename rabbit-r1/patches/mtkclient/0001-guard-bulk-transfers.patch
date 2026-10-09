@@ -808,3 +808,33 @@ diff --git a/mtkclient/Library/DA/mtk_da_handler.py b/mtkclient/Library/DA/mtk_d
          if mtk.daloader.config.generatekeys and mtk.daloader.is_patched():
              mtk.daloader.keys()
          if cmd == "gpt":
+diff --git a/mtkclient/Library/partition.py b/mtkclient/Library/partition.py
+--- a/mtkclient/Library/partition.py
++++ b/mtkclient/Library/partition.py
+@@ -123,8 +123,25 @@
+                         poffset = partentries[0].sector * self.config.pagesize
+                         fh.seek(poffset + offset)
+                         partentries = self.parse_gpt(fh, gpt_settings)
++                        # Export the primary header and its complete declared array.
++                        # LBA 1 + 32 sectors drops one sector when the array starts
++                        # at LBA 2 (the usual 128 entries of 128 bytes).
++                        header = partentries.header
++                        sector_size = partentries.sectorsize
++                        array_start = header.part_entry_start_lba * sector_size
++                        array_end = array_start + header.num_part_entries * header.part_entry_size
++                        if (header.current_lba != 1 or header.num_part_entries < 1 or
++                                header.part_entry_size < 128 or header.part_entry_size % 128 or
++                                array_start < 2 * sector_size or
++                                array_end > header.first_usable_lba * sector_size):
++                            raise ValueError("Invalid primary GPT export bounds")
++                        length = ((array_end + sector_size - 1) // sector_size) * sector_size
++                        if length > fh.filesize - offset:
++                            raise ValueError("Primary GPT export exceeds device size")
+                         fh.seek(offset)
+-                        data = fh.read(poffset + (32 * self.config.pagesize))
++                        data = fh.read(length)
++                        if len(data) != length:
++                            raise IOError("Short primary GPT export")
+                         return data, partentries
+                     else:
+                         mt2 = mbr(rf=fh)

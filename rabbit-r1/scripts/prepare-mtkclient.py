@@ -96,8 +96,8 @@ def read_inputs(manifest_path, archive_override=None, patch_override=None, *, wo
     patch = regular_bytes(local_path(patch_override or PROJECT / patch_spec['path'], workspace))
     pin(archive, archive_spec, 'archive')
     pin(patch, patch_spec, 'patch')
-    require(isinstance(manifest['files'], list) and len(manifest['files']) == 5,
-            'expected exactly five patched files')
+    require(isinstance(manifest['files'], list) and len(manifest['files']) == 6,
+            'expected exactly six patched files')
     changes = {}
     for entry in manifest['files']:
         require(set(entry) == {'path', 'before_sha256', 'after_sha256',
