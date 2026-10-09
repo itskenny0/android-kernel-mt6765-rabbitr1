@@ -27,6 +27,7 @@
 #define POWER_SUPPLY_STATUS_NOT_CHARGING 3
 #define POWER_SUPPLY_STATUS_FULL 4
 struct platform_device { struct device dev; };
+static void platform_set_drvdata(struct platform_device *p, void *v) { p->dev.driver_data=v; }
 struct power_supply_config { void *drv_data; void *fwnode; };
 struct mt6397_chip { struct regmap *regmap; };
 static struct platform_device charger_provider;
@@ -257,6 +258,9 @@ static int devm_mutex_init(struct device *d, struct mutex *m)
 }
 /* Diagnostics are disabled in this existing STATUS-specific fixture. */
 static void mt6357_gauge_live_diagnostic(struct mt6357_gauge *g) { }
+static int mt6357_soc_init(struct mt6357_gauge *g) { return 0; }
+static int mt6357_soc_seed(struct mt6357_gauge *g) { return 0; }
+static int mt6357_soc_start(struct mt6357_gauge *g) { return 0; }
 static int mt6357_gauge_init_adc(struct mt6357_gauge *g)
 {
     /* Existing current suite covers the real ADC init; isolate supplier probe. */

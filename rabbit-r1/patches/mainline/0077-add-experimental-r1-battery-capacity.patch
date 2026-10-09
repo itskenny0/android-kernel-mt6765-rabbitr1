@@ -1,0 +1,2141 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Add experimental live r1 battery capacity
+
+Seed a board-specific stock-profile model from bracketed live measurements
+before registering CAPACITY. Track signed charge with explicit uncertainty,
+expire cached estimates, and invalidate continuity across observed power
+and lifetime events. Keep the uncalibrated experiment disabled by default.
+
+diff --git a/drivers/power/supply/mt6357-gauge.c b/drivers/power/supply/mt6357-gauge.c
+--- a/drivers/power/supply/mt6357-gauge.c
++++ b/drivers/power/supply/mt6357-gauge.c
+@@ -4,6 +4,8 @@
+ #include <linux/atomic.h>
+ #include <linux/bitfield.h>
+ #include <linux/cleanup.h>
++#include <linux/delay.h>
++#include <linux/pm.h>
+ #include <linux/iio/consumer.h>
+ #include <linux/iio/iio.h>
+ #include <linux/ktime.h>
+@@ -20,6 +22,10 @@
+ #include <linux/regmap.h>
+ #include <linux/workqueue.h>
+ 
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++#include "mt6357-r1-model/session.h"
++#endif
++
+ #define MT6357_FG_ON		BIT(0)
+ #define MT6357_FG_CLOCK_PD	(BIT(3) | BIT(4))
+ #define MT6357_FG_READ_PRE	BIT(0)
+@@ -76,6 +82,20 @@
+ #define MT6357_READ_CAR BIT(1)
+ #define MT6357_READ_BATON BIT(2)
+ 
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++#define MT6357_SOC_INTERVAL (2 * HZ)
++struct mt6357_r1_soc {
++	struct mutex lock;
++	struct delayed_work work;
++	struct r1_battery_session session;
++	struct mt6357_live_observation live;
++	struct r1_battery_observation observation;
++	u64 event_token;
++	bool enabled, running, stopping, notified, notified_valid;
++	int error, notified_capacity;
++};
++#endif
++
+ struct mt6357_gauge {
+ 	struct device *dev;
+ 	struct regmap *regmap;
+@@ -83,6 +103,10 @@
+ 	u32 shunt_uohms;
+ 	u32 gain_permille;
+ 	bool needs_release;
++	bool suspended;
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++	struct mt6357_r1_soc soc;
++#endif
+ 	u64 live_generation, live_sequence;
+ 	const struct power_supply_desc *desc;
+ 	struct notifier_block status_nb;
+@@ -526,7 +550,12 @@
+ 
+ 	if (!IS_ENABLED(CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS))
+ 		return;
+-	mt6357_gauge_collect_live(gauge, &sample);
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++	if (gauge->soc.enabled)
++		sample = gauge->soc.live;
++	else
++#endif
++		mt6357_gauge_collect_live(gauge, &sample);
+ 	dev_info(gauge->dev, "live acquisition generation=%llu sequence=%llu ns=%llu..%llu error=%d (not SOC)\n",
+ 		 sample.generation, sample.sequence, sample.started_ns, sample.finished_ns, sample.error);
+ 	for (set = 0; set < 2; set++) {
+@@ -552,6 +581,362 @@
+ 	}
+ }
+ 
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++/* Experimental factory-r1 model. These assumptions are not calibrated error
++ * bounds. See rabbit-r1/battery/SESSION.rst and the integration policy audit. */
++static const struct r1_battery_policy mt6357_r1_policy = {
++	.minimum_01mv = 33500, .discharge_01ma = 5000,
++	.shunt_01mohm = 100, .meter_01mohm = 75, .dc_ratio_percent = 100,
++	.max_capture_ns = 500000000, .max_gap_ns = 10000000000LL,
++	.max_epoch_ns = 60000000000LL, .valid_for_ns = 5000000000LL,
++	.observed_current_limit_ua = 3000000, .interval_current_bound_ua = 10299600,
++	.voltage_motion_uv = 30000, .current_motion_ua = 300000,
++	.temperature_motion_decic = 10,
++	.model_error_uah = 30300, .cutoff_error_uah = 30300,
++	.car_delta_error_uah = 5250, .max_charge_width_uah = 101000,
++	.max_soc_width_bp = 2000,
++};
++
++static int mt6357_soc_errno(const struct r1_battery_estimate *estimate)
++{
++	if (estimate->reason == R1_BATTERY_REASON_ACQUISITION)
++		return estimate->detail_error < 0 ? estimate->detail_error : -EIO;
++	if (estimate->reason == R1_BATTERY_REASON_ARITHMETIC)
++		return -ERANGE;
++	if (estimate->reason == R1_BATTERY_REASON_EVENT)
++		return -EAGAIN;
++	return -ENODATA;
++}
++
++static int mt6357_soc_percent(r1_battery_int basis_points, int *out)
++{
++	if (basis_points < 0 || basis_points > 10000)
++		return -ERANGE;
++	/* Uniform nearest percent, including genuine zero; no positive floor. */
++	*out = (basis_points + 50) / 100;
++	return 0;
++}
++
++static int mt6357_soc_capacity_locked(struct mt6357_gauge *gauge, u64 now, int *out)
++{
++	struct mt6357_r1_soc *soc = &gauge->soc;
++	struct r1_battery_estimate estimate;
++	int ret;
++
++	lockdep_assert_held(&soc->lock);
++	if (soc->stopping)
++		return -ENODEV;
++	if (READ_ONCE(gauge->suspended))
++		return -EAGAIN;
++	if (soc->error)
++		return soc->error;
++	if (!now || now > S64_MAX)
++		return -ERANGE;
++	ret = r1_battery_session_read(&soc->session, now, &estimate);
++	if (ret)
++		return -EINVAL;
++	if (estimate.validity != R1_BATTERY_FRESH)
++		return mt6357_soc_errno(&estimate);
++	return mt6357_soc_percent(estimate.soc_point_bp, out);
++}
++
++static int mt6357_soc_read_capacity(struct mt6357_gauge *gauge, int *out)
++{
++	int ret;
++
++	if (!gauge->soc.enabled)
++		return -EINVAL;
++	mutex_lock(&gauge->soc.lock);
++	ret = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), out);
++	mutex_unlock(&gauge->soc.lock);
++	return ret;
++}
++
++/* Source report is retained independently. Even a populated value beside an
++ * error remains unusable. This adapter performs no I/O or model acceptance. */
++static int mt6357_soc_adapt(const struct mt6357_live_observation *s,
++			   struct r1_battery_observation *out)
++{
++	struct r1_battery_observation o = {};
++	u64 cursor;
++	unsigned int set, channel, word;
++	int ret = s->error;
++
++	if (!s->generation || s->generation > S64_MAX || !s->sequence ||
++	    s->sequence > S64_MAX || !s->started_ns || s->finished_ns > S64_MAX ||
++	    s->finished_ns < s->started_ns) {
++		o.error = -ERANGE;
++		*out = o;
++		return o.error;
++	}
++	o.generation = s->generation;
++	o.sequence = s->sequence;
++	o.started_ns = s->started_ns;
++	o.finished_ns = s->finished_ns;
++	for (set = 0; set < 2; set++) {
++		const struct mt6357_live_fg *fg = &s->fg[set];
++		struct r1_battery_endpoint *ep = &o.endpoint[set];
++		int error = fg->prepare_error ?: fg->latch_error ?: fg->release_error ?:
++			fg->current_ua.error ?: fg->charge_uah.error ?: fg->present.error ?:
++			s->temperature_decic[set].error;
++
++		for (word = 0; word < MT6357_LIVE_WORDS; word++) {
++			if (!error)
++				error = fg->words[word].error;
++			if (!error && (fg->words[word].value < 0 || fg->words[word].value > 0xffff))
++				error = -ERANGE;
++		}
++		for (channel = 0; channel < 3; channel++) {
++			const struct mt6357_live_adc *adc = &s->adc[set][channel];
++
++			if (!error)
++				error = adc->raw.error ?: adc->scale_error ?: adc->mv.error;
++		}
++		if (!error && (s->adc[set][0].mv.value <= 0 ||
++			      s->adc[set][0].mv.value > INT_MAX / 1000))
++			error = -ERANGE;
++		ep->error = error;
++		if (!ret)
++			ret = error;
++		if (error)
++			continue;
++		ep->raw_car = (u32)fg->words[MT6357_LIVE_CAR_LOW].value |
++			      ((u32)fg->words[MT6357_LIVE_CAR_HIGH].value << 16);
++		ep->car_uah = fg->charge_uah.value;
++		ep->current_ua = fg->current_ua.value;
++		ep->present = fg->present.value;
++		ep->voltage_uv = s->adc[set][0].mv.value * 1000;
++		ep->temperature_decic = s->temperature_decic[set].value;
++	}
++	/* Verify the exact FG0, ADC012/210, FG1 acquisition order on success. */
++	cursor = s->started_ns;
++	if (!ret) {
++		const struct mt6357_live_fg *fg = &s->fg[0];
++
++		if (fg->started_ns < cursor || fg->ready_ns < fg->started_ns ||
++		    fg->finished_ns < fg->ready_ns)
++			ret = -ERANGE;
++		cursor = fg->finished_ns;
++		for (set = 0; set < 2; set++) for (channel = 0; channel < 3; channel++) {
++			const struct mt6357_live_adc *adc = &s->adc[set][set ? 2 - channel : channel];
++
++			if (adc->started_ns < cursor || adc->finished_ns < adc->started_ns)
++				ret = -ERANGE;
++			cursor = adc->finished_ns;
++		}
++		fg = &s->fg[1];
++		if (fg->started_ns < cursor || fg->ready_ns < fg->started_ns ||
++		    fg->finished_ns < fg->ready_ns || s->finished_ns < fg->finished_ns)
++			ret = -ERANGE;
++	}
++	o.error = ret;
++	*out = o;
++	return ret;
++}
++
++static enum r1_battery_event mt6357_soc_observed_event(const struct mt6357_live_observation *s)
++{
++	unsigned int i;
++
++	for (i = 0; i < 2; i++) {
++		const struct mt6357_live_fg *fg = &s->fg[i];
++
++		if (!fg->present.error && fg->present.value == 0)
++			return R1_BATTERY_EVENT_REMOVAL;
++		if ((!fg->words[MT6357_LIVE_ENGINE].error &&
++		     !(fg->words[MT6357_LIVE_ENGINE].value & MT6357_FG_ON)) ||
++		    (!fg->words[MT6357_LIVE_CLOCK].error &&
++		     (fg->words[MT6357_LIVE_CLOCK].value & MT6357_FG_CLOCK_PD)))
++			return R1_BATTERY_EVENT_ENGINE_OFF;
++	}
++	return R1_BATTERY_EVENT_NONE;
++}
++
++static void mt6357_soc_event_locked(struct mt6357_gauge *gauge, enum r1_battery_event event)
++{
++	struct mt6357_r1_soc *soc = &gauge->soc;
++	struct r1_battery_observation observation = { .event = event };
++	struct r1_battery_estimate estimate;
++	u64 now = ktime_get_boottime_ns();
++
++	lockdep_assert_held(&soc->lock);
++	/* An unrepresentable event time deliberately invokes the missing-barrier
++	 * hold; it must never become proof that an old capture is post-event. */
++	if (now && now <= S64_MAX && gauge->live_generation <= S64_MAX) {
++		observation.generation = gauge->live_generation;
++		observation.started_ns = observation.finished_ns = now;
++	}
++	r1_battery_session_step(&soc->session, &mt6357_r1_policy, &observation, &estimate);
++	soc->error = -EAGAIN;
++	if (soc->event_token == U64_MAX) {
++		soc->stopping = true;
++		soc->error = -EOVERFLOW;
++	} else {
++		soc->event_token++;
++	}
++}
++
++static int mt6357_soc_consume_locked(struct mt6357_gauge *gauge)
++{
++	struct mt6357_r1_soc *soc = &gauge->soc;
++	struct r1_battery_estimate estimate;
++	enum r1_battery_event event;
++	int ret, capacity;
++
++	lockdep_assert_held(&soc->lock);
++	event = mt6357_soc_observed_event(&soc->live);
++	if (event != R1_BATTERY_EVENT_NONE) {
++		mt6357_soc_event_locked(gauge, event);
++		return soc->error;
++	}
++	mt6357_soc_adapt(&soc->live, &soc->observation);
++	ret = r1_battery_session_step(&soc->session, &mt6357_r1_policy,
++				    &soc->observation, &estimate);
++	soc->error = ret ? -EINVAL : estimate.validity == R1_BATTERY_FRESH ? 0 :
++		     mt6357_soc_errno(&estimate);
++	return mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
++}
++
++static void mt6357_soc_work(struct work_struct *work)
++{
++	struct mt6357_r1_soc *soc = container_of(to_delayed_work(work), struct mt6357_r1_soc, work);
++	struct mt6357_gauge *gauge = container_of(soc, struct mt6357_gauge, soc);
++	u64 token;
++	int before, ret, capacity = 0;
++	bool changed;
++
++	mutex_lock(&soc->lock);
++	if (!soc->running || soc->stopping || READ_ONCE(gauge->suspended)) {
++		mutex_unlock(&soc->lock);
++		return;
++	}
++	token = soc->event_token;
++	mutex_unlock(&soc->lock);
++	mt6357_gauge_collect_live(gauge, &soc->live);
++	mutex_lock(&soc->lock);
++	if (!soc->running || soc->stopping || READ_ONCE(gauge->suspended) || token != soc->event_token) {
++		mutex_unlock(&soc->lock);
++		return;
++	}
++	/* Readers may have observed expiry while collection held no state lock. */
++	before = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
++	ret = mt6357_soc_consume_locked(gauge);
++	if (!ret)
++		ret = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
++	changed = !soc->notified || soc->notified_valid != !ret ||
++		  (!ret && (soc->notified_capacity != capacity || before));
++	soc->notified = true;
++	soc->notified_valid = !ret;
++	soc->notified_capacity = capacity;
++	if (!soc->stopping)
++		queue_delayed_work(system_freezable_power_efficient_wq, &soc->work, MT6357_SOC_INTERVAL);
++	mutex_unlock(&soc->lock);
++	if (changed)
++		power_supply_changed(gauge->psy);
++}
++
++static void mt6357_soc_stop(void *data)
++{
++	struct mt6357_gauge *gauge = data;
++	struct mt6357_r1_soc *soc = &gauge->soc;
++
++	if (!soc->enabled)
++		return;
++	mutex_lock(&soc->lock);
++	soc->running = false;
++	if (!soc->stopping)
++		mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_REMOVAL);
++	soc->stopping = true;
++	mutex_unlock(&soc->lock);
++	cancel_delayed_work_sync(&soc->work);
++}
++
++static int mt6357_soc_init(struct mt6357_gauge *gauge)
++{
++	static const struct mt6357_thermistor_point ntc[] = {
++		{ -40000, 195652 }, { -35000, 148171 }, { -30000, 113347 }, { -25000, 87559 },
++		{ -20000, 68237 }, { -15000, 53650 }, { -10000, 42506 }, { -5000, 33892 },
++		{ 0, 27219 }, { 5000, 22021 }, { 10000, 17926 }, { 15000, 14674 },
++		{ 20000, 12081 }, { 25000, 10000 }, { 30000, 8315 }, { 35000, 6948 },
++		{ 40000, 5834 }, { 45000, 4917 }, { 50000, 4161 }, { 55000, 3535 }, { 60000, 3014 },
++	};
++	struct mt6357_r1_soc *soc = &gauge->soc;
++	unsigned int i;
++	int ret;
++
++	if (!of_machine_is_compatible("rabbit,r1"))
++		return 0;
++	if (!gauge->voltage || !gauge->thermistor || !gauge->reference || !gauge->charger)
++		return -ENODATA;
++	if (gauge->shunt_uohms != 10000 || gauge->gain_permille != 1000 ||
++	    gauge->pullup_ohms != 16900 || gauge->series_uohms != 10000 ||
++	    gauge->num_points != ARRAY_SIZE(ntc))
++		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(ntc); i++)
++		if (gauge->table[i].temperature_mc != ntc[i].temperature_mc ||
++		    gauge->table[i].resistance != ntc[i].resistance)
++			return -EINVAL;
++	ret = devm_mutex_init(gauge->dev, &soc->lock);
++	if (ret)
++		return ret;
++	INIT_DELAYED_WORK(&soc->work, mt6357_soc_work);
++	soc->error = -ENODATA;
++	soc->enabled = true;
++	return 0;
++}
++
++static int mt6357_soc_seed(struct mt6357_gauge *gauge)
++{
++	struct mt6357_r1_soc *soc = &gauge->soc;
++	u64 start, now;
++	unsigned int attempt;
++	int ret = -ENODATA, capacity;
++
++	if (!soc->enabled)
++		return 0;
++	start = ktime_get_boottime_ns();
++	for (attempt = 0; attempt < 8; attempt++) {
++		now = ktime_get_boottime_ns();
++		if (now < start || now - start >= 6000000000ULL)
++			break;
++		mt6357_gauge_collect_live(gauge, &soc->live);
++		mutex_lock(&soc->lock);
++		ret = mt6357_soc_consume_locked(gauge);
++		now = ktime_get_boottime_ns();
++		/* Check a two-second publication margin without renewing the seed. */
++		if (!ret)
++			ret = now > S64_MAX - 2000000000ULL ? -ERANGE :
++				mt6357_soc_capacity_locked(gauge, now + 2000000000ULL, &capacity);
++		mutex_unlock(&soc->lock);
++		if (!ret)
++			return 0;
++		if (attempt < 7)
++			msleep(250);
++	}
++	return ret ?: -ETIMEDOUT;
++}
++
++static int mt6357_soc_start(struct mt6357_gauge *gauge)
++{
++	int ret;
++
++	if (!gauge->soc.enabled)
++		return 0;
++	ret = devm_add_action_or_reset(gauge->dev, mt6357_soc_stop, gauge);
++	if (ret)
++		return ret;
++	mutex_lock(&gauge->soc.lock);
++	gauge->soc.running = true;
++	mod_delayed_work(system_freezable_power_efficient_wq, &gauge->soc.work, 0);
++	mutex_unlock(&gauge->soc.lock);
++	return 0;
++}
++#else
++static int mt6357_soc_init(struct mt6357_gauge *gauge) { return 0; }
++static int mt6357_soc_seed(struct mt6357_gauge *gauge) { return 0; }
++static int mt6357_soc_start(struct mt6357_gauge *gauge) { return 0; }
++#endif
++
+ static int mt6357_gauge_read_temperature(struct mt6357_gauge *gauge, int *temperature)
+ {
+ 	int ret, voltage_mv, reference_mv, current_ua;
+@@ -611,10 +996,12 @@
+ 	bool valid, changed;
+ 	int status = POWER_SUPPLY_STATUS_UNKNOWN;
+ 
++	if (READ_ONCE(gauge->suspended))
++		return;
+ 	/* Supplier I/O never holds the measurement or notification mutex. */
+ 	valid = !mt6357_gauge_read_status(gauge, &status);
+ 	mutex_lock(&gauge->status_lock);
+-	if (!gauge->status_active) {
++	if (!gauge->status_active || READ_ONCE(gauge->suspended)) {
+ 		mutex_unlock(&gauge->status_lock);
+ 		return;
+ 	}
+@@ -639,7 +1026,7 @@
+ 	if (event != PSY_EVENT_PROP_CHANGED || data != gauge->charger)
+ 		return NOTIFY_DONE;
+ 	mutex_lock(&gauge->status_lock);
+-	if (gauge->status_active)
++	if (gauge->status_active && !READ_ONCE(gauge->suspended))
+ 		mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
+ 	mutex_unlock(&gauge->status_lock);
+ 	return NOTIFY_DONE;
+@@ -664,6 +1051,10 @@
+ 	struct mt6357_gauge *gauge = power_supply_get_drvdata(psy);
+ 
+ 	switch (psp) {
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++	case POWER_SUPPLY_PROP_CAPACITY:
++		return mt6357_soc_read_capacity(gauge, &val->intval);
++#endif
+ 	case POWER_SUPPLY_PROP_STATUS:
+ 		return mt6357_gauge_read_status(gauge, &val->intval);
+ 	case POWER_SUPPLY_PROP_PRESENT:
+@@ -705,6 +1096,14 @@
+ 	POWER_SUPPLY_PROP_STATUS,
+ };
+ 
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++static const enum power_supply_property mt6357_gauge_soc_properties[] = {
++	POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW,
++	POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_STATUS, POWER_SUPPLY_PROP_CAPACITY,
++};
++#endif
++
+ /* A class iterator may retain psy after unregister, so keep its descriptor static. */
+ #define MT6357_GAUGE_DESC(_properties, _count) { \
+ 	.name = "mt6357-battery", \
+@@ -713,6 +1112,11 @@
+ 	.num_properties = (_count), \
+ 	.get_property = mt6357_gauge_get_property, \
+ }
++
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++static const struct power_supply_desc mt6357_gauge_soc_desc =
++	MT6357_GAUGE_DESC(mt6357_gauge_soc_properties, ARRAY_SIZE(mt6357_gauge_soc_properties));
++#endif
+ 
+ static const struct power_supply_desc mt6357_gauge_desc =
+ 	MT6357_GAUGE_DESC(mt6357_gauge_properties, 3);
+@@ -950,15 +1354,26 @@
+ 		return dev_err_probe(dev, ret, "Invalid battery charger supplier\n");
+ 	gauge->needs_release = true;
+ 	gauge->live_generation = atomic64_inc_return(&mt6357_live_generation);
++	ret = mt6357_soc_init(gauge);
++	if (ret)
++		return dev_err_probe(dev, ret, "Unsupported experimental r1 model inputs\n");
++	ret = mt6357_soc_seed(gauge);
+ 	mt6357_gauge_live_diagnostic(gauge);
++	if (ret)
++		return dev_err_probe(dev, ret, "No usable initial live SOC estimate\n");
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++	if (gauge->soc.enabled)
++		gauge->desc = &mt6357_gauge_soc_desc;
++#endif
++	platform_set_drvdata(pdev, gauge);
+ 	config.drv_data = gauge;
+ 	config.fwnode = dev_fwnode(dev);
+ 	psy = devm_power_supply_register(dev, gauge->desc, &config);
+ 	if (IS_ERR(psy))
+ 		return PTR_ERR(psy);
++	gauge->psy = psy;
+ 	if (!gauge->charger)
+-		return 0;
+-	gauge->psy = psy;
++		return mt6357_soc_start(gauge);
+ 	ret = power_supply_reg_notifier(&gauge->status_nb);
+ 	if (ret)
+ 		return ret;
+@@ -970,8 +1385,68 @@
+ 	gauge->status_active = true;
+ 	mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
+ 	mutex_unlock(&gauge->status_lock);
++	return mt6357_soc_start(gauge);
++}
++
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++static int mt6357_gauge_suspend(struct device *dev)
++{
++	struct mt6357_gauge *gauge = dev_get_drvdata(dev);
++
++	if (!gauge->soc.enabled)
++		return 0;
++	/* Serialize the pause with notifier requeue checks before draining work. */
++	mutex_lock(&gauge->status_lock);
++	WRITE_ONCE(gauge->suspended, true);
++	mutex_unlock(&gauge->status_lock);
++	mutex_lock(&gauge->soc.lock);
++	mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_SUSPEND);
++	mutex_unlock(&gauge->soc.lock);
++	/* Never hold the state mutex while draining an entered worker. */
++	cancel_delayed_work_sync(&gauge->soc.work);
++	cancel_delayed_work_sync(&gauge->status_work);
+ 	return 0;
+ }
++
++static int mt6357_gauge_resume(struct device *dev)
++{
++	struct mt6357_gauge *gauge = dev_get_drvdata(dev);
++
++	if (!gauge->soc.enabled)
++		return 0;
++	mutex_lock(&gauge->soc.lock);
++	if (!gauge->soc.stopping) {
++		mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_SUSPEND);
++		WRITE_ONCE(gauge->suspended, false);
++		/* One jiffy avoids an equal-clock capture at the strict event barrier. */
++		if (gauge->soc.running && !gauge->soc.stopping)
++			mod_delayed_work(system_freezable_power_efficient_wq, &gauge->soc.work, 1);
++	}
++	mutex_unlock(&gauge->soc.lock);
++	mutex_lock(&gauge->status_lock);
++	if (gauge->status_active && !READ_ONCE(gauge->suspended))
++		mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
++	mutex_unlock(&gauge->status_lock);
++	return 0;
++}
++
++static void mt6357_gauge_shutdown(struct platform_device *pdev)
++{
++	struct mt6357_gauge *gauge = platform_get_drvdata(pdev);
++
++	if (!gauge->soc.enabled)
++		return;
++	WRITE_ONCE(gauge->suspended, true);
++	mt6357_soc_stop(gauge);
++	mutex_lock(&gauge->status_lock);
++	gauge->status_active = false;
++	mutex_unlock(&gauge->status_lock);
++	cancel_delayed_work_sync(&gauge->status_work);
++	/* The existing devres stop action owns notifier unregister on detach. */
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(mt6357_gauge_pm, mt6357_gauge_suspend, mt6357_gauge_resume);
++#endif
+ 
+ static const struct of_device_id mt6357_gauge_of_match[] = {
+ 	{ .compatible = "mediatek,mt6357-gauge" },
+@@ -981,9 +1456,15 @@
+ 
+ static struct platform_driver mt6357_gauge_driver = {
+ 	.probe = mt6357_gauge_probe,
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++	.shutdown = mt6357_gauge_shutdown,
++#endif
+ 	.driver = {
+ 		.name = "mt6357-gauge",
+ 		.of_match_table = mt6357_gauge_of_match,
++#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
++		.pm = pm_sleep_ptr(&mt6357_gauge_pm),
++#endif
+ 	},
+ };
+ module_platform_driver(mt6357_gauge_driver);
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -435,10 +435,22 @@
+ 	help
+ 	  Read signed battery current from the MT6357 gauge, with optional ADC
+ 	  voltage and current-compensated thermistor readings. The firmware must
+-	  have started the gauge engine. This driver does not yet report state
+-	  of charge or control charging.
+-
+-	  This driver can also be built as a module, called mt6357-gauge.
++	  have started the gauge engine. The optional experimental r1 model below
++	  estimates state of charge from live measurements. Charging settings
++	  are not controlled by this driver.
++
++	  This driver can also be built as a module, called mt6357-battery.
++
++config BATTERY_MT6357_R1_SOC
++	bool "Experimental rabbit r1 live battery model"
++	depends on BATTERY_MT6357 && OF
++	default n
++	help
++	  Estimate capacity from real bracketed voltage/current/temperature and
++	  charge-counter observations on the factory rabbit r1 battery0 profile.
++	  Acceptance/error policy is an uncalibrated experiment, not hardware
++	  validation. Initial model failure prevents battery registration.
++	  No gauge reset, active load or charging change is performed.
+ 
+ config BATTERY_MT6357_LIVE_DIAGNOSTICS
+ 	bool "MT6357 probe-time live measurement diagnostics"
+diff --git a/drivers/power/supply/Makefile b/drivers/power/supply/Makefile
+--- a/drivers/power/supply/Makefile
++++ b/drivers/power/supply/Makefile
+@@ -56,7 +56,10 @@
+ obj-$(CONFIG_BATTERY_DA9052)	+= da9052-battery.o
+ obj-$(CONFIG_CHARGER_DA9150)	+= da9150-charger.o
+ obj-$(CONFIG_BATTERY_DA9150)	+= da9150-fg.o
+-obj-$(CONFIG_BATTERY_MT6357)	+= mt6357-gauge.o
++obj-$(CONFIG_BATTERY_MT6357)	+= mt6357-battery.o
++mt6357-battery-y := mt6357-gauge.o
++mt6357-battery-$(CONFIG_BATTERY_MT6357_R1_SOC) += mt6357-r1-model/profile.o \
++	mt6357-r1-model/stock_profiles.o mt6357-r1-model/session.o
+ obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
+ obj-$(CONFIG_BATTERY_MAX17042)	+= max17042_battery.o
+ obj-$(CONFIG_BATTERY_MAX1720X)	+= max1720x_battery.o
+diff --git a/drivers/power/supply/mt6357-r1-model/profile.c b/drivers/power/supply/mt6357-r1-model/profile.c
+new file mode 100644
+--- /dev/null
++++ b/drivers/power/supply/mt6357-r1-model/profile.c
+@@ -0,0 +1,483 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#include "profile.h"
++
++#define BATT_MAX 9223372036854775807LL
++#define BATT_MIN (-BATT_MAX - 1LL)
++
++static int add(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if ((b > 0 && a > BATT_MAX - b) || (b < 0 && a < BATT_MIN - b))
++        return R1_BATTERY_OVERFLOW;
++    *out = a + b;
++    return R1_BATTERY_OK;
++}
++
++static int subtract(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if ((b > 0 && a < BATT_MIN + b) || (b < 0 && a > BATT_MAX + b))
++        return R1_BATTERY_OVERFLOW;
++    *out = a - b;
++    return R1_BATTERY_OK;
++}
++
++static int multiply(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if (a > 0) {
++        if ((b > 0 && a > BATT_MAX / b) || (b < 0 && b < BATT_MIN / a))
++            return R1_BATTERY_OVERFLOW;
++    } else if (a < 0) {
++        if ((b > 0 && a < BATT_MIN / b) || (b < 0 && a < BATT_MAX / b))
++            return R1_BATTERY_OVERFLOW;
++    }
++    *out = a * b;
++    return R1_BATTERY_OK;
++}
++
++static int divide(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if (!b) return R1_BATTERY_INVALID;
++    if (a == BATT_MIN && b == -1) return R1_BATTERY_OVERFLOW;
++    *out = a / b; /* C99 signed division truncates toward zero. */
++    return R1_BATTERY_OK;
++}
++
++static int interpolate(r1_battery_int x0, r1_battery_int y0,
++                       r1_battery_int x1, r1_battery_int y1,
++                       r1_battery_int x, r1_battery_int *out)
++{
++    r1_battery_int dx, dy, position, product, change;
++    int ret;
++    if ((ret = subtract(x1, x0, &dx)) || (ret = subtract(y1, y0, &dy)) ||
++        (ret = subtract(x, x0, &position)) ||
++        (ret = multiply(dy, position, &product)) ||
++        (ret = divide(product, dx, &change))) return ret;
++    return add(y0, change, out);
++}
++
++static int percentage(r1_battery_int charge, r1_battery_int usable, r1_battery_int *out)
++{
++    r1_battery_int scaled;
++    int ret = multiply(charge, R1_BATTERY_PERCENT_SCALE, &scaled);
++    if (ret) return ret;
++    return divide(scaled, usable, out);
++}
++
++static int validate_curve(const struct r1_battery_table *table)
++{
++    size_t i;
++    if (!table || table->count < 2 || table->count > R1_BATTERY_ROWS ||
++        table->qmax_01mah <= 0 || table->qmax_high_01mah <= 0)
++        return R1_BATTERY_INVALID;
++    for (i = 0; i < table->count; ++i) {
++        const struct r1_battery_point *point = &table->points[i];
++        if (point->charge_01mah < 0 || point->voltage_01mv <= 0 ||
++            point->resistance_01mohm <= 0) return R1_BATTERY_INVALID;
++        if (i && (point->charge_01mah < table->points[i - 1].charge_01mah ||
++                  point->voltage_01mv > table->points[i - 1].voltage_01mv))
++            return R1_BATTERY_INVALID;
++    }
++    return table->points[table->count - 1].charge_01mah > 0 ?
++           R1_BATTERY_OK : R1_BATTERY_INVALID;
++}
++
++r1_battery_int r1_battery_whole_celsius(r1_battery_int temperature_decic)
++{
++    return temperature_decic / 10;
++}
++
++int r1_battery_validate_tables(const struct r1_battery_table *tables, size_t count)
++{
++    size_t i;
++    int ascending, ret;
++    if (!tables || count < 2 || count > R1_BATTERY_TABLES) return R1_BATTERY_INVALID;
++    ascending = tables[1].temperature_c > tables[0].temperature_c;
++    for (i = 0; i < count; ++i) {
++        if ((ret = validate_curve(&tables[i]))) return ret;
++        if (tables[i].count != tables[0].count) return R1_BATTERY_INVALID;
++        if (i && (ascending ? tables[i].temperature_c <= tables[i - 1].temperature_c :
++                             tables[i].temperature_c >= tables[i - 1].temperature_c))
++            return R1_BATTERY_INVALID;
++    }
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_profile_at(const struct r1_battery_table *tables, size_t count,
++                          r1_battery_int temperature_c, struct r1_battery_profile *out)
++{
++    struct r1_battery_profile result = {0};
++    const struct r1_battery_table *low, *high;
++    size_t i, bracket;
++    int ascending, ret;
++    if (!out) return R1_BATTERY_INVALID;
++    if ((ret = r1_battery_validate_tables(tables, count))) return ret;
++    ascending = tables[1].temperature_c > tables[0].temperature_c;
++    for (bracket = 1; bracket < count - 1; ++bracket)
++        if (ascending ? temperature_c <= tables[bracket].temperature_c :
++                        temperature_c >= tables[bracket].temperature_c) break;
++    low = &tables[ascending ? bracket - 1 : bracket];
++    high = &tables[ascending ? bracket : bracket - 1];
++    if (temperature_c < low->temperature_c) temperature_c = low->temperature_c;
++    if (temperature_c > high->temperature_c) temperature_c = high->temperature_c;
++    result.curve.temperature_c = temperature_c;
++    result.curve.count = low->count;
++    for (i = 0; i < low->count; ++i) {
++        struct r1_battery_point *point = &result.curve.points[i];
++        if ((ret = interpolate(low->temperature_c, low->points[i].charge_01mah,
++                               high->temperature_c, high->points[i].charge_01mah,
++                               temperature_c, &point->charge_01mah)) ||
++            (ret = interpolate(low->temperature_c, low->points[i].voltage_01mv,
++                               high->temperature_c, high->points[i].voltage_01mv,
++                               temperature_c, &point->voltage_01mv)) ||
++            (ret = interpolate(low->temperature_c, low->points[i].resistance_01mohm,
++                               high->temperature_c, high->points[i].resistance_01mohm,
++                               temperature_c, &point->resistance_01mohm))) return ret;
++    }
++    if ((ret = interpolate(low->temperature_c, low->qmax_01mah,
++                           high->temperature_c, high->qmax_01mah, temperature_c,
++                           &result.curve.qmax_01mah)) ||
++        (ret = interpolate(low->temperature_c, low->qmax_high_01mah,
++                           high->temperature_c, high->qmax_high_01mah, temperature_c,
++                           &result.curve.qmax_high_01mah)) ||
++        (ret = validate_curve(&result.curve))) return ret;
++    *out = result;
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_assign_dod(const struct r1_battery_profile *profile,
++                          r1_battery_int usable_01mah, struct r1_battery_profile *out)
++{
++    struct r1_battery_profile result;
++    size_t i;
++    int ret;
++    if (!profile || !out || usable_01mah <= 0) return R1_BATTERY_INVALID;
++    if ((ret = validate_curve(&profile->curve))) return ret;
++    result = *profile;
++    result.usable_01mah = usable_01mah;
++    for (i = 0; i < profile->curve.count; ++i)
++        if ((ret = percentage(profile->curve.points[i].charge_01mah, usable_01mah,
++                              &result.dod[i]))) return ret;
++    *out = result;
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_validate_profile(const struct r1_battery_profile *profile)
++{
++    size_t i;
++    r1_battery_int expected;
++    int ret;
++    if (!profile) return R1_BATTERY_INVALID;
++    if ((ret = validate_curve(&profile->curve))) return ret;
++    if (profile->usable_01mah <= 0) return R1_BATTERY_UNNORMALIZED;
++    for (i = 0; i < profile->curve.count; ++i) {
++        if ((ret = percentage(profile->curve.points[i].charge_01mah,
++                              profile->usable_01mah, &expected))) return ret;
++        if (profile->dod[i] != expected) return R1_BATTERY_INVALID;
++    }
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_ocv_to_dod(const struct r1_battery_profile *profile,
++                          r1_battery_int ocv_01mv, r1_battery_int *dod)
++{
++    size_t i;
++    int ret;
++    if (!dod || ocv_01mv <= 0) return R1_BATTERY_INVALID;
++    if ((ret = r1_battery_validate_profile(profile))) return ret;
++    /* The first crossing preserves cold-profile repeated charge/voltage rows. */
++    for (i = 0; i < profile->curve.count; ++i)
++        if (profile->curve.points[i].voltage_01mv <= ocv_01mv) break;
++    if (!i) { *dod = profile->dod[0]; return R1_BATTERY_OK; }
++    if (i == profile->curve.count) { *dod = profile->dod[i - 1]; return R1_BATTERY_OK; }
++    return interpolate(profile->curve.points[i - 1].voltage_01mv, profile->dod[i - 1],
++                       profile->curve.points[i].voltage_01mv, profile->dod[i], ocv_01mv, dod);
++}
++
++int r1_battery_dod_to_ocv(const struct r1_battery_profile *profile,
++                          r1_battery_int dod, r1_battery_int *ocv_01mv)
++{
++    size_t i;
++    int ret;
++    if (!ocv_01mv) return R1_BATTERY_INVALID;
++    if ((ret = r1_battery_validate_profile(profile))) return ret;
++    for (i = 0; i < profile->curve.count; ++i)
++        if (profile->dod[i] >= dod) break;
++    if (!i) { *ocv_01mv = profile->curve.points[0].voltage_01mv; return R1_BATTERY_OK; }
++    if (i == profile->curve.count) {
++        *ocv_01mv = profile->curve.points[i - 1].voltage_01mv;
++        return R1_BATTERY_OK;
++    }
++    return interpolate(profile->dod[i - 1], profile->curve.points[i - 1].voltage_01mv,
++                       profile->dod[i], profile->curve.points[i].voltage_01mv, dod, ocv_01mv);
++}
++
++int r1_battery_update(const struct r1_battery_profile *profile,
++                      r1_battery_int reference_ocv_01mv, r1_battery_int delta_01mah,
++                      struct r1_battery_state *out)
++{
++    struct r1_battery_state result;
++    r1_battery_int reference_dod, change;
++    int ret;
++    if (!out) return R1_BATTERY_INVALID;
++    if ((ret = r1_battery_ocv_to_dod(profile, reference_ocv_01mv, &reference_dod)) ||
++        (ret = percentage(delta_01mah, profile->usable_01mah, &change)) ||
++        (ret = subtract(reference_dod, change, &result.dod)) ||
++        (ret = subtract(R1_BATTERY_PERCENT_SCALE, result.dod, &result.soc))) return ret;
++    *out = result;
++    return R1_BATTERY_OK;
++}
++
++/* Stock's capacity interpolation is anchored at the lower-voltage row. This
++ * differs by one unit from reversing the endpoints before signed division. */
++static int capacity_at_cutoff(const struct r1_battery_table *curve,
++                              r1_battery_int cutoff, r1_battery_int *capacity)
++{
++    size_t i;
++    int ret;
++    for (i = 0; i < curve->count; ++i)
++        if (curve->points[i].voltage_01mv < cutoff) break;
++    if (!i) *capacity = curve->points[0].charge_01mah;
++    else if (i == curve->count) *capacity = curve->points[i - 1].charge_01mah;
++    else {
++        ret = interpolate(curve->points[i].voltage_01mv, curve->points[i].charge_01mah,
++                          curve->points[i - 1].voltage_01mv,
++                          curve->points[i - 1].charge_01mah, cutoff, capacity);
++        if (ret) return ret;
++    }
++    return *capacity > 0 ? R1_BATTERY_OK : R1_BATTERY_NO_CUTOFF;
++}
++
++static int loaded_voltage(r1_battery_int voltage, r1_battery_int resistance,
++                           const struct r1_battery_load *load, r1_battery_int *out)
++{
++    r1_battery_int scaled, total, compensation;
++    int ret;
++    if ((ret = multiply(resistance, load->dc_ratio_percent, &scaled)) ||
++        (ret = add(scaled / 100, load->shunt_01mohm, &total)) ||
++        (ret = add(total, load->meter_01mohm, &total)) ||
++        (ret = multiply(-load->discharge_01ma, total, &compensation))) return ret;
++    /* Preserve both stock divisions, including +5 for negative compensation. */
++    compensation /= 1000;
++    if ((ret = add(compensation, 5, &compensation))) return ret;
++    return add(voltage, compensation / 10, out);
++}
++
++static int cutoff_from_load(const struct r1_battery_profile *profile,
++                             const struct r1_battery_load *load, r1_battery_int *cutoff)
++{
++    size_t high;
++    r1_battery_int loaded, span, dod, voltage, resistance;
++    int ret;
++    for (high = profile->curve.count - 1; high > 0; --high)
++        if (profile->dod[high - 1] < R1_BATTERY_PERCENT_SCALE) break;
++    for (; high > 0; --high) {
++        const struct r1_battery_point *point = &profile->curve.points[high - 1];
++        if ((ret = loaded_voltage(point->voltage_01mv, point->resistance_01mohm,
++                                   load, &loaded))) return ret;
++        if (loaded > load->minimum_01mv) break;
++    }
++    if (!high) return R1_BATTERY_NO_CUTOFF;
++    /* No index -1, division by zero, or unbounded loop on a malformed bracket. */
++    if ((ret = subtract(profile->dod[high], profile->dod[high - 1], &span))) return ret;
++    if (span <= 0) return R1_BATTERY_NO_CUTOFF;
++    if (span > R1_BATTERY_PERCENT_SCALE) return R1_BATTERY_SEARCH_LIMIT;
++    for (dod = profile->dod[high]; ; dod -= 10) {
++        if ((ret = interpolate(profile->dod[high - 1],
++                               profile->curve.points[high - 1].voltage_01mv,
++                               profile->dod[high], profile->curve.points[high].voltage_01mv,
++                               dod, &voltage)) ||
++            (ret = interpolate(profile->dod[high - 1],
++                               profile->curve.points[high - 1].resistance_01mohm,
++                               profile->dod[high], profile->curve.points[high].resistance_01mohm,
++                               dod, &resistance)) ||
++            (ret = loaded_voltage(voltage, resistance, load, &loaded))) return ret;
++        if (loaded > load->minimum_01mv) {
++            *cutoff = voltage;
++            return R1_BATTERY_OK;
++        }
++        /* The stock grid starts at this bracket's upper DOD, not a global
++         * multiple of ten. Do not invent a successful lower-endpoint sample. */
++        if (dod - profile->dod[high - 1] < 10) return R1_BATTERY_NO_CUTOFF;
++    }
++}
++
++int r1_battery_calculate_usable(const struct r1_battery_profile *profile,
++                                const struct r1_battery_load *load,
++                                struct r1_battery_capacity *out)
++{
++    struct r1_battery_capacity result;
++    r1_battery_int drop, capacity;
++    int ret;
++    if (!profile || !load || !out || load->minimum_01mv <= 0 ||
++        load->discharge_01ma < 0 || load->rac_01mohm < 0 ||
++        load->shunt_01mohm < 0 || load->meter_01mohm < 0 ||
++        load->dc_ratio_percent <= 0) return R1_BATTERY_INVALID;
++    if ((ret = validate_curve(&profile->curve)) ||
++        (ret = multiply(load->discharge_01ma, load->rac_01mohm, &drop)) ||
++        (ret = add(load->minimum_01mv, drop / 10000, &result.initial_cutoff_01mv)) ||
++        (ret = capacity_at_cutoff(&profile->curve, result.initial_cutoff_01mv,
++                                  &result.initial_usable_01mah)) ||
++        (ret = r1_battery_assign_dod(profile, result.initial_usable_01mah, &result.profile)) ||
++        (ret = cutoff_from_load(&result.profile, load, &result.cutoff_01mv)) ||
++        (ret = capacity_at_cutoff(&result.profile.curve, result.cutoff_01mv, &capacity)) ||
++        (ret = r1_battery_assign_dod(&result.profile, capacity, &result.profile))) return ret;
++    *out = result;
++    return R1_BATTERY_OK;
++}
++
++/* Keep the exact rational model separate from the stock staged rounding. */
++static int model_residuals(const struct r1_battery_profile *profile,
++                          r1_battery_int voltage,
++                          const struct r1_battery_model_parameters *parameters,
++                          r1_battery_int residual[R1_BATTERY_ROWS])
++{
++    r1_battery_int extra, scaled_extra;
++    size_t i;
++    int ret;
++    if (!profile || !parameters || voltage <= 0 ||
++        parameters->shunt_01mohm < 0 || parameters->meter_01mohm < 0 ||
++        parameters->dc_ratio_percent <= 0) return R1_BATTERY_INVALID;
++    if ((ret = validate_curve(&profile->curve)) ||
++        (ret = add(parameters->shunt_01mohm, parameters->meter_01mohm, &extra)) ||
++        (ret = multiply(extra, 100, &scaled_extra))) return ret;
++    for (i = 0; i < profile->curve.count; ++i) {
++        const struct r1_battery_point *point = &profile->curve.points[i];
++        r1_battery_int difference, scaled_voltage, cell, total, drop;
++        if ((ret = subtract(point->voltage_01mv, voltage, &difference)) ||
++            (ret = multiply(difference, 1000000, &scaled_voltage)) ||
++            (ret = multiply(point->resistance_01mohm,
++                            parameters->dc_ratio_percent, &cell)) ||
++            (ret = add(cell, scaled_extra, &total)) ||
++            (ret = multiply(parameters->current_01ma, total, &drop)) ||
++            (ret = add(scaled_voltage, drop, &residual[i]))) return ret;
++    }
++    return R1_BATTERY_OK;
++}
++
++static int same_point(const struct r1_battery_point *a,
++                      const struct r1_battery_point *b)
++{
++    return a->charge_01mah == b->charge_01mah &&
++           a->voltage_01mv == b->voltage_01mv &&
++           a->resistance_01mohm == b->resistance_01mohm;
++}
++
++static int opposite(r1_battery_int a, r1_battery_int b)
++{
++    return (a < 0 && b > 0) || (a > 0 && b < 0);
++}
++
++/* Interpolate a nonnegative quantity with floor, even on a decreasing edge.
++ * Anchoring at the smaller endpoint avoids C's negative truncation/ceil. */
++static int model_interpolate(r1_battery_int a, r1_battery_int b,
++                             r1_battery_int numerator, r1_battery_int denominator,
++                             r1_battery_int *out)
++{
++    r1_battery_int span, position, product, change;
++    int ret;
++    if (a <= b) {
++        if ((ret = subtract(b, a, &span))) return ret;
++        position = numerator;
++    } else {
++        if ((ret = subtract(a, b, &span)) ||
++            (ret = subtract(denominator, numerator, &position))) return ret;
++    }
++    if ((ret = multiply(span, position, &product)) ||
++        (ret = divide(product, denominator, &change))) return ret;
++    return add(a <= b ? a : b, change, out);
++}
++
++static int model_point(const struct r1_battery_profile *profile,
++                       const r1_battery_int residual[R1_BATTERY_ROWS],
++                       size_t left, size_t right, struct r1_battery_model_point *out)
++{
++    const struct r1_battery_point *a = &profile->curve.points[left];
++    const struct r1_battery_point *b = &profile->curve.points[right];
++    r1_battery_int numerator, denominator;
++    int ret;
++    if (left == right) {
++        out->charge_01mah = a->charge_01mah;
++        out->ocv_01mv = a->voltage_01mv;
++        out->resistance_01mohm = a->resistance_01mohm;
++        return R1_BATTERY_OK;
++    }
++    if (residual[left] > 0) {
++        numerator = residual[left];
++        ret = subtract(residual[left], residual[right], &denominator);
++    } else {
++        ret = subtract(0, residual[left], &numerator);
++        if (!ret) ret = subtract(residual[right], residual[left], &denominator);
++    }
++    if (ret) return ret;
++    if ((ret = model_interpolate(a->charge_01mah, b->charge_01mah,
++                                 numerator, denominator, &out->charge_01mah)) ||
++        (ret = model_interpolate(a->voltage_01mv, b->voltage_01mv,
++                                 numerator, denominator, &out->ocv_01mv)) ||
++        (ret = model_interpolate(a->resistance_01mohm, b->resistance_01mohm,
++                                 numerator, denominator, &out->resistance_01mohm))) return ret;
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_model_seed(const struct r1_battery_profile *profile,
++                          r1_battery_int terminal_01mv,
++                          const struct r1_battery_model_parameters *parameters,
++                          struct r1_battery_model_point *out)
++{
++    struct r1_battery_model_point result;
++    r1_battery_int residual[R1_BATTERY_ROWS];
++    size_t i, left = 0, right = 0, roots = 0;
++    int ret;
++    if (!out) return R1_BATTERY_INVALID;
++    if ((ret = model_residuals(profile, terminal_01mv, parameters, residual))) return ret;
++    for (i = 0; i < profile->curve.count; ++i) {
++        if (i) {
++            const struct r1_battery_point *a = &profile->curve.points[i - 1];
++            const struct r1_battery_point *b = &profile->curve.points[i];
++            if (same_point(a, b)) continue;
++            if ((!residual[i - 1] && !residual[i]) ||
++                (a->charge_01mah == b->charge_01mah &&
++                 (!residual[i - 1] || !residual[i] ||
++                  opposite(residual[i - 1], residual[i])))) return R1_BATTERY_AMBIGUOUS;
++            if (opposite(residual[i - 1], residual[i])) {
++                left = i - 1; right = i;
++                if (++roots > 1) return R1_BATTERY_AMBIGUOUS;
++            }
++        }
++        if (!residual[i]) {
++            left = i; right = i;
++            if (++roots > 1) return R1_BATTERY_AMBIGUOUS;
++        }
++    }
++    if (!roots) return R1_BATTERY_NO_ROOT;
++    if ((ret = model_point(profile, residual, left, right, &result))) return ret;
++    *out = result;
++    return R1_BATTERY_OK;
++}
++
++int r1_battery_model_cutoff(const struct r1_battery_profile *profile,
++                            r1_battery_int minimum_01mv,
++                            const struct r1_battery_model_parameters *parameters,
++                            struct r1_battery_model_capacity *out)
++{
++    struct r1_battery_model_capacity result = {0};
++    r1_battery_int residual[R1_BATTERY_ROWS];
++    size_t i, left, right;
++    int ret;
++    if (!out || !parameters || parameters->current_01ma > 0) return R1_BATTERY_INVALID;
++    if ((ret = model_residuals(profile, minimum_01mv, parameters, residual))) return ret;
++    if (profile->curve.points[0].charge_01mah) return R1_BATTERY_INVALID;
++    if (residual[0] <= 0) return R1_BATTERY_NO_CUTOFF;
++    result.boundary = R1_BATTERY_MODEL_PROFILE_END;
++    left = right = profile->curve.count - 1;
++    for (i = 1; i < profile->curve.count; ++i) {
++        if (residual[i] > 0) continue;
++        left = i - 1; right = i;
++        result.boundary = profile->curve.points[left].charge_01mah ==
++                          profile->curve.points[right].charge_01mah ?
++                          R1_BATTERY_MODEL_DISCONTINUITY : R1_BATTERY_MODEL_CROSSING;
++        break;
++    }
++    if ((ret = model_point(profile, residual, left, right, &result.point))) return ret;
++    if (!result.point.charge_01mah) return R1_BATTERY_NO_CUTOFF;
++    *out = result;
++    return R1_BATTERY_OK;
++}
+diff --git a/drivers/power/supply/mt6357-r1-model/profile.h b/drivers/power/supply/mt6357-r1-model/profile.h
+new file mode 100644
+--- /dev/null
++++ b/drivers/power/supply/mt6357-r1-model/profile.h
+@@ -0,0 +1,166 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef R1_BATTERY_PROFILE_H
++#define R1_BATTERY_PROFILE_H
++
++#ifdef __KERNEL__
++#include <linux/types.h>
++typedef s64 r1_battery_int;
++#else
++#include <stddef.h>
++#include <stdint.h>
++typedef int64_t r1_battery_int;
++#endif
++
++#define R1_BATTERY_ROWS 53
++#define R1_BATTERY_TABLES 4
++#define R1_BATTERY_PERCENT_SCALE 10000
++
++enum r1_battery_error {
++    R1_BATTERY_OK = 0,
++    R1_BATTERY_INVALID = -1,
++    R1_BATTERY_OVERFLOW = -2,
++    R1_BATTERY_UNNORMALIZED = -3,
++    R1_BATTERY_NO_CUTOFF = -4,
++    R1_BATTERY_SEARCH_LIMIT = -5,
++    R1_BATTERY_NO_ROOT = -6,
++    R1_BATTERY_AMBIGUOUS = -7,
++};
++
++struct r1_battery_point {
++    r1_battery_int charge_01mah;
++    r1_battery_int voltage_01mv;
++    r1_battery_int resistance_01mohm;
++};
++
++struct r1_battery_table {
++    r1_battery_int temperature_c;
++    r1_battery_int qmax_01mah;
++    r1_battery_int qmax_high_01mah;
++    size_t count;
++    struct r1_battery_point points[R1_BATTERY_ROWS];
++};
++
++struct r1_battery_profile {
++    struct r1_battery_table curve;
++    /* Zero until the caller explicitly supplies a usable capacity. */
++    r1_battery_int usable_01mah;
++    r1_battery_int dod[R1_BATTERY_ROWS];
++};
++
++/* All inputs are explicit; none is obtained from Qmax metadata or a default.
++ * RAC uses the same 0.1 mOhm unit as the profile, NOT raw stock PTIM mOhm. */
++struct r1_battery_load {
++    r1_battery_int minimum_01mv;
++    r1_battery_int discharge_01ma;
++    r1_battery_int rac_01mohm;
++    r1_battery_int shunt_01mohm;
++    r1_battery_int meter_01mohm;
++    r1_battery_int dc_ratio_percent;
++};
++
++struct r1_battery_capacity {
++    struct r1_battery_profile profile;
++    r1_battery_int initial_cutoff_01mv;
++    r1_battery_int initial_usable_01mah;
++    r1_battery_int cutoff_01mv;
++};
++
++/* Rational loaded-profile model, independent of the stock RAC search.
++ * Positive current means charging. No parameter has an implicit default. */
++struct r1_battery_model_parameters {
++    r1_battery_int current_01ma;
++    r1_battery_int shunt_01mohm;
++    r1_battery_int meter_01mohm;
++    r1_battery_int dc_ratio_percent;
++};
++
++struct r1_battery_model_point {
++    r1_battery_int charge_01mah;
++    r1_battery_int ocv_01mv;
++    r1_battery_int resistance_01mohm;
++};
++
++enum r1_battery_model_boundary {
++    R1_BATTERY_MODEL_CROSSING,
++    R1_BATTERY_MODEL_DISCONTINUITY,
++    R1_BATTERY_MODEL_PROFILE_END,
++};
++
++struct r1_battery_model_capacity {
++    struct r1_battery_model_point point;
++    enum r1_battery_model_boundary boundary;
++};
++
++struct r1_battery_state {
++    /* Internal model coordinates, deliberately not restricted to 0..10000. */
++    r1_battery_int dod;
++    r1_battery_int soc;
++};
++
++extern const struct r1_battery_table r1_battery_stock_tables[R1_BATTERY_TABLES];
++
++/* Explicit adapter for mainline TEMP: signed truncation toward zero. */
++r1_battery_int r1_battery_whole_celsius(r1_battery_int temperature_decic);
++
++/* Validate all supplied rows, counts, metadata and strictly ordered temperatures.
++ * Both ascending and descending temperature order are accepted. Profiles clamp
++ * to the outer temperatures; resistance need not be monotonic. */
++int r1_battery_validate_tables(const struct r1_battery_table *tables, size_t count);
++int r1_battery_profile_at(const struct r1_battery_table *tables, size_t count,
++                          r1_battery_int temperature_c, struct r1_battery_profile *out);
++
++/* Qmax metadata is never silently used as usable capacity. In-place operation is
++ * supported. Failed operations leave every caller-owned output unchanged. */
++int r1_battery_assign_dod(const struct r1_battery_profile *profile,
++                          r1_battery_int usable_01mah, struct r1_battery_profile *out);
++int r1_battery_validate_profile(const struct r1_battery_profile *profile);
++
++/* Calculate cutoff and normalize only the explicit valid curve rows. Existing
++ * DOD/usable fields are ignored. Positive minimum voltage/DC ratio and
++ * nonnegative load/resistances are required. The stock 0.1%-DOD search is
++ * bounded to a bracket spanning at most 10000 units (1001 samples). Missing
++ * crossings, zero capacity and selected repeated DOD coordinates fail closed.
++ * out may contain the input profile; failed operations publish nothing. */
++int r1_battery_calculate_usable(const struct r1_battery_profile *profile,
++                                const struct r1_battery_load *load,
++                                struct r1_battery_capacity *out);
++
++/* Solve terminal = OCV + current * (Rcell * DC / 100 + shunt + meter)
++ * / 10000 as an exact piecewise-linear rational model on explicit curve rows.
++ * Usable/DOD fields are ignored. Voltage and DC ratio must be positive; extra
++ * resistances must be nonnegative. Return a MODEL ESTIMATE, not measured OCV.
++ * Missing/multiple roots fail. Uniqueness is decided before flooring outputs;
++ * identical repeated points/shared vertices count once, but a root on a flat
++ * interval or a nonidentical zero-charge-width segment is ambiguous.
++ * Failed operations leave the whole output unchanged. */
++int r1_battery_model_seed(const struct r1_battery_profile *profile,
++                          r1_battery_int terminal_01mv,
++                          const struct r1_battery_model_parameters *parameters,
++                          struct r1_battery_model_point *out);
++
++/* Same model under current <= 0. Require first charge zero. The earliest
++ * at/below-minimum boundary ends discharge; later recovery cannot extend it.
++ * A zero-width drop returns DISCONTINUITY, not a uniquely usable seed point.
++ * No crossing returns PROFILE_END: only a truncated-domain bound, not evidence
++ * that the minimum was reached. Starting at/below minimum or a capacity that
++ * floors to zero fails NO_CUTOFF. No implicit normalization or Qmax fallback.
++ * All returned positive physical quantities are floored in their named units. */
++int r1_battery_model_cutoff(const struct r1_battery_profile *profile,
++                            r1_battery_int minimum_01mv,
++                            const struct r1_battery_model_parameters *parameters,
++                            struct r1_battery_model_capacity *out);
++
++/* Positive OCV input is required. These are curve conversions, not evidence
++ * that a loaded terminal-voltage measurement is a valid OCV reference. */
++int r1_battery_ocv_to_dod(const struct r1_battery_profile *profile,
++                          r1_battery_int ocv_01mv, r1_battery_int *dod);
++int r1_battery_dod_to_ocv(const struct r1_battery_profile *profile,
++                          r1_battery_int dod, r1_battery_int *ocv_01mv);
++
++/* Positive relative charge means charging. The caller must establish a valid
++ * reference OCV and counter continuity before calling this pure function.
++ * Delta is in 0.1 mAh (100 microamp-hours), not raw CHARGE_COUNTER units. */
++int r1_battery_update(const struct r1_battery_profile *profile,
++                      r1_battery_int reference_ocv_01mv, r1_battery_int delta_01mah,
++                      struct r1_battery_state *out);
++#endif
+diff --git a/drivers/power/supply/mt6357-r1-model/stock_profiles.c b/drivers/power/supply/mt6357-r1-model/stock_profiles.c
+new file mode 100644
+--- /dev/null
++++ b/drivers/power/supply/mt6357-r1-model/stock_profiles.c
+@@ -0,0 +1,246 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Generated from the verified stock DTB; see provenance.json. */
++#include "profile.h"
++
++const struct r1_battery_table r1_battery_stock_tables[R1_BATTERY_TABLES] = {
++    {
++        .temperature_c = 50,
++        .qmax_01mah = 10100, .qmax_high_01mah = 9090,
++        .count = 53,
++        .points = {
++            {0, 43737, 2800},
++            {200, 43417, 2800},
++            {400, 43171, 2770},
++            {600, 42925, 2724},
++            {801, 42703, 2753},
++            {1001, 42476, 2756},
++            {1201, 42248, 2753},
++            {1401, 42027, 2756},
++            {1601, 41799, 2753},
++            {1801, 41584, 2785},
++            {2001, 41362, 2768},
++            {2201, 41159, 2815},
++            {2402, 40944, 2815},
++            {2602, 40741, 2844},
++            {2802, 40550, 2874},
++            {3002, 40354, 2892},
++            {3202, 40169, 2921},
++            {3402, 39991, 2953},
++            {3603, 39812, 2968},
++            {3803, 39652, 3027},
++            {4003, 39486, 3056},
++            {4203, 39326, 3073},
++            {4403, 39148, 3058},
++            {4603, 38945, 2953},
++            {4803, 38736, 2800},
++            {5004, 38576, 2741},
++            {5204, 38447, 2726},
++            {5404, 38336, 2724},
++            {5604, 38231, 2724},
++            {5804, 38139, 2756},
++            {6004, 38059, 2785},
++            {6204, 37985, 2815},
++            {6404, 37911, 2830},
++            {6604, 37844, 2862},
++            {6804, 37782, 2892},
++            {7005, 37727, 2906},
++            {7205, 37665, 2921},
++            {7405, 37591, 2889},
++            {7605, 37475, 2785},
++            {7805, 37388, 2768},
++            {8005, 37308, 2768},
++            {8205, 37229, 2770},
++            {8405, 37161, 2785},
++            {8605, 37069, 2785},
++            {8806, 36952, 2785},
++            {9006, 36835, 2815},
++            {9206, 36699, 2739},
++            {9406, 36675, 2800},
++            {9606, 36663, 2938},
++            {9806, 36583, 3044},
++            {9900, 35961, 2997},
++            {10000, 34799, 3300},
++            {10100, 34000, 5342},
++        },
++    },
++    {
++        .temperature_c = 25,
++        .qmax_01mah = 10000, .qmax_high_01mah = 8600,
++        .count = 53,
++        .points = {
++            {0, 43705, 3004},
++            {201, 43580, 3004},
++            {401, 43365, 3017},
++            {602, 43143, 2955},
++            {802, 42916, 2982},
++            {1003, 42685, 2997},
++            {1204, 42451, 2990},
++            {1404, 42221, 2931},
++            {1604, 41996, 2879},
++            {1805, 41775, 2916},
++            {2006, 41558, 3135},
++            {2206, 41342, 3189},
++            {2407, 41129, 3243},
++            {2608, 40918, 3290},
++            {2808, 40713, 3334},
++            {3008, 40573, 3450},
++            {3209, 40380, 3523},
++            {3410, 40060, 3391},
++            {3610, 39820, 3445},
++            {3811, 39714, 3523},
++            {4012, 39583, 3300},
++            {4212, 39417, 3238},
++            {4413, 39225, 3137},
++            {4614, 39002, 2953},
++            {4814, 38797, 2835},
++            {5215, 38505, 2815},
++            {5416, 38391, 2781},
++            {5617, 38293, 2778},
++            {5817, 38197, 2815},
++            {6018, 38113, 2857},
++            {6218, 38034, 2837},
++            {6419, 37964, 2874},
++            {6620, 37897, 2906},
++            {6820, 37838, 2951},
++            {7021, 37782, 2940},
++            {7222, 37730, 2962},
++            {7422, 37678, 2973},
++            {7623, 37619, 2951},
++            {7823, 37551, 2894},
++            {8024, 37493, 2886},
++            {8225, 37422, 2982},
++            {8425, 37362, 3056},
++            {8626, 37284, 3117},
++            {8827, 37155, 2997},
++            {9028, 37046, 2960},
++            {9228, 36904, 2936},
++            {9429, 36819, 2948},
++            {9629, 36761, 2962},
++            {9730, 36673, 3027},
++            {9791, 36528, 3165},
++            {9870, 35167, 2965},
++            {9950, 34590, 3423},
++            {10000, 34000, 3506},
++        },
++    },
++    {
++        .temperature_c = 0,
++        .qmax_01mah = 9800, .qmax_high_01mah = 8200,
++        .count = 53,
++        .points = {
++            {0, 43680, 8489},
++            {200, 43420, 8489},
++            {400, 43170, 8637},
++            {600, 42930, 8588},
++            {800, 42690, 8465},
++            {1001, 42470, 8440},
++            {1201, 42240, 8292},
++            {1401, 42010, 8194},
++            {1601, 41800, 8096},
++            {1801, 41570, 7997},
++            {2001, 41380, 8046},
++            {2201, 41150, 7899},
++            {2401, 40930, 7849},
++            {2601, 40760, 7849},
++            {2801, 40580, 7948},
++            {3002, 40350, 7849},
++            {3202, 39970, 7431},
++            {3402, 39660, 7284},
++            {3602, 39440, 7234},
++            {3802, 39290, 7161},
++            {4002, 39170, 7185},
++            {4202, 39020, 7111},
++            {4402, 38880, 7062},
++            {4602, 38730, 7013},
++            {4803, 38610, 7013},
++            {5003, 38490, 7062},
++            {5203, 38370, 7013},
++            {5403, 38280, 7111},
++            {5603, 38180, 7111},
++            {5803, 38090, 7136},
++            {6003, 38010, 7210},
++            {6203, 37940, 7259},
++            {6403, 37870, 7308},
++            {6604, 37800, 7333},
++            {6804, 37750, 7406},
++            {7004, 37720, 7505},
++            {7204, 37680, 7603},
++            {7404, 37630, 7727},
++            {7604, 37590, 7874},
++            {7804, 37590, 7579},
++            {8004, 37510, 8194},
++            {8204, 37430, 8613},
++            {8405, 37350, 8932},
++            {8605, 37250, 9277},
++            {8805, 37130, 9547},
++            {9005, 37010, 10163},
++            {9205, 36920, 11073},
++            {9405, 36860, 12304},
++            {9605, 36810, 14887},
++            {9805, 36640, 16979},
++            {9805, 34000, 16979},
++            {9805, 34000, 16979},
++            {9805, 34000, 16979},
++        },
++    },
++    {
++        .temperature_c = -10,
++        .qmax_01mah = 9200, .qmax_high_01mah = 7500,
++        .count = 53,
++        .points = {
++            {0, 43840, 17643},
++            {200, 43500, 17643},
++            {400, 43140, 17126},
++            {600, 42810, 16929},
++            {800, 42530, 16610},
++            {1000, 42260, 15995},
++            {1200, 42020, 15650},
++            {1401, 41780, 15330},
++            {1601, 41560, 15010},
++            {1801, 41340, 14764},
++            {2001, 41120, 14345},
++            {2201, 40940, 14297},
++            {2401, 40770, 14198},
++            {2601, 40530, 14100},
++            {2801, 40250, 13706},
++            {3001, 39920, 13288},
++            {3201, 39660, 13091},
++            {3401, 39480, 10237},
++            {3602, 39300, 13116},
++            {3802, 39170, 12919},
++            {4002, 39030, 15109},
++            {4202, 38880, 14862},
++            {4402, 38750, 12648},
++            {4602, 38610, 12623},
++            {4802, 38490, 12549},
++            {5002, 38370, 12549},
++            {5202, 38260, 12599},
++            {5402, 38160, 12623},
++            {5602, 38090, 12697},
++            {5802, 37990, 12107},
++            {6003, 37920, 12795},
++            {6203, 37870, 12943},
++            {6403, 37820, 12968},
++            {6603, 37780, 13214},
++            {6803, 37740, 13386},
++            {7003, 37700, 13731},
++            {7203, 37670, 14764},
++            {7403, 37630, 14272},
++            {7603, 37590, 14666},
++            {7803, 37540, 15207},
++            {8003, 37480, 15650},
++            {8203, 37420, 16142},
++            {8403, 37360, 16634},
++            {8604, 37270, 17151},
++            {8804, 37170, 17545},
++            {9004, 37080, 17988},
++            {9204, 36990, 22146},
++            {9204, 34000, 22146},
++            {9204, 34000, 22146},
++            {9204, 34000, 22146},
++            {9204, 34000, 22146},
++            {9204, 34000, 22146},
++            {9204, 34000, 22146},
++        },
++    },
++};
+diff --git a/drivers/power/supply/mt6357-r1-model/session.c b/drivers/power/supply/mt6357-r1-model/session.c
+new file mode 100644
+--- /dev/null
++++ b/drivers/power/supply/mt6357-r1-model/session.c
+@@ -0,0 +1,438 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#include "session.h"
++
++#define LIMIT64 9223372036854775807LL
++#define MIN64 (-LIMIT64 - 1LL)
++#define NS_UA_PER_UAH 3600000000000LL
++
++static int sum(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if ((b > 0 && a > LIMIT64 - b) || (b < 0 && a < MIN64 - b))
++        return R1_BATTERY_OVERFLOW;
++    *out = a + b;
++    return 0;
++}
++
++static int difference(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if ((b > 0 && a < MIN64 + b) || (b < 0 && a > LIMIT64 + b))
++        return R1_BATTERY_OVERFLOW;
++    *out = a - b;
++    return 0;
++}
++
++static int product(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    if (a > 0) {
++        if ((b > 0 && a > LIMIT64 / b) || (b < 0 && b < MIN64 / a))
++            return R1_BATTERY_OVERFLOW;
++    } else if (a < 0) {
++        if ((b > 0 && a < MIN64 / b) || (b < 0 && a < LIMIT64 / b))
++            return R1_BATTERY_OVERFLOW;
++    }
++    *out = a * b;
++    return 0;
++}
++
++static int distance(r1_battery_int a, r1_battery_int b, r1_battery_int *out)
++{
++    return a >= b ? difference(a, b, out) : difference(b, a, out);
++}
++
++static int midpoint(struct r1_battery_interval interval, r1_battery_int *out)
++{
++    r1_battery_int width;
++    int ret = difference(interval.high, interval.low, &width);
++    return ret ? ret : sum(interval.low, width / 2, out);
++}
++
++static int valid_policy(const struct r1_battery_policy *p)
++{
++    return p && p->minimum_01mv > 0 && p->discharge_01ma > 0 &&
++        p->shunt_01mohm >= 0 && p->meter_01mohm >= 0 && p->dc_ratio_percent > 0 &&
++        p->max_capture_ns > 0 && p->max_gap_ns > 0 && p->max_epoch_ns > 0 &&
++        p->valid_for_ns > 0 && p->valid_for_ns <= p->max_gap_ns &&
++        p->observed_current_limit_ua >= 0 && p->interval_current_bound_ua > 0 &&
++        p->interval_current_bound_ua >= p->observed_current_limit_ua &&
++        p->voltage_motion_uv >= 0 && p->current_motion_ua >= 0 &&
++        p->temperature_motion_decic >= 0 && p->model_error_uah >= 0 &&
++        p->cutoff_error_uah >= 0 && p->car_delta_error_uah >= 0 &&
++        p->max_charge_width_uah > 0 && p->max_soc_width_bp > 0;
++}
++
++static int same_policy(const struct r1_battery_policy *a, const struct r1_battery_policy *b)
++{
++#define SAME(field) (a->field == b->field)
++    return SAME(minimum_01mv) && SAME(discharge_01ma) && SAME(shunt_01mohm) &&
++        SAME(meter_01mohm) && SAME(dc_ratio_percent) && SAME(max_capture_ns) &&
++        SAME(max_gap_ns) && SAME(max_epoch_ns) && SAME(valid_for_ns) &&
++        SAME(observed_current_limit_ua) && SAME(interval_current_bound_ua) &&
++        SAME(voltage_motion_uv) && SAME(current_motion_ua) &&
++        SAME(temperature_motion_decic) && SAME(model_error_uah) &&
++        SAME(cutoff_error_uah) && SAME(car_delta_error_uah) &&
++        SAME(max_charge_width_uah) && SAME(max_soc_width_bp);
++#undef SAME
++}
++
++/* Positive operands only. Splitting time first permits ordinary hour/day
++ * intervals without multiplying current by the entire nanosecond count. */
++static int charge_bound(r1_battery_int current, r1_battery_int ns, r1_battery_int *out)
++{
++    r1_battery_int whole, fraction, rounded;
++    int ret;
++    if ((ret = product(current, ns / NS_UA_PER_UAH, &whole)) ||
++        (ret = product(current, ns % NS_UA_PER_UAH, &fraction))) return ret;
++    rounded = fraction / NS_UA_PER_UAH + !!(fraction % NS_UA_PER_UAH);
++    return sum(whole, rounded, out);
++}
++
++static int intersect(struct r1_battery_interval a, struct r1_battery_interval b,
++                      struct r1_battery_interval *out)
++{
++    out->low = a.low > b.low ? a.low : b.low;
++    out->high = a.high < b.high ? a.high : b.high;
++    return out->low <= out->high;
++}
++
++static int car_class(r1_battery_int raw)
++{
++    r1_battery_int magnitude = (raw >> 11) & 0xfffff;
++    return (int)((raw >> 31) * 4) + (magnitude == 0 ? 1 : magnitude == 0xfffff ? 2 : 0);
++}
++
++static int valid_endpoint(const struct r1_battery_endpoint *e)
++{
++    int code;
++    if (e->raw_car < 0 || e->raw_car > 0xffffffffLL || e->voltage_uv <= 0 ||
++        e->voltage_uv % 1000 || e->current_ua % 100 || e->car_uah % 100)
++        return 0;
++    code = car_class(e->raw_car);
++    if ((code % 4 && e->car_uah) || (code >= 4 && e->car_uah > 0) ||
++        (code < 4 && e->car_uah < 0)) return 0;
++    return 1;
++}
++
++static int expand_root(r1_battery_int q, r1_battery_int error,
++                        struct r1_battery_interval *out)
++{
++    r1_battery_int base, high;
++    int ret;
++    if ((ret = product(q, 100, &base)) || (ret = sum(base, 100, &high)) ||
++        (ret = difference(base, error, &out->low))) return ret;
++    return sum(high, error, &out->high);
++}
++
++static int possible_delta(r1_battery_int a, r1_battery_int b, r1_battery_int elapsed,
++                           const struct r1_battery_policy *p, int *possible)
++{
++    r1_battery_int movement, allowance;
++    int ret;
++    if ((ret = distance(a, b, &movement)) ||
++        (ret = charge_bound(p->interval_current_bound_ua, elapsed, &allowance)) ||
++        (ret = sum(allowance, p->car_delta_error_uah, &allowance))) return ret;
++    *possible = movement <= allowance;
++    return 0;
++}
++
++/* This frame owns the only temporary curve. Keep it out of the reducer's
++ * state-copy frame; no retained profile/devres pointer or dynamic allocation. */
++static __attribute__((__noinline__)) int candidate(const struct r1_battery_policy *p,
++                      const struct r1_battery_observation *o,
++                      struct r1_battery_estimate *e, enum r1_battery_reason *why)
++{
++    struct r1_battery_profile curve;
++    struct r1_battery_model_parameters parameters = {
++        .shunt_01mohm = p->shunt_01mohm, .meter_01mohm = p->meter_01mohm,
++        .dc_ratio_percent = p->dc_ratio_percent,
++    };
++    struct r1_battery_model_point root;
++    struct r1_battery_model_capacity cutoff;
++    struct r1_battery_interval intervals[2];
++    r1_battery_int padding;
++    int ret, i;
++
++    *why = R1_BATTERY_REASON_ARITHMETIC;
++    if ((ret = charge_bound(p->interval_current_bound_ua,
++                           o->finished_ns - o->started_ns, &padding)) ||
++        (ret = sum(padding, p->model_error_uah, &padding))) return ret;
++    e->temperature_c = r1_battery_whole_celsius(o->endpoint[0].temperature_decic);
++    *why = R1_BATTERY_REASON_MODEL;
++    ret = r1_battery_profile_at(r1_battery_stock_tables, R1_BATTERY_TABLES,
++                                e->temperature_c, &curve);
++    if (ret) return ret;
++    for (i = 0; i < 2; i++) {
++        parameters.current_01ma = o->endpoint[i].current_ua / 100;
++        ret = r1_battery_model_seed(&curve, o->endpoint[i].voltage_uv / 100,
++                                    &parameters, &root);
++        if (ret) return ret;
++        ret = expand_root(root.charge_01mah, padding, &intervals[i]);
++        if (ret) { *why = R1_BATTERY_REASON_ARITHMETIC; return ret; }
++    }
++    if (!intersect(intervals[0], intervals[1], &e->discharged_uah)) {
++        *why = R1_BATTERY_REASON_DISAGREEMENT;
++        return R1_BATTERY_NO_ROOT;
++    }
++    *why = R1_BATTERY_REASON_CUTOFF;
++    parameters.current_01ma = -p->discharge_01ma;
++    ret = r1_battery_model_cutoff(&curve, p->minimum_01mv, &parameters, &cutoff);
++    if (ret) return ret;
++    if (cutoff.boundary == R1_BATTERY_MODEL_PROFILE_END) return R1_BATTERY_NO_CUTOFF;
++    e->boundary = cutoff.boundary;
++    ret = expand_root(cutoff.point.charge_01mah, p->cutoff_error_uah, &e->usable_uah);
++    if (ret) { *why = R1_BATTERY_REASON_ARITHMETIC; return ret; }
++    return e->usable_uah.low > 0 ? 0 : R1_BATTERY_NO_CUTOFF;
++}
++
++/* Exact rational SOC rounded outwards. Positive Q is guaranteed by candidate.
++ * Keep negative/out-of-range coordinates: presentation clamping is separate. */
++static int soc(r1_battery_int q, r1_battery_int usable, int round_up,
++                r1_battery_int *out)
++{
++    r1_battery_int numerator, quotient;
++    int ret;
++    if ((ret = difference(usable, q, &numerator)) ||
++        (ret = product(numerator, 10000, &numerator))) return ret;
++    quotient = numerator / usable;
++    if (numerator % usable) {
++        if (round_up && numerator > 0) quotient++;
++        if (!round_up && numerator < 0) quotient--;
++    }
++    *out = quotient;
++    return 0;
++}
++
++static int normalize(struct r1_battery_estimate *e, const struct r1_battery_policy *p,
++                      enum r1_battery_reason *why)
++{
++    r1_battery_int q[2] = {e->discharged_uah.low, e->discharged_uah.high};
++    r1_battery_int usable[2] = {e->usable_uah.low, e->usable_uah.high};
++    r1_battery_int width, lo, hi;
++    int i, j, ret;
++    *why = R1_BATTERY_REASON_ARITHMETIC;
++    if ((ret = difference(q[1], q[0], &width))) return ret;
++    if (width > p->max_charge_width_uah) {
++        *why = R1_BATTERY_REASON_WIDTH; return R1_BATTERY_INVALID;
++    }
++    e->soc_bp.low = LIMIT64;
++    e->soc_bp.high = MIN64;
++    for (i = 0; i < 2; i++) for (j = 0; j < 2; j++) {
++        if ((ret = soc(q[i], usable[j], 0, &lo)) ||
++            (ret = soc(q[i], usable[j], 1, &hi))) return ret;
++        if (lo < e->soc_bp.low) e->soc_bp.low = lo;
++        if (hi > e->soc_bp.high) e->soc_bp.high = hi;
++    }
++    if ((ret = difference(e->soc_bp.high, e->soc_bp.low, &width))) return ret;
++    if (width > p->max_soc_width_bp) {
++        *why = R1_BATTERY_REASON_WIDTH; return R1_BATTERY_INVALID;
++    }
++    if ((ret = midpoint(e->discharged_uah, &e->discharged_point_uah)) ||
++        (ret = midpoint(e->usable_uah, &e->usable_point_uah)) ||
++        (ret = soc(e->discharged_point_uah, e->usable_point_uah, 0,
++                   &e->soc_point_bp))) return ret;
++    if (e->soc_point_bp < 0) e->soc_point_bp = 0;
++    if (e->soc_point_bp > 10000) e->soc_point_bp = 10000;
++    return 0;
++}
++
++static void invalidate(struct r1_battery_session *s, enum r1_battery_reason why,
++                        int error, enum r1_battery_event event)
++{
++    s->active = 0;
++    s->estimate.validity = s->has_history ? R1_BATTERY_HISTORICAL : R1_BATTERY_UNAVAILABLE;
++    s->estimate.reason = why;
++    s->estimate.detail_error = error;
++    s->estimate.event = event;
++}
++
++int r1_battery_session_step(struct r1_battery_session *state,
++                            const struct r1_battery_policy *p,
++                            const struct r1_battery_observation *o,
++                            struct r1_battery_estimate *out)
++{
++    struct r1_battery_session next;
++    struct r1_battery_estimate e = {0};
++    struct r1_battery_interval predicted;
++    enum r1_battery_reason why = R1_BATTERY_REASON_INITIAL, cause;
++    r1_battery_int value, duration, delta, epoch_age;
++    int i, ret = 0, possible;
++
++    if (!state || !out || !o || !valid_policy(p) ||
++        o->event < R1_BATTERY_EVENT_NONE || o->event > R1_BATTERY_EVENT_ENGINE_OFF)
++        return R1_BATTERY_INVALID;
++    next = *state;
++    why = R1_BATTERY_REASON_ORDER;
++    if (o->generation <= 0 || o->started_ns <= 0 ||
++        o->finished_ns < o->started_ns || o->generation < next.seen_generation ||
++        o->started_ns < next.seen_finished_ns) {
++        if (o->event != R1_BATTERY_EVENT_NONE) next.barrier_missing = 1;
++        goto failed;
++    }
++    if (o->event != R1_BATTERY_EVENT_NONE) {
++        /* Reject a previously queued capture even if it was not processed
++         * before this invalidation. Events do not fabricate FG sequences. */
++        if (o->generation != next.seen_generation) next.seen_sequence = 0;
++        next.seen_generation = o->generation;
++        next.seen_finished_ns = o->finished_ns;
++        next.event_barrier_ns = o->finished_ns;
++        next.barrier_missing = 0;
++        why = R1_BATTERY_REASON_EVENT;
++        goto failed;
++    }
++    /* Equal clock values cannot prove that acquisition followed an event.
++     * Ordinary adjacent captures may still share their boundary timestamp. */
++    if (next.barrier_missing || o->started_ns <= next.event_barrier_ns ||
++        o->sequence <= 0 || (o->generation == next.seen_generation &&
++                            o->sequence <= next.seen_sequence)) goto failed;
++    next.seen_generation = o->generation;
++    next.seen_sequence = o->sequence;
++    next.seen_finished_ns = o->finished_ns;
++    why = R1_BATTERY_REASON_ACQUISITION;
++    ret = o->error;
++    if (ret) goto failed;
++    for (i = 0; i < 2; i++) {
++        ret = o->endpoint[i].error;
++        if (ret) goto failed;
++    }
++    for (i = 0; i < 2; i++) {
++        const struct r1_battery_endpoint *v = &o->endpoint[i];
++        why = R1_BATTERY_REASON_ABSENT;
++        if (!v->present) goto failed;
++        why = R1_BATTERY_REASON_INPUT;
++        if (v->present != 1 || !valid_endpoint(v)) goto failed;
++        why = R1_BATTERY_REASON_TEMPERATURE;
++        if (v->temperature_decic < -100 || v->temperature_decic > 500) goto failed;
++        why = R1_BATTERY_REASON_ARITHMETIC;
++        if ((ret = distance(v->current_ua, 0, &value))) goto failed;
++        why = R1_BATTERY_REASON_LIMIT;
++        if (value > p->observed_current_limit_ua) goto failed;
++    }
++    why = R1_BATTERY_REASON_TEMPERATURE;
++    if (r1_battery_whole_celsius(o->endpoint[0].temperature_decic) !=
++        r1_battery_whole_celsius(o->endpoint[1].temperature_decic)) goto failed;
++    duration = o->finished_ns - o->started_ns;
++    why = R1_BATTERY_REASON_LIMIT;
++    if (duration > p->max_capture_ns) goto failed;
++#define MOTION(field, limit) do { \
++    why = R1_BATTERY_REASON_ARITHMETIC; \
++    if ((ret = distance(o->endpoint[0].field, o->endpoint[1].field, &value))) goto failed; \
++    why = R1_BATTERY_REASON_LIMIT; \
++    if (value > p->limit) goto failed; \
++} while (0)
++    MOTION(voltage_uv, voltage_motion_uv);
++    MOTION(current_ua, current_motion_ua);
++    MOTION(temperature_decic, temperature_motion_decic);
++#undef MOTION
++    why = R1_BATTERY_REASON_COUNTER_AMBIGUOUS;
++    if (car_class(o->endpoint[0].raw_car) != car_class(o->endpoint[1].raw_car)) goto failed;
++    why = R1_BATTERY_REASON_ARITHMETIC;
++    if ((ret = possible_delta(o->endpoint[0].car_uah, o->endpoint[1].car_uah,
++                              duration, p, &possible))) goto failed;
++    why = R1_BATTERY_REASON_COUNTER_RATE;
++    if (!possible) goto failed;
++    ret = candidate(p, o, &e, &why);
++    if (ret) goto failed;
++
++    cause = R1_BATTERY_REASON_TRACKED;
++    if (!next.active) cause = R1_BATTERY_REASON_SEEDED;
++    else if (o->generation != next.estimate.generation) cause = R1_BATTERY_REASON_GENERATION;
++    else if (!same_policy(p, &next.policy)) cause = R1_BATTERY_REASON_POLICY;
++    else if (e.temperature_c != next.estimate.temperature_c) cause = R1_BATTERY_REASON_TEMPERATURE;
++    else if (o->finished_ns - next.estimate.accepted_ns > p->max_gap_ns)
++        cause = R1_BATTERY_REASON_GAP;
++    else if (o->finished_ns - next.seed_ns > p->max_epoch_ns)
++        cause = R1_BATTERY_REASON_EPOCH_AGE;
++    else if (car_class(o->endpoint[0].raw_car) != car_class(next.last_raw_car))
++        cause = R1_BATTERY_REASON_COUNTER_AMBIGUOUS;
++
++    if (cause == R1_BATTERY_REASON_TRACKED) {
++        why = R1_BATTERY_REASON_ARITHMETIC;
++        epoch_age = o->finished_ns - next.seed_ns;
++        if ((ret = possible_delta(next.last_car_uah, o->endpoint[1].car_uah,
++                                  o->finished_ns - next.estimate.accepted_ns, p, &possible)))
++            goto failed;
++        why = R1_BATTERY_REASON_COUNTER_RATE;
++        if (!possible) goto failed;
++        why = R1_BATTERY_REASON_ARITHMETIC;
++        if ((ret = possible_delta(next.seed_car_uah, o->endpoint[1].car_uah,
++                                  epoch_age, p, &possible))) goto failed;
++        why = R1_BATTERY_REASON_COUNTER_RATE;
++        if (!possible) goto failed;
++        why = R1_BATTERY_REASON_ARITHMETIC;
++        if ((ret = difference(o->endpoint[1].car_uah, next.seed_car_uah, &delta)) ||
++            (ret = difference(next.seed_discharged_uah.low, delta, &predicted.low)) ||
++            (ret = difference(predicted.low, p->car_delta_error_uah, &predicted.low)) ||
++            (ret = difference(next.seed_discharged_uah.high, delta, &predicted.high)) ||
++            (ret = sum(predicted.high, p->car_delta_error_uah, &predicted.high))) goto failed;
++        why = R1_BATTERY_REASON_DISAGREEMENT;
++        if (!intersect(e.discharged_uah, predicted, &e.discharged_uah)) goto failed;
++        /* Recomputed from identical frozen inputs; retain epoch capacity. */
++        e.usable_uah = next.estimate.usable_uah;
++        e.epoch = next.estimate.epoch;
++    } else {
++        why = R1_BATTERY_REASON_ARITHMETIC;
++        if ((ret = sum(next.estimate.epoch, 1, &e.epoch))) goto failed;
++        next.seed_discharged_uah = e.discharged_uah;
++        next.seed_car_uah = o->endpoint[1].car_uah;
++        next.seed_ns = o->finished_ns;
++    }
++    ret = normalize(&e, p, &why);
++    if (ret) goto failed;
++    why = R1_BATTERY_REASON_ARITHMETIC;
++    if ((ret = sum(o->finished_ns, p->valid_for_ns, &e.expires_ns)) ||
++        (ret = sum(next.seed_ns, p->max_epoch_ns, &value))) goto failed;
++    if (value < e.expires_ns) e.expires_ns = value;
++    e.validity = R1_BATTERY_FRESH;
++    e.reason = cause;
++    e.generation = o->generation;
++    e.sequence = o->sequence;
++    e.accepted_ns = o->finished_ns;
++    next.estimate = e;
++    next.active = next.has_history = 1;
++    next.last_car_uah = o->endpoint[1].car_uah;
++    next.last_raw_car = o->endpoint[1].raw_car;
++    next.policy = *p;
++    goto publish;
++failed:
++    invalidate(&next, why, ret, o->event);
++publish:
++    *state = next;
++    *out = next.estimate;
++    return 0;
++}
++
++int r1_battery_session_read(const struct r1_battery_session *state,
++                            r1_battery_int now_ns, struct r1_battery_estimate *out)
++{
++    struct r1_battery_estimate result;
++    enum r1_battery_reason why = R1_BATTERY_REASON_ARITHMETIC;
++    r1_battery_int movement;
++    int ret = 0;
++    if (!state || !out || now_ns <= 0) return R1_BATTERY_INVALID;
++    result = state->estimate;
++    if (result.validity == R1_BATTERY_FRESH) {
++        if (now_ns < result.accepted_ns || now_ns > result.expires_ns) {
++            why = now_ns < result.accepted_ns ? R1_BATTERY_REASON_ORDER :
++                                               R1_BATTERY_REASON_EXPIRED;
++            goto historical;
++        }
++        /* No new electrical observation occurred. Widen both charge bounds
++         * using the externally justified unsampled-current envelope, without
++         * renewing accepted_ns, expiry or the reducer's CAR baseline. */
++        if ((ret = charge_bound(state->policy.interval_current_bound_ua,
++                                now_ns - result.accepted_ns, &movement)) ||
++            (ret = difference(result.discharged_uah.low, movement,
++                               &result.discharged_uah.low)) ||
++            (ret = sum(result.discharged_uah.high, movement,
++                        &result.discharged_uah.high)) ||
++            (ret = normalize(&result, &state->policy, &why))) goto historical;
++    }
++    *out = result;
++    return 0;
++historical:
++    result = state->estimate;
++    result.validity = R1_BATTERY_HISTORICAL;
++    result.reason = why;
++    result.detail_error = ret;
++    *out = result;
++    return 0;
++}
+diff --git a/drivers/power/supply/mt6357-r1-model/session.h b/drivers/power/supply/mt6357-r1-model/session.h
+new file mode 100644
+--- /dev/null
++++ b/drivers/power/supply/mt6357-r1-model/session.h
+@@ -0,0 +1,123 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef R1_BATTERY_SESSION_H
++#define R1_BATTERY_SESSION_H
++#include "profile.h"
++
++/* Explicit experimental policy. No field has a board default. Error budgets
++ * are assumptions supplied by the caller, not inferred from endpoint motion.
++ * An epoch freezes this policy and one whole-C stock battery0 profile. */
++struct r1_battery_policy {
++    /* discharge_01ma is a positive reference-load magnitude, not signed I. */
++    r1_battery_int minimum_01mv, discharge_01ma;
++    r1_battery_int shunt_01mohm, meter_01mohm, dc_ratio_percent;
++    r1_battery_int max_capture_ns, max_gap_ns, max_epoch_ns, valid_for_ns;
++    r1_battery_int observed_current_limit_ua, interval_current_bound_ua;
++    r1_battery_int voltage_motion_uv, current_motion_ua, temperature_motion_decic;
++    r1_battery_int model_error_uah, cutoff_error_uah, car_delta_error_uah;
++    r1_battery_int max_charge_width_uah, max_soc_width_bp;
++};
++
++struct r1_battery_endpoint {
++    /* The adapter must fold ALL per-field, conversion and release errors into
++     * error; zero means complete, independently valid PRESENT and V/I/T/CAR.
++     * raw_car is the unsigned packed pair, represented in a signed64 carrier. */
++    int error, present;
++    r1_battery_int raw_car, car_uah, current_ua, voltage_uv, temperature_decic;
++};
++
++enum r1_battery_event {
++    R1_BATTERY_EVENT_NONE,
++    R1_BATTERY_EVENT_SUSPEND,
++    R1_BATTERY_EVENT_RESET,
++    R1_BATTERY_EVENT_REMOVAL,
++    R1_BATTERY_EVENT_ENGINE_OFF,
++};
++
++struct r1_battery_observation {
++    /* Positive, process-lifetime monotonic identities and boottime ns. The
++     * adapter rejects u64 values above INT64_MAX instead of narrowing them. */
++    r1_battery_int generation, sequence, started_ns, finished_ns;
++    int error;
++    /* Events require a real monotonic generation/time barrier; sequence and
++     * endpoint fields are ignored. New captures must start strictly after it. */
++    enum r1_battery_event event;
++    struct r1_battery_endpoint endpoint[2];
++};
++
++struct r1_battery_interval { r1_battery_int low, high; };
++
++enum r1_battery_validity {
++    R1_BATTERY_UNAVAILABLE, /* No accepted estimate exists. Numeric fields unusable. */
++    R1_BATTERY_FRESH,      /* Accepted observation or bounded, widened cache read. */
++    R1_BATTERY_HISTORICAL,  /* Numeric fields are history, NOT publishable capacity. */
++};
++
++enum r1_battery_reason {
++    R1_BATTERY_REASON_INITIAL,
++    R1_BATTERY_REASON_SEEDED,
++    R1_BATTERY_REASON_TRACKED,
++    R1_BATTERY_REASON_EVENT,
++    R1_BATTERY_REASON_ORDER,
++    R1_BATTERY_REASON_ACQUISITION,
++    R1_BATTERY_REASON_ABSENT,
++    R1_BATTERY_REASON_INPUT,
++    R1_BATTERY_REASON_LIMIT,
++    R1_BATTERY_REASON_TEMPERATURE,
++    R1_BATTERY_REASON_COUNTER_AMBIGUOUS,
++    R1_BATTERY_REASON_COUNTER_RATE,
++    R1_BATTERY_REASON_MODEL,
++    R1_BATTERY_REASON_DISAGREEMENT,
++    R1_BATTERY_REASON_CUTOFF,
++    R1_BATTERY_REASON_WIDTH,
++    R1_BATTERY_REASON_ARITHMETIC,
++    R1_BATTERY_REASON_GENERATION,
++    R1_BATTERY_REASON_POLICY,
++    R1_BATTERY_REASON_GAP,
++    R1_BATTERY_REASON_EPOCH_AGE,
++    R1_BATTERY_REASON_EXPIRED,
++};
++
++struct r1_battery_estimate {
++    enum r1_battery_validity validity;
++    enum r1_battery_reason reason;
++    int detail_error;
++    enum r1_battery_event event;
++    r1_battery_int epoch, generation, sequence, accepted_ns, expires_ns;
++    r1_battery_int temperature_c;
++    struct r1_battery_interval discharged_uah, usable_uah, soc_bp;
++    /* Interval midpoints; SOC representative is floored then clamped to
++     * 0..10000 basis points. Bounds remain unclamped for uncertainty review.
++     * No integer Android percentage rounding policy is imposed here. */
++    r1_battery_int discharged_point_uah, usable_point_uah, soc_point_bp;
++    enum r1_battery_model_boundary boundary;
++};
++
++/* Caller-owned, zero-initialize once; thereafter only these functions mutate
++ * it. No pointers or borrowed lifetime. Binding generation is not a PMIC reset
++ * epoch. Serialize calls; use explicit suspend/reset/removal/off events. */
++struct r1_battery_session {
++    int active, has_history, barrier_missing;
++    r1_battery_int seen_generation, seen_sequence, seen_finished_ns;
++    r1_battery_int event_barrier_ns;
++    r1_battery_int seed_ns, seed_car_uah, last_car_uah, last_raw_car;
++    struct r1_battery_interval seed_discharged_uah;
++    struct r1_battery_policy policy;
++    struct r1_battery_estimate estimate;
++};
++
++/* Returns INVALID for malformed API/policy arguments, leaving state/out
++ * unchanged. Observation failures are successful state transitions to
++ * unavailable/history with a reason, never a manufactured fresh zero.
++ * FRESH is as of accepted_ns: publish only through read(actual_now_ns).
++ * State and output must not overlap other arguments. No dynamic allocation. */
++int r1_battery_session_step(struct r1_battery_session *state,
++                            const struct r1_battery_policy *policy,
++                            const struct r1_battery_observation *observation,
++                            struct r1_battery_estimate *out);
++
++/* Pure publication check. Widen charge uncertainty by the explicit current
++ * envelope over cache age, recheck width, never renew accepted time/expiry or
++ * mutate state. Positive now_ns required. Failures produce labeled history. */
++int r1_battery_session_read(const struct r1_battery_session *state,
++                            r1_battery_int now_ns, struct r1_battery_estimate *out);
++#endif

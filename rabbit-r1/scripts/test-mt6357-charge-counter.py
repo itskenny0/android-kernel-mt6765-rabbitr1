@@ -139,6 +139,8 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
 #define U64_MAX UINT64_MAX
+#define CONFIG_BATTERY_MT6357_R1_SOC 0
+#define IS_ENABLED(x) (x)
 typedef struct { int64_t value; } atomic64_t;
 #define ATOMIC64_INIT(x) { (x) }
 static int64_t atomic64_inc_return(atomic64_t *v) { return __atomic_add_fetch(&v->value,1,__ATOMIC_SEQ_CST); }

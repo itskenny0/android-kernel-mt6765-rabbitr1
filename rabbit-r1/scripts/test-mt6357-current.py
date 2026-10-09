@@ -116,6 +116,7 @@ typedef int64_t ktime_t;
 struct device { struct { int status; } links; void *of_node; struct device *parent; void *driver_data; struct regmap *regmap; };
 struct mt6397_chip { struct regmap *regmap; };
 struct platform_device { struct device dev; };
+static void platform_set_drvdata(struct platform_device *p, void *v) { p->dev.driver_data=v; }
 struct device_node { int index; };
 struct of_phandle_args { struct device_node *np; };
 struct mutex { pthread_mutex_t raw; unsigned int owner; bool initialized; };
@@ -140,6 +141,9 @@ struct iio_channel { unsigned int id; enum iio_chan_type type; struct iio_dev *i
 #define IIO_VAL_INT 1
 #define IIO_VAL_FRACTIONAL 10
 #define CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS 0
+#ifndef CONFIG_BATTERY_MT6357_R1_SOC
+#define CONFIG_BATTERY_MT6357_R1_SOC 0
+#endif
 #define IS_ENABLED(x) (x)
 static void mock_dev_info(const char *fmt, ...) { }
 #define dev_info(d,...) ((void)(d),mock_dev_info(__VA_ARGS__))

@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "scope": "Default-off experimental kernel integration; physical model and Android boot are unvalidated",
+  "shipping_config_enabled": false,
+  "hardware_tested": false,
+  "kernel_patch": "patches/mainline/0077-add-experimental-r1-battery-capacity.patch",
+  "kernel_patch_sha256": "54d864fca24afefa419d09017068621aa016c07bd701964392bbecc4c175f97e",
+  "source_sha256": {
+    "drivers/power/supply/mt6357-gauge.c": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+    "drivers/power/supply/Kconfig": "49c7d4433cc2898860080d9ea4860e21633f756f6b38949231b06c3423266f2e",
+    "drivers/power/supply/Makefile": "12077b9ec7140d090dbeace2fbc4ba73870c2d7f025928df24f1f353ba424fe5",
+    "drivers/power/supply/mt6357-r1-model/profile.c": "247eee7d55c47960232fd28dd6254a426b0f3979c4177f9235647b2008eca8ba",
+    "drivers/power/supply/mt6357-r1-model/profile.h": "a88b1ed8662d2a1d607ceaced52402859ed07a07b06c55a9d6a824b84b9aec58",
+    "drivers/power/supply/mt6357-r1-model/stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+    "drivers/power/supply/mt6357-r1-model/session.c": "257ea68c57b0e46eec6b778b0fa2b4e9d473ba5fd997f2997b9ddcb2473623d1",
+    "drivers/power/supply/mt6357-r1-model/session.h": "38dae4045bcd1de50fb5c6ecd486c1788e7d1e944bac4a5e1ba9ae0d1ffddf4c",
+    "rabbit-r1/scripts/test-mt6357-current.py": "703b314d6c05bb0678db1f314f268ed9c2ed05df5acd61f6b5fc2ec525d9832b",
+    "rabbit-r1/scripts/test-mt6357-charge-counter.py": "f9e41f27489f0d189144492048c80b2aa7c32de134066448d41995e0d45a760e",
+    "rabbit-r1/scripts/test-mt6357-status.py": "83d25b3f4725ee4d6aed4a6855c2696128c988211ad65219415fb8ca26a6c1f2",
+    "rabbit-r1/scripts/test-mt6357-live.py": "aa1561d19594cbea407f316884b810d8a0a220a2fab91cb070bfba0da2ecd003",
+    "rabbit-r1/tests/battery/mt6357-status.c": "6a9cff25f272b8b0e80b6bdd0669f027eb46db1f4ef8b19ba25800dbfbc9d694",
+    "rabbit-r1/scripts/test-mt6357-soc.py": "352b0f189531679598f52308ad5a8efd12560f42170ce21afba5801be3cd22ee",
+    "rabbit-r1/tests/battery/mt6357-soc.c": "107921f10a398917d8c78705d387c97b0fbeb82abb1cd0dc403d800ca917fb2c",
+    "rabbit-r1/docs/MT6357-SOC.md": "0526f4499e8a5235968926d2ae336c01efd5b50cfcf13da724ab717bc8dc7426"
+  },
+  "private_handoff": {
+    "state": "prototype_frozen_independently_reviewed",
+    "canonical_edits": false,
+    "shipping_config_enabled": false,
+    "hardware_tested": false,
+    "base_repository_head": "14834f07aaeb126077b55954b86090b8e4ca028d",
+    "production_sha256": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+    "model_copies_byte_equal": true,
+    "soc_host": {
+      "asan_ubsan": true,
+      "diagnostics": [
+        0,
+        1
+      ],
+      "cases_each": 177,
+      "independent_fraction_grid_cases": 22
+    },
+    "other_suites": [
+      "current/NTC",
+      "counter",
+      "STATUS",
+      "collector diagnostics0/1"
+    ],
+    "arm64": "actual Kbuild MODULE aggregate links with SOC0/1, W=1 -Werror; not .ko modpost or full kernel link",
+    "patch_replay": "exact and zero fuzz in private replay-final tree",
+    "artifacts": {
+      "current-prototype.log": "463c41bacb8a47a503e2829180b5afba51354cd2e198b06e132b4a53357054c9",
+      "status-prototype.log": "c3a74b757de7e65392f29a7bd82bdfa170a55fd859e4838b26e0994655619475",
+      "live-prototype.log": "0695198e4503f1aa4d6e5c25886de2686ce6cad53d08d13ffcd0a81d523c1ad9",
+      "soc-prototype.log": "89b54c0b3777b49770a5cb737150c81ec2fc44955de50d2d7f910ed7013869a0",
+      "kernel-patch-replay.log": "43cb73b5be5a028c4e48ca1a1e65479a7b3bba4091f20f69d12a749601ac4d6d",
+      "project-patch-replay.log": "a074548273af0ce6064e46d80bb11d31f982360b478cac8bf2999827e2ed05a5",
+      "arm64/build.log": "783939b4b0cdbb05dd77d096380c52c6461c0eac3a67762c562457508ccb46e9",
+      "arm64-off/build.log": "be8d405fe2a7220791e89bb27f88ff903686a39b9da383f217d7927efe6458bf",
+      "HANDOFF.md": "88028e0b1bab002cda53ef87ac26abfacfe8695fdc94760e7ae803b55688b778",
+      "migration.json": "725084dd16697845ff20a3762dc5617de07981298b60cccd3c38d1822be3db7d",
+      "kernel-experimental-soc.patch": "54d864fca24afefa419d09017068621aa016c07bd701964392bbecc4c175f97e",
+      "project-experimental-soc.patch": "3574d2a549a787dcd163c6d29a867b62a39fc50668c60752e959175bce6469c8",
+      "arm64/inputs.json": "e4f35a9695cd82692a2a75fd64963d15814c42cf12d3f1cd569c4d40d5207d5d",
+      "arm64/result.json": "9a497c4f300c5ebb6adfede5cc486dda432138a6564e0467b4d0a6093ba16d19",
+      "host-output/mt6357-soc/result.json": "fd20a4590b41fc1da4c194b5c936b86ca5366811e9d7c191eef4e012498d730d"
+    },
+    "pending": "Root integration/patch numbering/CI; full kernel build and coordinated Android startup gate before any experiment",
+    "kconfig_sha256": "49c7d4433cc2898860080d9ea4860e21633f756f6b38949231b06c3423266f2e",
+    "independent_review": {
+      "review.md": "39b26b7330da366e5f11bd4a75c7e457d923e70bcb7c368db4184ee694ef41ad",
+      "provenance.json": "46b738b220dda6e20de9c667d446ef8c0019fb6ca653cb30a76c97a0ef64eb5e"
+    }
+  },
+  "independent_review": {
+    "conclusion": "No unresolved blocker in the reviewed SOC diff after the stale-to-fresh notification fix.",
+    "production_sha256": {
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-gauge.c": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/rabbit-r1/tests/battery/mt6357-soc.c": "107921f10a398917d8c78705d387c97b0fbeb82abb1cd0dc403d800ca917fb2c",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/rabbit-r1/docs/MT6357-SOC.md": "0526f4499e8a5235968926d2ae336c01efd5b50cfcf13da724ab717bc8dc7426",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/rabbit-r1/scripts/test-mt6357-soc.py": "352b0f189531679598f52308ad5a8efd12560f42170ce21afba5801be3cd22ee",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/Kconfig": "49c7d4433cc2898860080d9ea4860e21633f756f6b38949231b06c3423266f2e",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/Makefile": "12077b9ec7140d090dbeace2fbc4ba73870c2d7f025928df24f1f353ba424fe5",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-r1-model/profile.c": "247eee7d55c47960232fd28dd6254a426b0f3979c4177f9235647b2008eca8ba",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-r1-model/profile.h": "a88b1ed8662d2a1d607ceaced52402859ed07a07b06c55a9d6a824b84b9aec58",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-r1-model/stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-r1-model/session.c": "257ea68c57b0e46eec6b778b0fa2b4e9d473ba5fd997f2997b9ddcb2473623d1",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/prototype/drivers/power/supply/mt6357-r1-model/session.h": "38dae4045bcd1de50fb5c6ecd486c1788e7d1e944bac4a5e1ba9ae0d1ffddf4c"
+    },
+    "core_source_sha256": {
+      "/rabbitr1/src/mainline/drivers/power/supply/power_supply_core.c": "c2448e55ce430ddb688de62a5df8dc0ae7bc9af92099ad8fc9297b3bc131c722",
+      "/rabbitr1/src/mainline/drivers/base/core.c": "fa223c8f9f1bb40ca52c73f156439d311065e9be04efa2c6cf57039940e1c9fa",
+      "/rabbitr1/src/mainline/drivers/base/dd.c": "12b0555ee317adb59b09dc16c6fc7113c72e7148961f772d3f51f9a0c8dcb9b3",
+      "/rabbitr1/src/mainline/fs/kernfs/dir.c": "3ab7a7dd09fcbbb09a40af4ecf25bba4ef0a80f430722a56de34012b544cd177",
+      "/rabbitr1/src/mainline/drivers/power/supply/rabbit-r1-charging.c": "a39e7351b68dfd7f833cc14adf488b999ab6118d8fafcc257202ea19ff5887c8"
+    },
+    "evidence_sha256": {
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/final-test.log": "89b54c0b3777b49770a5cb737150c81ec2fc44955de50d2d7f910ed7013869a0",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/host-output/final-soc/result.json": "5bbfbd17dc3508e321e499e53a9d201507a1ede74854c57ac1ea5915f7d93416",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/expiry-before/result.json": "c7d1c64820b05a9f8a089baa6b843a40dc3c72153e0ce33148b05a759c5bafd2",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/expiry-after/result.json": "e76868d12471e74d2bf8984745732621b05bcd6af9cbdba4af7a729146340b25",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/expiry-fix.log": "78ca8e93aff13f864bc3e7646a6acd6073ebf24a503efc258b752a5277fcb0d6",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/supplement-result.json": "d74a863827a6c621f3973362f053e9cc2d431258fe74db049e680a97af5fd77c",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/current-regression.log": "463c41bacb8a47a503e2829180b5afba51354cd2e198b06e132b4a53357054c9",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/status-regression.log": "c3a74b757de7e65392f29a7bd82bdfa170a55fd859e4838b26e0994655619475",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/live-regression.log": "0695198e4503f1aa4d6e5c25886de2686ce6cad53d08d13ffcd0a81d523c1ad9",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/kconfig/result.json": "ecb0f4eb7a3010f452f7709f961b8b70efa3e826a13c6e3e8cea990a5658b07e",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/harness-path-adjustments.json": "2dd97cd1207ada974989fd8223e16b5ac19e0e99aa139c87ace9b480b82161eb",
+      "/rabbitr1/out/battery-review/soc-state/kernel-integration/independent-review/original-source-hashes.json": "87ca039228506aad44f474144957dface35b6369fcfc49b498d18fc995ce1fcd"
+    },
+    "resolved_finding": {
+      "baseline_gauge_sha256": "98e96c0e062761874979b889c3e49e12390649267cb70f4f53bd8c880a3bfa51",
+      "trigger": "Valid180171000ns collection crosses old cache expiry and produces the same65percent result.",
+      "baseline_notifications": "1->1",
+      "corrected_notifications": "1->2",
+      "correction": "Old validity evaluated after collection immediately before consume under SOC lock.",
+      "corrected_diagnostics": [
+        0,
+        1
+      ]
+    },
+    "checks": {
+      "final_soc_cases_each": 177,
+      "fraction_grid_cases": 22,
+      "asan_ubsan": true,
+      "old_config_off_suites": "Current/NTC/presence, full counter via STATUS, STATUS/supplier lifetime, live collector diagnostics0/1 passed. Worker-only final correction excluded by their CONFIG_SOC0.",
+      "additional_checks": "Linux errno/math-code separation; NULL gauge->psy during registration callback; no read-based timestamp renewal; delayed stale-to-fresh notification; real Kconfig bool selection for gauge=m/y.",
+      "model_copies_byte_equal": true,
+      "arm64": "Final actual AArch64 MODULE composite SOC0/1 source/hash/object proof reviewed; no new target build run by this review."
+    },
+    "limitations": [
+      "No physical accuracy/calibration validation; numerical policy stays explicitly uncalibrated and default off.",
+      "Expiry reads do not renew cache; notifications occur on worker transitions, not a separate bounded expiry timer while I/O is blocked.",
+      "Standard sysfs/uevent teardown and managed-linked consumer ordering are the supported lifetime scope; a bare retained psy does not pin gauge drv_data.",
+      "Pre-existing rabbit-r1-charging.c get_by_reference/raw-parent link path requires separate supplier-lifetime follow-up.",
+      "ARM64 evidence is aggregate object linking, not full .ko modpost, full-kernel link, runtime lockdep, complete call-chain stack bound or device test.",
+      "Coordinated Android readiness/priming remains required; this driver does not alter Health or shutdown policy."
+    ],
+    "canonical_edits": false,
+    "hardware_tested": false
+  },
+  "original_workspace_directory": "/rabbitr1/out/battery-review/soc-state/kernel-integration",
+  "pending": [
+    "Full kernel and module link",
+    "Android same-monitor priming and readiness integration",
+    "Hardware measurements and calibration"
+  ],
+  "canonical_validation": {
+    "migration_files_match_reviewed_hashes": true,
+    "patch_series": {
+      "patches": 77,
+      "affected_files": 93,
+      "log": "logs/kernel-patches-0077.log",
+      "sha256": "da50fe520f89c445b6ca2c033d78a2a5f22041ac2d7a6c97bbf648fae5056cf5"
+    },
+    "host_test": {
+      "cases_per_config": 177,
+      "configurations": [
+        0,
+        1
+      ],
+      "independent_fraction_cases": 22,
+      "log": "logs/mt6357-soc-canonical.log",
+      "sha256": "89b54c0b3777b49770a5cb737150c81ec2fc44955de50d2d7f910ed7013869a0",
+      "result": "/rabbitr1/out/battery-review/soc-state/kernel-integration/canonical-test/result.json",
+      "result_sha256": "72f273bdbe51e745b6132d0ae8a73a95298e513099c70124ed83780bf30c86bd"
+    }
+  }
+}

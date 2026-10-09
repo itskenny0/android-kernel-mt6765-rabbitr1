@@ -435,10 +435,22 @@ config BATTERY_MT6357
 	help
 	  Read signed battery current from the MT6357 gauge, with optional ADC
 	  voltage and current-compensated thermistor readings. The firmware must
-	  have started the gauge engine. This driver does not yet report state
-	  of charge or control charging.
+	  have started the gauge engine. The optional experimental r1 model below
+	  estimates state of charge from live measurements. Charging settings
+	  are not controlled by this driver.
 
-	  This driver can also be built as a module, called mt6357-gauge.
+	  This driver can also be built as a module, called mt6357-battery.
+
+config BATTERY_MT6357_R1_SOC
+	bool "Experimental rabbit r1 live battery model"
+	depends on BATTERY_MT6357 && OF
+	default n
+	help
+	  Estimate capacity from real bracketed voltage/current/temperature and
+	  charge-counter observations on the factory rabbit r1 battery0 profile.
+	  Acceptance/error policy is an uncalibrated experiment, not hardware
+	  validation. Initial model failure prevents battery registration.
+	  No gauge reset, active load or charging change is performed.
 
 config BATTERY_MT6357_LIVE_DIAGNOSTICS
 	bool "MT6357 probe-time live measurement diagnostics"

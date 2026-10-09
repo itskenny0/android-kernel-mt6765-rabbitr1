@@ -4,6 +4,8 @@
 #include <linux/atomic.h>
 #include <linux/bitfield.h>
 #include <linux/cleanup.h>
+#include <linux/delay.h>
+#include <linux/pm.h>
 #include <linux/iio/consumer.h>
 #include <linux/iio/iio.h>
 #include <linux/ktime.h>
@@ -19,6 +21,10 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/workqueue.h>
+
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+#include "mt6357-r1-model/session.h"
+#endif
 
 #define MT6357_FG_ON		BIT(0)
 #define MT6357_FG_CLOCK_PD	(BIT(3) | BIT(4))
@@ -76,6 +82,20 @@ struct mt6357_live_observation {
 #define MT6357_READ_CAR BIT(1)
 #define MT6357_READ_BATON BIT(2)
 
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+#define MT6357_SOC_INTERVAL (2 * HZ)
+struct mt6357_r1_soc {
+	struct mutex lock;
+	struct delayed_work work;
+	struct r1_battery_session session;
+	struct mt6357_live_observation live;
+	struct r1_battery_observation observation;
+	u64 event_token;
+	bool enabled, running, stopping, notified, notified_valid;
+	int error, notified_capacity;
+};
+#endif
+
 struct mt6357_gauge {
 	struct device *dev;
 	struct regmap *regmap;
@@ -83,6 +103,10 @@ struct mt6357_gauge {
 	u32 shunt_uohms;
 	u32 gain_permille;
 	bool needs_release;
+	bool suspended;
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+	struct mt6357_r1_soc soc;
+#endif
 	u64 live_generation, live_sequence;
 	const struct power_supply_desc *desc;
 	struct notifier_block status_nb;
@@ -526,7 +550,12 @@ static void mt6357_gauge_live_diagnostic(struct mt6357_gauge *gauge)
 
 	if (!IS_ENABLED(CONFIG_BATTERY_MT6357_LIVE_DIAGNOSTICS))
 		return;
-	mt6357_gauge_collect_live(gauge, &sample);
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+	if (gauge->soc.enabled)
+		sample = gauge->soc.live;
+	else
+#endif
+		mt6357_gauge_collect_live(gauge, &sample);
 	dev_info(gauge->dev, "live acquisition generation=%llu sequence=%llu ns=%llu..%llu error=%d (not SOC)\n",
 		 sample.generation, sample.sequence, sample.started_ns, sample.finished_ns, sample.error);
 	for (set = 0; set < 2; set++) {
@@ -551,6 +580,362 @@ static void mt6357_gauge_live_diagnostic(struct mt6357_gauge *gauge)
 		}
 	}
 }
+
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+/* Experimental factory-r1 model. These assumptions are not calibrated error
+ * bounds. See rabbit-r1/battery/SESSION.rst and the integration policy audit. */
+static const struct r1_battery_policy mt6357_r1_policy = {
+	.minimum_01mv = 33500, .discharge_01ma = 5000,
+	.shunt_01mohm = 100, .meter_01mohm = 75, .dc_ratio_percent = 100,
+	.max_capture_ns = 500000000, .max_gap_ns = 10000000000LL,
+	.max_epoch_ns = 60000000000LL, .valid_for_ns = 5000000000LL,
+	.observed_current_limit_ua = 3000000, .interval_current_bound_ua = 10299600,
+	.voltage_motion_uv = 30000, .current_motion_ua = 300000,
+	.temperature_motion_decic = 10,
+	.model_error_uah = 30300, .cutoff_error_uah = 30300,
+	.car_delta_error_uah = 5250, .max_charge_width_uah = 101000,
+	.max_soc_width_bp = 2000,
+};
+
+static int mt6357_soc_errno(const struct r1_battery_estimate *estimate)
+{
+	if (estimate->reason == R1_BATTERY_REASON_ACQUISITION)
+		return estimate->detail_error < 0 ? estimate->detail_error : -EIO;
+	if (estimate->reason == R1_BATTERY_REASON_ARITHMETIC)
+		return -ERANGE;
+	if (estimate->reason == R1_BATTERY_REASON_EVENT)
+		return -EAGAIN;
+	return -ENODATA;
+}
+
+static int mt6357_soc_percent(r1_battery_int basis_points, int *out)
+{
+	if (basis_points < 0 || basis_points > 10000)
+		return -ERANGE;
+	/* Uniform nearest percent, including genuine zero; no positive floor. */
+	*out = (basis_points + 50) / 100;
+	return 0;
+}
+
+static int mt6357_soc_capacity_locked(struct mt6357_gauge *gauge, u64 now, int *out)
+{
+	struct mt6357_r1_soc *soc = &gauge->soc;
+	struct r1_battery_estimate estimate;
+	int ret;
+
+	lockdep_assert_held(&soc->lock);
+	if (soc->stopping)
+		return -ENODEV;
+	if (READ_ONCE(gauge->suspended))
+		return -EAGAIN;
+	if (soc->error)
+		return soc->error;
+	if (!now || now > S64_MAX)
+		return -ERANGE;
+	ret = r1_battery_session_read(&soc->session, now, &estimate);
+	if (ret)
+		return -EINVAL;
+	if (estimate.validity != R1_BATTERY_FRESH)
+		return mt6357_soc_errno(&estimate);
+	return mt6357_soc_percent(estimate.soc_point_bp, out);
+}
+
+static int mt6357_soc_read_capacity(struct mt6357_gauge *gauge, int *out)
+{
+	int ret;
+
+	if (!gauge->soc.enabled)
+		return -EINVAL;
+	mutex_lock(&gauge->soc.lock);
+	ret = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), out);
+	mutex_unlock(&gauge->soc.lock);
+	return ret;
+}
+
+/* Source report is retained independently. Even a populated value beside an
+ * error remains unusable. This adapter performs no I/O or model acceptance. */
+static int mt6357_soc_adapt(const struct mt6357_live_observation *s,
+			   struct r1_battery_observation *out)
+{
+	struct r1_battery_observation o = {};
+	u64 cursor;
+	unsigned int set, channel, word;
+	int ret = s->error;
+
+	if (!s->generation || s->generation > S64_MAX || !s->sequence ||
+	    s->sequence > S64_MAX || !s->started_ns || s->finished_ns > S64_MAX ||
+	    s->finished_ns < s->started_ns) {
+		o.error = -ERANGE;
+		*out = o;
+		return o.error;
+	}
+	o.generation = s->generation;
+	o.sequence = s->sequence;
+	o.started_ns = s->started_ns;
+	o.finished_ns = s->finished_ns;
+	for (set = 0; set < 2; set++) {
+		const struct mt6357_live_fg *fg = &s->fg[set];
+		struct r1_battery_endpoint *ep = &o.endpoint[set];
+		int error = fg->prepare_error ?: fg->latch_error ?: fg->release_error ?:
+			fg->current_ua.error ?: fg->charge_uah.error ?: fg->present.error ?:
+			s->temperature_decic[set].error;
+
+		for (word = 0; word < MT6357_LIVE_WORDS; word++) {
+			if (!error)
+				error = fg->words[word].error;
+			if (!error && (fg->words[word].value < 0 || fg->words[word].value > 0xffff))
+				error = -ERANGE;
+		}
+		for (channel = 0; channel < 3; channel++) {
+			const struct mt6357_live_adc *adc = &s->adc[set][channel];
+
+			if (!error)
+				error = adc->raw.error ?: adc->scale_error ?: adc->mv.error;
+		}
+		if (!error && (s->adc[set][0].mv.value <= 0 ||
+			      s->adc[set][0].mv.value > INT_MAX / 1000))
+			error = -ERANGE;
+		ep->error = error;
+		if (!ret)
+			ret = error;
+		if (error)
+			continue;
+		ep->raw_car = (u32)fg->words[MT6357_LIVE_CAR_LOW].value |
+			      ((u32)fg->words[MT6357_LIVE_CAR_HIGH].value << 16);
+		ep->car_uah = fg->charge_uah.value;
+		ep->current_ua = fg->current_ua.value;
+		ep->present = fg->present.value;
+		ep->voltage_uv = s->adc[set][0].mv.value * 1000;
+		ep->temperature_decic = s->temperature_decic[set].value;
+	}
+	/* Verify the exact FG0, ADC012/210, FG1 acquisition order on success. */
+	cursor = s->started_ns;
+	if (!ret) {
+		const struct mt6357_live_fg *fg = &s->fg[0];
+
+		if (fg->started_ns < cursor || fg->ready_ns < fg->started_ns ||
+		    fg->finished_ns < fg->ready_ns)
+			ret = -ERANGE;
+		cursor = fg->finished_ns;
+		for (set = 0; set < 2; set++) for (channel = 0; channel < 3; channel++) {
+			const struct mt6357_live_adc *adc = &s->adc[set][set ? 2 - channel : channel];
+
+			if (adc->started_ns < cursor || adc->finished_ns < adc->started_ns)
+				ret = -ERANGE;
+			cursor = adc->finished_ns;
+		}
+		fg = &s->fg[1];
+		if (fg->started_ns < cursor || fg->ready_ns < fg->started_ns ||
+		    fg->finished_ns < fg->ready_ns || s->finished_ns < fg->finished_ns)
+			ret = -ERANGE;
+	}
+	o.error = ret;
+	*out = o;
+	return ret;
+}
+
+static enum r1_battery_event mt6357_soc_observed_event(const struct mt6357_live_observation *s)
+{
+	unsigned int i;
+
+	for (i = 0; i < 2; i++) {
+		const struct mt6357_live_fg *fg = &s->fg[i];
+
+		if (!fg->present.error && fg->present.value == 0)
+			return R1_BATTERY_EVENT_REMOVAL;
+		if ((!fg->words[MT6357_LIVE_ENGINE].error &&
+		     !(fg->words[MT6357_LIVE_ENGINE].value & MT6357_FG_ON)) ||
+		    (!fg->words[MT6357_LIVE_CLOCK].error &&
+		     (fg->words[MT6357_LIVE_CLOCK].value & MT6357_FG_CLOCK_PD)))
+			return R1_BATTERY_EVENT_ENGINE_OFF;
+	}
+	return R1_BATTERY_EVENT_NONE;
+}
+
+static void mt6357_soc_event_locked(struct mt6357_gauge *gauge, enum r1_battery_event event)
+{
+	struct mt6357_r1_soc *soc = &gauge->soc;
+	struct r1_battery_observation observation = { .event = event };
+	struct r1_battery_estimate estimate;
+	u64 now = ktime_get_boottime_ns();
+
+	lockdep_assert_held(&soc->lock);
+	/* An unrepresentable event time deliberately invokes the missing-barrier
+	 * hold; it must never become proof that an old capture is post-event. */
+	if (now && now <= S64_MAX && gauge->live_generation <= S64_MAX) {
+		observation.generation = gauge->live_generation;
+		observation.started_ns = observation.finished_ns = now;
+	}
+	r1_battery_session_step(&soc->session, &mt6357_r1_policy, &observation, &estimate);
+	soc->error = -EAGAIN;
+	if (soc->event_token == U64_MAX) {
+		soc->stopping = true;
+		soc->error = -EOVERFLOW;
+	} else {
+		soc->event_token++;
+	}
+}
+
+static int mt6357_soc_consume_locked(struct mt6357_gauge *gauge)
+{
+	struct mt6357_r1_soc *soc = &gauge->soc;
+	struct r1_battery_estimate estimate;
+	enum r1_battery_event event;
+	int ret, capacity;
+
+	lockdep_assert_held(&soc->lock);
+	event = mt6357_soc_observed_event(&soc->live);
+	if (event != R1_BATTERY_EVENT_NONE) {
+		mt6357_soc_event_locked(gauge, event);
+		return soc->error;
+	}
+	mt6357_soc_adapt(&soc->live, &soc->observation);
+	ret = r1_battery_session_step(&soc->session, &mt6357_r1_policy,
+				    &soc->observation, &estimate);
+	soc->error = ret ? -EINVAL : estimate.validity == R1_BATTERY_FRESH ? 0 :
+		     mt6357_soc_errno(&estimate);
+	return mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
+}
+
+static void mt6357_soc_work(struct work_struct *work)
+{
+	struct mt6357_r1_soc *soc = container_of(to_delayed_work(work), struct mt6357_r1_soc, work);
+	struct mt6357_gauge *gauge = container_of(soc, struct mt6357_gauge, soc);
+	u64 token;
+	int before, ret, capacity = 0;
+	bool changed;
+
+	mutex_lock(&soc->lock);
+	if (!soc->running || soc->stopping || READ_ONCE(gauge->suspended)) {
+		mutex_unlock(&soc->lock);
+		return;
+	}
+	token = soc->event_token;
+	mutex_unlock(&soc->lock);
+	mt6357_gauge_collect_live(gauge, &soc->live);
+	mutex_lock(&soc->lock);
+	if (!soc->running || soc->stopping || READ_ONCE(gauge->suspended) || token != soc->event_token) {
+		mutex_unlock(&soc->lock);
+		return;
+	}
+	/* Readers may have observed expiry while collection held no state lock. */
+	before = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
+	ret = mt6357_soc_consume_locked(gauge);
+	if (!ret)
+		ret = mt6357_soc_capacity_locked(gauge, ktime_get_boottime_ns(), &capacity);
+	changed = !soc->notified || soc->notified_valid != !ret ||
+		  (!ret && (soc->notified_capacity != capacity || before));
+	soc->notified = true;
+	soc->notified_valid = !ret;
+	soc->notified_capacity = capacity;
+	if (!soc->stopping)
+		queue_delayed_work(system_freezable_power_efficient_wq, &soc->work, MT6357_SOC_INTERVAL);
+	mutex_unlock(&soc->lock);
+	if (changed)
+		power_supply_changed(gauge->psy);
+}
+
+static void mt6357_soc_stop(void *data)
+{
+	struct mt6357_gauge *gauge = data;
+	struct mt6357_r1_soc *soc = &gauge->soc;
+
+	if (!soc->enabled)
+		return;
+	mutex_lock(&soc->lock);
+	soc->running = false;
+	if (!soc->stopping)
+		mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_REMOVAL);
+	soc->stopping = true;
+	mutex_unlock(&soc->lock);
+	cancel_delayed_work_sync(&soc->work);
+}
+
+static int mt6357_soc_init(struct mt6357_gauge *gauge)
+{
+	static const struct mt6357_thermistor_point ntc[] = {
+		{ -40000, 195652 }, { -35000, 148171 }, { -30000, 113347 }, { -25000, 87559 },
+		{ -20000, 68237 }, { -15000, 53650 }, { -10000, 42506 }, { -5000, 33892 },
+		{ 0, 27219 }, { 5000, 22021 }, { 10000, 17926 }, { 15000, 14674 },
+		{ 20000, 12081 }, { 25000, 10000 }, { 30000, 8315 }, { 35000, 6948 },
+		{ 40000, 5834 }, { 45000, 4917 }, { 50000, 4161 }, { 55000, 3535 }, { 60000, 3014 },
+	};
+	struct mt6357_r1_soc *soc = &gauge->soc;
+	unsigned int i;
+	int ret;
+
+	if (!of_machine_is_compatible("rabbit,r1"))
+		return 0;
+	if (!gauge->voltage || !gauge->thermistor || !gauge->reference || !gauge->charger)
+		return -ENODATA;
+	if (gauge->shunt_uohms != 10000 || gauge->gain_permille != 1000 ||
+	    gauge->pullup_ohms != 16900 || gauge->series_uohms != 10000 ||
+	    gauge->num_points != ARRAY_SIZE(ntc))
+		return -EINVAL;
+	for (i = 0; i < ARRAY_SIZE(ntc); i++)
+		if (gauge->table[i].temperature_mc != ntc[i].temperature_mc ||
+		    gauge->table[i].resistance != ntc[i].resistance)
+			return -EINVAL;
+	ret = devm_mutex_init(gauge->dev, &soc->lock);
+	if (ret)
+		return ret;
+	INIT_DELAYED_WORK(&soc->work, mt6357_soc_work);
+	soc->error = -ENODATA;
+	soc->enabled = true;
+	return 0;
+}
+
+static int mt6357_soc_seed(struct mt6357_gauge *gauge)
+{
+	struct mt6357_r1_soc *soc = &gauge->soc;
+	u64 start, now;
+	unsigned int attempt;
+	int ret = -ENODATA, capacity;
+
+	if (!soc->enabled)
+		return 0;
+	start = ktime_get_boottime_ns();
+	for (attempt = 0; attempt < 8; attempt++) {
+		now = ktime_get_boottime_ns();
+		if (now < start || now - start >= 6000000000ULL)
+			break;
+		mt6357_gauge_collect_live(gauge, &soc->live);
+		mutex_lock(&soc->lock);
+		ret = mt6357_soc_consume_locked(gauge);
+		now = ktime_get_boottime_ns();
+		/* Check a two-second publication margin without renewing the seed. */
+		if (!ret)
+			ret = now > S64_MAX - 2000000000ULL ? -ERANGE :
+				mt6357_soc_capacity_locked(gauge, now + 2000000000ULL, &capacity);
+		mutex_unlock(&soc->lock);
+		if (!ret)
+			return 0;
+		if (attempt < 7)
+			msleep(250);
+	}
+	return ret ?: -ETIMEDOUT;
+}
+
+static int mt6357_soc_start(struct mt6357_gauge *gauge)
+{
+	int ret;
+
+	if (!gauge->soc.enabled)
+		return 0;
+	ret = devm_add_action_or_reset(gauge->dev, mt6357_soc_stop, gauge);
+	if (ret)
+		return ret;
+	mutex_lock(&gauge->soc.lock);
+	gauge->soc.running = true;
+	mod_delayed_work(system_freezable_power_efficient_wq, &gauge->soc.work, 0);
+	mutex_unlock(&gauge->soc.lock);
+	return 0;
+}
+#else
+static int mt6357_soc_init(struct mt6357_gauge *gauge) { return 0; }
+static int mt6357_soc_seed(struct mt6357_gauge *gauge) { return 0; }
+static int mt6357_soc_start(struct mt6357_gauge *gauge) { return 0; }
+#endif
 
 static int mt6357_gauge_read_temperature(struct mt6357_gauge *gauge, int *temperature)
 {
@@ -611,10 +996,12 @@ static void mt6357_gauge_status_work(struct work_struct *work)
 	bool valid, changed;
 	int status = POWER_SUPPLY_STATUS_UNKNOWN;
 
+	if (READ_ONCE(gauge->suspended))
+		return;
 	/* Supplier I/O never holds the measurement or notification mutex. */
 	valid = !mt6357_gauge_read_status(gauge, &status);
 	mutex_lock(&gauge->status_lock);
-	if (!gauge->status_active) {
+	if (!gauge->status_active || READ_ONCE(gauge->suspended)) {
 		mutex_unlock(&gauge->status_lock);
 		return;
 	}
@@ -639,7 +1026,7 @@ static int mt6357_gauge_status_notify(struct notifier_block *nb,
 	if (event != PSY_EVENT_PROP_CHANGED || data != gauge->charger)
 		return NOTIFY_DONE;
 	mutex_lock(&gauge->status_lock);
-	if (gauge->status_active)
+	if (gauge->status_active && !READ_ONCE(gauge->suspended))
 		mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
 	mutex_unlock(&gauge->status_lock);
 	return NOTIFY_DONE;
@@ -664,6 +1051,10 @@ static int mt6357_gauge_get_property(struct power_supply *psy,
 	struct mt6357_gauge *gauge = power_supply_get_drvdata(psy);
 
 	switch (psp) {
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+	case POWER_SUPPLY_PROP_CAPACITY:
+		return mt6357_soc_read_capacity(gauge, &val->intval);
+#endif
 	case POWER_SUPPLY_PROP_STATUS:
 		return mt6357_gauge_read_status(gauge, &val->intval);
 	case POWER_SUPPLY_PROP_PRESENT:
@@ -705,6 +1096,14 @@ static const enum power_supply_property mt6357_gauge_adc_status_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 };
 
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+static const enum power_supply_property mt6357_gauge_soc_properties[] = {
+	POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_STATUS, POWER_SUPPLY_PROP_CAPACITY,
+};
+#endif
+
 /* A class iterator may retain psy after unregister, so keep its descriptor static. */
 #define MT6357_GAUGE_DESC(_properties, _count) { \
 	.name = "mt6357-battery", \
@@ -713,6 +1112,11 @@ static const enum power_supply_property mt6357_gauge_adc_status_properties[] = {
 	.num_properties = (_count), \
 	.get_property = mt6357_gauge_get_property, \
 }
+
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+static const struct power_supply_desc mt6357_gauge_soc_desc =
+	MT6357_GAUGE_DESC(mt6357_gauge_soc_properties, ARRAY_SIZE(mt6357_gauge_soc_properties));
+#endif
 
 static const struct power_supply_desc mt6357_gauge_desc =
 	MT6357_GAUGE_DESC(mt6357_gauge_properties, 3);
@@ -950,15 +1354,26 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, ret, "Invalid battery charger supplier\n");
 	gauge->needs_release = true;
 	gauge->live_generation = atomic64_inc_return(&mt6357_live_generation);
+	ret = mt6357_soc_init(gauge);
+	if (ret)
+		return dev_err_probe(dev, ret, "Unsupported experimental r1 model inputs\n");
+	ret = mt6357_soc_seed(gauge);
 	mt6357_gauge_live_diagnostic(gauge);
+	if (ret)
+		return dev_err_probe(dev, ret, "No usable initial live SOC estimate\n");
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+	if (gauge->soc.enabled)
+		gauge->desc = &mt6357_gauge_soc_desc;
+#endif
+	platform_set_drvdata(pdev, gauge);
 	config.drv_data = gauge;
 	config.fwnode = dev_fwnode(dev);
 	psy = devm_power_supply_register(dev, gauge->desc, &config);
 	if (IS_ERR(psy))
 		return PTR_ERR(psy);
-	if (!gauge->charger)
-		return 0;
 	gauge->psy = psy;
+	if (!gauge->charger)
+		return mt6357_soc_start(gauge);
 	ret = power_supply_reg_notifier(&gauge->status_nb);
 	if (ret)
 		return ret;
@@ -970,8 +1385,68 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
 	gauge->status_active = true;
 	mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
 	mutex_unlock(&gauge->status_lock);
+	return mt6357_soc_start(gauge);
+}
+
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+static int mt6357_gauge_suspend(struct device *dev)
+{
+	struct mt6357_gauge *gauge = dev_get_drvdata(dev);
+
+	if (!gauge->soc.enabled)
+		return 0;
+	/* Serialize the pause with notifier requeue checks before draining work. */
+	mutex_lock(&gauge->status_lock);
+	WRITE_ONCE(gauge->suspended, true);
+	mutex_unlock(&gauge->status_lock);
+	mutex_lock(&gauge->soc.lock);
+	mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_SUSPEND);
+	mutex_unlock(&gauge->soc.lock);
+	/* Never hold the state mutex while draining an entered worker. */
+	cancel_delayed_work_sync(&gauge->soc.work);
+	cancel_delayed_work_sync(&gauge->status_work);
 	return 0;
 }
+
+static int mt6357_gauge_resume(struct device *dev)
+{
+	struct mt6357_gauge *gauge = dev_get_drvdata(dev);
+
+	if (!gauge->soc.enabled)
+		return 0;
+	mutex_lock(&gauge->soc.lock);
+	if (!gauge->soc.stopping) {
+		mt6357_soc_event_locked(gauge, R1_BATTERY_EVENT_SUSPEND);
+		WRITE_ONCE(gauge->suspended, false);
+		/* One jiffy avoids an equal-clock capture at the strict event barrier. */
+		if (gauge->soc.running && !gauge->soc.stopping)
+			mod_delayed_work(system_freezable_power_efficient_wq, &gauge->soc.work, 1);
+	}
+	mutex_unlock(&gauge->soc.lock);
+	mutex_lock(&gauge->status_lock);
+	if (gauge->status_active && !READ_ONCE(gauge->suspended))
+		mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
+	mutex_unlock(&gauge->status_lock);
+	return 0;
+}
+
+static void mt6357_gauge_shutdown(struct platform_device *pdev)
+{
+	struct mt6357_gauge *gauge = platform_get_drvdata(pdev);
+
+	if (!gauge->soc.enabled)
+		return;
+	WRITE_ONCE(gauge->suspended, true);
+	mt6357_soc_stop(gauge);
+	mutex_lock(&gauge->status_lock);
+	gauge->status_active = false;
+	mutex_unlock(&gauge->status_lock);
+	cancel_delayed_work_sync(&gauge->status_work);
+	/* The existing devres stop action owns notifier unregister on detach. */
+}
+
+static DEFINE_SIMPLE_DEV_PM_OPS(mt6357_gauge_pm, mt6357_gauge_suspend, mt6357_gauge_resume);
+#endif
 
 static const struct of_device_id mt6357_gauge_of_match[] = {
 	{ .compatible = "mediatek,mt6357-gauge" },
@@ -981,9 +1456,15 @@ MODULE_DEVICE_TABLE(of, mt6357_gauge_of_match);
 
 static struct platform_driver mt6357_gauge_driver = {
 	.probe = mt6357_gauge_probe,
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+	.shutdown = mt6357_gauge_shutdown,
+#endif
 	.driver = {
 		.name = "mt6357-gauge",
 		.of_match_table = mt6357_gauge_of_match,
+#if IS_ENABLED(CONFIG_BATTERY_MT6357_R1_SOC)
+		.pm = pm_sleep_ptr(&mt6357_gauge_pm),
+#endif
 	},
 };
 module_platform_driver(mt6357_gauge_driver);

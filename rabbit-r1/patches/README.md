@@ -4,6 +4,13 @@ Apply `mainline/*.patch` in filename order to the locked user-fork commit
 `cceb223d0c2d7ce52fade7bb6b9ef679c560bea7`. `scripts/fetch-sources.py` does this
 idempotently. Patches are also already present in `src/mainline`.
 
+Patch 0077 adds the default-off live battery-capacity experiment. It seeds the
+stock-profile model before registration, checks cache freshness, and invalidates
+continuity across observed power and lifetime events. Its error budgets are
+uncalibrated. The shipping configuration remains unchanged; see
+`docs/MT6357-SOC.md` and `tests/battery/soc-integration.json` for the tests and
+remaining Android and hardware requirements.
+
 | Patch | Purpose |
 | --- | --- |
 | 0001 | Experimental rabbit r1 DTS, DTB target and board/vendor bindings |
