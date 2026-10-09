@@ -60,6 +60,70 @@ The caller must supply delta charge in the documented units; raw mainline
 CHARGE_COUNTER values are in microamp-hours. Conversion and counter-baseline
 continuity belong to the future estimator integration.
 
+``r1_battery_calculate_usable`` takes a temperature curve and explicit minimum
+voltage, discharge load, RAC, shunt resistance, meter resistance and DC ratio.
+Its result contains initial cutoff/capacity, final cutoff and a profile normalized
+by the final usable capacity. Existing DOD/usable fields are ignored. No Qmax
+metadata or fixed capacity supplies a missing input. Input and output may share
+the result's profile field; failure leaves the complete output untouched.
+
+Load is in 0.1 mA; RAC, shunt and meter resistance are in 0.1 milliohms; DC ratio
+is percent (100 means unity). Minimum voltage and DC ratio must be positive.
+Load and resistance inputs must be nonnegative. Explicit zero inputs support
+no-load/ideal-resistance arithmetic tests; zero is never a missing-measurement
+fallback. For example, 5000 load units and 1500 RAC units mean 500 mA and
+150 milliohms, giving a 750-unit (75 mV) initial voltage allowance.
+
+The stock source has a unit inconsistency at its RAC boundary:
+``mt635x-auxadc.c:auxadc_get_rac`` returns milliohms, and
+``mt6357-gauge.c:ptim_resist_get`` forwards that value unchanged, but
+``mtk_battery_algo.c:fgr_construct_vboot`` divides ``iboot * rac`` by 10000.
+With the verified 0.1-mA current unit, that division requires 0.1-milliohm RAC.
+This API names the latter unit explicitly. A future caller with a verified
+milliohm measurement must convert it with checked multiplication by ten.
+The tests pass the explicit arithmetic operand to stock instructions; they do
+not claim that stock's unconverted supplier input is dimensionally correct.
+
+Cutoff and resistance search
+---------------------------
+
+The calculation first adds ``load * RAC / 10000`` to minimum voltage and
+interpolates usable charge at that cutoff. It then normalizes DOD, searches
+from low voltage for a strict loaded-voltage crossing, and derives final usable
+charge and DOD from the resulting OCV coordinate. Cell resistance is scaled by
+DC ratio before adding shunt and meter resistance. Both signed stock divisions
+are retained: ``comp = (-load * total_resistance) / 1000`` followed by
+``(comp + 5) / 10``. This asymmetric negative-current rounding is intentional;
+it is not replaced with a single division or symmetric rounding.
+
+Capacity interpolation requires nondecreasing charge and nonincreasing voltage
+across all valid rows. It uses the first *strictly lower* voltage crossing and
+anchors interpolation at that lower-voltage row, preserving stock truncation.
+Repeated voltage/charge rows are retained: strict crossing guarantees different
+voltage coordinates when interpolation is needed. Below the final valid voltage,
+capacity is the last valid charge. A zero result (including at/above a zero-charge
+first row) returns ``R1_BATTERY_NO_CUTOFF``. Resistance need not be monotonic;
+the search retains stock's backwards first-crossing order and does not assume
+that loaded voltage is globally monotonic or suitable for binary search.
+
+The search starts at the upper DOD of the selected bracket and decrements by
+10 units (0.1 percent). It accepts only a strict loaded-voltage crossing on that
+grid. A missing crossing or repeated selected DOD coordinate returns
+``R1_BATTERY_NO_CUTOFF``. It does not read row -1 or return the final unsuccessful
+sample, both of which occur on captured stock paths. A bracket spanning more
+than 10000 DOD units returns ``R1_BATTERY_SEARCH_LIMIT``. This documented
+computational bound permits at most 1001 samples; it is not a physical assertion
+that every input outside that range is impossible.
+
+Stock constructs 53 rows but scans 100 for cutoff capacity. The zero tail
+changes its initial normalization. This implementation uses the explicit count
+(up to 53), so those unconstructed rows cannot influence any result. Comparison
+fixtures deliberately repeat the last valid stock row in the extra slots to
+exercise equivalent endpoint behavior; separate captures preserve the actual
+zero-tail differences. Final DOD remains wide instead of wrapping at stock's
+unsigned-short store. The fixture captures both the stock pre-store register
+and the stored value to make that difference independently verifiable.
+
 All subtraction, multiplication, division and addition intermediates are
 checked. Division truncates toward zero. A zero divisor, invalid profile,
 inconsistent DOD normalization or unrepresentable intermediate returns an
@@ -73,6 +137,9 @@ Run from the installed workspace::
 
     source /rabbitr1/scripts/env.sh
     python3 /rabbitr1/battery/tests/run.py
+
+Use ``--out /rabbitr1/out/battery-review/usable-capacity/test`` to redirect test
+artifacts. Both suites run by default.
 
 The normal test requires neither stock firmware nor emulation. It compiles the
 actual C sources with strict warnings, ASan and UBSan. Frozen expected values
@@ -96,27 +163,35 @@ regenerated with::
 
     /rabbitr1/toolchains/boot-tools/bin/python /rabbitr1/battery/tests/replay-stock.py
     /rabbitr1/toolchains/boot-tools/bin/python /rabbitr1/battery/tools/import-stock.py
+    /rabbitr1/toolchains/boot-tools/bin/python /rabbitr1/battery/tests/replay-usable-capacity.py
 
 The importer verifies pinned source hashes and the original full capture hash,
 compares all four DT tables with captured temperature endpoints, and records
-hashes of generated data. The original source replay also captures cutoff/RAC
-behavior for research; those results are excluded from the C implementation's
-pass criteria. The frozen fixtures and host sanitizers verify software behavior,
-not electrical calibration or SOC accuracy on a device.
+hashes of generated data. The dedicated usable-capacity replay runs the actual
+``fgr_construct_vboot`` QMAX_SEL=1 instructions and nested cutoff/resistance
+functions. It reuses pinned profile captures, verifies the kernel ELF and
+function hashes, and mocks only explicit RAC and unrelated hardware/logging
+inputs. ``tests/usable-provenance.json`` independently pins this replay and
+its frozen output; normal tests require neither firmware nor Unicorn. Expected
+arithmetic comes from emulation, including the quotient before the stock
+unsigned-short DOD store. Invalid-index and no-crossing execution paths become
+explicit C rejection fixtures, with unchanged-output assertions. Additional
+host tests cover signed overflow, invalid physical parameters, duplicate selected
+DOD, search bounds, first-crossing behavior and in-place publication. The cutoff suite checks 931 successful instruction
+paths (including four explicit-tail boundaries), 108 rejected stock negative-row
+paths and 18 rejected search fallthroughs. Eighteen successful paths also expose
+the stock unsigned-short DOD wrap.
+
+The frozen fixtures and host sanitizers verify software behavior, not electrical
+calibration or SOC accuracy on a device.
 
 Remaining estimator work
 ------------------------
 
-The stock cutoff/RAC Qmax path is deliberately a separate implementation step.
-It iterates 100 entries after constructing only 53, so its unconstructed zero
-rows affect cutoff results. It also permits zero capacities and missing search
-brackets. The C core uses only explicit valid rows and does not introduce a
-zero-voltage tail or an assumed RAC measurement to imitate those cases.
-
-A usable-capacity policy must accept verified cutoff/load/impedance inputs,
-define bounded bracket handling, and account for that documented boundary
-difference. A real estimator additionally needs trustworthy OCV initialization,
-battery/profile identity, a paired charge baseline, reset/removal detection,
+The pure cutoff calculation is now available, but no measured RAC or runtime
+usable-capacity policy is supplied. A real estimator still needs trustworthy OCV
+initialization, battery/profile identity, a paired charge baseline, reset/removal
+detection,
 continuity checks and defined invalidation. Charger FULL at the current
 conservative voltage limit must not manufacture a 100-percent seed.
 

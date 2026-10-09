@@ -20,6 +20,8 @@ enum r1_battery_error {
     R1_BATTERY_INVALID = -1,
     R1_BATTERY_OVERFLOW = -2,
     R1_BATTERY_UNNORMALIZED = -3,
+    R1_BATTERY_NO_CUTOFF = -4,
+    R1_BATTERY_SEARCH_LIMIT = -5,
 };
 
 struct r1_battery_point {
@@ -41,6 +43,24 @@ struct r1_battery_profile {
     /* Zero until the caller explicitly supplies a usable capacity. */
     r1_battery_int usable_01mah;
     r1_battery_int dod[R1_BATTERY_ROWS];
+};
+
+/* All inputs are explicit; none is obtained from Qmax metadata or a default.
+ * RAC uses the same 0.1 mOhm unit as the profile, NOT raw stock PTIM mOhm. */
+struct r1_battery_load {
+    r1_battery_int minimum_01mv;
+    r1_battery_int discharge_01ma;
+    r1_battery_int rac_01mohm;
+    r1_battery_int shunt_01mohm;
+    r1_battery_int meter_01mohm;
+    r1_battery_int dc_ratio_percent;
+};
+
+struct r1_battery_capacity {
+    struct r1_battery_profile profile;
+    r1_battery_int initial_cutoff_01mv;
+    r1_battery_int initial_usable_01mah;
+    r1_battery_int cutoff_01mv;
 };
 
 struct r1_battery_state {
@@ -66,6 +86,16 @@ int r1_battery_profile_at(const struct r1_battery_table *tables, size_t count,
 int r1_battery_assign_dod(const struct r1_battery_profile *profile,
                           r1_battery_int usable_01mah, struct r1_battery_profile *out);
 int r1_battery_validate_profile(const struct r1_battery_profile *profile);
+
+/* Calculate cutoff and normalize only the explicit valid curve rows. Existing
+ * DOD/usable fields are ignored. Positive minimum voltage/DC ratio and
+ * nonnegative load/resistances are required. The stock 0.1%-DOD search is
+ * bounded to a bracket spanning at most 10000 units (1001 samples). Missing
+ * crossings, zero capacity and selected repeated DOD coordinates fail closed.
+ * out may contain the input profile; failed operations publish nothing. */
+int r1_battery_calculate_usable(const struct r1_battery_profile *profile,
+                                const struct r1_battery_load *load,
+                                struct r1_battery_capacity *out);
 
 /* Positive OCV input is required. These are curve conversions, not evidence
  * that a loaded terminal-voltage measurement is a valid OCV reference. */

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 """Run the C core against frozen stock instruction outputs, with sanitizers."""
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import os
@@ -10,10 +11,13 @@ import subprocess
 
 ROOT = Path('/rabbitr1')
 SOURCE = Path(__file__).resolve().parents[1]
-OUT = ROOT/'out/battery-profile'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--out', type=Path, default=ROOT/'out/battery-profile')
+args = parser.parse_args()
+OUT = args.out.resolve()
 OUT.mkdir(parents=True, exist_ok=True)
 resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-os.environ['TMPDIR'] = str(ROOT/'.tmp')
+os.environ['TMPDIR'] = str(OUT)
 os.environ['ASAN_OPTIONS'] = 'detect_leaks=1:abort_on_error=1'
 provenance = json.loads((SOURCE/'provenance.json').read_text())
 for name, expected in provenance['generated_sha256'].items():
@@ -42,3 +46,32 @@ command = ['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-Wconversion', '-Ws
            str(SOURCE/'tests/profile.c'), '-o', str(OUT/'profile-tests')]
 subprocess.run(command, check=True)
 subprocess.run([str(OUT/'profile-tests'), str(OUT/'stock-oracles.txt')], check=True)
+
+# The cutoff capture is independent and separately pinned. No fixture expansion
+# computes expected voltage, resistance, capacity, DOD or an error decision.
+usable_provenance = json.loads((SOURCE/'tests/usable-provenance.json').read_text())
+assert hashlib.sha256((SOURCE/'tests/replay-usable-capacity.py').read_bytes()).hexdigest() == usable_provenance['replay_script_sha256']
+usable_path = SOURCE/'tests/usable-oracles.json'
+assert hashlib.sha256(usable_path.read_bytes()).hexdigest() == usable_provenance['capture_sha256']
+usable = json.loads(usable_path.read_text())
+lines = []
+for case in usable['cases'] + usable['zero_tail_boundaries']:
+    if case['padding'] != 'repeat_last':
+        continue  # Actual zero-tail evidence is retained, never a valid C row.
+    errors = {'stock_negative_row_index': -4,
+              'stock_search_fell_through_without_crossing': -4}
+    reason = case.get('rejected')
+    if reason is not None and reason not in errors:
+        raise AssertionError('Capture needs explicit error mapping: ' + reason)
+    values = [case[key] for key in ('temp_c', 'minimum_01mv', 'discharge_01ma',
+              'rac_01mohm', 'shunt_01mohm', 'meter_01mohm', 'dc_ratio_percent')]
+    values.append(errors[reason] if reason else 0)
+    if not reason:
+        values += [case[key] for key in ('initial_cutoff_01mv', 'initial_usable_01mah',
+                                         'cutoff_01mv', 'usable_01mah')]
+        values += case['dod_before_u16_store']
+    lines.append(' '.join(map(str, values)))
+(OUT/'usable-oracles.txt').write_text('\n'.join(lines) + '\n')
+command[-3:] = [str(SOURCE/'tests/usable-capacity.c'), '-o', str(OUT/'usable-capacity-tests')]
+subprocess.run(command, check=True)
+subprocess.run([str(OUT/'usable-capacity-tests'), str(OUT/'usable-oracles.txt')], check=True)

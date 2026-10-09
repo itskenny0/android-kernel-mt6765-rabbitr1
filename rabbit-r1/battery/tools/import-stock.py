@@ -86,7 +86,7 @@ provenance = {
     'stock_function_hashes': capture['function_hashes'],
     'replay_script_sha256': sha((DEST/'tests/replay-stock.py').read_bytes()),
     'generated_sha256': {name: sha((DEST/name).read_bytes()) for name in ('stock_profiles.c', 'tests/stock-oracles.json')},
-    'scope': '53 explicit DT rows only; usable capacities in conversion fixtures are supplied inputs, not measured capacity. No cutoff/RAC estimator or initialization is implemented.',
+    'scope': '53 explicit DT rows only; usable capacities in these original conversion fixtures are supplied inputs, not measured capacity. The separate cutoff instruction capture is pinned by tests/usable-provenance.json. No initialization is implemented.',
 }
 (DEST/'provenance.json').write_text(json.dumps(provenance, indent=2) + '\n')
 print('Imported four verified 53-row stock curves and independent ARM64 instruction fixtures')

@@ -68,5 +68,5 @@
     "stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
     "tests/stock-oracles.json": "f1a6969466a1165083dbf3b54bbb1acbd4b3f7e2e8138a3dfba9e26325b72116"
   },
-  "scope": "53 explicit DT rows only; usable capacities in conversion fixtures are supplied inputs, not measured capacity. No cutoff/RAC estimator or initialization is implemented."
+  "scope": "53 explicit DT rows only; usable capacities in these original conversion fixtures are supplied inputs, not measured capacity. The separate cutoff instruction capture is pinned by tests/usable-provenance.json. No initialization is implemented."
 }

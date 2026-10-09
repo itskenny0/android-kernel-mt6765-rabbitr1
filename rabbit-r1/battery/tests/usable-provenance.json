@@ -1,0 +1,37 @@
+{
+  "hardware_tested": false,
+  "capture_sha256": "41d003294546b33454c9a5f77b7d73da44ac738beaee22ecc00c38db04cf4ec9",
+  "replay_script_sha256": "596e79763b0b0a0cedf89b90f66f48361edd186e0baafd35bf66848d89d3587a",
+  "source_sha256": {
+    "src/kernel/drivers/power/supply/mtk_battery_algo.c": "77fe6b856ef762f92d79c0fded5d0382dd89ff9c87412685ddeb48b29aeabbb8",
+    "src/kernel/drivers/power/supply/mt6357-gauge.c": "4def22ad2b77e2b470c151b9b6b9bd48fcc344f459e737849109da22f59a25ae",
+    "src/kernel/drivers/iio/adc/mt635x-auxadc.c": "37a9cef182a2ef6e8309f7352a9e50909f529a32be59edeb5469bc76ede78a4c"
+  },
+  "function_hashes": {
+    "fg_construct_battery_profile_by_vboot": {
+      "address": "0xffffff8008adcd88",
+      "size": 868,
+      "sha256": "195a2479e39a81683f8611dfafdd65b85b0acb3bf568beb8e65d08513b11eedb"
+    },
+    "fg_compensate_battery_voltage_from_low": {
+      "address": "0xffffff8008add45c",
+      "size": 960,
+      "sha256": "b1ba53f21d2fcb6e7555e3d5355087874f0209a09e54f11907a874db8744d196"
+    },
+    "fgr_construct_vboot": {
+      "address": "0xffffff8008add0ec",
+      "size": 880,
+      "sha256": "0039376f7fb6a2ec3c6ba3dbe927d363a01ca9b13d08a5e784d34707e95089ff"
+    }
+  },
+  "scope": "Actual stock fgr_construct_vboot QMAX_SEL=1 and nested instructions. Logging/instrumentation, unused voltage/current/temperature and explicit RAC input are mocked. Valid 53-row profiles are from existing pinned instruction captures. Repeat-last padding is a deliberate alternate stock-memory fixture for valid-row endpoint comparison, not actual stock constructor behavior. RAC operand is explicitly 0.1mOhm, correcting the source supplier unit mismatch at the future caller boundary. No expected cutoff/capacity math is implemented in Python.",
+  "source_repository": {
+    "url": "https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765.git",
+    "commit": "8167c8c1087f057d2ef302fc93b47554291687ec"
+  },
+  "source_urls": {
+    "src/kernel/drivers/power/supply/mtk_battery_algo.c": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mtk_battery_algo.c",
+    "src/kernel/drivers/power/supply/mt6357-gauge.c": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mt6357-gauge.c",
+    "src/kernel/drivers/iio/adc/mt635x-auxadc.c": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/iio/adc/mt635x-auxadc.c"
+  }
+}

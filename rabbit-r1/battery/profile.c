@@ -225,3 +225,101 @@ int r1_battery_update(const struct r1_battery_profile *profile,
     *out = result;
     return R1_BATTERY_OK;
 }
+
+/* Stock's capacity interpolation is anchored at the lower-voltage row. This
+ * differs by one unit from reversing the endpoints before signed division. */
+static int capacity_at_cutoff(const struct r1_battery_table *curve,
+                              r1_battery_int cutoff, r1_battery_int *capacity)
+{
+    size_t i;
+    int ret;
+    for (i = 0; i < curve->count; ++i)
+        if (curve->points[i].voltage_01mv < cutoff) break;
+    if (!i) *capacity = curve->points[0].charge_01mah;
+    else if (i == curve->count) *capacity = curve->points[i - 1].charge_01mah;
+    else {
+        ret = interpolate(curve->points[i].voltage_01mv, curve->points[i].charge_01mah,
+                          curve->points[i - 1].voltage_01mv,
+                          curve->points[i - 1].charge_01mah, cutoff, capacity);
+        if (ret) return ret;
+    }
+    return *capacity > 0 ? R1_BATTERY_OK : R1_BATTERY_NO_CUTOFF;
+}
+
+static int loaded_voltage(r1_battery_int voltage, r1_battery_int resistance,
+                           const struct r1_battery_load *load, r1_battery_int *out)
+{
+    r1_battery_int scaled, total, compensation;
+    int ret;
+    if ((ret = multiply(resistance, load->dc_ratio_percent, &scaled)) ||
+        (ret = add(scaled / 100, load->shunt_01mohm, &total)) ||
+        (ret = add(total, load->meter_01mohm, &total)) ||
+        (ret = multiply(-load->discharge_01ma, total, &compensation))) return ret;
+    /* Preserve both stock divisions, including +5 for negative compensation. */
+    compensation /= 1000;
+    if ((ret = add(compensation, 5, &compensation))) return ret;
+    return add(voltage, compensation / 10, out);
+}
+
+static int cutoff_from_load(const struct r1_battery_profile *profile,
+                             const struct r1_battery_load *load, r1_battery_int *cutoff)
+{
+    size_t high;
+    r1_battery_int loaded, span, dod, voltage, resistance;
+    int ret;
+    for (high = profile->curve.count - 1; high > 0; --high)
+        if (profile->dod[high - 1] < R1_BATTERY_PERCENT_SCALE) break;
+    for (; high > 0; --high) {
+        const struct r1_battery_point *point = &profile->curve.points[high - 1];
+        if ((ret = loaded_voltage(point->voltage_01mv, point->resistance_01mohm,
+                                   load, &loaded))) return ret;
+        if (loaded > load->minimum_01mv) break;
+    }
+    if (!high) return R1_BATTERY_NO_CUTOFF;
+    /* No index -1, division by zero, or unbounded loop on a malformed bracket. */
+    if ((ret = subtract(profile->dod[high], profile->dod[high - 1], &span))) return ret;
+    if (span <= 0) return R1_BATTERY_NO_CUTOFF;
+    if (span > R1_BATTERY_PERCENT_SCALE) return R1_BATTERY_SEARCH_LIMIT;
+    for (dod = profile->dod[high]; ; dod -= 10) {
+        if ((ret = interpolate(profile->dod[high - 1],
+                               profile->curve.points[high - 1].voltage_01mv,
+                               profile->dod[high], profile->curve.points[high].voltage_01mv,
+                               dod, &voltage)) ||
+            (ret = interpolate(profile->dod[high - 1],
+                               profile->curve.points[high - 1].resistance_01mohm,
+                               profile->dod[high], profile->curve.points[high].resistance_01mohm,
+                               dod, &resistance)) ||
+            (ret = loaded_voltage(voltage, resistance, load, &loaded))) return ret;
+        if (loaded > load->minimum_01mv) {
+            *cutoff = voltage;
+            return R1_BATTERY_OK;
+        }
+        /* The stock grid starts at this bracket's upper DOD, not a global
+         * multiple of ten. Do not invent a successful lower-endpoint sample. */
+        if (dod - profile->dod[high - 1] < 10) return R1_BATTERY_NO_CUTOFF;
+    }
+}
+
+int r1_battery_calculate_usable(const struct r1_battery_profile *profile,
+                                const struct r1_battery_load *load,
+                                struct r1_battery_capacity *out)
+{
+    struct r1_battery_capacity result;
+    r1_battery_int drop, capacity;
+    int ret;
+    if (!profile || !load || !out || load->minimum_01mv <= 0 ||
+        load->discharge_01ma < 0 || load->rac_01mohm < 0 ||
+        load->shunt_01mohm < 0 || load->meter_01mohm < 0 ||
+        load->dc_ratio_percent <= 0) return R1_BATTERY_INVALID;
+    if ((ret = validate_curve(&profile->curve)) ||
+        (ret = multiply(load->discharge_01ma, load->rac_01mohm, &drop)) ||
+        (ret = add(load->minimum_01mv, drop / 10000, &result.initial_cutoff_01mv)) ||
+        (ret = capacity_at_cutoff(&profile->curve, result.initial_cutoff_01mv,
+                                  &result.initial_usable_01mah)) ||
+        (ret = r1_battery_assign_dod(profile, result.initial_usable_01mah, &result.profile)) ||
+        (ret = cutoff_from_load(&result.profile, load, &result.cutoff_01mv)) ||
+        (ret = capacity_at_cutoff(&result.profile.curve, result.cutoff_01mv, &capacity)) ||
+        (ret = r1_battery_assign_dod(&result.profile, capacity, &result.profile))) return ret;
+    *out = result;
+    return R1_BATTERY_OK;
+}
