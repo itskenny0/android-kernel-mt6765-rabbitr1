@@ -54,5 +54,14 @@ fi
 echo "Android build log: $R1_ROOT/logs/android-targeted-build.log"
 m -j"$R1_ANDROID_JOBS" "${targets[@]}" > "$R1_ROOT/logs/android-targeted-build.log" 2>&1
 r1_status=$?
-tail -70 "$R1_ROOT/logs/android-targeted-build.log"
+python3 - "$R1_ROOT/logs/android-targeted-build.log" <<'PY'
+from collections import deque
+from pathlib import Path
+import sys
+
+with Path(sys.argv[1]).open(errors='replace') as stream:
+    for line in deque(stream, maxlen=70):
+        line = line.rstrip('\n')
+        print(line if len(line) <= 1200 else line[:1200] + ' ... [full command in build log]')
+PY
 exit "$r1_status"
