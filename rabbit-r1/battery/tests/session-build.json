@@ -1,0 +1,317 @@
+{
+  "scope": "Measured-observation seed, absolute CAR tracking, invalidation and publication validity; no kernel CAPACITY wiring.",
+  "source_sha256": {
+    "/rabbitr1/src/mainline/rabbit-r1/battery/session.c": "257ea68c57b0e46eec6b778b0fa2b4e9d473ba5fd997f2997b9ddcb2473623d1",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/session.h": "38dae4045bcd1de50fb5c6ecd486c1788e7d1e944bac4a5e1ba9ae0d1ffddf4c",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/SESSION.rst": "2339bf7d0423107267fcaa18f634d47e39f2eb8fdde9625d9e3df8852c99d25c",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/README.rst": "03f9a359a916e63c85c70fb20949eb28784a282ddb4b2b709a683908dae11cb3",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/tests/session.c": "50eb9c64f95a320147a194d136702ebde1695bad09b9ecd3c9972f6261c5e710",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/tests/session-reference.py": "18a3a66eba3d4fd2a3dec93dd006cae3b14eb61d3398a39e587c35ea88e61704",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/tests/run.py": "a5451d13ead492f38d6c8ea19f58df382fcd78bea7959b5a2cdbc1d5aa76d1f5",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/profile.c": "247eee7d55c47960232fd28dd6254a426b0f3979c4177f9235647b2008eca8ba",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/profile.h": "a88b1ed8662d2a1d607ceaced52402859ed07a07b06c55a9d6a824b84b9aec58",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/tests/model-reference.py": "1cc8f317979d66f23f7f140df2e3d18e635b43da30313c7170be04a13d0f6dca",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/tests/stock-oracles.json": "f1a6969466a1165083dbf3b54bbb1acbd4b3f7e2e8138a3dfba9e26325b72116",
+    "/rabbitr1/src/mainline/rabbit-r1/battery/provenance.json": "0106628ab254a8e46dcde69017ea6f258f4d86df1dc106c8f9af3a36efd4d2f5"
+  },
+  "owner_handoff": {
+    "path": "/rabbitr1/out/battery-review/soc-state/handoff.json",
+    "sha256": "f44983b14c1080509629456fd285e7d994d6743697e96017871b3a7489cba6e9",
+    "bytes": 10325
+  },
+  "host_validation": {
+    "unchanged_profile_oracles": 42270,
+    "unchanged_profile_boundary_checks": 141,
+    "final_session_reference_operations": 3642,
+    "final_session_hand_assertions": 152,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "session_log": {
+      "path": "/rabbitr1/out/battery-review/soc-state/strict-event-session.log",
+      "sha256": "d5258e67a8b545f9278886fd096e4e9cf32b09e1ca8d2913485cb98c3831e90e",
+      "bytes": 108
+    },
+    "independent_event_cases": {
+      "path": "/rabbitr1/out/battery-review/soc-state/independent-review/equal-event-timestamp/fixed/result.json",
+      "sha256": "5417b1cb9ce8d1cf8159ee8b37e014db1807cd01996bb6a1f478ab5a6e31473f",
+      "bytes": 6843
+    }
+  },
+  "arm64": {
+    "compiler": "aarch64-linux-gnu-gcc 13.3.0",
+    "command": [
+      "make",
+      "O=/rabbitr1/out/charger-lifetime-kernel",
+      "M=/rabbitr1/out/battery-review/soc-state/arm64",
+      "ARCH=arm64",
+      "CROSS_COMPILE=aarch64-linux-gnu-",
+      "-j2",
+      "W=1",
+      "r1-battery-check.o"
+    ],
+    "additional_cflags": [
+      "-Werror",
+      "-fstack-usage"
+    ],
+    "kernel_source_commit": "2fac4ba716dd3668b631d9771e4048085e0f1632",
+    "kernel_config": {
+      "path": "/rabbitr1/out/charger-lifetime-kernel/.config",
+      "sha256": "d63b7077dafed56315c39abe35e1fd8a7b41075c83d85bf72416ad1967b183e1",
+      "bytes": 195216
+    },
+    "inputs": {
+      "profile.c": "247eee7d55c47960232fd28dd6254a426b0f3979c4177f9235647b2008eca8ba",
+      "profile.h": "a88b1ed8662d2a1d607ceaced52402859ed07a07b06c55a9d6a824b84b9aec58",
+      "stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+      "session.c": "257ea68c57b0e46eec6b778b0fa2b4e9d473ba5fd997f2997b9ddcb2473623d1",
+      "session.h": "38dae4045bcd1de50fb5c6ecd486c1788e7d1e944bac4a5e1ba9ae0d1ffddf4c"
+    },
+    "log": {
+      "path": "/rabbitr1/out/battery-review/soc-state/arm64/build.log",
+      "sha256": "c1fb5ec78b0fd703035d19a88a923f8aec109368998d72ff5be73f8f9f3af131",
+      "bytes": 245
+    },
+    "objects": [
+      {
+        "path": "/rabbitr1/out/battery-review/soc-state/arm64/profile.o",
+        "sha256": "5d5d5be2cdac41de20f4245b6fa469eda0fb16ddbd36d1c7c195fb6118978d1a",
+        "bytes": 8296
+      },
+      {
+        "path": "/rabbitr1/out/battery-review/soc-state/arm64/stock_profiles.o",
+        "sha256": "70d5d1fc2be1380c73b60845bbc479e76854e7a636f7360c72f869b965438278",
+        "bytes": 6336
+      },
+      {
+        "path": "/rabbitr1/out/battery-review/soc-state/arm64/session.o",
+        "sha256": "ae33d76f130b9274bf7b38ffbcdf7210758e248f245e7457f15d13683a8b5432",
+        "bytes": 8048
+      },
+      {
+        "path": "/rabbitr1/out/battery-review/soc-state/arm64/r1-battery-check.o",
+        "sha256": "03eab76ebc10b7841ae7aebe32a6c6a7b63e26a86edc9e9e8bb34f4ef9eeab87",
+        "bytes": 20536
+      }
+    ],
+    "stack_usage": [
+      {
+        "function": "session.c:139:42:candidate.constprop",
+        "bytes": 1952,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:303:5:r1_battery_calculate_usable",
+        "bytes": 1936,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:104:5:r1_battery_profile_at",
+        "bytes": 1856,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:146:5:r1_battery_assign_dod.part.0",
+        "bytes": 1824,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:247:5:r1_battery_session_step",
+        "bytes": 960,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:456:5:r1_battery_model_cutoff",
+        "bytes": 528,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:420:5:r1_battery_model_seed",
+        "bytes": 512,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:403:5:r1_battery_session_read",
+        "bytes": 224,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:204:12:normalize",
+        "bytes": 160,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:389:12:model_point",
+        "bytes": 96,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:163:5:r1_battery_validate_profile",
+        "bytes": 96,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:213:5:r1_battery_update",
+        "bytes": 96,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:328:12:model_residuals",
+        "bytes": 80,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:44:12:interpolate",
+        "bytes": 64,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:125:12:possible_delta",
+        "bytes": 64,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:249:12:loaded_voltage",
+        "bytes": 48,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:371:12:model_interpolate",
+        "bytes": 48,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:179:5:r1_battery_ocv_to_dod",
+        "bytes": 48,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:195:5:r1_battery_dod_to_ocv",
+        "bytes": 48,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:79:12:charge_bound",
+        "bytes": 48,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:231:12:capacity_at_cutoff",
+        "bytes": 32,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:57:12:percentage",
+        "bytes": 32,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:42:12:midpoint",
+        "bytes": 32,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:115:12:expand_root",
+        "bytes": 32,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:188:12:soc",
+        "bytes": 32,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:88:5:r1_battery_validate_tables",
+        "bytes": 16,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:146:5:r1_battery_assign_dod",
+        "bytes": 16,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:37:12:distance",
+        "bytes": 16,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:7:12:add",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:15:12:subtract",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:23:12:multiply",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:65:12:validate_curve",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "profile.c:83:16:r1_battery_whole_celsius",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:8:12:sum",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:16:12:difference",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:24:12:product",
+        "bytes": 0,
+        "kind": "static"
+      },
+      {
+        "function": "session.c:97:12:car_class",
+        "bytes": 0,
+        "kind": "static"
+      }
+    ],
+    "remaining_undefined_symbols": [
+      "__stack_chk_fail",
+      "memcpy",
+      "memset"
+    ],
+    "warnings": 0,
+    "errors": 0,
+    "full_kernel_or_module_link": false
+  },
+  "resolved_defects": [
+    "Linux noinline macro collided with portable GCC attribute; use __noinline__.",
+    "A reset/suspend event did not originally fence queued old captures.",
+    "Equal event and capture-start timestamps were ambiguous; require strictly later capture start while retaining ordinary inclusive adjacency."
+  ],
+  "limitations": [
+    "Model/error/current-envelope policy values still require explicit review and physical validation.",
+    "Host tests model physical observations; they do not validate real battery accuracy or hidden hardware resets.",
+    "ARM64 stack sizes are individual frames, not a full call-chain or interrupt-stack bound.",
+    "No collector worker, CAPACITY getter, Android startup handshake or on-device boot is validated by this record."
+  ],
+  "hardware_tested": false,
+  "independent_review": {
+    "path": "/rabbitr1/out/battery-review/soc-state/independent-review/implementation-review.md",
+    "sha256": "88ace812171879c5583503da074288c0cb815e051782e53657ef37a937f6d039",
+    "bytes": 6376
+  },
+  "independent_review_provenance": {
+    "path": "/rabbitr1/out/battery-review/soc-state/independent-review/implementation-provenance.json",
+    "sha256": "e7e473832a06ede2f058986a7b23a0657c6836bca8c4522d7875746355222302",
+    "bytes": 4122
+  }
+}

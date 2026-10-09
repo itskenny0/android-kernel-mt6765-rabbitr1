@@ -84,3 +84,11 @@ subprocess.run(['python3', str(SOURCE/'tests/model-reference.py'),
 command[-3:] = [str(SOURCE/'tests/model.c'), '-o', str(OUT/'model-tests')]
 subprocess.run(command, check=True)
 subprocess.run([str(OUT/'model-tests'), str(OUT/'model-reference.txt')], check=True)
+
+# Runtime state policy is independently modeled, not a stock daemon replay.
+subprocess.run(['python3', str(SOURCE/'tests/session-reference.py'),
+                '--out', str(OUT/'session-reference.txt')], check=True)
+command[-3:] = [str(SOURCE/'session.c'), str(SOURCE/'tests/session.c'),
+                '-o', str(OUT/'session-tests')]
+subprocess.run(command, check=True)
+subprocess.run([str(OUT/'session-tests'), str(OUT/'session-reference.txt')], check=True)

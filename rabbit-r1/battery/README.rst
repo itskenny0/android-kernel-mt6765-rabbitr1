@@ -19,7 +19,9 @@ API and units
 It uses signed 64-bit arithmetic, no allocation and no userspace library calls.
 A conditional type alias permits the same source to use Linux's ``s64`` type
 when eventually integrated into a kernel; that integration is not part of this
-change. All failed operations leave caller-owned outputs unchanged.
+change. The profile math leaves caller-owned outputs unchanged on errors. The new
+``session.h`` runtime reducer distinguishes API errors from explicit invalid-data
+state transitions; see ``SESSION.rst`` for its publication contract.
 
 The numerical units match the stock algorithm:
 
@@ -139,7 +141,7 @@ Run from the installed workspace::
     python3 /rabbitr1/battery/tests/run.py
 
 Use ``--out /rabbitr1/out/battery-review/usable-capacity/test`` to redirect test
-artifacts. All three suites run by default.
+artifacts. All four suites run by default.
 
 The normal test requires neither stock firmware nor emulation. It compiles the
 actual C sources with strict warnings, ASan and UBSan. For the two
@@ -148,6 +150,8 @@ kernel's ARM64 instructions, independently of this C implementation.
 The runner only serializes those captured values for their C test executables;
 it does not calculate their expected interpolation or charge results. The third
 suite uses the explicit rational reference described below for the new model.
+The fourth suite independently checks the live runtime session with exact
+rational arithmetic and hand-derived fault boundaries; see ``SESSION.rst``.
 
 The fixture contains 81 complete temperature profiles, 2358 OCV/DOD conversions,
 8 explicit-Qmax normalizations, 66 repeated-coordinate boundary conversions and
@@ -187,20 +191,22 @@ the stock unsigned-short DOD wrap.
 The frozen fixtures and host sanitizers verify software behavior, not electrical
 calibration or SOC accuracy on a device.
 
-Remaining estimator work
-------------------------
+Runtime estimator and remaining integration
+-------------------------------------------
 
-The pure cutoff calculation is now available, but no measured RAC or runtime
-usable-capacity policy is supplied. A real estimator still needs trustworthy OCV
-initialization, battery/profile identity, a paired charge baseline, reset/removal
-detection,
-continuity checks and defined invalidation. Charger FULL at the current
-conservative voltage limit must not manufacture a 100-percent seed.
+``session.h``/``session.c`` now connect complete live V/I/T/CAR observations to a
+modeled seed, explicit usable-capacity policy, absolute CAR tracking, invalidation
+and bounded publication. They keep the consumed-charge coordinate directly;
+no measured RAC or old boot OCV is required. ``SESSION.rst`` documents the exact
+collector0074 field mapping, explicit physical assumptions, kernel worker/cache
+follow-up and actual Android startup/error constraints.
 
-This library publishes no CAPACITY property and changes no kernel driver, DT,
-Health service, charging limit, RTC byte or hardware accumulator. Those remaining
-integration decisions and real device validation are required before exposing
-a battery percentage to Android.
+No production acceptance/error budgets are invented. This library publishes no
+CAPACITY property and changes no kernel driver, DT, Health service, charging
+limit, RTC byte or hardware accumulator. Initial valid acquisition, runtime
+availability and physical model/policy validation remain required before a
+battery percentage can support normal Android boot. Charger FULL must not
+manufacture a 100-percent seed.
 
 
 Loaded-profile model estimates
