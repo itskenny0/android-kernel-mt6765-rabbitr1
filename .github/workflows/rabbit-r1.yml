@@ -105,6 +105,9 @@ jobs:
           python3 scripts/test-android-super.py \
             --lpmake /rabbitr1/toolchains/android-lp/bin/lpmake \
             --out /rabbitr1/out/android-super/ci-tests 2>&1 | tee logs/android-super-tests.log
+          python3 scripts/test-android-super-audit.py \
+            --lpmake /rabbitr1/toolchains/android-lp/bin/lpmake \
+            --out /rabbitr1/out/android-super/ci-audit-profile-tests 2>&1 | tee logs/android-super-audit-tests.log
           python3 scripts/test-android-sparse.py 2>&1 | tee logs/android-sparse-tests.log
           python3 scripts/test-android-pmsg.py 2>&1 | tee logs/android-pmsg-tests.log
           python3 scripts/test-android-pstore-collection.py 2>&1 | tee logs/android-pstore-collection-tests.log

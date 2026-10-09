@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""Audit only the completed SOC/cp2a Health targets; never run target code."""
+import argparse
+import gzip
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import stat
+import struct
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+ROOT = Path('/rabbitr1')
+HERE = Path(__file__).resolve().parent
+REVIEW = HERE.parent
+EVIDENCE = None
+ANDROID = ROOT / 'src/android'
+CANONICAL = ROOT / 'src/mainline'
+OUT = ROOT / 'out/android'
+PRODUCT = OUT / 'target/product/r1'
+SOURCE = None  # supplied by the full-image guard
+KERNEL_SOURCE = 'f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+TARGETS = ['android.hardware.health-service.r1', 'r1-health-initial-ready',
+           'android.hardware.health-service.example_recovery', 'selinux_policy',
+           'sepolicy.recovery', 'bootimage', 'dtboimage']
+READ_ELF = ANDROID / 'prebuilts/clang/host/linux-x86/clang-r596125/bin/llvm-readelf'
+ANALYZER = OUT / 'soong/.intermediates/system/sepolicy/tools/sepolicy-analyze/sepolicy-analyze/linux_glibc_x86_64/sepolicy-analyze'
+CHECKFC = OUT / 'soong/.intermediates/system/sepolicy/tools/checkfc/linux_glibc_x86_64/checkfc'
+POLICY_QUERY = ROOT / 'out/battery-review/soc-state/android-startup/prototype/integration/policy-review/query'
+POLICY_QUERY_SHA = 'df1e7fbe12978d3af2878294ee5e24b74d890cade1f2b9e0f97ed467741eb772'
+BINARIES = {
+    'vendor-service': 'vendor/bin/hw/android.hardware.health-service.r1',
+    'initial-readiness': 'vendor/bin/r1-health-initial-ready',
+    'recovery-service': 'recovery/root/system/bin/hw/android.hardware.health-service.example_recovery',
+}
+LIMITS = [
+    'This is a targeted build/artifact audit, not a full-image, flash, boot or physical battery calibration result.',
+    'Vendor files are inspected in build installation staging; no vendor.img or full-ROM membership is claimed.',
+    'ELF linkage and policy permissions do not prove runtime linker namespaces, init ordering or Binder behavior.',
+    'Product boot arguments request global permissive SELinux. Per-domain permissive checks do not prove enforcement.',
+    'The kernel SOC model remains experimental; genuine zero and existing runtime shutdown semantics remain unchanged.',
+    'No target program, driver or device is executed or accessed. No Ninja graph is parsed.',
+]
+os.environ.update(TMPDIR=str(ROOT / '.tmp'), PYTHONDONTWRITEBYTECODE='1', GIT_OPTIONAL_LOCKS='0')
+sys.dont_write_bytecode = True
+watched = {}
+
+
+def ensure(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def read(path):
+    path = Path(path)
+    ensure(path.resolve().is_relative_to(ROOT), 'Read outside workspace: ' + str(path))
+    data = path.read_bytes()
+    observed = (len(data), sha(data))
+    ensure(str(path) not in watched or watched[str(path)] == observed, 'Input changed during audit: ' + str(path))
+    watched[str(path)] = observed
+    return data
+
+
+def info(path):
+    data = read(path)
+    return {'path': str(path), 'bytes': len(data), 'sha256': sha(data)}
+
+
+def run(argv, tag=None, success=True):
+    proc = subprocess.run([str(x) for x in argv], cwd=ROOT, capture_output=True)
+    text = (proc.stdout + proc.stderr).decode(errors='replace')
+    if tag:
+        (HERE / (tag + '.txt')).write_text(text)
+    if success:
+        ensure(proc.returncode == 0, f'{argv[0]} failed ({proc.returncode}): {text[-1500:]}')
+    return proc, text
+
+
+def committed(path):
+    return run(['git', '-C', CANONICAL, 'show', SOURCE + ':rabbit-r1/' + path])[0].stdout
+
+
+def flags_and_kernel():
+    path = OUT / 'soong/soong.lineage_r1_soc.variables'
+    variables = json.loads(read(path))
+    expected = {'DeviceProduct': 'lineage_r1_soc', 'DeviceName': 'r1',
+                'Platform_version_name': '17', 'Platform_sdk_version': 37,
+                'Platform_sdk_codename': 'REL', 'Platform_sdk_final': True,
+                'Platform_preview_sdk_version': '0', 'VendorApiLevel': '202604',
+                'Platform_security_patch': '2026-10-01'}
+    for key, value in expected.items():
+        ensure(variables.get(key) == value, f'Generated {key}: expected {value!r}, got {variables.get(key)!r}')
+    ensure(variables['BuildFlags']['RELEASE_BUILD_CLANG_VERSION'] == 'clang-r596125',
+           'Resolved Lineage cp2a compiler flag differs')
+    ensure('device/rabbit/r1/health/sepolicy' in variables['BoardVendorSepolicyDirs'], 'SOC policy not selected')
+    prebuilt = ANDROID / 'device/rabbit/r1/prebuilt'
+    record = json.loads(read(prebuilt / 'kernel-build.json'))
+    ensure(record['source_commit'] == KERNEL_SOURCE, 'SOC kernel source differs')
+    mode = {}
+    exec(compile(committed('scripts/r1-health-mode.py'), 'committed-r1-health-mode.py', 'exec'), mode)
+    image_gz = read(prebuilt / 'Image.gz')
+    image = gzip.decompress(image_gz)
+    verified = mode['validate']('lineage_r1_soc', record, image_gz, image, read(prebuilt / 'kernel-config'))
+    ensure(verified == json.loads(read(prebuilt / 'health-mode.json')), 'Health attestation differs')
+    ensure(mode['makefile'](verified) == read(prebuilt / 'health-prebuilt.mk'), 'Generated product/config guard differs')
+    return {'generated_variables': info(path), 'values': expected,
+            'policy_versions': {k: variables.get(k) for k in ['BoardSepolicyVers', 'PlatformSepolicyVersion']},
+            'resolved_compiler_flag': variables['BuildFlags']['RELEASE_BUILD_CLANG_VERSION'],
+            'health_mode': verified, 'kernel_record': info(prebuilt / 'kernel-build.json')}
+
+
+def elf(path, tag):
+    data = read(path)
+    ensure(data[:6] == b'\x7fELF\x02\x01' and struct.unpack_from('<H', data, 18)[0] == 183,
+           'Not ELF64 little-endian ARM64: ' + str(path))
+    ensure(struct.unpack_from('<H', data, 16)[0] in (2, 3), 'Not linked executable ELF')
+    _, dyn = run([READ_ELF, '--wide', '--dynamic', path], tag + '-dynamic')
+    _, phdr = run([READ_ELF, '--wide', '--program-headers', path], tag + '-program-headers')
+    needed = re.findall(r'\(NEEDED\).*?\[([^]]+)\]', dyn)
+    ensure({'libbinder_ndk.so', 'android.hardware.health-V5-ndk.so'} <= set(needed),
+           'Health/Binder linked dependencies missing: ' + tag)
+    ensure('Requesting program interpreter: /system/bin/linker64' in phdr, 'Missing Android ARM64 interpreter')
+    _, compiler_comment = run([READ_ELF, '--string-dump=.comment', path], tag + '-compiler-comment')
+    return {**info(path), 'architecture': 'ELF64 little-endian AArch64', 'needed': needed,
+            'compiler_comment': compiler_comment.strip()}
+
+
+def binaries():
+    details = {name: elf(PRODUCT / path, name) for name, path in BINARIES.items()}
+    for name, token in [('vendor-service', b'same Health monitor primed from an actual capacity reading'),
+                        ('initial-readiness', b'initial Health capacity available, including genuine zero')]:
+        ensure(token in read(PRODUCT / BINARIES[name]), 'New Health implementation string absent: ' + name)
+    return details
+
+
+def manifest(path):
+    root = ET.fromstring(read(path))
+    ensure(root.tag == 'manifest' and root.get('type') == 'device', 'Not a device VINTF fragment')
+    hals = root.findall('hal')
+    ensure(len(hals) == 1 and hals[0].get('format') == 'aidl', 'Expected one AIDL Health HAL')
+    hal = hals[0]
+    ensure(hal.findtext('name') == 'android.hardware.health' and hal.findtext('version') == '5' and
+           hal.findtext('fqname') == 'IHealth/default', 'Wrong installed Health VINTF contract')
+    return info(path)
+
+
+def init_vintf():
+    rc = PRODUCT / 'vendor/etc/init/health.r1.rc'
+    ensure(read(rc) == committed('android/device/health/health.r1.rc'), 'Vendor Health rc differs')
+    recovery_rc = PRODUCT / 'recovery/root/system/etc/init/android.hardware.health-service.example_recovery.rc'
+    ensure(read(recovery_rc) == read(ANDROID / 'hardware/interfaces/health/aidl/default/android.hardware.health-service.example_recovery.rc'),
+           'Recovery Health rc differs')
+    ensure(b'seclabel u:r:hal_health_default:s0' in read(recovery_rc), 'Recovery explicit domain missing')
+    for relative in ['vendor/bin/hw/android.hardware.health-service.example',
+                     'vendor/etc/init/android.hardware.health-service.example.rc',
+                     'recovery/root/vendor/bin/r1-health-initial-ready',
+                     'recovery/root/system/bin/r1-health-initial-ready',
+                     'recovery/root/system/etc/init/health.r1.rc']:
+        ensure(not (PRODUCT / relative).exists(), 'Unexpected duplicate or recovery readiness package: ' + relative)
+    return {'vendor_init': info(rc), 'recovery_init': info(recovery_rc),
+            'vendor_vintf': manifest(PRODUCT / 'vendor/etc/vintf/manifest/health.r1.xml'),
+            'recovery_vintf': manifest(PRODUCT / 'recovery/root/system/etc/vintf/manifest/android.hardware.health-service.example.xml'),
+            'normal_boot_readiness_only': True}
+
+
+def cpio(raw):
+    entries, pos = {}, 0
+    while True:
+        ensure(raw[pos:pos+6] == b'070701' and pos + 110 <= len(raw), 'Malformed newc header')
+        fields = [int(raw[pos+6+i*8:pos+14+i*8], 16) for i in range(13)]
+        inode, mode, _, _, nlink, _, length, major, minor, _, _, namesize, _ = fields
+        start = pos + 110
+        ensure(namesize > 0 and start + namesize <= len(raw) and raw[start+namesize-1] == 0, 'Malformed newc name')
+        name = raw[start:start+namesize-1].decode().removeprefix('./')
+        start = (start + namesize + 3) & ~3
+        ensure(start + length <= len(raw), 'Malformed newc extent')
+        value, pos = raw[start:start+length], (start+length+3) & ~3
+        if name == 'TRAILER!!!':
+            # Linux can continue into another newc archive after a trailer.
+            # This audit supports mkbootfs's one archive plus zero padding;
+            # never silently omit later files or a competing Health service.
+            ensure(length == 0, 'Nonempty CPIO trailer payload')
+            ensure(not any(raw[pos:]), 'Unsupported nonzero data after CPIO trailer')
+            break
+        ensure(name not in entries and not PurePosixPath(name).is_absolute() and '..' not in PurePosixPath(name).parts,
+               'Invalid/duplicate newc path')
+        entries[name] = (mode, nlink, (major, minor, inode), value)
+    def get(name):
+        ensure(name in entries, 'Ramdisk missing ' + name)
+        mode, nlink, key, value = entries[name]
+        ensure(stat.S_ISREG(mode), 'Ramdisk non-regular entry: ' + name)
+        if not value and nlink > 1:
+            matches = [e[3] for e in entries.values() if e[2] == key and e[3]]
+            ensure(len(matches) == 1, 'Ambiguous CPIO hardlink data')
+            value = matches[0]
+        return value
+    return entries, get
+
+
+def boot_members():
+    data = read(PRODUCT / 'boot.img')
+    ensure(data[:8] == b'ANDROID!' and len(data) <= 33554432, 'Invalid r1 boot envelope')
+    kernel_size, _, ramdisk_size = struct.unpack_from('<3I', data, 8)
+    page, version = struct.unpack_from('<2I', data, 36)
+    ensure(page == 2048 and version == 2, 'Unexpected r1 boot header')
+    ensure(data[page:page+kernel_size] == read(ANDROID / 'device/rabbit/r1/prebuilt/Image.gz'), 'Boot contains different kernel')
+    offset = page + ((kernel_size + page - 1) // page) * page
+    ensure(offset + ramdisk_size <= len(data), 'Ramdisk outside boot')
+    compressed = data[offset:offset+ramdisk_size]
+    ensure(compressed == read(PRODUCT / 'ramdisk-recovery.img'), 'Boot recovery ramdisk differs')
+    entries, get = cpio(gzip.decompress(compressed))
+    names = ['system/bin/hw/android.hardware.health-service.example_recovery',
+             'system/etc/init/android.hardware.health-service.example_recovery.rc',
+             'system/etc/vintf/manifest/android.hardware.health-service.example.xml', 'sepolicy']
+    checked = {}
+    for name in names:
+        content = get(name)
+        ensure(content == read(PRODUCT / 'recovery/root' / name), 'Ramdisk differs from installed recovery: ' + name)
+        checked[name] = {'bytes': len(content), 'sha256': sha(content)}
+    ensure(not any('r1-health-initial-ready' in name or name.endswith('/health.r1.rc') for name in entries),
+           'Normal-boot readiness unexpectedly packaged in recovery')
+    cmdline = data[64:576].split(b'\0')[0] + data[608:1632].split(b'\0')[0]
+    ensure(b'androidboot.selinux=permissive' in cmdline, 'Boot enforcement changed: reassess audit scope')
+    return {'boot': info(PRODUCT / 'boot.img'), 'dtbo': info(PRODUCT / 'dtbo.img'),
+            'kernel_matches_attested_soc_prebuilt': True, 'recovery_members': checked,
+            'global_permissive_boot_requested': True,
+            'scope': 'Header/kernel/Health ramdisk correspondence only; no repeat of full AVB/DT audit'}
+
+
+def context_matches(contexts, tests, tag):
+    proc, text = run([CHECKFC, '-t', contexts, tests], tag, success=False)
+    if proc.returncode == 0:
+        ensure(not text.strip(), 'Unexpected checkfc success diagnostics')
+        return {'exit_code': 0, 'matched_test_paths': True, 'untested_context_rules': 0}
+    # checkfc distinguishes incorrect/missing path labels (1) from incomplete
+    # fixture coverage of unrelated regexes (2). Accept only that exact latter
+    # diagnostic, never an arbitrary exit 2 or a label mismatch.
+    lines = text.splitlines()
+    ending = ('No test entries were found for the contexts above. You may need to update '
+              + str(tests) + '.')
+    warnings = lines[:-1]
+    ensure(proc.returncode == 2 and len(lines) >= 2 and lines[-1] == ending and
+           all(re.fullmatch(r'Warning!  No matches for \(.+, u:object_r:[A-Za-z0-9_]+:s0\)', line)
+               for line in warnings),
+           'checkfc path lookup failed or produced non-coverage diagnostics: ' + text[-1800:])
+    return {'exit_code': 2, 'matched_test_paths': True,
+            'untested_context_rules': len(warnings),
+            'scope': 'Both requested Health paths matched; unrelated context rules are outside this two-path fixture'}
+
+
+def policy():
+    vendor = PRODUCT / 'vendor/etc/selinux'
+    normal = vendor / 'precompiled_sepolicy'
+    recovery = PRODUCT / 'recovery/root/sepolicy'
+    ensure(sha(read(POLICY_QUERY)) == POLICY_QUERY_SHA, 'Reviewed host libsepol query changed')
+    ensure(struct.unpack_from('<H', read(POLICY_QUERY), 18)[0] == 62, 'Query is not the reviewed host ELF')
+    _, query = run([POLICY_QUERY, normal], 'normal-policy-access-and-labels')
+    ensure(query.rstrip().endswith('PASS'), 'Compiled normal policy label/permission query failed')
+    metadata = {}
+    variables = json.loads(read(OUT / 'soong/soong.lineage_r1_soc.variables'))
+    version = variables['BoardSepolicyVers']
+    ensure(read(vendor / 'plat_sepolicy_vers.txt').decode().strip() == version, 'Vendor policy version mismatch')
+    for partition, prefix in [('system', 'plat'), ('system_ext', 'system_ext'), ('product', 'product')]:
+        base = PRODUCT / partition / 'etc/selinux'
+        cil = base / (prefix + '_sepolicy.cil')
+        mapping = base / 'mapping' / (version + '.cil')
+        expected = sha(read(cil) + read(mapping))
+        digest_file = base / (prefix + '_sepolicy_and_mapping.sha256')
+        precompiled_digest = vendor / ('precompiled_sepolicy.' + prefix + '_sepolicy_and_mapping.sha256')
+        ensure(read(digest_file).decode().strip() == expected == read(precompiled_digest).decode().strip(),
+               'Split policy/precompiled input digest mismatch: ' + partition)
+        metadata[partition] = {'cil': info(cil), 'mapping': info(mapping), 'combined_sha256': expected}
+    cil = read(vendor / 'vendor_sepolicy.cil')
+    ensure(b'(type r1_health_ready)' in cil, 'New helper missing from actual vendor CIL')
+    per_policy = {}
+    for name, path in [('normal', normal), ('recovery', recovery)]:
+        _, text = run([ANALYZER, path, 'permissive'], name + '-per-domain-permissive')
+        per_domain = text.splitlines()
+        ensure(not {'hal_health_default', 'r1_health_ready'} & set(per_domain), 'Health per-domain permissive declaration')
+        for domain, required in [('hal_health_default', {'domain', 'halserverdomain', 'hal_health_server'}),
+                                 ('r1_health_ready', {'domain'})]:
+            _, attributes = run([ANALYZER, path, 'attribute', '-r', domain], name + '-' + domain + '-attributes')
+            ensure(required <= set(attributes.splitlines()), 'Health domain attributes absent in ' + name)
+        per_policy[name] = {**info(path), 'per_domain_permissive_declarations': per_domain}
+    # A nonzero neverallow result must identify the exact compiled permission;
+    # arbitrary tool failure cannot satisfy these recovery-rootfs checks.
+    queries = []
+    for rule, proof in [
+        ('neverallow hal_health_default rootfs:file entrypoint;', 'allow hal_health_default rootfs:file { entrypoint }'),
+        ('neverallow init hal_health_default:process transition;', 'allow init hal_health_default:process { transition }')]:
+        proc, text = run([ANALYZER, recovery, 'neverallow', '-n', rule],
+                         'recovery-presence-' + str(len(queries)), success=False)
+        ensure(proc.returncode != 0 and 'neverallow violated by ' + proof in text, 'Compiled recovery permission absent: ' + proof)
+        queries.append(rule)
+    contexts = vendor / 'vendor_file_contexts'
+    run([CHECKFC, normal, contexts], 'vendor-file-context-validity')
+    tests = HERE / 'health-context-paths.txt'
+    tests.write_text('/vendor/bin/hw/android.hardware.health-service.r1 hal_health_default_exec\n'
+                     '/vendor/bin/r1-health-initial-ready r1_health_ready_exec\n')
+    path_lookup = context_matches(contexts, tests, 'vendor-health-context-matches')
+    return {'compiled': per_policy, 'split_inputs': metadata, 'vendor_cil': info(vendor / 'vendor_sepolicy.cil'),
+            'vendor_file_contexts': info(contexts), 'health_context_lookup': path_lookup,
+            'query': info(POLICY_QUERY),
+            'compiled_normal_label_and_access_checks': True, 'literal_genfs_prefix_capability_checked': True,
+            'recovery_rootfs_permission_presence_queries': queries, 'tools': {'analyzer': info(ANALYZER), 'checkfc': info(CHECKFC)},
+            'runtime_enforcement_verified': False}
+
+
+if __name__ == '__main__':
+    raise SystemExit('Use only through the terminal-success-gated full-image verifier')

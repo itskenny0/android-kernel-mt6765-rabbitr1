@@ -43,7 +43,7 @@ for i, name in enumerate(m.PARTS, 1):
 log = WORK/'synthetic-success.log'; log.write_text('SYNTHETIC TEST ONLY\n#### build completed successfully\n')
 audit = {'mode':'verify','overall':'pass','errors':[], 'synthetic_fixture_only':True,
          'build_start_source_commit':'1'*40,'verifier':m.digest_file(HERE/'test-android-super.py'),
-         'checks':[{'name':n,'status':'pass','details':{}} for n in m.CHECKS]}
+         'checks':[{'name':n,'status':'pass','details':{}} for n in m.LEGACY_CHECKS]}
 audit['checks'][0]['details'] = {'build_start_commit':'1'*40,'build_log':m.digest_file(log)}
 audit['checks'][1]['details'] = images
 audit['checks'][-1]['details'] = {'image_sizes_and_mtimes_unchanged':True}
@@ -54,7 +54,7 @@ def write_audit(obj=audit):
     return m.digest_file(ap)['sha256']
 
 def plan(obj=audit, dims=D):
-    return m.make_plan(ap,write_audit(obj),TOOL,m.digest_file(TOOL)['sha256'],dims)
+    return m.make_plan(ap,write_audit(obj),TOOL,m.digest_file(TOOL)['sha256'],dims,audit_profile='legacy-default-10')
 
 p = plan(); (WORK/'plan.json').write_text(json.dumps(p,indent=2)+'\n')
 out = WORK/'good'
@@ -89,7 +89,7 @@ for change in ['mode','overall','errors','missing','duplicate','failed','commit'
         assert str(path) not in {row['path'] for row in images.values()}, 'Incomplete audit opened an image'
         return real(path)
     with mock.patch.object(m,'digest_file',guard):
-        rejects(lambda:m.make_plan(ap,wanted,TOOL,real(TOOL)['sha256'],D))
+        rejects(lambda:m.make_plan(ap,wanted,TOOL,real(TOOL)['sha256'],D,audit_profile='legacy-default-10'))
 write_audit()
 for change in ['hash','size','sparse','unaligned','empty','budget','missing-image','bad-verifier','bad-log']:
     obj=copy.deepcopy(audit); row=obj['checks'][1]['details']['system']
@@ -106,7 +106,7 @@ for change in ['hash','size','sparse','unaligned','empty','budget','missing-imag
 write_audit()
 rejects(lambda:plan(dims=dict(D,group_bytes=20000)), 'per-group')
 rejects(lambda:plan(dims=dict(D,super_bytes=8*1024*1024)), 'headroom')
-rejects(lambda:m.make_plan(ap,m.digest_file(ap)['sha256'],TOOL,'0'*64,D), 'executable')
+rejects(lambda:m.make_plan(ap,m.digest_file(ap)['sha256'],TOOL,'0'*64,D,audit_profile='legacy-default-10'), 'executable')
 rejects(lambda:m.build(p,out), 'existing')
 q=copy.deepcopy(p);q['images']['system']['sha256']='0'*64
 rejects(lambda:m.build(q,WORK/'stale-plan'), 'Stale')
@@ -184,7 +184,7 @@ real_audit=WORK/'incomplete-audit.json'
 plan_only=copy.deepcopy(audit);plan_only['mode']='plan'
 real_audit.write_text(json.dumps(plan_only,indent=2)+'\n')
 reject_output=WORK/'rejected-plan.json'
-args=[sys.executable,str(HERE/'build-android-super.py'),'plan','--audit',str(real_audit),
+args=[sys.executable,str(HERE/'build-android-super.py'),'plan','--audit-profile','legacy-default-10','--audit',str(real_audit),
       '--audit-sha256',m.digest_file(real_audit)['sha256'],'--lpmake',str(TOOL),
       '--lpmake-sha256',m.digest_file(TOOL)['sha256'],'--output',str(reject_output)]
 proc=subprocess.run(args,capture_output=True,text=True)

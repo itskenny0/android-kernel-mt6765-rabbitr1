@@ -16,17 +16,35 @@ separate verification.
 ## Required inputs
 
 A completed, reviewed full-image audit is required before planning. Supply its
-SHA256 explicitly. The tool accepts the existing verifier's `mode=verify`,
-`overall=pass` record only when all ten required checks passed, the final image
-immutability check passed, and its build revision, verifier and successful build
-log are pinned consistently. A plan-only or failed audit is rejected before any
-filesystem image is read. The audit digest is a review trust anchor, not a
-signature or a substitute for reviewing the upstream content audit.
+SHA256 explicitly. The default `soc-cp2a-18` profile requires all eighteen checks
+from the reviewed SOC verifier, including the corrected normal/recovery Health
+inventory. It checks the build-start/result/log linkage, source and kernel
+identity, eight image records, source inputs and final immutability check.
+The verifier and its two accompanying modules must match the profile's exact
+source hashes. A plan-only or failed audit is rejected before any filesystem
+image is read. The audit digest is a review trust anchor, not a signature or a
+substitute for reviewing the content audit.
 
-The four audited inputs must be complete raw images, including their AVB data.
+This profile is tied to the reviewed SOC/cp2a producer and kernel revision
+`f72592a467a1e289ffbfd0fbee6adac5093bf6db`; producer or kernel changes require a
+reviewed profile update. Schema tests pass, but compatibility with the actual
+completed eighteen-check report remains to be verified after the current build
+and image audit finish.
+
+The older ten-check format requires explicit `--audit-profile legacy-default-10`.
+It is only for historical reproduction: it did not reject the old simulated
+Cuttlefish Health provider. Its plans and results carry that limitation, and
+there is no automatic fallback. New plans use schema 2 and record the selected
+profile and audit dependencies. Old schema-1 plans must be recreated from their
+reviewed audit and matching preserved inputs; historical evidence is unchanged.
+
+The four payload inputs must be complete raw images, including their AVB data.
 Their file lengths, logical lengths and SHA256 digests must match the audit.
 Sparse, empty, unaligned, oversized and changed inputs are rejected. Do not use
-the factory super as a payload input or inspect unfinished build outputs.
+the factory super as a payload input or inspect unfinished build outputs. The
+current profile also rechecks the audited boot, DTBO, vbmeta and factory-super
+hashes, although only the four filesystem images become lpmake payloads. Keep
+all pinned audit dependencies available through output validation.
 
 The tested AOSP `lpmake` comes from `prebuilts/kernel-build-tools` commit
 `811c6e2938d53b3c318d7635b03931601a68c765`. Its Linux executable SHA256 is
@@ -103,16 +121,27 @@ existing mismatched files are preserved. CI uses this same tool set without
 syncing an Android tree. The source is pinned to AOSP build-tools commit
 `811c6e2938d53b3c318d7635b03931601a68c765`.
 
-Run the 84-case suite with the real pinned executable into a new directory:
+Run the 131-case audit-profile suite and the 84-case construction suite into new
+directories:
 
 ```sh
+python3 /rabbitr1/src/mainline/rabbit-r1/scripts/test-android-super-audit.py \
+  --lpmake /rabbitr1/toolchains/android-lp/bin/lpmake \
+  --out /rabbitr1/out/android-super/audit-profile-tests
 python3 /rabbitr1/src/mainline/rabbit-r1/scripts/test-android-super.py \
   --lpmake /rabbitr1/toolchains/android-lp/bin/lpmake \
   --lpmake-sha256 e36cd66b46a04fedb9f23cc891b5b296f6779de7afcf6f08e3c67ee4b0bc7313 \
   --out /rabbitr1/out/android-super/test-run
 ```
 
-Tests create their own small distinctive payloads and audit fixtures. They cover
+The [audit-profile fixtures](../tests/android-super-audit/README.rst) exercise
+current and explicit legacy admission, build/source/Health correspondence,
+producer hashes, CLI selection and output confinement. Their producer snapshots
+are data only: the suite forbids their execution and never runs an image auditor
+or lpmake. Its synthetic passing records are not completed-build evidence.
+
+The construction suite uses the real pinned lpmake with its own small distinctive
+payloads and an explicitly selected legacy audit fixture. It covers
 incomplete-audit rejection, geometry/metadata corruption, semantic extent/group
 errors, shared A/B extents, payload corruption, changed inputs, raw-vs-sparse
 output, actual A-only construction, tool failure and report publication/cleanup

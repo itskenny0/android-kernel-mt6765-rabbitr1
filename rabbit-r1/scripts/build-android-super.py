@@ -10,7 +10,7 @@ PARTS = ('system', 'system_ext', 'product', 'vendor')
 LAYOUT = {'super_bytes': 8792064000, 'group_bytes': 4294967296,
           'metadata_bytes': 65536, 'metadata_slots': 3, 'block_bytes': 4096,
           'alignment_bytes': 1048576}
-CHECKS = (
+LEGACY_CHECKS = (
     'completed build and staged provenance',
     'image hashes and logical partition budgets',
     'actual check-all-partition-sizes result',
@@ -22,6 +22,130 @@ CHECKS = (
     'vendor pstore module kernel match and explicit-load packaging',
     'image immutability during read-only audit',
 )
+
+
+SOC_CHECKS = ('completed build and staged provenance',
+ 'image hashes and logical partition budgets',
+ 'actual check-all-partition-sizes result',
+ 'full vbmeta signature, descriptors and image correspondence',
+ 'sparse super metadata, A/B layout and actual extent payloads',
+ 'actual ext4 contents: init, fstab, VINTF, services, app and modules',
+ 'packaged ARM64 services and charging APK metadata',
+ 'all SOC kernel modules and explicit pstore-load packaging',
+ 'SOC cp2a product flags and embedded kernel configuration',
+ 'actual SOC Health linked binaries and init/VINTF separation',
+ 'compiled SOC split and recovery policy',
+ 'SOC Health service, helper, init/VINTF and policy inside vendor image',
+ 'packaged finalized Android 17 and Lineage 24 property values',
+ 'current SOC boot/DTBO headers, AVB coverage and recovery contents',
+ 'current packaged pstore collector and liblog implementations',
+ 'resolved ARM allocator configuration',
+ 'current allocator APEX payload, ARM64 libraries, init and VINTF',
+ 'image immutability during read-only audit')
+AUDIT_PROFILES = {'soc-cp2a-18': SOC_CHECKS, 'legacy-default-10': LEGACY_CHECKS}
+SOC_KERNEL = 'f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+SOC_PRODUCER = {'verify.py': 'd1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670',
+ 'provenance.py': '82aad6709888a0779a380a71e263192e313bb425fcc239314a5c307443c05f3b',
+ 'health_checks.py': '72a336069bc0ccabc70c058fabb5a0f8d19e9af6a96e311949050e09409aff8c'}
+SOC_TARGETS = {'bootimage',
+ 'check-all-partition-sizes',
+ 'dtboimage',
+ 'productimage',
+ 'sepolicy.recovery',
+ 'superimage',
+ 'systemextimage',
+ 'systemimage',
+ 'vbmetaimage',
+ 'vendorimage'}
+SOC_DETAIL_KEYS = {'completed build and staged provenance': {'build_identity',
+                                           'build_log',
+                                           'build_start_commit',
+                                           'canonical_templates_verified',
+                                           'installer_manifest',
+                                           'kernel_source_commit',
+                                           'staged_files_verified'},
+ 'image hashes and logical partition budgets': {'boot',
+                                                'dtbo',
+                                                'dynamic_group',
+                                                'product',
+                                                'super',
+                                                'system',
+                                                'system_ext',
+                                                'vbmeta',
+                                                'vendor'},
+ 'actual check-all-partition-sizes result': {'group_budget_independently_checked',
+                                             'input',
+                                             'log',
+                                             'warnings'},
+ 'full vbmeta signature, descriptors and image correspondence': {'boot',
+                                                                 'descriptor_payloads_verified',
+                                                                 'dtbo',
+                                                                 'fec_parity_verified',
+                                                                 'hashtrees_verified',
+                                                                 'product',
+                                                                 'system',
+                                                                 'system_ext',
+                                                                 'trusted_production_chain',
+                                                                 'vbmeta',
+                                                                 'vendor'},
+ 'sparse super metadata, A/B layout and actual extent payloads': {'empty_slot',
+                                                                  'geometry',
+                                                                  'logical_extent_image_sha256',
+                                                                  'metadata',
+                                                                  'nonoverlapping_extents',
+                                                                  'populated_slot',
+                                                                  'primary_backup_and_all_slots_identical'},
+ 'actual ext4 contents: init, fstab, VINTF, services, app and modules': {'product',
+                                                                         'system',
+                                                                         'system_ext',
+                                                                         'vendor'},
+ 'packaged ARM64 services and charging APK metadata': {'native_elfs', 'charging_apk', 'package'},
+ 'all SOC kernel modules and explicit pstore-load packaging': {'kernel_release',
+                                                               'module_dependencies_sha256',
+                                                               'module_files'},
+ 'SOC cp2a product flags and embedded kernel configuration': {'generated_variables',
+                                                              'health_mode',
+                                                              'kernel_record',
+                                                              'resolved_compiler_flag',
+                                                              'values'},
+ 'actual SOC Health linked binaries and init/VINTF separation': {'binaries', 'init_vintf'},
+ 'compiled SOC split and recovery policy': {'compiled',
+                                            'compiled_normal_label_and_access_checks',
+                                            'health_context_lookup',
+                                            'literal_genfs_prefix_capability_checked',
+                                            'split_inputs',
+                                            'vendor_cil'},
+ 'SOC Health service, helper, init/VINTF and policy inside vendor image': {'actual_vendor_image_members',
+                                                                           'default_vendor_health_absent',
+                                                                           'normal_health_inventory',
+                                                                           'split_policy_packaged_bytes_match_current_compiled_outputs'},
+ 'packaged finalized Android 17 and Lineage 24 property values': {'declared_security_patch_is_not_coverage_proof',
+                                                                  'values'},
+ 'current SOC boot/DTBO headers, AVB coverage and recovery contents': {'boot',
+                                                                       'dt_table',
+                                                                       'dtbo',
+                                                                       'header',
+                                                                       'recovery_dependency_closure',
+                                                                       'recovery_files',
+                                                                       'unique_health_fragments',
+                                                                       'unique_health_services'},
+ 'current packaged pstore collector and liblog implementations': {'actual_packaged_artifacts',
+                                                                  'old_build_hashes_reused'},
+ 'resolved ARM allocator configuration': {'minigbm_config', 'variables'},
+ 'current allocator APEX payload, ARM64 libraries, init and VINTF': {'bytes',
+                                                                     'elfs',
+                                                                     'manifest',
+                                                                     'path',
+                                                                     'payload',
+                                                                     'required_files',
+                                                                     'sha256',
+                                                                     'vintf_declarations'},
+ 'image immutability during read-only audit': {'image_sizes_and_mtimes_unchanged',
+                                               'no_writable_image_handles_used',
+                                               'source_records_and_full_artifact_hashes'}}
+LEGACY_WARNING = ('Historical default-product reproduction only: this ten-check audit predates '
+                  'the corrected Health provider inventory and did not reject the old Cuttlefish mock Health HAL. '
+                  'It is not current SOC complete-image or clean-install evidence.')
 
 
 def require(ok, message):
@@ -61,40 +185,238 @@ def checked_record(row):
     return got
 
 
-def read_audit(path, expected):
+SOC_BOOLEAN_DETAILS = {
+    'group_budget_independently_checked': True, 'descriptor_payloads_verified': True,
+    'hashtrees_verified': True, 'fec_parity_verified': False, 'trusted_production_chain': False,
+    'primary_backup_and_all_slots_identical': True, 'compiled_normal_label_and_access_checks': True,
+    'literal_genfs_prefix_capability_checked': True, 'default_vendor_health_absent': True,
+    'split_policy_packaged_bytes_match_current_compiled_outputs': True,
+    'declared_security_patch_is_not_coverage_proof': True, 'old_build_hashes_reused': False,
+    'image_sizes_and_mtimes_unchanged': True, 'no_writable_image_handles_used': True,
+}
+SOC_STRING_DETAILS = {'build_start_commit', 'kernel_source_commit', 'package', 'kernel_release',
+                      'module_dependencies_sha256', 'resolved_compiler_flag', 'populated_slot',
+                      'empty_slot', 'path', 'sha256'}
+SOC_INTEGER_DETAILS = {'staged_files_verified', 'canonical_templates_verified', 'bytes'}
+SOC_LIST_DETAILS = {'warnings', 'nonoverlapping_extents', 'unique_health_services', 'unique_health_fragments'}
+
+
+def record_shape(row):
+    require(isinstance(row, dict) and {'path', 'bytes', 'sha256'} <= row.keys(),
+            'Incomplete artifact record')
+    require(isinstance(row['path'], str) and Path(row['path']).is_absolute()
+            and type(row['bytes']) is int and row['bytes'] > 0
+            and isinstance(row['sha256'], str) and re.fullmatch('[0-9a-f]{64}', row['sha256']),
+            'Malformed artifact record')
+    local(row['path'])  # No file content is opened by this shape check.
+    return {k: row[k] for k in ('path', 'bytes', 'sha256')}
+
+
+def read_pinned_json(row, dependencies):
+    pin = checked_record(record_shape(row)); dependencies.append(pin)
+    data = Path(pin['path']).read_bytes()
+    require(hashlib.sha256(data).hexdigest() == pin['sha256'], 'JSON changed before parsing')
+    obj = json.loads(data)
+    require(isinstance(obj, dict), 'Expected pinned JSON object')
+    return obj
+
+
+def soc_audit(audit, checks, dependencies):
+    """Consume the frozen SOC producer contract; never substitute audit execution."""
+    # Pin imported producer code too: a same-named set of pass rows alone is
+    # not the reviewed producer. Source changes require an explicit new profile.
+    verifier = record_shape(audit['verifier'])
+    parent = Path(verifier['path']).parent
+    for name, wanted in SOC_PRODUCER.items():
+        pin = digest_file(parent/name)
+        require(pin['sha256'] == wanted, 'Unreviewed SOC audit producer: ' + name)
+        dependencies.append(pin)
+    require(Path(verifier['path']).name == 'verify.py', 'SOC verifier name differs')
+    for name, required in SOC_DETAIL_KEYS.items():
+        details = checks[name]
+        require(isinstance(details, dict) and required <= details.keys(),
+                'Incomplete SOC check details: ' + name)
+        for key in required:
+            value = details[key]
+            if key in SOC_BOOLEAN_DETAILS:
+                require(value is SOC_BOOLEAN_DETAILS[key], 'SOC detail scope differs: ' + key)
+            else:
+                kind = (str if key in SOC_STRING_DETAILS else int if key in SOC_INTEGER_DETAILS
+                        else list if key in SOC_LIST_DETAILS else dict)
+                require(type(value) is kind and (key == 'warnings' or bool(value)),
+                        'Malformed SOC detail: ' + name + ':' + key)
+    provenance = checks[SOC_CHECKS[0]]
+    source = audit['build_start_source_commit']
+    identity = provenance['build_identity']
+    require(isinstance(identity, dict)
+            and identity['expected_source_commit'] == source
+            and identity['expected_kernel_commit'] == SOC_KERNEL
+            and identity['product'] == 'lineage_r1_soc' and identity['release'] == 'cp2a'
+            and isinstance(identity['completed_session'], str)
+            and re.fullmatch('[0-9]+', identity['completed_session']),
+            'Incomplete SOC build identity')
+    source_keys = {'build_start_commit', 'installer_manifest', 'staged_files_verified',
+                   'canonical_templates_verified', 'templates', 'generated_inputs_pinned_by_build_start',
+                   'kernel_source_commit', 'android_patch_series_sha256', 'sources_lock_sha256',
+                   'verified_applied_patches'}
+    require(isinstance(identity['source_identity'], dict)
+            and set(identity['source_identity']) == source_keys
+            and identity['source_identity'] == {k: provenance[k] for k in source_keys}
+            and provenance['kernel_source_commit'] == SOC_KERNEL
+            and type(provenance['staged_files_verified']) is int and provenance['staged_files_verified'] > 0
+            and type(provenance['canonical_templates_verified']) is int and provenance['canonical_templates_verified'] > 0,
+            'SOC source identity differs')
+    require(record_shape(identity['guard']) == record_shape(next(
+        row for row in dependencies if row['path'] == str(parent/'provenance.py'))),
+        'SOC guard record differs')
+    start = read_pinned_json(identity['build_start'], dependencies)
+    result = read_pinned_json(identity['build_result'], dependencies)
+    require(start['build_source_commit'] == source
+            and (start['product'], start['release'], start['variant']) == ('lineage_r1_soc', 'cp2a', 'userdebug')
+            and isinstance(start['targets'], list) and SOC_TARGETS <= set(start['targets']),
+            'SOC build-start context differs')
+    require(type(result['exit_code']) is int and result['exit_code'] == 0
+            and result['inputs_unchanged'] is True and result.get('build_source_commit', source) == source
+            and result['build_start'] == identity['build_start']['path']
+            and result['build_start_sha256'] == identity['build_start']['sha256'],
+            'SOC completed-result linkage differs')
+    log = record_shape(provenance['build_log'])
+    require(record_shape(identity['build_log']) == log and result['log'] == log['path']
+            and result['log_sha256'] == log['sha256']
+            and ('log' not in start or start['log'] == log['path']), 'SOC build-log linkage differs')
+    require('Android configuration: lineage_r1_soc cp2a userdebug' in Path(log['path']).read_text(errors='replace'),
+            'SOC wrapper configuration marker missing')
+    installer = record_shape(provenance['installer_manifest'])
+    require(start['inputs']['installer_sha256'] == installer['sha256'], 'SOC installer pin differs')
+    inputs = audit['source_inputs']
+    require(isinstance(inputs, list) and len(inputs) == 12
+            and len({row['path'] for row in inputs}) == 12
+            and installer in [record_shape(row) for row in inputs], 'Incomplete SOC source inputs')
+    for row in inputs: dependencies.append(checked_record(record_shape(row)))
+    closed = checks[SOC_CHECKS[-1]]
+    require(closed['image_sizes_and_mtimes_unchanged'] is True
+            and closed['no_writable_image_handles_used'] is True
+            and closed['source_records_and_full_artifact_hashes']['unchanged'] is True
+            and closed['source_records_and_full_artifact_hashes']['source_commit'] == source
+            and type(closed['source_records_and_full_artifact_hashes']['watched_artifacts']) is int
+            and closed['source_records_and_full_artifact_hashes']['watched_artifacts'] > 0,
+            'SOC final source/artifact guard did not close')
+    sizes = checks[SOC_CHECKS[1]]
+    names = (*PARTS, 'super', 'vbmeta', 'boot', 'dtbo')
+    require(set(sizes) == set(names) | {'dynamic_group'}, 'Incomplete SOC image set')
+    records = {name: record_shape(sizes[name]) for name in names}
+    image_parent = Path(records['system']['path']).parent
+    require(all(Path(row['path']) == image_parent/(name+'.img') for name,row in records.items())
+            and len(audit['expected_images']) == 8
+            and set(audit['expected_images']) == {row['path'] for row in records.values()},
+            'SOC image paths differ')
+    require(sizes['super']['android_sparse'] is True and sizes['super']['logical_bytes'] == LAYOUT['super_bytes']
+            and sizes['boot']['logical_bytes'] == sizes['boot']['bytes'] == 33554432
+            and sizes['dtbo']['logical_bytes'] == sizes['dtbo']['bytes'] == 8388608,
+            'SOC fixed image dimensions differ')
+    total = sum(sizes[n]['bytes'] for n in PARTS)
+    require(sizes['dynamic_group'] == {'image_total_bytes': total, 'maximum_bytes': LAYOUT['group_bytes'],
+                                      'remaining_bytes': LAYOUT['group_bytes']-total}, 'SOC group summary differs')
+    super_details = checks[SOC_CHECKS[4]]
+    require(super_details['populated_slot'] == 'a' and super_details['empty_slot'] == 'b'
+            and super_details['primary_backup_and_all_slots_identical'] is True
+            and super_details['logical_extent_image_sha256'] == {n+'_a': records[n]['sha256'] for n in PARTS},
+            'SOC factory-super payload correspondence differs')
+    avb = checks[SOC_CHECKS[3]]
+    require(avb['descriptor_payloads_verified'] is True and avb['hashtrees_verified'] is True
+            and avb['fec_parity_verified'] is False and avb['trusted_production_chain'] is False,
+            'SOC AVB scope differs')
+    boot = checks[SOC_CHECKS[13]]
+    require(record_shape(boot['boot']) == records['boot'] and record_shape(boot['dtbo']) == records['dtbo'],
+            'SOC audited boot/DTBO correspondence differs')
+    flags = checks[SOC_CHECKS[8]]
+    mode = flags['health_mode']
+    require(mode['product'] == 'lineage_r1_soc' and mode['experimental_soc_health'] is True
+            and mode['soc_config'] == 'y' and mode['embedded_config_verified'] is True
+            and flags['resolved_compiler_flag'] == 'clang-r596125'
+            and flags['values']['DeviceProduct'] == 'lineage_r1_soc'
+            and flags['values']['Platform_version_name'] == '17'
+            and flags['values']['Platform_sdk_version'] == 37
+            and flags['values']['VendorApiLevel'] == '202604', 'SOC Health/kernel product context differs')
+    require(record_shape(flags['kernel_record']) in [record_shape(row) for row in inputs],
+            'SOC kernel record not included in pinned source inputs')
+    linked = checks[SOC_CHECKS[9]]
+    require(set(linked['binaries']) == {'vendor-service', 'initial-readiness', 'recovery-service'}
+            and linked['init_vintf']['normal_boot_readiness_only'] is True, 'SOC Health/recovery separation differs')
+    policy = checks[SOC_CHECKS[10]]
+    require(set(policy['compiled']) == {'normal', 'recovery'}
+            and policy['compiled_normal_label_and_access_checks'] is True
+            and policy['literal_genfs_prefix_capability_checked'] is True,
+            'SOC policy detail missing')
+    packaged = checks[SOC_CHECKS[11]]
+    require(packaged['default_vendor_health_absent'] is True
+            and packaged['split_policy_packaged_bytes_match_current_compiled_outputs'] is True,
+            'SOC packaged Health check incomplete')
+    inventory = packaged['normal_health_inventory']
+    require(inventory['cuttlefish_health_apex_absent'] is True
+            and inventory['normal_health_vintf_providers'] == [{'partition':'vendor',
+                'path':'/etc/vintf/manifest/health.r1.xml','format':'aidl','version':'5','fqnames':['IHealth/default']}],
+            'SOC competing/default Health provider present')
+    expected_services = [{'partition':'vendor','path':'/etc/init/health.r1.rc','name':name,'command':argv}
+        for name,argv in [('vendor.health-default',['/vendor/bin/hw/android.hardware.health-service.r1']),
+                          ('r1-health-initial-ready',['/vendor/bin/r1-health-initial-ready']),
+                          ('vendor.charger',['/vendor/bin/hw/android.hardware.health-service.r1','--charger'])]]
+    require(sorted(inventory['normal_health_init_services'], key=lambda x:x['name']) ==
+            sorted(expected_services, key=lambda x:x['name']), 'SOC Health service inventory differs')
+    for path,key in [('/bin/hw/android.hardware.health-service.r1','vendor-service'),
+                     ('/bin/r1-health-initial-ready','initial-readiness')]:
+        packaged_row = record_shape(packaged['actual_vendor_image_members'][path])
+        filesystem_row = record_shape(checks[SOC_CHECKS[5]]['vendor']['selected_files'][path])
+        linked_row = record_shape(linked['binaries'][key])
+        require(packaged_row == filesystem_row
+                and all(packaged_row[k] == linked_row[k] for k in ('bytes','sha256')),
+                'SOC packaged/linked Health bytes differ')
+    require(checks[SOC_CHECKS[15]]['minigbm_config']['platform'] == 'all_arm', 'SOC allocator architecture differs')
+    # The other image hashes also belong to the completed audit, even though
+    # only the four filesystem images become lpmake payloads. Validate them
+    # only after this complete schema/provenance gate, in make_plan().
+    return [records[n] for n in ('super', 'vbmeta', 'boot', 'dtbo')]
+
+def read_audit(path, expected, audit_profile):
     # All completion gates run before any logical filesystem image is opened.
     pin = digest_file(path)
     require(pin['sha256'] == expected, 'Audit SHA256 mismatch')
     data = Path(pin['path']).read_bytes()
     require(hashlib.sha256(data).hexdigest() == expected, 'Audit changed before parsing')
     audit = json.loads(data)
+    require(isinstance(audit, dict), 'Expected audit object')
     require(audit.get('mode') == 'verify' and audit.get('overall') == 'pass'
             and audit.get('errors') == [], 'A completed passing image audit is required')
+    require(audit_profile in AUDIT_PROFILES, 'Unknown audit profile')
+    required = AUDIT_PROFILES[audit_profile]
     rows = audit.get('checks', [])
-    require(len(rows) == len(CHECKS) and {r.get('name') for r in rows} == set(CHECKS)
-            and all(r.get('status') == 'pass' for r in rows), 'Incomplete/failed audit checks')
+    require(isinstance(rows, list) and all(isinstance(row, dict) for row in rows)
+            and len(rows) == len(required) and {r.get('name') for r in rows} == set(required)
+            and all(r.get('status') == 'pass' and isinstance(r.get('details'), dict) for r in rows), 'Incomplete/failed audit checks')
     checks = {r['name']: r['details'] for r in rows}
-    provenance = checks[CHECKS[0]]
+    provenance = checks[required[0]]
     commit = audit.get('build_start_source_commit', '')
     require(re.fullmatch('[0-9a-f]{40}', commit)
             and provenance.get('build_start_commit') == commit, 'Build revision mismatch')
-    checked_record(audit['verifier'])
-    log = checked_record(provenance['build_log'])
+    dependencies = [checked_record(audit['verifier'])]
+    log = checked_record(provenance['build_log']); dependencies.append(log)
     require('#### build completed successfully' in Path(log['path']).read_text(errors='replace'),
             'Successful pinned build log missing')
-    require(checks[CHECKS[-1]].get('image_sizes_and_mtimes_unchanged') is True,
+    require(checks[required[-1]].get('image_sizes_and_mtimes_unchanged') is True,
             'Audit did not finish image immutability check')
-    return pin, audit, checks
+    images = soc_audit(audit, checks, dependencies) if audit_profile == 'soc-cp2a-18' else []
+    return pin, audit, checks, dependencies, images
 
 
-def make_plan(audit_path, audit_sha256, tool_path, tool_sha256, layout=None):
+def make_plan(audit_path, audit_sha256, tool_path, tool_sha256, layout=None,
+              audit_profile='soc-cp2a-18'):
     # Alternate dimensions exist only for imported synthetic tests; the CLI fixes r1.
     layout = dict(LAYOUT if layout is None else layout)
-    pin, audit, checks = read_audit(audit_path, audit_sha256)
+    pin, audit, checks, dependencies, other_images = read_audit(audit_path, audit_sha256, audit_profile)
     tool = digest_file(tool_path)
     require(tool['sha256'] == tool_sha256 and os.access(tool['path'], os.X_OK),
             'Pinned executable lpmake missing/changed')
-    sizes = checks[CHECKS[1]]
+    sizes = checks[AUDIT_PROFILES[audit_profile][1]]
     images = {}
     for name in PARTS:
         row = sizes[name]
@@ -114,7 +436,15 @@ def make_plan(audit_path, audit_sha256, tool_path, tool_sha256, layout=None):
     # Conservative initial allocation bound, independently checked again in output.
     bound = first + 2 * sum(((row['bytes'] + align - 1) // align) * align for row in images.values())
     require(bound <= layout['super_bytes'], 'Insufficient metadata/alignment headroom')
-    return {'schema': 1, 'status': 'verified-input-plan-only', 'audit': pin,
+    for row in other_images: dependencies.append(checked_record(row))
+    unique = {}
+    for row in dependencies:
+        require(row['path'] not in unique or unique[row['path']] == row, 'Conflicting audit dependency pins')
+        unique[row['path']] = row
+    return {'schema': 2, 'status': 'verified-input-plan-only', 'audit': pin,
+            'audit_profile': audit_profile, 'audit_dependencies': list(unique.values()),
+            'historical_reproduction_only': audit_profile == 'legacy-default-10',
+            'audit_limitations': [LEGACY_WARNING] if audit_profile == 'legacy-default-10' else [],
             'build_start_source_commit': audit['build_start_source_commit'],
             'lpmake': tool, 'layout': layout, 'images': images,
             'group_used_bytes': total, 'conservative_allocation_end': bound,
@@ -286,11 +616,11 @@ def publish_result(output_dir, result):
 
 
 def build(plan, output_dir):
-    require(plan['status'] == 'verified-input-plan-only', 'Invalid plan')
+    require(plan['schema'] == 2 and plan['status'] == 'verified-input-plan-only', 'Invalid/profile-less plan')
     fresh = make_plan(plan['audit']['path'], plan['audit']['sha256'],
-                      plan['lpmake']['path'], plan['lpmake']['sha256'], plan['layout'])
+                      plan['lpmake']['path'], plan['lpmake']['sha256'], plan['layout'], plan['audit_profile'])
     require(fresh == plan, 'Stale/modified plan')
-    guarded = [plan['audit'], plan['lpmake'], *plan['images'].values()]
+    guarded = [plan['audit'], plan['lpmake'], *plan['images'].values(), *plan['audit_dependencies']]
     before_inputs = {row['path']: identity(local(row['path']).stat()) for row in guarded}
     output_dir = local(output_dir, output=True)
     require(not output_dir.exists(), 'Refusing existing output directory')
@@ -308,7 +638,7 @@ def build(plan, output_dir):
         synced_output = sync_file(dest)
         sync_file(output_dir/'lpmake.log')
         checked_record(plan['audit']); checked_record(plan['lpmake'])
-        for row in plan['images'].values(): checked_record(row)
+        for row in [*plan['images'].values(), *plan['audit_dependencies']]: checked_record(row)
         result['validation'] = validate_raw(dest, plan)
         sync_directory(output_dir)
         require(identity(local(dest).stat()) == synced_output,
@@ -339,6 +669,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest='mode', required=True)
     p = sub.add_parser('plan')
+    p.add_argument('--audit-profile', choices=sorted(AUDIT_PROFILES), default='soc-cp2a-18',
+                   help='Current SOC audit by default; legacy-default-10 is historical reproduction only')
     for flag in ['audit', 'audit-sha256', 'lpmake', 'lpmake-sha256', 'output']:
         p.add_argument('--'+flag, required=True)
     p = sub.add_parser('build')
@@ -348,7 +680,7 @@ def main():
         if a.mode == 'plan':
             output = local(a.output, output=True)
             require(not output.exists(), 'Refusing existing plan output')
-            plan = make_plan(a.audit, a.audit_sha256, a.lpmake, a.lpmake_sha256)
+            plan = make_plan(a.audit, a.audit_sha256, a.lpmake, a.lpmake_sha256, audit_profile=a.audit_profile)
             with output.open('x') as f: json.dump(plan, f, indent=2); f.write('\n')
         else:
             pin = digest_file(a.plan); require(pin['sha256'] == a.plan_sha256, 'Plan SHA256 mismatch')

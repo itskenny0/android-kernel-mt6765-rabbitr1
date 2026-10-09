@@ -1,0 +1,150 @@
+"""Bind read-only audits to exact successful build records and committed inputs."""
+import hashlib,json,re,subprocess
+from pathlib import Path,PurePosixPath
+
+ROOT=Path('/rabbitr1')
+EXPECTED_KERNEL='f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+EXPECTED_PRODUCT='lineage_r1_soc'
+EXPECTED_RELEASE='cp2a'
+REQUIRED_TARGETS={'systemimage','systemextimage','productimage','vendorimage','superimage','vbmetaimage','check-all-partition-sizes','bootimage','dtboimage','sepolicy.recovery'}
+
+def ensure(ok,message):
+    if not ok: raise ValueError(message)
+
+def digest(data): return hashlib.sha256(data).hexdigest()
+def hex_value(value,length):
+    ensure(isinstance(value,str) and re.fullmatch('[0-9a-f]{'+str(length)+'}',value),'Invalid SHA value')
+    return value
+
+def add_arguments(parser,*,evidence=False):
+    parser.add_argument('--expected-source-commit',required=True)
+    parser.add_argument('--build-start',required=True,type=Path)
+    parser.add_argument('--build-start-sha256',required=True)
+    parser.add_argument('--build-result',type=Path)
+    parser.add_argument('--build-result-sha256')
+    parser.add_argument('--expected-kernel-commit',required=True)
+    parser.add_argument('--completed-session')
+    parser.add_argument('--build-log',type=Path)
+    parser.add_argument('--build-log-sha256')
+
+class Guard:
+    def __init__(self,args,*,root=ROOT,evidence=False):
+        self.root=root.resolve();self.android=self.root/'src/android';self.repo=self.root/'src/mainline'
+        self.source=hex_value(args.expected_source_commit,40);self.args=args;self.verify=args.verify
+        ensure(args.expected_kernel_commit==EXPECTED_KERNEL,'Wrong kernel source for this SOC audit')
+        self.start_path=self.confined(args.build_start)
+        self.start=self.pinned_json(self.start_path,args.build_start_sha256)
+        ensure(self.start['build_source_commit']==self.source,'Build-start source differs from requested source')
+        ensure(self.start['product']==EXPECTED_PRODUCT and self.start['release']=='cp2a' and self.start['variant']=='userdebug','Wrong full-image product/release/variant')
+        ensure(REQUIRED_TARGETS<=set(self.start['targets']),'Full build must explicitly include filesystem, boot, DTBO and recovery-policy targets')
+        self.stamp_sha=hex_value(self.start['inputs']['installer_sha256'],64)
+        self.log=None;self.result=None;self.evidence_commit=None;self.evidence_records={}
+        if self.verify:
+            ensure(args.build_result is not None and args.build_result_sha256 is not None,'Verification requires pinned completed build result')
+            ensure(args.completed_session and re.fullmatch(r'[0-9]+',args.completed_session),'Root-confirmed completed session is required')
+            ensure(args.build_log is not None and args.build_log_sha256 is not None,'Explicit completed log path and SHA are required')
+            self.result_path=self.confined(args.build_result)
+            self.result=self.pinned_json(self.result_path,args.build_result_sha256)
+            ensure(type(self.result['exit_code']) is int and self.result['exit_code']==0,'Build did not exit successfully')
+            ensure(self.result['inputs_unchanged'] is True,'Build did not verify unchanged final inputs')
+            ensure(self.result.get('build_source_commit',self.source)==self.source,'Result source differs from build-start source')
+            ensure(self.confined(Path(self.result['build_start']))==self.start_path,'Completed result names a different build-start record')
+            ensure(self.result['build_start_sha256']==args.build_start_sha256,'Completed result has a different start-record hash')
+            self.log=self.confined(Path(self.result['log']))
+            if 'log' in self.start: ensure(self.confined(Path(self.start['log']))==self.log,'Start/result log paths differ')
+            ensure(self.log==self.confined(args.build_log) and self.result['log_sha256']==args.build_log_sha256,'Explicit log pin differs from result')
+            self.log_info=self.pinned_info(self.log,self.result['log_sha256'])
+            ensure(b'#### build completed successfully' in self.log.read_bytes(),'No completed-success log marker')
+            ensure(b'Android configuration: lineage_r1_soc cp2a userdebug' in self.log.read_bytes(),'Missing actual wrapper product/release context')
+        elif args.build_result is not None or args.build_result_sha256 is not None:
+            ensure(args.build_result is not None and args.build_result_sha256 is not None,'Partial result pin')
+        self.initial=self.source_identity()
+        self.initial_watches={}
+    def confined(self,path):
+        p=Path(path);ensure(p.is_absolute(),'Audit path must be absolute: '+str(path))
+        p=p.resolve();ensure(p.is_relative_to(self.root),'Path leaves workspace: '+str(path));return p
+    def info(self,path):
+        p=self.confined(path)
+        with p.open('rb') as f: sha=hashlib.file_digest(f,'sha256').hexdigest()
+        return {'path':str(p),'bytes':p.stat().st_size,'sha256':sha}
+    def pinned_info(self,path,wanted):
+        item=self.info(path);ensure(item['sha256']==hex_value(wanted,64),'Pinned file changed: '+str(path));return item
+    def pinned_json(self,path,wanted):
+        self.pinned_info(path,wanted);return json.loads(Path(path).read_bytes())
+    def git(self,*argv):
+        return subprocess.check_output(['git','--no-optional-locks','-C',str(self.repo),*argv])
+    def committed(self,path,commit=None):
+        ensure(not PurePosixPath(path).is_absolute() and '..' not in PurePosixPath(path).parts,'Unsafe Git source path')
+        return self.git('show',(commit or self.source)+':rabbit-r1/'+path)
+    def source_identity(self):
+        stamp_path=self.android/'.r1-install.json';self.pinned_info(stamp_path,self.stamp_sha)
+        install=json.loads(stamp_path.read_bytes())
+        ensure(install['kernel_source_commit']==EXPECTED_KERNEL,'Unexpected staged kernel')
+        ensure(install['health_mode']['product']==EXPECTED_PRODUCT and install['health_mode']['experimental_soc_health'] is True,'Audit requires experimental SOC product')
+        ensure((self.root/'scripts/env.sh').read_bytes()==self.committed('scripts/env.sh'),'Workspace environment script differs from build source')
+        ensure((self.root/'scripts/build-android.sh').read_bytes()==self.committed('scripts/build-android.sh'),'Workspace build helper differs from source')
+        webview=self.android/'external/chromium-webview/prebuilt/arm64/webview.apk'
+        self.pinned_info(webview,self.start['inputs']['webview_sha256'])
+        ensure(webview.stat().st_size==267260603,'Unexpected WebView payload size')
+        for name,wanted in install['files'].items():
+            ensure(not PurePosixPath(name).is_absolute() and '..' not in PurePosixPath(name).parts,'Unsafe installer path')
+            path=self.android/name;ensure(not path.is_symlink(),'Symlink in managed inputs: '+name)
+            ensure(path.resolve().is_relative_to(self.android),'Managed input leaves Android tree')
+            self.pinned_info(path,wanted)
+        templates={}
+        for source,target in [('device','device/rabbit/r1'),('charging','device/rabbit/r1/charging'),('local_manifests','.repo/local_manifests')]:
+            prefix='rabbit-r1/android/'+source+'/'
+            for row in filter(None,self.git('ls-tree','-r','-z',self.source,'--',prefix).split(b'\0')):
+                meta,name=row.split(b'\t',1);mode,kind,oid=meta.split()
+                ensure(mode in (b'100644',b'100755') and kind==b'blob','Unsupported source template')
+                name=name.decode();ensure(name.startswith(prefix),'Wrong source prefix')
+                dest=target+'/'+name[len(prefix):];ensure(dest not in templates,'Overlapping source template')
+                wanted=digest(self.git('cat-file','blob',oid.decode()))
+                ensure(install['files'].get(dest)==wanted,'Installed template differs from source commit: '+dest)
+                templates[dest]={'source_path':name,'sha256':wanted}
+        ensure(templates,'No committed source templates')
+        generated=set(install['files'])-set(templates)
+        ensure(all(p.startswith('device/rabbit/r1/prebuilt/') for p in generated),'Unexplained generated input')
+        record=json.loads((self.android/'device/rabbit/r1/prebuilt/kernel-build.json').read_bytes())
+        ensure(record['source_commit']==EXPECTED_KERNEL,'Kernel record source mismatch')
+        import gzip
+        mode_scope={}
+        exec(compile(self.committed('scripts/r1-health-mode.py'),'committed-health-mode.py','exec'),mode_scope)
+        prebuilt=self.android/'device/rabbit/r1/prebuilt'
+        image_gz=(prebuilt/'Image.gz').read_bytes()
+        mode=mode_scope['validate'](EXPECTED_PRODUCT,record,image_gz,gzip.decompress(image_gz),(prebuilt/'kernel-config').read_bytes())
+        ensure(mode==install['health_mode']==json.loads((prebuilt/'health-mode.json').read_bytes()),'Embedded SOC kernel attestation differs')
+        ensure(mode_scope['makefile'](mode)==(prebuilt/'health-prebuilt.mk').read_bytes(),'Generated SOC product guard differs')
+        series_raw=self.committed('android/patches/series.json');series=json.loads(series_raw);patched=[]
+        for entry in series:
+            project=self.android/entry['project'];ensure(project.resolve().is_relative_to(self.android),'Patch project leaves Android tree')
+            actual=subprocess.check_output(['git','--no-optional-locks','-C',str(project),'rev-parse','HEAD'],text=True).strip()
+            ensure(actual==entry['base_commit'],'Android patch base changed: '+entry['project'])
+            ensure(digest(self.committed('android/patches/'+entry['patch']))==entry['sha256'],'Committed patch hash mismatch')
+            for item in entry['files']:
+                p=project/item['path'];ensure(p.resolve().is_relative_to(project.resolve()) and not p.is_symlink(),'Unsafe patched path')
+                self.pinned_info(p,item['after_sha256'])
+            patched.append({k:entry[k] for k in ['project','base_commit','patch','sha256','files']})
+        return {'build_start_commit':self.source,'installer_manifest':self.info(stamp_path),
+                'staged_files_verified':len(install['files']),'canonical_templates_verified':len(templates),
+                'templates':templates,'generated_inputs_pinned_by_build_start':sorted(generated),
+                'kernel_source_commit':EXPECTED_KERNEL,'android_patch_series_sha256':digest(series_raw),
+                'sources_lock_sha256':digest(self.committed('sources.lock.json')),'verified_applied_patches':patched}
+    def watch(self,paths):
+        for path in paths:
+            p=self.confined(path);st=p.stat();self.initial_watches[str(p)]=(st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns,self.info(p)['sha256'])
+    def finish(self):
+        ensure(self.source_identity()==self.initial,'Source identity changed during audit')
+        self.pinned_info(self.start_path,self.args.build_start_sha256)
+        if self.verify:
+            self.pinned_info(self.result_path,self.args.build_result_sha256);self.pinned_info(self.log,self.log_info['sha256'])
+        for name,before in self.initial_watches.items():
+            p=Path(name);st=p.stat();now=(st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns,self.info(p)['sha256'])
+            ensure(now==before,'Artifact changed during audit: '+name)
+        return {'unchanged':True,'source_commit':self.source,'watched_artifacts':len(self.initial_watches)}
+    def summary(self):
+        return {'expected_source_commit':self.source,'expected_kernel_commit':EXPECTED_KERNEL,
+                'product':EXPECTED_PRODUCT,'release':EXPECTED_RELEASE,'completed_session':self.args.completed_session,
+                'build_start':self.info(self.start_path),'build_result':self.info(self.result_path) if self.verify else None,
+                'build_log':self.log_info if self.verify else None,'source_identity':self.initial,
+                'guard':self.info(Path(__file__))}

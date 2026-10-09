@@ -1,0 +1,817 @@
+#!/usr/bin/env python3
+"""Inspect completed Android images without mounting or opening them writable."""
+import argparse, gzip, hashlib, importlib.util, json, os, re, stat, struct, subprocess, sys, tempfile, zipfile
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+ROOT=Path('/rabbitr1'); A=ROOT/'src/android'; O=ROOT/'out/android'; P=O/'target/product/r1'
+H=Path(__file__).resolve().parent; D=A/'device/rabbit/r1'
+C=ROOT/'src/mainline/rabbit-r1'; PARTITIONS=('system','system_ext','product','vendor')
+SUPER_SIZE=8792064000; GROUP_SIZE=4294967296
+DEBUGFS=ROOT/'out/e2fsprogs/debugfs/debugfs'
+AVB=A/'external/avb/avbtool.py'
+READELF=A/'prebuilts/clang/host/linux-x86/clang-r596125/bin/llvm-readelf'
+os.environ.update(TMPDIR=str(ROOT/'.tmp'),PYTHONDONTWRITEBYTECODE='1',GIT_OPTIONAL_LOCKS='0')
+sys.dont_write_bytecode=True
+
+sys.path.insert(0, str(H))
+from provenance import Guard, add_arguments
+
+ap=argparse.ArgumentParser(description=__doc__)
+ap.add_argument('--verify',action='store_true',help='Only after parent confirms terminal build success')
+add_arguments(ap)
+args=ap.parse_args();guard=Guard(args);args.build_log=guard.log;H.mkdir(parents=True,exist_ok=True)
+r={'mode':'verify' if args.verify else 'plan','checks':[],'errors':[],
+   'hardware_tested':False,'images_mounted':False,'target_code_executed':False,
+   'runtime_linker_namespaces_verified':False,'runtime_selinux_enforcement_verified':False,
+   'flash_installation_validated':False,
+   'limitations':['Packaging presence and static data integrity do not establish boot, HAL/service startup, linker namespace/APEX behavior, power/charging correctness or hardware support.',
+    'Factory super populates A only; a future installer must verify/select A or supply populated B images. Active device slot was not queried.',
+    'Top-level vbmeta flags 3 disable verification/hashtree enforcement. Public development-key signature checks do not establish a production trust chain or relock safety.',
+    'Current kernel arguments request global permissive SELinux. No runtime enforcing-policy validation is performed.',
+    'AOSP avbtool verifies hashtree/root integrity but does not regenerate/check FEC correction parity; that limitation remains explicit.']}
+
+def ensure(ok,msg):
+    if not ok:raise ValueError(msg)
+def sha(p):
+    ensure(p.resolve().is_relative_to(ROOT),'Path leaves workspace: '+str(p))
+    with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def info(p):return {'path':str(p),'bytes':p.stat().st_size,'sha256':sha(p)}
+def load(name,path):
+    spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+def run(argv,tag):
+    p=subprocess.run([str(x) for x in argv],cwd=H,capture_output=True,text=True)
+    text=p.stdout+p.stderr;(H/(tag+'.txt')).write_text(text)
+    ensure(p.returncode==0,f'{tag}: tool exit {p.returncode}; inspect saved output')
+    return text
+def check(name,fn):
+    print('Checking '+name+'...',flush=True)
+    try:r['checks'].append({'name':name,'status':'pass','details':fn()})
+    except Exception as e:r['checks'].append({'name':name,'status':'fail','error':str(e)});r['errors'].append(name+': '+str(e))
+    print(r['checks'][-1]['status'].upper()+': '+name,flush=True)
+    (H/'results-in-progress.json').write_text(json.dumps(r,indent=2)+'\n')
+
+def head(p):return subprocess.check_output(['git','-C',str(p),'rev-parse','HEAD'],text=True).strip()
+
+r['expected_images']=[str(P/(x+'.img')) for x in [*PARTITIONS,'super','vbmeta','boot','dtbo']]
+r['source_inputs']=[info(p) for p in [D/'BoardConfig.mk',D/'device.mk',D/'rootdir/fstab.r1',
+    D/'prebuilt/kernel-build.json',A/'.r1-install.json',
+    A/'build/make/core/Makefile',A/'build/make/tools/releasetools/build_super_image.py',
+    A/'build/make/tools/releasetools/check_partition_sizes.py',A/'build/make/tools/releasetools/build_image.py',
+    A/'system/fs/fs_mgr/liblp/include/liblp/metadata_format.h',A/'system/fs/fs_mgr/liblp/utility.cpp',AVB]]
+r['verifier']=info(Path(__file__))
+guard.watch([Path(__file__),H/'provenance.py',H/'health_checks.py',DEBUGFS,READELF]+[Path(item['path']) for item in r['source_inputs']])
+r['tools']={'readelf':info(READELF),'debugfs':str(DEBUGFS),'avbtool':str(AVB),'super_reader':'AOSP ImageHandler(read_only=True); no expanded copy',
+            'lp_schema':str(A/'system/fs/fs_mgr/liblp/include/liblp/metadata_format.h')}
+r['size_check_log']=str(P/'obj/PACKAGING/check-all-partition-sizes_intermediates/check_all_partition_sizes.log')
+r['audit_source_commit']=head(ROOT/'src/mainline')
+ensure(re.fullmatch(r'[0-9a-f]{40}',args.expected_source_commit),'Expected source commit must be a full SHA-1')
+r['build_start_source_commit']=args.expected_source_commit
+
+def committed(path):
+    return guard.committed(path)
+
+def source_identity():
+    return {**guard.initial, 'build_identity':guard.summary(), 'audit_commit':r['audit_source_commit']}
+
+if not args.verify:
+    r['source_identity']=source_identity()
+    (H/'plan.json').write_text(json.dumps(r,indent=2)+'\n');print('Prepared plan; no incomplete image inspected.');raise SystemExit(0)
+ensure(args.build_log is not None and args.expected_source_commit,'Verification needs --build-log and --expected-source-commit')
+ensure(not (H/'results.json').exists(),'Preserve earlier audit results before a reviewed rerun')
+avb=load('r1_full_avb',AVB)
+images={};meta={};extracted={};before={}
+
+def readat(image,offset,length):
+    ensure(0<=offset<=image.image_size and 0<=length<=image.image_size-offset,'Image read outside logical bounds')
+    image.seek(offset);data=image.read(length);ensure(len(data)==length,'Short image read');return data
+
+def provenance():
+    ensure(args.build_log.resolve().is_relative_to(ROOT),'Build log outside workspace')
+    ensure('#### build completed successfully' in args.build_log.read_text(errors='replace'),'No completed build marker')
+    identity=source_identity()
+    guard.watch([P/(name+'.img') for name in [*PARTITIONS,'super','vbmeta','boot','dtbo']])
+    for name in [*PARTITIONS,'super','vbmeta','boot','dtbo']:
+        path=P/(name+'.img');st=path.stat();before[name]=(st.st_size,st.st_mtime_ns)
+        images[name]=avb.ImageHandler(str(path),read_only=True)
+    return {'build_log':info(args.build_log),**identity}
+check('completed build and staged provenance',provenance)
+ensure(not r['errors'],'Stopping after provenance failure; no further image inspection')
+
+def image_sizes():
+    rows={}
+    for name,image in images.items():
+        path=P/(name+'.img');rows[name]={**info(path),'logical_bytes':image.image_size,'android_sparse':image.is_sparse,
+            'host_allocated_bytes':path.stat().st_blocks*512}
+    ensure(set(rows)==set([*PARTITIONS,'super','vbmeta','boot','dtbo']),'Missing image')
+    ensure(rows['super']['logical_bytes']==SUPER_SIZE,'Wrong expanded physical super size')
+    ensure(rows['super']['android_sparse'],'Factory super unexpectedly not Android sparse')
+    for name in PARTITIONS:
+        ensure(not rows[name]['android_sparse'],'Ext4 image unexpectedly Android sparse: '+name)
+        ensure(0<rows[name]['logical_bytes']<=GROUP_SIZE,'Invalid logical partition image size')
+    total=sum(rows[n]['logical_bytes'] for n in PARTITIONS)
+    ensure(total<=GROUP_SIZE,'Logical images exceed per-slot dynamic group')
+    ensure(rows['boot']['logical_bytes']==33554432 and rows['dtbo']['logical_bytes']==8388608,'Wrong fixed image size')
+    rows['dynamic_group']={'image_total_bytes':total,'maximum_bytes':GROUP_SIZE,'remaining_bytes':GROUP_SIZE-total}
+    return rows
+check('image hashes and logical partition budgets',image_sizes)
+
+def size_check():
+    log=Path(r['size_check_log']);text=log.read_text()
+    ensure(text.strip(),'Empty partition-size check log')
+    ensure(not re.search(r'\b(?:ERROR|CRITICAL)\b|Traceback',text),'Partition-size log contains an error')
+    ensure('BOARD_SUPER_PARTITION_SIZE' in text and 'BOARD_r1_dynamic_partitions_SIZE' in text,'Expected dynamic-group checks absent from log')
+    props=P/'obj/PACKAGING/check-all-partition-sizes_intermediates/misc_info.txt'
+    values=dict(line.strip().split('=',1) for line in props.read_text().splitlines() if '=' in line)
+    ensure(values.get('ab_update')=='true' and values.get('virtual_ab','false')!='true','Wrong A/B type in size-check inputs')
+    ensure(int(values['super_partition_size'])==SUPER_SIZE,'Size checker used wrong physical budget')
+    ensure(int(values['super_r1_dynamic_partitions_group_size'])==GROUP_SIZE,'Size checker used wrong group budget')
+    ensure(set(values['dynamic_partition_list'].split())==set(PARTITIONS),'Wrong size-check partition list')
+    return {'log':info(log),'input':info(props),'warnings':[l for l in text.splitlines() if 'WARNING' in l],
+            'group_budget_independently_checked':True}
+check('actual check-all-partition-sizes result',size_check)
+
+def parse_avb(name):
+    image=images[name]
+    f,h,descs,_=avb.Avb()._parse_image(image)
+    size=h.SIZE+h.authentication_data_block_size+h.auxiliary_data_block_size
+    blob=readat(image,f.vbmeta_offset if f else 0,size)
+    ensure(avb.verify_vbmeta_signature(h,blob),'Invalid vbmeta self-signature: '+name)
+    if f:
+        ensure(0<f.original_image_size<=f.vbmeta_offset and f.vbmeta_offset+f.vbmeta_size<=image.image_size-64,'Invalid footer bounds: '+name)
+    result={'algorithm':avb.lookup_algorithm_by_type(h.algorithm_type)[0],'flags':h.flags,
+        'rollback_index':h.rollback_index,'rollback_index_location':h.rollback_index_location,
+        'signed':h.algorithm_type!=0,'vbmeta_blob_sha256':hashlib.sha256(blob).hexdigest(),
+        'original_image_size':f.original_image_size if f else None,'descriptors':[]}
+    for d in descs:
+        item={'type':type(d).__name__,'encoded_sha256':hashlib.sha256(d.encode()).hexdigest()}
+        for field in ['partition_name','image_size','hash_algorithm','flags','tree_offset','tree_size','data_block_size','hash_block_size','fec_num_roots','fec_offset','fec_size','rollback_index_location','key','value']:
+            if hasattr(d,field):
+                v=getattr(d,field);item[field]=v.decode(errors='replace') if isinstance(v,bytes) else v
+        for field in ['salt','digest','root_digest','public_key']:
+            if hasattr(d,field):item[field]=getattr(d,field).hex()
+        result['descriptors'].append(item)
+    meta[name]=(f,h,descs)
+    return result
+
+def require_embedded_descriptor(name, descriptor):
+    # avbtool supports persistent digests: an empty digest/root is valid format
+    # but deliberately skips the payload comparison. This offline audit has no
+    # device persistent store and requires a supported embedded digest layout.
+    if name in ('boot', 'dtbo'):
+        expected_type = avb.AvbHashDescriptor
+        field = 'digest'
+        algorithms = ('sha256',)
+    else:
+        ensure(name in PARTITIONS, 'Unsupported AVB partition: '+name)
+        expected_type = avb.AvbHashtreeDescriptor
+        field = 'root_digest'
+        # AOSP add_hashtree_footer still defaults to SHA1; SHA256 is its
+        # supported nonpersistent alternative. Record the actual selection.
+        algorithms = ('sha1', 'sha256')
+    ensure(type(descriptor) is expected_type, 'Wrong AVB descriptor type: '+name)
+    ensure(descriptor.hash_algorithm in algorithms, 'Unsupported AVB payload hash algorithm: '+name)
+    ensure(descriptor.flags == 0, 'Unsupported AVB descriptor flags: '+name)
+    embedded = getattr(descriptor, field)
+    ensure(isinstance(embedded, bytes) and len(embedded) == hashlib.new(descriptor.hash_algorithm).digest_size,
+           'Missing or malformed embedded AVB '+field+': '+name)
+
+
+def verified_boot():
+    details={n:parse_avb(n) for n in ['vbmeta','boot','dtbo',*PARTITIONS]}
+    ensure(details['vbmeta']['flags']==3,'Top-level vbmeta must use development flags 3')
+    ensure(details['vbmeta']['algorithm']=='SHA256_RSA4096','Unexpected top-level vbmeta algorithm')
+    main=meta['vbmeta'][2]
+    partition_desc=[d for d in main if isinstance(d,(avb.AvbHashDescriptor,avb.AvbHashtreeDescriptor))]
+    ensure({d.partition_name for d in partition_desc}==set(['boot','dtbo',*PARTITIONS]) and len(partition_desc)==6,'Top-level descriptors do not cover exact image set')
+    ensure(not any(isinstance(d,avb.AvbChainPartitionDescriptor) for d in main),'Unexpected chained vbmeta layout')
+    for name in ['boot','dtbo',*PARTITIONS]:
+        desc=[d for d in meta[name][2] if isinstance(d,(avb.AvbHashDescriptor,avb.AvbHashtreeDescriptor))]
+        ensure(len(desc)==1 and desc[0].partition_name==name,'Unexpected partition footer descriptor: '+name)
+        ensure(next(d for d in partition_desc if d.partition_name==name).encode()==desc[0].encode(),'Top-level/footer descriptor mismatch: '+name)
+        ensure(details[name]['flags']==0,'Unexpected non-top-level vbmeta flags')
+        d=desc[0]
+        require_embedded_descriptor(name,d)
+        ensure(meta[name][0] is not None,'Missing partition AVB footer: '+name)
+        ensure(d.image_size==meta[name][0].original_image_size,'Footer/hash extent mismatch: '+name)
+        if name in ('boot','dtbo'):ensure(details[name]['algorithm']=='NONE','Unexpected boot/DTBO footer signing algorithm')
+        if name in PARTITIONS:
+            ensure(isinstance(d,avb.AvbHashtreeDescriptor),'Missing filesystem hashtree descriptor')
+            ensure(d.image_size==meta[name][0].original_image_size, 'Filesystem descriptor and footer disagree on original data size')
+            ensure(d.image_size<=d.tree_offset and d.tree_offset+d.tree_size<=meta[name][0].vbmeta_offset,'Hashtree extent overlaps data or vbmeta')
+            if d.fec_size:ensure(d.fec_offset>=d.tree_offset+d.tree_size and d.fec_offset+d.fec_size<=meta[name][0].vbmeta_offset,'FEC extent overlaps tree or vbmeta')
+    public_key=A/'external/avb/test/data/testkey_rsa4096_pub.pem'
+    run([sys.executable,AVB,'verify_image','--image',P/'vbmeta.img','--key',public_key],'avb-verify-all')
+    run([sys.executable,AVB,'info_image','--image',P/'vbmeta.img'],'vbmeta-info')
+    details['public_development_key']=info(public_key)
+    details['descriptor_payloads_verified']=True
+    details['hashtrees_verified']=True
+    details['fec_parity_verified']=False
+    details['trusted_production_chain']=False
+    details['correspondence_scope']='All current top-level and partition descriptors verified together; no old build hashes carried forward'
+    return details
+check('full vbmeta signature, descriptors and image correspondence',verified_boot)
+
+
+def textname(raw):
+    text=raw.split(b'\0',1)[0].decode('ascii');ensure(re.fullmatch(r'[A-Za-z0-9_]+',text),'Invalid metadata name');return text
+
+def metadata(blob):
+    magic,major,minor,hsize=struct.unpack_from('<IHHI',blob)
+    ensure(magic==0x414c5030 and major==10 and 0<=minor<=2 and hsize in (128,256),'Unexpected LP header')
+    header=bytearray(blob[:hsize]);wanted=bytes(header[12:44]);header[12:44]=bytes(32)
+    ensure(hashlib.sha256(header).digest()==wanted,'LP header checksum mismatch')
+    tsize=struct.unpack_from('<I',blob,44)[0];ensure(hsize+tsize<=len(blob),'LP table bounds')
+    table=blob[hsize:hsize+tsize];ensure(hashlib.sha256(table).digest()==blob[48:80],'LP table checksum mismatch')
+    flags=struct.unpack_from('<I',blob,128)[0] if hsize>=256 else 0
+    ensure(flags==0,'Unexpected LP flags, including virtual A/B')
+    def rows(offset,size,fmt):
+        start,count,stride=struct.unpack_from('<III',blob,offset)
+        ensure(stride==size and start+count*stride<=len(table),'LP entry table bounds/size')
+        return [struct.unpack_from(fmt,table,start+i*stride) for i in range(count)]
+    ps=rows(80,52,'<36sIIII');es=rows(92,24,'<QIQI');gs=rows(104,48,'<36sIQ');ds=rows(116,64,'<QIIQ36sI')
+    groups=[{'name':textname(n),'flags':f,'maximum_size':s} for n,f,s in gs]
+    devices=[{'first_logical_sector':first,'alignment':al,'alignment_offset':ao,'size':size,'name':textname(n),'flags':f} for first,al,ao,size,n,f in ds]
+    extents=[{'num_sectors':n,'target_type':t,'target_data':d,'target_source':s} for n,t,d,s in es]
+    partitions=[]
+    for n,attr,first,count,group in ps:
+        ensure(group<len(groups) and first+count<=len(es),'LP partition table indexes')
+        parts=extents[first:first+count]
+        partitions.append({'name':textname(n),'attributes':attr,'group':groups[group]['name'],
+            'first_extent_index':first,'extent_count':count,'size':sum(e['num_sectors']*512 for e in parts),'extents':parts})
+    ensure(len({p['name'] for p in partitions})==len(partitions),'Duplicate LP partition')
+    return {'version':f'{major}.{minor}','header_size':hsize,'flags':flags,'groups':groups,'block_devices':devices,
+            'partitions':partitions,'metadata_sha256':hashlib.sha256(blob[:hsize+tsize]).hexdigest()}
+
+def super_image():
+    image=images['super'];primary=readat(image,4096,4096);backup=readat(image,8192,4096)
+    ensure(primary==backup,'Super geometry copies differ')
+    magic,size=struct.unpack_from('<II',primary)
+    ensure(magic==0x616c4467 and size==52,'Unexpected LP geometry')
+    g=bytearray(primary[:size]);wanted=bytes(g[8:40]);g[8:40]=bytes(32)
+    ensure(hashlib.sha256(g).digest()==wanted,'LP geometry checksum mismatch')
+    maximum,slots,block=struct.unpack_from('<III',primary,40)
+    ensure((maximum,slots,block)==(65536,3,4096),'Wrong metadata reservation/slot count/block size')
+    copies=[]
+    for index in range(slots):
+        first=readat(image,12288+maximum*index,maximum)
+        second=readat(image,12288+maximum*slots+maximum*index,maximum)
+        ensure(first==second,'Primary/backup LP metadata differ for slot '+str(index))
+        copies.append(metadata(first))
+    ensure(all(m==copies[0] for m in copies),'Factory metadata slots differ')
+    m=copies[0];groups={x['name']:x for x in m['groups']}
+    ensure(set(groups)=={'default','r1_dynamic_partitions_a','r1_dynamic_partitions_b'},'Wrong LP groups')
+    for slot in 'ab':ensure(groups['r1_dynamic_partitions_'+slot]=={'name':'r1_dynamic_partitions_'+slot,'flags':0,'maximum_size':GROUP_SIZE},'Wrong group limit/flags')
+    ensure(len(m['block_devices'])==1,'Expected one physical super device')
+    dev=m['block_devices'][0]
+    ensure(dev['name']=='super' and dev['size']==SUPER_SIZE and dev['flags']==0,'Wrong LP physical device')
+    ensure(dev['first_logical_sector']*512>=12288+2*maximum*slots,'Logical data overlaps metadata reservation')
+    parts={x['name']:x for x in m['partitions']}
+    ensure(set(parts)=={p+'_'+s for p in PARTITIONS for s in 'ab'},'Wrong LP partition set')
+    ranges=[];hashes={}
+    for name,p in parts.items():
+        slot=name[-1];base=name[:-2]
+        ensure(p['attributes']==0 and p['group']=='r1_dynamic_partitions_'+slot,'Wrong partition attributes/group')
+        if slot=='b':ensure(p['size']==0 and p['extent_count']==0,'Factory B partition unexpectedly populated');continue
+        ensure(p['size']==images[base].image_size,'LP size differs from complete image: '+name)
+        h=hashlib.sha256()
+        for e in p['extents']:
+            ensure(e['target_type']==0 and e['target_source']==0 and e['num_sectors']>0,'Unexpected non-linear LP extent')
+            start=e['target_data']*512;length=e['num_sectors']*512
+            ensure(start>=dev['first_logical_sector']*512 and start+length<=SUPER_SIZE,'LP extent outside usable device')
+            ensure(start%block==0 and length%block==0,'LP extent not logical-block aligned')
+            ranges.append((start,start+length,name))
+            for off in range(0,length,1024*1024):h.update(readat(image,start+off,min(1024*1024,length-off)))
+        hashes[name]=h.hexdigest();ensure(hashes[name]==sha(P/(base+'.img')),'Super payload differs from source image: '+name)
+    ranges.sort()
+    for left,right in zip(ranges,ranges[1:]):ensure(left[1]<=right[0],'Overlapping logical extents')
+    total=sum(x['size'] for x in parts.values());ensure(total<=GROUP_SIZE,'A payload exceeds group')
+    return {'geometry':{'metadata_max_size':maximum,'metadata_slot_count':slots,'logical_block_size':block,
+            'sha256':hashlib.sha256(primary[:size]).hexdigest()},'metadata':m,
+            'primary_backup_and_all_slots_identical':True,'logical_extent_image_sha256':hashes,
+            'nonoverlapping_extents':ranges,'populated_slot':'a','empty_slot':'b',
+            'group_used_bytes':total,'group_remaining_bytes':GROUP_SIZE-total,
+            'raw_super_expanded_or_written':False}
+check('sparse super metadata, A/B layout and actual extent payloads',super_image)
+
+# image-relative file names paired with their exact product staging locations.
+FILES={
+ 'system':{'/system/bin/init':'system/bin/init','/system/lib64/libbinder_ndk.so':'system/lib64/libbinder_ndk.so',
+           '/system/lib64/liblog.so':'system/lib64/liblog.so',
+           '/system/bin/recovery-persist':'system/bin/recovery-persist',
+           '/system/bin/dumpstate':'system/bin/dumpstate',
+           '/system/etc/init/recovery-persist.rc':'system/etc/init/recovery-persist.rc',
+           '/system/etc/init/dumpstate.rc':'system/etc/init/dumpstate.rc',
+           '/system/etc/init/hw/init.rc':'system/etc/init/hw/init.rc','/system/build.prop':'system/build.prop'},
+ 'system_ext':{'/bin/r1-charging':'system_ext/bin/r1-charging','/etc/init/r1-charging.rc':'system_ext/etc/init/r1-charging.rc',
+           '/priv-app/R1ChargingSettings/R1ChargingSettings.apk':'system_ext/priv-app/R1ChargingSettings/R1ChargingSettings.apk',
+           '/etc/build.prop':'system_ext/etc/build.prop'},
+ 'product':{'/etc/build.prop':'product/etc/build.prop'},
+ 'vendor':{'/etc/fstab.r1':'vendor/etc/fstab.r1','/etc/init/init.r1.rc':'vendor/etc/init/init.r1.rc',
+           '/apex/com.android.hardware.graphics.allocator.minigbm_upstream.apex':'vendor/apex/com.android.hardware.graphics.allocator.minigbm_upstream.apex',
+           '/bin/r1-expdb':'vendor/bin/r1-expdb','/etc/init/r1-expdb.rc':'vendor/etc/init/r1-expdb.rc',
+           '/bin/hw/android.hardware.boot-service.r1':'vendor/bin/hw/android.hardware.boot-service.r1',
+           '/etc/init/android.hardware.boot-service.r1.rc':'vendor/etc/init/android.hardware.boot-service.r1.rc',
+           '/etc/vintf/manifest/android.hardware.boot-service.r1.xml':'vendor/etc/vintf/manifest/android.hardware.boot-service.r1.xml',
+           '/lib/modules/pstore_zone.ko':'vendor/lib/modules/pstore_zone.ko','/lib/modules/pstore_blk.ko':'vendor/lib/modules/pstore_blk.ko',
+           '/lib/modules/modules.dep':'vendor/lib/modules/modules.dep','/lib/modules/modules.load':'vendor/lib/modules/modules.load',
+           '/etc/selinux/precompiled_sepolicy':'vendor/etc/selinux/precompiled_sepolicy','/build.prop':'vendor/build.prop'}}
+
+FILES['vendor'].update({
+ '/bin/hw/android.hardware.health-service.r1':'vendor/bin/hw/android.hardware.health-service.r1',
+ '/bin/r1-health-initial-ready':'vendor/bin/r1-health-initial-ready',
+ '/etc/init/health.r1.rc':'vendor/etc/init/health.r1.rc',
+ '/etc/vintf/manifest/health.r1.xml':'vendor/etc/vintf/manifest/health.r1.xml',
+ '/etc/selinux/vendor_sepolicy.cil':'vendor/etc/selinux/vendor_sepolicy.cil',
+ '/etc/selinux/vendor_file_contexts':'vendor/etc/selinux/vendor_file_contexts',
+ '/etc/selinux/plat_sepolicy_vers.txt':'vendor/etc/selinux/plat_sepolicy_vers.txt',
+ '/etc/selinux/plat_pub_versioned.cil':'vendor/etc/selinux/plat_pub_versioned.cil'})
+FILES['system']['/first_stage_ramdisk/fstab.r1']='root/first_stage_ramdisk/fstab.r1'
+for part,prefix in [('system','plat'),('system_ext','system_ext'),('product','product')]:
+ base='/system/etc/selinux/' if part=='system' else '/etc/selinux/'
+ for name in [prefix+'_sepolicy.cil','mapping/202604.cil',prefix+'_sepolicy_and_mapping.sha256']:
+  FILES[part][base+name]=part+'/etc/selinux/'+name
+ name='precompiled_sepolicy.'+prefix+'_sepolicy_and_mapping.sha256'
+ FILES['vendor']['/etc/selinux/'+name]='vendor/etc/selinux/'+name
+# Every module recorded by this SOC kernel is required, not only its pstore pair.
+module_record=json.loads((D/'prebuilt/kernel-build.json').read_bytes())
+module_basenames=[Path(n).name for n in module_record['modules']]
+ensure(len(module_basenames)==len(set(module_basenames)),'Duplicate module basename')
+for name in module_basenames: FILES['vendor']['/lib/modules/'+name]='vendor/lib/modules/'+name
+
+def dump(partition,name,tag):
+    ensure(re.fullmatch(r'/[A-Za-z0-9_./+@-]+',name) and '..' not in Path(name).parts,'Unsafe debugfs path')
+    dest=H/'extracted'/partition/name.lstrip('/');dest.parent.mkdir(parents=True,exist_ok=True)
+    if dest.exists():ensure(dest.is_file() and not dest.is_symlink(),'Unsafe existing extraction');dest.unlink()
+    run([DEBUGFS,'-R',f'dump {name} {dest}',P/(partition+'.img')],tag+'-dump')
+    ensure(dest.is_file(),'File missing from filesystem image: '+partition+':'+name)
+    return dest
+
+def filesystems():
+    rows={}
+    for partition in PARTITIONS:
+        image=images[partition];superblock=readat(image,1024,1024)
+        ensure(superblock[56:58]==b'\x53\xef','Not raw ext4: '+partition)
+        block=1024<<struct.unpack_from('<I',superblock,24)[0]
+        count=struct.unpack_from('<I',superblock,4)[0]
+        incompat=struct.unpack_from('<I',superblock,96)[0]
+        if incompat&0x80:count|=struct.unpack_from('<I',superblock,336)[0]<<32
+        ensure(block*count==next(d.image_size for d in meta[partition][2] if isinstance(d,avb.AvbHashtreeDescriptor)),'Ext4 filesystem extent differs from AVB data extent')
+        run([DEBUGFS,'-R','stats',P/(partition+'.img')],partition+'-ext4-stats')
+        rows[partition]={'filesystem_bytes':block*count,'block_size':block,'selected_files':{}}
+        for name,staged in FILES[partition].items():
+            tag=partition+'-'+name.strip('/').replace('/','_');dest=dump(partition,name,tag)
+            ensure(sha(dest)==sha(P/staged),'Packaged file differs from installed file: '+staged)
+            rows[partition]['selected_files'][name]=info(dest);extracted[(partition,name)]=dest
+    ensure(extracted[('vendor','/etc/fstab.r1')].read_bytes()==(D/'rootdir/fstab.r1').read_bytes(),'Packaged fstab differs from device source')
+    pairs=[('vendor','/etc/init/init.r1.rc','rootdir/init.r1.rc'),('vendor','/etc/init/r1-expdb.rc','logging/r1-expdb.rc'),
+           ('vendor','/etc/init/android.hardware.boot-service.r1.rc','boot/android.hardware.boot-service.r1.rc'),
+           ('system_ext','/etc/init/r1-charging.rc','charging/r1-charging.rc')]
+    for part,path,source in pairs:ensure(extracted[(part,path)].read_bytes()==(D/source).read_bytes(),'Packaged init file differs from source: '+path)
+    v=ET.parse(extracted[('vendor','/etc/vintf/manifest/android.hardware.boot-service.r1.xml')]).getroot()
+    hal=v.find('hal');ensure(v.get('type')=='device' and hal is not None and hal.get('format')=='aidl' and hal.findtext('name')=='android.hardware.boot' and hal.findtext('fqname')=='IBootControl/default' and hal.findtext('version','1')=='1','Packaged boot VINTF contract mismatch')
+    prop=extracted[('vendor','/build.prop')].read_text();ensure(re.search(r'^ro.vendor.r1.expdb.enabled=1$',prop,re.M),'Packaged expdb enable property missing')
+    return rows
+check('actual ext4 contents: init, fstab, VINTF, services, app and modules',filesystems)
+
+
+
+def elf(path,tag,reloc=False):
+    b=path.read_bytes();ensure(b[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',b,18)[0]==183,'Packaged ELF is not ARM64')
+    ensure(struct.unpack_from('<H',b,16)[0]==(1 if reloc else 3),'Wrong ELF type')
+    text=run([READELF,'-h','-d','-l','--wide',path],tag+'-elf')
+    return {**info(path),'needed':re.findall(r'\(NEEDED\).*?\[([^]]+)\]',text)}
+
+def native_and_app():
+    rows={}
+    for part,path in [('system','/system/bin/init'),('system','/system/lib64/libbinder_ndk.so'),('system_ext','/bin/r1-charging'),('vendor','/bin/r1-expdb'),('vendor','/bin/hw/android.hardware.boot-service.r1')]:
+        rows[part+':'+path]=elf(extracted[(part,path)],part+'-'+Path(path).name)
+    ensure('libbinder.so' in rows['system:/system/lib64/libbinder_ndk.so']['needed'],'Packaged Binder NDK is a link stub')
+    path=extracted[('system_ext','/priv-app/R1ChargingSettings/R1ChargingSettings.apk')]
+    badge=run([O/'host/linux-x86/bin/aapt2','dump','badging',path],'charging-apk-badging')
+    ensure("name='cat.kenny.r1.charging'" in badge,'Wrong packaged charging APK')
+    tree=run([O/'host/linux-x86/bin/aapt2','dump','xmltree',path,'--file','AndroidManifest.xml'],'charging-apk-manifest')
+    for token in ['ChargingActivity','android.permission.DEVICE_POWER','com.android.settings.category.ia.battery','r1_charging_speed']:ensure(token in tree,'Missing packaged APK manifest field: '+token)
+    return {'native_elfs':rows,'charging_apk':info(path),'package':'cat.kenny.r1.charging','execution_or_installation_performed':False}
+check('packaged ARM64 services and charging APK metadata',native_and_app)
+
+def modules():
+    record=json.loads((D/'prebuilt/kernel-build.json').read_text());result={}
+    for module_path,wanted in record['modules'].items():
+        name=Path(module_path).stem
+        path=extracted[('vendor','/lib/modules/'+name+'.ko')]
+        ensure(sha(path)==wanted,'Packaged module does not match SOC kernel build: '+module_path)
+        result[name]=elf(path,name,reloc=True)
+        text=run([READELF,'-p','.modinfo',path],name+'-modinfo')
+        ensure('vermagic='+record['kernel_release']+' ' in text,'Packaged module vermagic mismatch')
+    loads=extracted[('vendor','/lib/modules/modules.load')].read_text()
+    ensure(not re.search(r'^\s*(?:.*/)?pstore_(?:zone|blk)(?:\.ko)?\s*$',loads,re.M),'Pstore autoload bypasses bounded setup')
+    dep=extracted[('vendor','/lib/modules/modules.dep')].read_text()
+    ensure(any(line.split(':',1)[0].endswith('pstore_blk.ko') and 'pstore_zone.ko' in line.split(':',1)[1] for line in dep.splitlines() if ':' in line),'Missing pstore_blk→pstore_zone module dependency')
+    return {'module_files':result,'module_loads':loads,'module_dependencies_sha256':hashlib.sha256(dep.encode()).hexdigest(),
+            'kernel_release':record['kernel_release'],'autoload_of_pstore_disabled':True,'module_loading_tested':False}
+check('all SOC kernel modules and explicit pstore-load packaging',modules)
+
+# Definitions inserted into the gated full-image verifier; not a standalone audit.
+health=load('r1_soc_health_checks',H/'health_checks.py')
+health.SOURCE=guard.source
+check('SOC cp2a product flags and embedded kernel configuration',health.flags_and_kernel)
+check('actual SOC Health linked binaries and init/VINTF separation',lambda:{
+    'binaries':health.binaries(),'init_vintf':health.init_vintf()})
+check('compiled SOC split and recovery policy',health.policy)
+
+
+def image_directory(part,path,tag):
+    text=run([DEBUGFS,'-R','ls -l -p '+path,P/(part+'.img')],tag)
+    if 'File not found by ext2_lookup' in text:
+        ensure(not any(line.startswith('/') for line in text.splitlines()),'Ambiguous missing image directory')
+        return []
+    rows=[];parsed=False
+    for line in text.splitlines():
+        fields=line.split('/')
+        if len(fields)!=8:continue
+        inode,mode,uid,gid,name,size=fields[1:7]
+        if not inode.isdigit() or not mode:continue
+        parsed=True
+        if name in ('.','..'):continue
+        ensure(re.fullmatch(r'[A-Za-z0-9_.+@-]+',name),'Unsafe image directory entry')
+        rows.append({'name':name,'mode':int(mode,8),'bytes':size})
+    ensure(parsed,'Unrecognized debugfs directory listing: '+part+':'+path)
+    return rows
+
+
+def normal_health_inventory():
+    providers=[];services=[];apexes={}
+    for part in PARTITIONS:
+        base='/system' if part=='system' else ''
+        manifests=[]
+        for item in image_directory(part,base+'/etc/vintf',part+'-vintf-directory'):
+            if item['name']=='manifest.xml' and stat.S_ISREG(item['mode']):
+                manifests.append(base+'/etc/vintf/manifest.xml')
+        for item in image_directory(part,base+'/etc/vintf/manifest',part+'-vintf-fragments-directory'):
+            if item['name'].endswith('.xml') and stat.S_ISREG(item['mode']):
+                manifests.append(base+'/etc/vintf/manifest/'+item['name'])
+        for name in manifests:
+            path=dump(part,name,'inventory-'+part+'-'+Path(name).name)
+            root=ET.fromstring(path.read_bytes())
+            if root.tag!='manifest':continue
+            for hal in root.findall('hal'):
+                if hal.findtext('name')=='android.hardware.health':
+                    providers.append({'partition':part,'path':name,'format':hal.get('format'),
+                                      'version':hal.findtext('version'),'fqnames':[x.text for x in hal.findall('fqname')]})
+        for item in image_directory(part,base+'/etc/init',part+'-init-directory'):
+            if not stat.S_ISREG(item['mode']):continue
+            name=base+'/etc/init/'+item['name'];path=dump(part,name,'inventory-'+part+'-'+item['name'])
+            for line in path.read_text().splitlines():
+                fields=line.split()
+                if len(fields)>=3 and fields[0]=='service' and (
+                    'android.hardware.health-service.' in fields[2] or fields[2].endswith('/r1-health-initial-ready')):
+                    services.append({'partition':part,'path':name,'name':fields[1],'command':fields[2:]})
+        archives=image_directory(part,base+'/apex',part+'-apex-directory')
+        names=[item['name'] for item in archives if stat.S_ISREG(item['mode'])]
+        ensure(not any(name.startswith(('com.google.cf.health','com.android.hardware.health','android.hardware.health')) for name in names),
+               'Unexpected Health APEX (including com.google.cf.health): '+part+':'+str(names))
+        apexes[part]=names
+    ensure(providers==[{'partition':'vendor','path':'/etc/vintf/manifest/health.r1.xml',
+                        'format':'aidl','version':'5','fqnames':['IHealth/default']}],
+           'Normal images must declare exactly r1 Health default: '+str(providers))
+    expected=[{'partition':'vendor','path':'/etc/init/health.r1.rc','name':name,'command':command}
+              for name,command in [
+                ('vendor.health-default',['/vendor/bin/hw/android.hardware.health-service.r1']),
+                ('r1-health-initial-ready',['/vendor/bin/r1-health-initial-ready']),
+                ('vendor.charger',['/vendor/bin/hw/android.hardware.health-service.r1','--charger'])]]
+    ensure(sorted(services,key=lambda x:x['name'])==sorted(expected,key=lambda x:x['name']),
+           'Unexpected normal Health service or competing provider: '+str(services))
+    return {'normal_health_vintf_providers':providers,'normal_health_init_services':services,
+            'packaged_apex_names':apexes,'cuttlefish_health_apex_absent':True,
+            'scope':'All four image root VINTF manifests/fragments, every regular file in each root init directory and known Health APEX names; no target startup performed'}
+
+
+def health_in_filesystems():
+    selected={}
+    for path in ['/bin/hw/android.hardware.health-service.r1','/bin/r1-health-initial-ready',
+                 '/etc/init/health.r1.rc','/etc/vintf/manifest/health.r1.xml',
+                 '/etc/selinux/precompiled_sepolicy','/etc/selinux/vendor_sepolicy.cil',
+                 '/etc/selinux/vendor_file_contexts']:
+        selected[path]=info(extracted[('vendor',path)])
+    ensure(extracted[('vendor','/etc/init/health.r1.rc')].read_bytes()==guard.committed('android/device/health/health.r1.rc'),
+           'Packaged SOC Health startup differs from committed product')
+    health.manifest(extracted[('vendor','/etc/vintf/manifest/health.r1.xml')])
+    # Presence checks above already bind every extracted byte to the just-built
+    # staging artifact audited by health.policy()/binaries(); no old audit used.
+    for path in ['/bin/hw/android.hardware.health-service.example',
+                 '/etc/init/android.hardware.health-service.example.rc']:
+        text=run([DEBUGFS,'-R','stat '+path,P/'vendor.img'],'absent-default-health-'+Path(path).name)
+        ensure('File not found by ext2_lookup' in text and not re.search(r'\bInode:\s*\d+',text),
+               'Unexpected default vendor Health or ambiguous debugfs absence result')
+    ensure(extracted[('system','/first_stage_ramdisk/fstab.r1')].read_bytes()==(D/'rootdir/fstab.r1').read_bytes(),
+           'System-as-root first-stage fstab differs')
+    return {'actual_vendor_image_members':selected,'normal_health_inventory':normal_health_inventory(),
+            'default_vendor_health_absent':True,
+            'split_policy_packaged_bytes_match_current_compiled_outputs':True}
+check('SOC Health service, helper, init/VINTF and policy inside vendor image',health_in_filesystems)
+
+
+def image_properties():
+    values={}
+    for part,path in [('system','/system/build.prop'),('system_ext','/etc/build.prop'),
+                      ('product','/etc/build.prop'),('vendor','/build.prop')]:
+        props={}
+        for line in extracted[(part,path)].read_text().splitlines():
+            if line and not line.startswith('#') and '=' in line:
+                key,value=line.split('=',1);ensure(key not in props or props[key]==value,'Conflicting property '+key);props[key]=value
+        prefix='ro.'+part+'.build.version.'
+        for suffix,wanted in [('release','17'),('release_or_codename','17'),('sdk','37'),('sdk_full','37.0')]:
+            ensure(props.get(prefix+suffix)==wanted,'Wrong packaged '+prefix+suffix)
+        if part in ('system','product'):
+            for key,wanted in [('ro.build.version.codename','REL'),('ro.build.version.preview_sdk','0'),
+                               ('ro.build.version.security_patch','2026-10-01')]:
+                ensure(props.get(key)==wanted,'Wrong packaged '+key)
+        if part=='vendor':
+            ensure(props.get('ro.board.api_level')=='202604','Wrong packaged vendor API')
+            ensure(props.get('ro.vendor.build.security_patch')=='2026-10-01','Wrong packaged vendor SPL')
+            ensure(props.get('ro.product.first_api_level')=='33','Wrong device shipping API')
+        if part=='product':ensure(props.get('ro.lineage.version','').startswith('24.0-'),'Wrong packaged Lineage major')
+        values[part]={k:v for k,v in props.items() if k.startswith(prefix) or k in [
+            'ro.build.version.codename','ro.build.version.preview_sdk','ro.build.version.security_patch',
+            'ro.vendor.build.security_patch','ro.board.api_level','ro.product.first_api_level',
+            'ro.lineage.version','ro.build.fingerprint']}
+    return {'values':values,'declared_security_patch_is_not_coverage_proof':True}
+check('packaged finalized Android 17 and Lineage 24 property values',image_properties)
+
+
+def dt_table(data):
+    ensure(len(data)>=64,'Truncated DT table')
+    magic,total,header,stride,count,start,page,version=struct.unpack_from('>8I',data)
+    ensure((magic,header,stride,count,start,page,version)==(0xd7b7ab1e,32,32,1,32,2048,0),'Unexpected DT table geometry')
+    ensure(64<=total<=len(data),'DT table outside image')
+    size,offset,dtid,revision,*custom=struct.unpack_from('>8I',data,start)
+    ensure(offset>=64 and offset+size<=total and dtid==revision==0 and custom==[0]*4,'Invalid DT entry')
+    blob=data[offset:offset+size];ensure(blob[:4]==b'\xd0\x0d\xfe\xed','DT entry is not FDT')
+    return {'total_size':total,'dtb_size':size,'offset':offset,'sha256':hashlib.sha256(data[:total]).hexdigest()},blob
+
+
+def boot_current():
+    data=(P/'boot.img').read_bytes()
+    ensure(data[:8]==b'ANDROID!' and len(data)==33554432,'Invalid r1 boot envelope')
+    keys=['kernel_size','kernel_addr','ramdisk_size','ramdisk_addr','second_size','second_addr','tags_addr','page_size','version','os_version']
+    header=dict(zip(keys,struct.unpack_from('<10I',data,8)))
+    ensure(header['version']==2 and header['page_size']==2048,'Wrong boot version/page size')
+    ensure((header['kernel_addr'],header['ramdisk_addr'],header['tags_addr'])==(0x40080000,0x51b00000,0x47880000),'Wrong boot load addresses')
+    recovery_size,recovery_offset,header_size=struct.unpack_from('<IQI',data,1632)
+    dtb_size,dtb_addr=struct.unpack_from('<IQ',data,1648)
+    ensure(header_size==1660 and dtb_addr==0x47880000 and header['second_size']==recovery_size==0,'Wrong v2 layout')
+    align=lambda value:(value+2047)//2048*2048
+    ro=2048+align(header['kernel_size']);do=ro+align(header['ramdisk_size']);end=do+align(dtb_size)
+    ensure(end<=meta['boot'][0].original_image_size,'Boot components extend beyond AVB-hashed image extent')
+    kernel=data[2048:2048+header['kernel_size']];ramdisk=data[ro:ro+header['ramdisk_size']];dtb=data[do:do+dtb_size]
+    ensure(kernel==(D/'prebuilt/Image.gz').read_bytes(),'Boot kernel differs from attested SOC prebuilt')
+    record=json.loads((D/'prebuilt/kernel-build.json').read_text());unpacked=gzip.decompress(kernel)
+    ensure(unpacked[56:60]==b'ARM\x64' and hashlib.sha256(unpacked).hexdigest()==record['artifacts']['Image']['sha256'],'Wrong raw ARM64 kernel')
+    ensure(header['kernel_addr']+len(unpacked)<dtb_addr and dtb_addr+len(dtb)<header['ramdisk_addr'],'Overlapping load areas')
+    ensure(dtb==(D/'prebuilt/dtb/table.dtb').read_bytes(),'Boot DT table differs from staged table')
+    table,blob=dt_table(dtb)
+    helper=H/'committed-validate-kernel.py';helper.write_bytes(guard.committed('scripts/validate-kernel.py'))
+    validate=load('soc_committed_kernel_validator',helper)
+    original=ROOT/'dist/mainline/mt6765-rabbit-r1.dtb'
+    ensure(sha(original)==record['artifacts']['mt6765-rabbit-r1.dtb']['sha256'],'Kernel reference DTB changed')
+    expected=validate.fdt_nodes(original.read_bytes());expected['/soc/mmc@11230000']['status']=b'okay\0'
+    ensure(validate.fdt_nodes(blob)==expected,'Android DTB changed beyond enabling eMMC')
+    cmdline=(data[64:576].split(b'\0')[0]+data[608:1632].split(b'\0')[0]).decode()
+    ensure('androidboot.fstab_suffix=r1' in cmdline and 'androidboot.selinux=permissive' in cmdline,'Required boot arguments missing')
+    ensure('androidboot.force_normal_boot=' not in cmdline and 'rdinit=/init' not in cmdline and 'r1.expdb=' not in cmdline,'Wrong normal/recovery or diagnostic boot token')
+    os_major=(header['os_version']>>25)&127
+    spl_year=((header['os_version']>>4)&127)+2000;spl_month=header['os_version']&15
+    ensure(os_major==17 and (spl_year,spl_month)==(2026,10),'Wrong boot header OS/SPL metadata')
+    stock=(D/'prebuilt/dtbo.img').read_bytes();new=(P/'dtbo.img').read_bytes()
+    ensure(hashlib.sha256(stock).hexdigest()=='de91deb66ca18aada0e3fd1ad3766cc7d3e96c578cd02c35e9d88bffa815be2e','Stock DTBO pin differs')
+    oldfooter=avb.AvbFooter(stock[-64:]);newfooter=meta['dtbo'][0]
+    ensure(oldfooter.original_image_size==newfooter.original_image_size and new[:oldfooter.original_image_size]==stock[:oldfooter.original_image_size],
+           'Stock DTBO payload changed before replaced AVB footer')
+    ensure(dt_table(stock)==dt_table(new),'Stock DTBO table/overlay changed')
+    ensure(ramdisk==(P/'ramdisk-recovery.img').read_bytes(),'Built recovery ramdisk differs from boot')
+    entries,get=health.cpio(gzip.decompress(ramdisk))
+    item=entries.get('init');ensure(item and stat.S_ISLNK(item[0]) and item[3]==b'/system/bin/init','Wrong recovery /init link')
+    # Count the actual packaged Health declarations and service commands, not
+    # merely the existence of our selected example service. Different init
+    # service names can still race to register the same Binder default instance.
+    health_fragments=[];health_services=[]
+    for name,item in entries.items():
+        if not stat.S_ISREG(item[0]):continue
+        if '/etc/vintf/' in name and name.endswith('.xml'):
+            root=ET.fromstring(get(name))
+            for hal in (root.findall('hal') if root.tag=='manifest' else []):
+                if hal.findtext('name')=='android.hardware.health':
+                    health_fragments.append({'path':name,'format':hal.get('format'),
+                                             'version':hal.findtext('version'),
+                                             'fqnames':[x.text for x in hal.findall('fqname')]})
+        if '/etc/init/' in name:
+            for line in get(name).decode().splitlines():
+                fields=line.split()
+                if len(fields)>=3 and fields[0]=='service' and 'android.hardware.health-service.' in fields[2]:
+                    health_services.append({'path':name,'name':fields[1],'command':fields[2:]})
+    ensure(health_fragments==[{'path':'system/etc/vintf/manifest/android.hardware.health-service.example.xml',
+                              'format':'aidl','version':'5','fqnames':['IHealth/default']}],
+           'Recovery must declare exactly one Health default instance: '+str(health_fragments))
+    ensure(health_services==[{'path':'system/etc/init/android.hardware.health-service.example_recovery.rc',
+                             'name':'vendor.health-default',
+                             'command':['/system/bin/hw/android.hardware.health-service.example_recovery']}],
+           'Recovery must start exactly one Health implementation: '+str(health_services))
+    ensure(not any('health-service.cuttlefish' in name for name in entries),'Cuttlefish Health remains in recovery archive')
+    selected={};destroot=H/'recovery-files'
+    def save(name):
+        content=get(name);dest=destroot/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(content)
+        ensure(content==(P/'recovery/root'/name).read_bytes(),'Recovery installed bytes differ: '+name)
+        selected[name]=info(dest);return dest
+    for name in ['system/bin/init','system/bin/linker64','system/bin/recovery',
+                 'system/bin/hw/android.hardware.boot-service.r1_recovery',
+                 'system/bin/hw/android.hardware.health-service.example_recovery',
+                 'system/etc/init/android.hardware.boot-service.r1_recovery.rc',
+                 'system/etc/init/android.hardware.health-service.example_recovery.rc',
+                 'system/etc/vintf/manifest/android.hardware.boot-service.r1.xml',
+                 'system/etc/vintf/manifest/android.hardware.health-service.example.xml',
+                 'system/lib64/liblog.so','system/etc/recovery.fstab','system/etc/init/hw/init.rc','sepolicy']:
+        save(name)
+    ensure(get('system/etc/recovery.fstab')==(D/'rootdir/fstab.r1').read_bytes(),'Recovery fstab differs')
+    ensure(get('first_stage_ramdisk/fstab.r1')==(D/'rootdir/fstab.r1').read_bytes(),'Normal first-stage fstab missing/different')
+    ensure(get('system/etc/init/hw/init.rc')==(A/'bootable/recovery/etc/init.rc').read_bytes(),'Recovery init source mismatch')
+    ensure(not any('r1-health-initial-ready' in name or name.endswith('/health.r1.rc') for name in entries),'Readiness gate leaked into recovery')
+    todo=['system/bin/init','system/bin/recovery','system/bin/hw/android.hardware.boot-service.r1_recovery',
+          'system/bin/hw/android.hardware.health-service.example_recovery'];closure={}
+    while todo:
+        name=todo.pop()
+        if name in closure:continue
+        path=save(name);item=elf(path,'recovery-'+Path(name).name);closure[name]=item
+        text=run([READELF,'-l','--wide',path],'recovery-interp-'+Path(name).name)
+        dependencies=['system/lib64/'+n for n in item['needed']]
+        dependencies += [n.lstrip('/') for n in re.findall(r'Requesting program interpreter: ([^]]+)',text)]
+        for dep in dependencies:ensure(dep in entries,'Missing recovery dependency '+name+' -> '+dep)
+        todo.extend(dependencies)
+    globals()['recovery_liblog']=destroot/'system/lib64/liblog.so'
+    guard.watch([original,helper])
+    return {'boot':info(P/'boot.img'),'dtbo':info(P/'dtbo.img'),'header':header,'cmdline':cmdline,
+            'dt_table':table,'stock_dtbo_payload_matches':True,'payload_end':end,
+            'avb_original_image_size':meta['boot'][0].original_image_size,'recovery_files':selected,
+            'recovery_dependency_closure':closure,'unique_health_services':health_services,
+            'unique_health_fragments':health_fragments,
+            'recovery_init_inventory_scope':'Conservative recursive scan of every regular archive member beneath etc/init, regardless of filename suffix',
+            'normal_boot_token_supplied_by_lk_not_header':True,
+            'target_execution_performed':False}
+check('current SOC boot/DTBO headers, AVB coverage and recovery contents',boot_current)
+
+
+def pstore_actual():
+    symbol='__android_log_pmsg_file_read_from_backend';out={}
+    items=[('system-liblog',extracted[('system','/system/lib64/liblog.so')],True,False),
+           ('recovery-liblog',recovery_liblog,True,False),
+           ('recovery-persist',extracted[('system','/system/bin/recovery-persist')],False,True),
+           ('dumpstate',extracted[('system','/system/bin/dumpstate')],False,False)]
+    for name,path,provider,consumer in items:
+        item=elf(path,name);text=run([READELF,'--wide','--dyn-syms',path],name+'-symbols')
+        lines=[line.strip() for line in text.splitlines() if symbol in line]
+        if provider:ensure(any(symbol+'@@LIBLOG_PRIVATE' in line and ' UND ' not in line for line in lines),'Missing private liblog export')
+        if consumer:ensure('liblog.so' in item['needed'] and any(symbol+'@LIBLOG_PRIVATE' in line and ' UND ' in line for line in lines),'Missing private pmsg import')
+        paths=[b'/sys/fs/pstore/pmsg-ramoops-0',b'/sys/fs/pstore/pmsg-pstore_blk-0'] if provider else [b'/sys/fs/pstore/console-ramoops',b'/sys/fs/pstore/console-pstore_blk-0']
+        if consumer:paths += [b'/sys/fs/pstore/pmsg-ramoops-0',b'/sys/fs/pstore/pmsg-pstore_blk-0']
+        data=path.read_bytes()
+        for token in paths:ensure(token+b'\0' in data,'Missing current pstore backend string '+name)
+        item['private_api_symbols']=lines;item['backend_paths']=[x.decode() for x in paths];out[name]=item
+    for name,source in [('recovery-persist','bootable/recovery/recovery-persist.rc'),('dumpstate','frameworks/native/cmds/dumpstate/dumpstate.rc')]:
+        path=extracted[('system','/system/etc/init/'+name+'.rc')]
+        ensure(path.read_bytes()==(A/source).read_bytes(),'Packaged pstore collector init differs')
+    return {'actual_packaged_artifacts':out,'old_build_hashes_reused':False,'runtime_persistence_verified':False}
+check('current packaged pstore collector and liblog implementations',pstore_actual)
+
+
+def read(path):
+    ensure(Path(path).resolve().is_relative_to(ROOT),'Read outside workspace')
+    return Path(path).read_bytes()
+
+
+def command(argv,tag=None):
+    return run(argv,tag or ('apex-step-'+str(command.index())))
+
+
+_command_number=0
+
+def _next_command():
+    global _command_number
+    _command_number+=1
+    return _command_number
+command.index=_next_command
+
+
+def allocator_configuration():
+    path=O/'soong/soong.lineage_r1_soc.variables'
+    variables=json.loads(path.read_text())
+    config=variables['VendorVars']['minigbm_upstream']
+    ensure(config['platform']=='all_arm','Wrong resolved minigbm platform')
+    return {'variables':info(path),'minigbm_config':config,
+            'compiler_commands_parsed':False,'runtime_graphics_verified':False}
+check('resolved ARM allocator configuration',allocator_configuration)
+
+def allocator_apex():
+    apex_path = globals()['extracted'][('vendor','/apex/com.android.hardware.graphics.allocator.minigbm_upstream.apex')]
+    install = info(apex_path)
+    payload = H/'apex_payload.img'
+    with zipfile.ZipFile(apex_path) as archive:
+        ensure(archive.namelist().count('apex_payload.img') == 1, 'Missing/duplicate APEX payload')
+        payload.write_bytes(archive.read('apex_payload.img'))
+        archive_names = archive.namelist()
+        zip_manifest = archive.read('apex_manifest.pb')
+    with payload.open('rb') as stream:
+        stream.seek(1024)
+        superblock = stream.read(58)
+    filesystem = 'erofs' if superblock[:4] == b'\xe2\xe1\xf5\xe0' else 'ext4' if superblock[56:58] == b'\x53\xef' else None
+    ensure(filesystem is not None, 'Unsupported APEX payload filesystem')
+    extracted, listing = {}, []
+    def walk(directory):
+        text = command([DEBUGFS,'-R','ls -l -p '+directory,payload])
+        for line in text.splitlines():
+            fields = line.split('/')
+            if len(fields) != 8: continue
+            inode,mode,uid,gid,name,size = fields[1:7]
+            if not name or name in ('.','..'): continue
+            ensure('/' not in name and name not in ('.','..') and re.fullmatch(r'[A-Za-z0-9_.+@-]+',name), 'Unexpected APEX filename')
+            path = directory.rstrip('/')+'/'+name
+            mode = int(mode,8)
+            listing.append({'path':path,'mode':oct(mode),'size':size})
+            if stat.S_ISDIR(mode): walk(path)
+            elif stat.S_ISREG(mode):
+                destination = H/'apex-files'/path.lstrip('/')
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                command([DEBUGFS,'-R',f'dump {path} {destination}',payload])
+                ensure(destination.is_file() and destination.stat().st_size == int(size), 'APEX dump failed '+path)
+                extracted[path] = destination
+    if filesystem == 'ext4':
+        walk('/')
+    else:
+        # Same host read-only extraction used by AOSP deapexer for EROFS.
+        fsck = O/'host/linux-x86/bin/fsck.erofs'
+        destination = Path(tempfile.mkdtemp(prefix='apex-erofs-',dir=H))
+        command([fsck,'--extract='+str(destination),'--no-preserve-owner','--no-preserve-perms',payload], 'apex-erofs-extract')
+        r['erofs_host_tool'] = info(fsck)
+        for parent,dirs,files in os.walk(destination,followlinks=False):
+            for name in dirs+files:
+                path = Path(parent)/name
+                relative = '/'+str(path.relative_to(destination))
+                metadata = path.lstat()
+                ensure(stat.S_ISREG(metadata.st_mode) or stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode), 'Unexpected non-file in built APEX '+relative)
+                listing.append({'path':relative,'mode':oct(metadata.st_mode),'size':metadata.st_size})
+                if stat.S_ISREG(metadata.st_mode):
+                    ensure(path.resolve().is_relative_to(destination), 'Extracted regular file escapes review directory')
+                    extracted[relative] = path
+    (H/'apex-listing.json').write_text(json.dumps(listing,indent=2)+'\n')
+    ensure(zip_manifest == read(extracted['/apex_manifest.pb']), 'ZIP/payload protobuf manifests differ')
+    deapexer = O/'host/linux-x86/bin/deapexer'
+    manifest = json.loads(command([deapexer,'info',apex_path], 'apex-manifest'))
+    ensure(manifest['name'] == 'com.android.hardware.graphics.allocator' and int(manifest['version']) == 1, 'Wrong APEX manifest identity')
+    ensure(manifest.get('vendorBootstrap') is True, 'Missing vendor bootstrap manifest flag')
+    android_manifest = command([O/'host/linux-x86/bin/aapt2','dump','xmltree',apex_path,'--file','AndroidManifest.xml'], 'apex-android-manifest')
+    ensure('package="com.android.hardware.graphics.allocator"' in android_manifest, 'Wrong APEX Android package')
+    r['apex_manifest_host_tool'] = info(deapexer)
+    required = ['/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream','/lib64/hw/mapper.minigbm_upstream.so','/lib64/libminigbm_gralloc_upstream.so','/etc/vintf/allocator.minigbm_upstream.xml','/etc/vintf/mapper.minigbm_upstream.xml','/etc/linker.config.pb','/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc']
+    for name in required: ensure(name in extracted, 'APEX missing '+name)
+    rc = read(extracted['/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc'])
+    ensure(b'/apex/com.android.hardware.graphics.allocator/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream' in rc, 'Wrong APEX service path')
+    binaries = {}
+    for name,path in extracted.items():
+        with path.open('rb') as stream: magic = stream.read(4)
+        if magic == b'\x7fELF': binaries[name] = elf(path,'apex-'+path.name)
+    ensure(len(binaries) >= 3, 'APEX ELF payload incomplete')
+    packaged_names = {Path(name).name for name in binaries}
+    external_needed = sorted({name for binary in binaries.values() for name in binary['needed']} - packaged_names)
+    ensure(set(external_needed) <= set(manifest.get('requireNativeLibs',[])), 'APEX ELF imports missing from declared external native libraries')
+    # assemble_vintf emits schema 9, canonical fqnames and an input comment.
+    expected_vintf = {
+        'allocator': '<manifest version="9.0" type="device"><hal format="aidl"><name>android.hardware.graphics.allocator</name><version>3</version><fqname>IAllocator/default</fqname></hal></manifest>',
+        'mapper': '<manifest version="9.0" type="device"><hal format="native"><name>mapper</name><fqname>@5.0/minigbm_upstream</fqname></hal></manifest>',
+    }
+    def semantic(element):
+        return [element.tag,dict(element.attrib),(element.text or '').strip(),[semantic(child) for child in element]]
+    vintf = {}
+    for name,expected in expected_vintf.items():
+        actual = semantic(ET.fromstring(read(extracted['/etc/vintf/'+name+'.minigbm_upstream.xml'])))
+        ensure(actual == semantic(ET.fromstring(expected)), 'Unexpected packaged VINTF declaration '+name)
+        vintf[name] = actual
+    ensure(not any(name.startswith('/lib/') for name in binaries), 'Unexpected 32-bit APEX variant')
+    return {**install,'manifest':manifest,'payload':info(payload),'payload_filesystem':filesystem,'archive_members':archive_names,
+            'required_files':{name:info(extracted[name]) for name in required},'elfs':binaries,'external_needed_declared_in_manifest':external_needed,'vintf_declarations':vintf,
+            'signature_trust_verified':False,'runtime_dependency_resolution_verified':False}
+check('current allocator APEX payload, ARM64 libraries, init and VINTF',allocator_apex)
+guard.watch([O/'host/linux-x86/bin/aapt2',O/'host/linux-x86/bin/deapexer'])
+
+
+def unchanged():
+    after={n:( (P/(n+'.img')).stat().st_size,(P/(n+'.img')).stat().st_mtime_ns) for n in images}
+    ensure(after==before,'Image size/mtime changed during verification')
+    for path in list(health.watched): health.read(Path(path))
+    return {'image_sizes_and_mtimes_unchanged':True,'no_writable_image_handles_used':True,
+            'source_records_and_full_artifact_hashes':guard.finish()}
+check('image immutability during read-only audit',unchanged)
+for image in images.values():image._image.close()
+r['overall']='pass' if not r['errors'] else 'fail'
+(H/'results.json').write_text(json.dumps(r,indent=2)+'\n')
+print('Results: '+str(H/'results.json'),flush=True)
+for e in r['errors']:print('FAIL: '+e)
+raise SystemExit(bool(r['errors']))

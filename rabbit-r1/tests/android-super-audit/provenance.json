@@ -1,0 +1,28 @@
+{
+  "scope": "exact project-authored producer source snapshots; not an executed Android audit",
+  "source_review_handoff_sha256": "a93d66c4885ced523f25f2bf38c0065c4c1cf6911d4b2f727412a3ef0a079013",
+  "producer_files": {
+    "verify.py": {
+      "fixture": "producer/verify.py.txt",
+      "sha256": "d1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670",
+      "bytes": 58863,
+      "origin": "out/android-build-review/soc-cp2a/full-images/verification/verify.py",
+      "execution": "data only; hash and AST parse, never import"
+    },
+    "provenance.py": {
+      "fixture": "producer/provenance.py.txt",
+      "sha256": "82aad6709888a0779a380a71e263192e313bb425fcc239314a5c307443c05f3b",
+      "bytes": 12021,
+      "origin": "out/android-build-review/soc-cp2a/full-images/verification/provenance.py",
+      "execution": "data only; hash and AST parse, never import"
+    },
+    "health_checks.py": {
+      "fixture": "producer/health_checks.py.txt",
+      "sha256": "72a336069bc0ccabc70c058fabb5a0f8d19e9af6a96e311949050e09409aff8c",
+      "bytes": 18458,
+      "origin": "out/android-build-review/soc-cp2a/full-images/verification/health_checks.py",
+      "execution": "data only; hash and AST parse, never import"
+    }
+  },
+  "licensing_note": "Original private snapshots have no SPDX headers. Bytes are preserved for exact source pins; no third-party firmware, AOSP binaries or Android images are included. Distribution licensing remains the project maintainer policy; no header is invented inside pinned data."
+}
