@@ -91,3 +91,10 @@ thermal regulation are not interpreted as battery health. Runtime attachment,
 notification latency, teardown ordering and real charge completion remain
 hardware validation requirements. STATUS alone does not resolve the missing
 capacity estimate or make Android firmware beta-ready.
+
+# MT6357 retained RTC bytes
+
+`python3 scripts/test-mt6357-rtc-nvmem.py` tests the actual read-only RTC provider,
+probe and alarm operations with the separately pinned stock register mapping.
+See [RTC-NVMEM.md](../../docs/RTC-NVMEM.md) for the byte layout, optional compiled
+DT/config checks, lifetime behavior and unresolved retained-state validity.

@@ -279,6 +279,10 @@
       "url": "https://raw.githubusercontent.com/LineageOS/android_system_core/7c3f32fe89c52b4176fd288ba5bb4f907809c202/libcutils/include/cutils/list.h",
       "bytes": 2310,
       "sha256": "a9c672c93718dc24586cbabc25170c9d242920e3c4b5af96fb2dba4afba23dd2"
+    },
+    "src/kernel/drivers/rtc/rtc-mt6397.c": {
+      "sha256": "d1ac8438fd3e73b7100022c52acf4530e834eac8e22b0c4858cee3792752c8bd",
+      "bytes": 44570
     }
   }
 }

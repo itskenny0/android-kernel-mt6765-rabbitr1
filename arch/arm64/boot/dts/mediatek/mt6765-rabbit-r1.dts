@@ -143,6 +143,23 @@
 	interrupts = <144 IRQ_TYPE_LEVEL_HIGH>;
 	#interrupt-cells = <2>;
 
+	rtc {
+		nvmem-layout {
+			compatible = "fixed-layout";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/* Raw stock retained bytes; neither is a validated SOC seed. */
+			r1_fg_init: initialization@0 {
+				reg = <0 1>;
+			};
+
+			r1_fg_soc: state-of-charge@1 {
+				reg = <1 1>;
+			};
+		};
+	};
+
 	r1_battery: gauge {
 		compatible = "mediatek,mt6357-gauge";
 		power-supplies = <&r1_charger>;

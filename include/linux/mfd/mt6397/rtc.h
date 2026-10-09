@@ -64,6 +64,7 @@
 #define MTK_RTC_POLL_TIMEOUT   (jiffies_to_usecs(HZ))
 
 struct mtk_rtc_data {
+	bool                    has_fg_spares;
 	u32                     wrtgr;
 };
 

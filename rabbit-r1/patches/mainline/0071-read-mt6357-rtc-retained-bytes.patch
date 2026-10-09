@@ -1,0 +1,202 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Expose MT6357 retained RTC bytes read-only
+
+Provide the two verified RTC spare bytes through read-only NVMEM, sharing
+the alarm mutex and preserving read errors. Protect late NVMEM reads
+against parent-driver unbind. Describe the logical bytes and r1 fixed
+cells without adding a battery consumer or interpreting retained charge.
+
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -9,12 +9,65 @@
+ #include <linux/mfd/mt6397/core.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
++#include <linux/nvmem-provider.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/rtc.h>
+ #include <linux/mfd/mt6397/rtc.h>
+ #include <linux/mod_devicetable.h>
++
++#define MT6357_RTC_SPARE_SIZE 2
++
++static struct platform_driver mtk_rtc_driver;
++
++static int mt6357_rtc_nvmem_read(void *priv, unsigned int offset, void *val,
++				 size_t bytes)
++{
++	static const unsigned int registers[] = {
++		RTC_AL_SEC + 2 * RTC_OFFSET_HOUR,
++		RTC_AL_SEC + 2 * RTC_OFFSET_MTH,
++	};
++	struct device *dev = priv;
++	struct mt6397_rtc *rtc;
++	u8 data[MT6357_RTC_SPARE_SIZE];
++	unsigned int i, value;
++	int ret = 0;
++
++	if (offset > MT6357_RTC_SPARE_SIZE || bytes > MT6357_RTC_SPARE_SIZE - offset)
++		return -EINVAL;
++	if (!bytes)
++		return 0;
++	/* NVMEM references can outlive driver unbind. Its parent device survives,
++	 * but the driver's devres allocation does not. Never wait here: unbind
++	 * holds this lock while removing sysfs, which can wait for this reader.
++	 */
++	if (!device_trylock(dev))
++		return -EAGAIN;
++	if (dev->driver != &mtk_rtc_driver.driver) {
++		ret = -ENODEV;
++		goto unlock_device;
++	}
++	rtc = dev_get_drvdata(dev);
++	if (!rtc || !rtc->data->has_fg_spares) {
++		ret = -ENODEV;
++		goto unlock_device;
++	}
++	mutex_lock(&rtc->lock);
++	for (i = 0; i < bytes; i++) {
++		ret = regmap_read(rtc->regmap, rtc->addr_base + registers[offset + i], &value);
++		if (ret)
++			break;
++		data[i] = (value >> 8) & 0xff;
++	}
++	mutex_unlock(&rtc->lock);
++	if (!ret)
++		memcpy(val, data, bytes);
++
++unlock_device:
++	device_unlock(dev);
++	return ret;
++}
+ 
+ static int mtk_rtc_write_trigger(struct mt6397_rtc *rtc)
+ {
+@@ -251,6 +304,8 @@
+ 	struct mt6397_rtc *rtc;
+ 	int ret;
+ 
++	if (!mt6397_chip || !mt6397_chip->regmap)
++		return -ENODEV;
+ 	rtc = devm_kzalloc(&pdev->dev, sizeof(struct mt6397_rtc), GFP_KERNEL);
+ 	if (!rtc)
+ 		return -ENOMEM;
+@@ -261,6 +316,8 @@
+ 	rtc->addr_base = res->start;
+ 
+ 	rtc->data = of_device_get_match_data(&pdev->dev);
++	if (!rtc->data)
++		return -ENODEV;
+ 
+ 	rtc->irq = platform_get_irq(pdev, 0);
+ 	if (rtc->irq < 0)
+@@ -294,7 +351,23 @@
+ 	rtc->rtc_dev->start_secs = mktime64(1968, 1, 2, 0, 0, 0);
+ 	rtc->rtc_dev->set_start_time = true;
+ 
+-	return devm_rtc_register_device(rtc->rtc_dev);
++	ret = devm_rtc_register_device(rtc->rtc_dev);
++	if (ret)
++		return ret;
++	if (IS_ENABLED(CONFIG_RTC_NVMEM) && rtc->data->has_fg_spares) {
++		struct nvmem_config config = {
++			.size = MT6357_RTC_SPARE_SIZE,
++			.word_size = 1,
++			.stride = 1,
++			.read_only = true,
++			.ignore_wp = true,
++			.reg_read = mt6357_rtc_nvmem_read,
++			.priv = &pdev->dev,
++		};
++
++		return devm_rtc_nvmem_register(rtc->rtc_dev, &config);
++	}
++	return 0;
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -322,6 +395,11 @@
+ static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_rtc_suspend,
+ 			mt6397_rtc_resume);
+ 
++static const struct mtk_rtc_data mt6357_rtc_data = {
++	.wrtgr = RTC_WRTGR_MT6358,
++	.has_fg_spares = true,
++};
++
+ static const struct mtk_rtc_data mt6358_rtc_data = {
+ 	.wrtgr = RTC_WRTGR_MT6358,
+ };
+@@ -332,7 +410,7 @@
+ 
+ static const struct of_device_id mt6397_rtc_of_match[] = {
+ 	{ .compatible = "mediatek,mt6323-rtc", .data = &mt6397_rtc_data },
+-	{ .compatible = "mediatek,mt6357-rtc", .data = &mt6358_rtc_data },
++	{ .compatible = "mediatek,mt6357-rtc", .data = &mt6357_rtc_data },
+ 	{ .compatible = "mediatek,mt6358-rtc", .data = &mt6358_rtc_data },
+ 	{ .compatible = "mediatek,mt6397-rtc", .data = &mt6397_rtc_data },
+ 	{ }
+diff --git a/include/linux/mfd/mt6397/rtc.h b/include/linux/mfd/mt6397/rtc.h
+--- a/include/linux/mfd/mt6397/rtc.h
++++ b/include/linux/mfd/mt6397/rtc.h
+@@ -64,6 +64,7 @@
+ #define MTK_RTC_POLL_TIMEOUT   (jiffies_to_usecs(HZ))
+ 
+ struct mtk_rtc_data {
++	bool                    has_fg_spares;
+ 	u32                     wrtgr;
+ };
+ 
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+--- a/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mt6357.yaml
+@@ -78,12 +78,17 @@
+     type: object
+     $ref: /schemas/rtc/rtc.yaml#
+     unevaluatedProperties: false
+-    description:
+-      MT6357 Real Time Clock.
++    description: |
++      MT6357 Real Time Clock. Its read-only NVMEM view contains two logical
++      bytes: alarm-hour bits 15:8 at offset 0 and alarm-month bits 15:8 at
++      offset 1. These spare bytes retain firmware data; they are not a
++      validated battery state-of-charge estimate.
+     properties:
+       compatible:
+         const: mediatek,mt6357-rtc
+       start-year: true
++      nvmem-layout:
++        $ref: /schemas/nvmem/layouts/fixed-layout.yaml#
+     required:
+       - compatible
+ 
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+--- a/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts
+@@ -142,6 +142,23 @@
+ 	interrupt-parent = <&pio>;
+ 	interrupts = <144 IRQ_TYPE_LEVEL_HIGH>;
+ 	#interrupt-cells = <2>;
++
++	rtc {
++		nvmem-layout {
++			compatible = "fixed-layout";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			/* Raw stock retained bytes; neither is a validated SOC seed. */
++			r1_fg_init: initialization@0 {
++				reg = <0 1>;
++			};
++
++			r1_fg_soc: state-of-charge@1 {
++				reg = <1 1>;
++			};
++		};
++	};
+ 
+ 	r1_battery: gauge {
+ 		compatible = "mediatek,mt6357-gauge";

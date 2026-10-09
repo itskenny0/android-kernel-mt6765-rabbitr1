@@ -1,0 +1,32 @@
+{
+  "stock_rtc_source": "src/kernel/drivers/rtc/rtc-mt6397.c",
+  "stock_rtc_source_sha256": "d1ac8438fd3e73b7100022c52acf4530e834eac8e22b0c4858cee3792752c8bd",
+  "stock_kernel_commit": "8167c8c1087f057d2ef302fc93b47554291687ec",
+  "stock_merged_dtb_sha256": "e2b20d7cfc48bbf4498e8fd12610328eac8d2f6887d19d2c1df149e3145c87f4",
+  "base": 1416,
+  "base_source": "src/kernel/drivers/mfd/mt6397-core.c:31,74; MT6357 resources use MT6358_RTC_BASE",
+  "base_source_sha256": "ab0953f7e7817197ca59dbacafb25f47de8330f6f19c692f3e0b53ddfa720fc8",
+  "register_offsets": [
+    28,
+    34
+  ],
+  "registers": [
+    1444,
+    1450
+  ],
+  "lsb": 8,
+  "msb": 15,
+  "logical_cells": [
+    {
+      "name": "fg_init",
+      "offset": 0,
+      "size": 1
+    },
+    {
+      "name": "fg_soc",
+      "offset": 1,
+      "size": 1
+    }
+  ],
+  "provenance": "Register fields and byte order from stock rtc-mt6397.c:157,264,412. Actual stock merged DTB cells captured in out/battery-review/stock-profile-verification.json. This fixture describes raw bytes only, not validated retained SOC."
+}

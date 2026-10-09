@@ -78,12 +78,17 @@ properties:
     type: object
     $ref: /schemas/rtc/rtc.yaml#
     unevaluatedProperties: false
-    description:
-      MT6357 Real Time Clock.
+    description: |
+      MT6357 Real Time Clock. Its read-only NVMEM view contains two logical
+      bytes: alarm-hour bits 15:8 at offset 0 and alarm-month bits 15:8 at
+      offset 1. These spare bytes retain firmware data; they are not a
+      validated battery state-of-charge estimate.
     properties:
       compatible:
         const: mediatek,mt6357-rtc
       start-year: true
+      nvmem-layout:
+        $ref: /schemas/nvmem/layouts/fixed-layout.yaml#
     required:
       - compatible
 
