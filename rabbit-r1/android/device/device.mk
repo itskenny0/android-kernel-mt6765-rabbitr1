@@ -35,9 +35,10 @@ PRODUCT_PACKAGES += \
 # The logger validates expdb and bounds its mapping before loading pstore.
 PRODUCT_VENDOR_PROPERTIES += ro.vendor.r1.expdb.enabled=1
 
+# Recovery-as-boot copies root/ into its ramdisk for the normal-boot switch.
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/rootdir/fstab.r1:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.r1 \
-    $(LOCAL_PATH)/rootdir/fstab.r1:$(TARGET_COPY_OUT_RAMDISK)/first_stage_ramdisk/fstab.r1 \
+    $(LOCAL_PATH)/rootdir/fstab.r1:$(TARGET_COPY_OUT_ROOT)/first_stage_ramdisk/fstab.r1 \
     $(LOCAL_PATH)/rootdir/init.r1.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/init.r1.rc
 
 # Match the physical panel. Revisit density after UI testing on the device.
