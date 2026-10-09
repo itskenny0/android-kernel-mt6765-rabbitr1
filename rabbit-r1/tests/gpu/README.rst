@@ -104,9 +104,13 @@ patch was added. ``mesa-android-build-attempt.json`` records the failed build
 and its verified inputs; this is distinct from the successful Linux host build.
 
 The next build needs ``platforms=android`` and its real vendor dependencies,
-including currently missing libhardware and libui outputs. Packaging also needs
-the imagination-to-powervr_mesa suffix mapping and Android buffer-sharing
-support. Production continues to use SwiftShader.
+including currently missing libhardware and libui outputs. Patch 0005 now maps
+Android's ``imagination`` selection to the ``powervr_mesa`` library suffix.
+The patch applies to all 116 declared files, and Make expands the actual target
+rule to ``libvulkan_powervr_mesa.so`` and HAL name ``vulkan.powervr_mesa.so``.
+This packaging correction is not an Android build or link result. Image build
+``6555dd117c`` retains the earlier patch and does not validate this mapping.
+Android buffer-sharing support remains necessary. Production uses SwiftShader.
 
 The r1 GPU remains disabled
 -------------------------

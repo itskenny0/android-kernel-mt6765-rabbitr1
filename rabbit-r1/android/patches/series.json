@@ -70,7 +70,7 @@
     "project": "external/mesa",
     "base_commit": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
     "patch": "0005-update-mesa-26.2.4.patch",
-    "sha256": "59756d6f6329c211d4db1c73bb5f3f6dab65ca136a0e5e189cc7a04a17154923",
+    "sha256": "7740ab534dba11a98c5eb7dd720f1a6fa896f24cddf54a572000d7d425dd3034",
     "files": [
       {
         "path": ".pick_status.json",
@@ -81,6 +81,11 @@
         "path": "VERSION",
         "before_sha256": "9576076381e107da92785b6bc34ee8783107388ff244831c8db8169a9b84eb77",
         "after_sha256": "6fdb5e1a17496d2a90f08d87bf219fa0cbe025d0b95962ed326788c76ebbc947"
+      },
+      {
+        "path": "android/Android.mk",
+        "before_sha256": "f3e48e113675e703a6184dbca637e8e2090ff23cfce42128887a7f940069f9af",
+        "after_sha256": "340899802abd768882efe85fe47032a63d9ee3ce6283fe16c6d448202b833253"
       },
       {
         "path": "docs/relnotes.rst",
