@@ -3,23 +3,29 @@
   "project": "haretic",
   "status": "offline Android boot artifact checks passed; not a flashable complete ROM",
   "build_targets": [
+    "recovery-persist",
+    "dumpstate",
+    "out/target/product/r1/system/lib64/liblog.so",
+    "out/target/product/r1/recovery/root/system/lib64/liblog.so",
+    "com.android.hardware.graphics.allocator.minigbm_upstream",
     "bootimage",
     "dtboimage",
     "sepolicy.recovery",
     "out/target/product/r1/system/lib64/libbinder_ndk.so"
   ],
   "build_log": {
-    "path": "/rabbitr1/logs/android-boot-images-c3ae6a96e4.log",
-    "bytes": 11538,
-    "sha256": "03ecec1e7255ec3e34b0204237db2cc5136b46133821f6a05336f8ecd92e99d3"
+    "path": "/rabbitr1/logs/android-pstore-graphics-boot-b970f300bd.log",
+    "bytes": 2380998,
+    "sha256": "353cef216009b22b86d7c96d2e6801549f291222b568d95acf7b605141938fae"
   },
-  "device_source_commit": "c3ae6a96e421f4bfc7f14ce6a7b5687a40fea4a1",
+  "device_source_commit": "b970f300bdf7b320c6c897ca66e0f225d449d93f",
+  "audit_source_commit": "ea55ec9d2699b2e49b2aabe789e2650230fab699",
   "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
   "provenance": {
     "installer_manifest": {
       "path": "src/android/.r1-install.json",
       "bytes": 7236,
-      "sha256": "de2a04a5a8aaa5285348ef65180a45edcc5d5b5ed8d09d46e85c6eda88470738"
+      "sha256": "3d3dcb8b443c49cd785efcab777f760b7966c3c2e0db78e5a2cb218e166b42a6"
     },
     "all_managed_files_sha256_verified": true,
     "managed_file_count": 61,
@@ -30,13 +36,13 @@
     },
     "sources_lock": {
       "path": "src/mainline/rabbit-r1/sources.lock.json",
-      "bytes": 16493,
-      "sha256": "ec8f5fbeff8060cdd6148865aebd234f83f5e634e82ec9af3d2943abd03e8320"
+      "bytes": 18272,
+      "sha256": "17f55d01c07b387f98f8e3cc77625db6dd9ca615f2c6c941d20e5f094b40bbcc"
     },
     "android_patch_series": {
       "path": "src/mainline/rabbit-r1/android/patches/series.json",
-      "bytes": 32841,
-      "sha256": "8e546c5f3986daca47ef971f19436b09d3108073f6241887ab8dbc8b49750abb"
+      "bytes": 34097,
+      "sha256": "d0a71e3ee94a9a41d60cdb0b376f1e49525978e3ef6e4974add0d45725ff6f87"
     },
     "verified_applied_patches": [
       {
@@ -64,8 +70,8 @@
         "project": "system/logging",
         "base_commit": "336e1707c8258adf1f1c5c5511218b533f3a22e8",
         "patch": "0004-support-deferred-pstore-logging.patch",
-        "sha256": "9977ddc718f943ed8f38711943135a1da171184a74b01b7476c29125d1c9bf35",
-        "verified_applied_file_count": 2
+        "sha256": "b493ec2f7f43351290d7b8ed7c2ac048113cab72229384fe3e5a7daaabec7501",
+        "verified_applied_file_count": 4
       },
       {
         "project": "external/mesa",
@@ -78,8 +84,15 @@
         "project": "bootable/recovery",
         "base_commit": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
         "patch": "0006-fix-recovery-algorithm-include.patch",
-        "sha256": "9c746d4172715e762363520bdfc12aed358bba6b42c6ee6f945483d602d50714",
-        "verified_applied_file_count": 2
+        "sha256": "a84f9d2f34bc7efc4f9cb040d0d3b10c7486a7c670a57972bfbdc84a015ff17c",
+        "verified_applied_file_count": 3
+      },
+      {
+        "project": "frameworks/native",
+        "base_commit": "46018f54b42489de960c62c3db9de131abce43ea",
+        "patch": "0007-collect-pstore-blk-console.patch",
+        "sha256": "0c1826f7df35ae7f9700bbd7daf0647a2c2e18bc4676aa1cbc1c223681ac3dfa",
+        "verified_applied_file_count": 1
       }
     ],
     "android_project_commits": {
@@ -92,17 +105,17 @@
       "system/tools/mkbootimg": "4a27dd13adf9846e12d585d6fe99a375ebb58396"
     },
     "verifier": {
-      "path": "out/android-build-review/boot-images/verify.py",
-      "bytes": 27190,
-      "sha256": "d47e7bd4987e16a30db4f3d9f7e1b711813bca1f5e060439acfde8ac5df2c6bd"
+      "path": "out/android-build-review/boot-images-pstore/verify.py",
+      "bytes": 27197,
+      "sha256": "93629ba91f694b63c8b0d299021f1a495e10277b467bb8a0bb36fcce2f7e71d8"
     },
     "detailed_results": {
-      "path": "out/android-build-review/boot-images/results.json",
-      "bytes": 85212,
-      "sha256": "92101be2253911fd5adb28b575a9e00ac58a2a8589f73dd9a0802d1b5c36d3ea"
+      "path": "out/android-build-review/boot-images-pstore/results.json",
+      "bytes": 94202,
+      "sha256": "c237ea6ec5451a7b9749067acf630104df459435e07179c9b18e9d44ddb4a679"
     },
     "lk_replay_source": {
-      "path": "out/android-build-review/boot-images/replay-lk-normal-boot.py",
+      "path": "out/android-build-review/boot-images-pstore/replay-lk-normal-boot.py",
       "bytes": 4191,
       "sha256": "fd6b9583458a0aa53a418ff033be9a222c5cd7afba76335b5aff6a175922c0c9"
     }
@@ -111,17 +124,17 @@
     "out/android/target/product/r1/boot.img": {
       "path": "out/android/target/product/r1/boot.img",
       "bytes": 33554432,
-      "sha256": "70898794ed0a3e1ea10bf8a685848272a460472c3242f6e24fc6959b49afdc58"
+      "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e"
     },
     "out/android/target/product/r1/dtbo.img": {
       "path": "out/android/target/product/r1/dtbo.img",
       "bytes": 8388608,
-      "sha256": "cef11c9e215b5683048e28d8fd2a632a83ab2db32dc5c9b2259bebdc30c88baa"
+      "sha256": "595f3edd36057d87ca7a53c5e32f25c16617c1018efa92c9e35f3138ac47e037"
     },
     "out/android/target/product/r1/ramdisk-recovery.img": {
       "path": "out/android/target/product/r1/ramdisk-recovery.img",
-      "bytes": 16198511,
-      "sha256": "95e872867ca7d73e19d8540f727f9c2aaf401c230bb7b7eca0256eb0922956b0"
+      "bytes": 16199271,
+      "sha256": "b33b9c7d298ec354569424e6e647aebef1e181a5667fb5e5879a1544f3d131d2"
     },
     "out/android/target/product/r1/recovery/root/sepolicy": {
       "path": "out/android/target/product/r1/recovery/root/sepolicy",
@@ -135,13 +148,13 @@
     },
     "out/android/target/product/r1/recovery/root/system/bin/linker64": {
       "path": "out/android/target/product/r1/recovery/root/system/bin/linker64",
-      "bytes": 2400824,
-      "sha256": "0c40c7d487f2658ed38df37432c1a0442be28f6eaf70789541bf30dd4e0ca8d2"
+      "bytes": 2400968,
+      "sha256": "b6b407257fd521518efc0a24a74fad20bd84db3df54e90dfb292030391e61525"
     },
     "out/android/target/product/r1/recovery/root/system/bin/recovery": {
       "path": "out/android/target/product/r1/recovery/root/system/bin/recovery",
-      "bytes": 3064680,
-      "sha256": "823337c5037c872f0f92a8b872735c57a79ca90a37a802fecf753c3206d3552f"
+      "bytes": 3064656,
+      "sha256": "bde7420bd7be6ac06229c7b571b6070460f7ac5188284dcf8458a7848f93cf24"
     },
     "out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.boot-service.r1_recovery": {
       "path": "out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.boot-service.r1_recovery",
@@ -204,11 +217,11 @@
   "boot": {
     "path": "/rabbitr1/out/android/target/product/r1/boot.img",
     "bytes": 33554432,
-    "sha256": "70898794ed0a3e1ea10bf8a685848272a460472c3242f6e24fc6959b49afdc58",
+    "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e",
     "header": {
       "kernel_size": 12546227,
       "kernel_addr": 1074266112,
-      "ramdisk_size": 16198511,
+      "ramdisk_size": 16199271,
       "ramdisk_addr": 1370488832,
       "second_size": 0,
       "second_addr": 0,
@@ -237,7 +250,7 @@
   "boot_avb": {
     "path": "/rabbitr1/out/android/target/product/r1/boot.img",
     "bytes": 33554432,
-    "sha256": "70898794ed0a3e1ea10bf8a685848272a460472c3242f6e24fc6959b49afdc58",
+    "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e",
     "original_image_size": 28778496,
     "vbmeta_offset": 28778496,
     "vbmeta_bytes": 704,
@@ -268,7 +281,7 @@
     "footer": {
       "path": "/rabbitr1/out/android/target/product/r1/dtbo.img",
       "bytes": 8388608,
-      "sha256": "cef11c9e215b5683048e28d8fd2a632a83ab2db32dc5c9b2259bebdc30c88baa",
+      "sha256": "595f3edd36057d87ca7a53c5e32f25c16617c1018efa92c9e35f3138ac47e037",
       "original_image_size": 44528,
       "vbmeta_offset": 45056,
       "vbmeta_bytes": 640,
@@ -287,31 +300,31 @@
     "compression": "gzip",
     "uncompressed_bytes": 40369920,
     "entries": 598,
-    "archive_sha256": "38672ce49724c975c92ff5260d20ae759d85efe918efeda0cb50fdcf229ca866",
+    "archive_sha256": "a5a1d205bdb274b45ef1be53ce53c7fe8e465238339c5d65b7787faae9b9689f",
     "extraction": "CPIO parsed in memory; selected regular files copied only; no archive symlinks/devices materialized"
   },
   "first_stage": {
     "fstab": {
-      "path": "/rabbitr1/out/android-build-review/boot-images/selected/first_stage_ramdisk/fstab.r1",
+      "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/first_stage_ramdisk/fstab.r1",
       "bytes": 1008,
       "sha256": "6f8f6ad884e5b4144f07f341cd9981851a96628041eab1ef4f292bfe3b024f36"
     },
     "build_metadata": {
-      "path": "/rabbitr1/out/android-build-review/boot-images/selected/first_stage_ramdisk/system/etc/ramdisk/build.prop",
+      "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/first_stage_ramdisk/system/etc/ramdisk/build.prop",
       "bytes": 935,
-      "sha256": "73b34306e53e3484283ac67939cb69459697d05cc9153b30156ddd8476fb822a"
+      "sha256": "3092c464778140436ede0715237a6e224cbdb70274ca78629917232e6467ef05"
     },
     "fixed_in_commit": "c3ae6a96e421f4bfc7f14ce6a7b5687a40fea4a1",
     "fix": "Stage first-stage fstab under TARGET_COPY_OUT_ROOT so recovery-as-boot includes it.",
     "initial_failure_record": {
-      "path": "out/android-build-review/boot-images/results-before-fstab-fix.json",
+      "path": "out/android-build-review/boot-images-pstore/results-before-fstab-fix.json",
       "bytes": 84852,
       "sha256": "d2a45bc16018aa5c773197b5f4903373fbf06dc51f7de463dae4e34476bd8337"
     },
     "init_layout": "/init points to /system/bin/init; recovery init and linker dependencies exist in the ramdisk. FirstStageMain mounts system before its next exec; no separate first_stage_ramdisk init/linker is required."
   },
   "recovery_policy": {
-    "path": "/rabbitr1/out/android-build-review/boot-images/selected/sepolicy",
+    "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/sepolicy",
     "bytes": 936696,
     "sha256": "3b55d7496fca92857831c12c16a78407d791070d86e599cc3e0c17389e0fdd76",
     "per_domain_permissive_declarations": [
@@ -353,9 +366,9 @@
     "elf_count": 56,
     "missing": [],
     "files": {
-      "out/android-build-review/boot-images/selected/system/bin/recovery": {
-        "bytes": 3064680,
-        "sha256": "823337c5037c872f0f92a8b872735c57a79ca90a37a802fecf753c3206d3552f",
+      "out/android-build-review/boot-images-pstore/selected/system/bin/recovery": {
+        "bytes": 3064656,
+        "sha256": "bde7420bd7be6ac06229c7b571b6070460f7ac5188284dcf8458a7848f93cf24",
         "needed": [
           "android.hardware.health@2.0.so",
           "libbinder_ndk.so",
@@ -389,31 +402,31 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/bin/linker64": {
-        "bytes": 2400824,
-        "sha256": "0c40c7d487f2658ed38df37432c1a0442be28f6eaf70789541bf30dd4e0ca8d2",
+      "out/android-build-review/boot-images-pstore/selected/system/bin/linker64": {
+        "bytes": 2400968,
+        "sha256": "b6b407257fd521518efc0a24a74fad20bd84db3df54e90dfb292030391e61525",
         "needed": []
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libdl.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libdl.so": {
         "bytes": 50832,
         "sha256": "07c06e846de6ad6bad95e771f494b4b0db8b02f98fc9b0d7a5d75b8e31f8c612",
         "needed": [
           "ld-android.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/ld-android.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/ld-android.so": {
         "bytes": 34160,
         "sha256": "5dbbe8389b417d3abea5f022cf630cf79bc6909b8404a8765c271978c7bd655e",
         "needed": []
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libm.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libm.so": {
         "bytes": 265384,
         "sha256": "98b05b7977800503776c9e5dbcc015cbb145df1908952f998b6cfc3531bf4746",
         "needed": [
           "libc.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libc.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libc.so": {
         "bytes": 1329624,
         "sha256": "214813846cef24997ac74dd74c0fa500026b2c4c038ea368f41b4d630a642d38",
         "needed": [
@@ -421,7 +434,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libc++.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libc++.so": {
         "bytes": 1152760,
         "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
         "needed": [
@@ -430,7 +443,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/librecovery_ui.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/librecovery_ui.so": {
         "bytes": 433864,
         "sha256": "58d443ac7a7ffd46b727e65b402acd9b150ed0ffdd10490984483114b7575caa",
         "needed": [
@@ -448,7 +461,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libvolume_manager.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libvolume_manager.so": {
         "bytes": 254920,
         "sha256": "7c25c27a55167a5c3e742ee7913143f38e285d1b25e13f585c37e966398724bc",
         "needed": [
@@ -464,7 +477,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libsysutils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsysutils.so": {
         "bytes": 69736,
         "sha256": "980ca28bf4325fe2ebe38dbbf59392cffa425c9f2f42b1b39521a04c0659d25e",
         "needed": [
@@ -477,9 +490,9 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/liblog.so": {
-        "bytes": 102536,
-        "sha256": "ca101f7d6ff1d07869152e9f11685e51e31214c127d9e64dff993447ce2e54de",
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblog.so": {
+        "bytes": 102608,
+        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
         "needed": [
           "libc++.so",
           "libc.so",
@@ -487,7 +500,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libcutils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcutils.so": {
         "bytes": 118336,
         "sha256": "544f15cb5e9230b494538db9e64d92f4c736e59e09b6a4fd55adb9210ea0880e",
         "needed": [
@@ -499,7 +512,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libbase.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbase.so": {
         "bytes": 234920,
         "sha256": "f64d7ced8ea4629653a912b1810961f237a96c961a3eaa61ee7a5bc91e4ab8fd",
         "needed": [
@@ -510,7 +523,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libsgdisk.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsgdisk.so": {
         "bytes": 298416,
         "sha256": "94afcc796b7f0db78f9954620fdf71075285611a97690d9dfb767f3308f37a80",
         "needed": [
@@ -521,7 +534,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libext2_uuid.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libext2_uuid.so": {
         "bytes": 51448,
         "sha256": "e5af2aeb114d0ac6dd89699cb672aef889556a2457322b0e13b83e14fb54db7a",
         "needed": [
@@ -530,7 +543,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libselinux.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libselinux.so": {
         "bytes": 135432,
         "sha256": "973cdf64e46565c71a7d2a74e213a808545e2cae09868b6dd8805b495e7adb95",
         "needed": [
@@ -540,7 +553,7 @@
           "libc.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libpackagelistparser.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpackagelistparser.so": {
         "bytes": 51648,
         "sha256": "e2d0b7721349331e84a56e86dec4878cf813cdd1ccbe96730f82276b181c7927",
         "needed": [
@@ -551,14 +564,14 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libpcre2.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpcre2.so": {
         "bytes": 412712,
         "sha256": "308d11a715405c2549bb0708c1d273d579bcab5977be169995a62620bfdc3def",
         "needed": [
           "libc.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libz.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libz.so": {
         "bytes": 134448,
         "sha256": "7ea13eda543ff64056a4145d96dcb88d6d0d7ee33e38a105a78dfae046e4defa",
         "needed": [
@@ -567,7 +580,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libutils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libutils.so": {
         "bytes": 168720,
         "sha256": "4d1e70eea5e7bfd3f8eb36362c84e3e8af1616b74786c951485425e03d07b911",
         "needed": [
@@ -579,7 +592,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libpng.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpng.so": {
         "bytes": 284440,
         "sha256": "0f7912c1cc4f4b8a3178a1d6212773b721a26713f553fa32713763caa29453bd",
         "needed": [
@@ -590,7 +603,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libhidlbase.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libhidlbase.so": {
         "bytes": 744504,
         "sha256": "405f21e2b53cd48ea2ffd8e1b876dac66139701a1bab4142f8e963a41cee4b04",
         "needed": [
@@ -604,7 +617,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.health-V5-ndk.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health-V5-ndk.so": {
         "bytes": 85768,
         "sha256": "58693b945cedb61b144d419400e02a3d67d2e5d58f1e8dc0991546df601f0c76",
         "needed": [
@@ -615,7 +628,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libbinder_ndk.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbinder_ndk.so": {
         "bytes": 205640,
         "sha256": "3a40712239c78061ccb1a6c8cb005ad8c8464ad9cdfd9f1309a31eb820f32088",
         "needed": [
@@ -628,7 +641,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libbinder.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbinder.so": {
         "bytes": 1002128,
         "sha256": "14163a88ac585a8994da701c9935bc68f18a156612618dece9777811965ede9c",
         "needed": [
@@ -641,7 +654,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.boot-V1-ndk.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot-V1-ndk.so": {
         "bytes": 68848,
         "sha256": "723bcd5c9a8fb33f17357604bac4fd3641efa548cd409104c684dd2d26b6d25f",
         "needed": [
@@ -652,7 +665,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libziparchive.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libziparchive.so": {
         "bytes": 119408,
         "sha256": "1189dd0dcc9c312c8b79263ab2c69f1d16bcb3340f1f06fe7076a575a29f02b3",
         "needed": [
@@ -665,7 +678,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libtinyxml2.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libtinyxml2.so": {
         "bytes": 150856,
         "sha256": "de2789367174cfe0f32b557b8f509adb9e34c271562deb933100c92dc8a3629c",
         "needed": [
@@ -676,7 +689,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libhidl-gen-utils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libhidl-gen-utils.so": {
         "bytes": 69144,
         "sha256": "c1208a0bc4ce65b1a9c4d485da901ef33f42f1ff0d6f197c9026ce45ef4d9f8b",
         "needed": [
@@ -687,7 +700,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libfusesideload.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfusesideload.so": {
         "bytes": 69832,
         "sha256": "b5eb1e95e3c03bdf2262ca673b3d8251963e6965317f96e409d98f7eec0bc6ae",
         "needed": [
@@ -699,7 +712,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libcrypto.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcrypto.so": {
         "bytes": 1978408,
         "sha256": "87eef555d150b4d01cb9846cf9f596032d8b93d5e53dc45a7394e6330f806fbd",
         "needed": [
@@ -708,7 +721,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libfs_mgr.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfs_mgr.so": {
         "bytes": 647488,
         "sha256": "0eb5de6973f8f35f1721e82b9d116ca015f332d3b7a88852d090288e0c79a6bb",
         "needed": [
@@ -727,7 +740,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/liblp.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblp.so": {
         "bytes": 217600,
         "sha256": "e04abb143567e9a6216aee852277ba0d96a75169ae4c519216dcc989a9b3fd9d",
         "needed": [
@@ -745,7 +758,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libext4_utils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libext4_utils.so": {
         "bytes": 51376,
         "sha256": "3ee0f64674b9f9cd7deedaf3537e66f1f7082a6fbd3612cd94439d3c00d9a60e",
         "needed": [
@@ -759,7 +772,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libsparse.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsparse.so": {
         "bytes": 52408,
         "sha256": "c2012649992323cf5d4efd87de211b64be20d54b3412c1e0d52d20ae62d7f673",
         "needed": [
@@ -771,7 +784,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libcrypto_utils.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcrypto_utils.so": {
         "bytes": 35400,
         "sha256": "2214c9221a9abd560953ea08c014818d87a63a8b66a9bd0244a9422f6e2b740b",
         "needed": [
@@ -782,7 +795,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libfec.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfec.so": {
         "bytes": 118000,
         "sha256": "cda626ccd26b7b458d8e5cc68a091f7fe1416e899de22a668adc043dafbc918b",
         "needed": [
@@ -798,7 +811,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libfec_rs.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfec_rs.so": {
         "bytes": 51704,
         "sha256": "dfac7cfcb2cefa665628104b8eb18e30065919b323490738ab15e993f7f68f61",
         "needed": [
@@ -808,7 +821,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libbootloader_message.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbootloader_message.so": {
         "bytes": 135328,
         "sha256": "7b7fedc69ace47fcf5f0eb673aaa435f97a6d16e4b179f10055f5302ee17e2a3",
         "needed": [
@@ -819,7 +832,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libprotobuf-cpp-lite-6.33.5.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprotobuf-cpp-lite-6.33.5.so": {
         "bytes": 1497016,
         "sha256": "a5980cf4db6e938c9dca91a4669e8bd73eead3641a1a396d3f5e0a91cb184a27",
         "needed": [
@@ -830,7 +843,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libboot_control_client.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libboot_control_client.so": {
         "bytes": 68848,
         "sha256": "feaa46b14a3f0156146d00a8ce9237e03f3ca2500c3c81341a52b2dca030cb31",
         "needed": [
@@ -849,7 +862,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.boot@1.2.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.2.so": {
         "bytes": 118976,
         "sha256": "5738b4bdaad2cf99f672c920428b84420eb2b67512509220d6ab0257b0c528c6",
         "needed": [
@@ -865,7 +878,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.boot@1.1.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.1.so": {
         "bytes": 118960,
         "sha256": "deea7a497b73977edc07b836cf0bb28e8436f499e6ec9916bf8950d4ad107d31",
         "needed": [
@@ -880,7 +893,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.boot@1.0.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.0.so": {
         "bytes": 135656,
         "sha256": "18ce52154dffacba66347dca8b70231a91f9e43aa77a03c3294463c048354f42",
         "needed": [
@@ -894,7 +907,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.health@2.0.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health@2.0.so": {
         "bytes": 219384,
         "sha256": "10ca1dd041e5173dd3136933f39b5c108d4ef91eb4a05abb5984b620ca105374",
         "needed": [
@@ -909,7 +922,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/android.hardware.health@1.0.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health@1.0.so": {
         "bytes": 35312,
         "sha256": "c25abfc1ba8b3e8615da74af0601cb57a1580596b623d2dcb0ea4949a0992dfb",
         "needed": [
@@ -923,7 +936,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/bin/init": {
+      "out/android-build-review/boot-images-pstore/selected/system/bin/init": {
         "bytes": 2652808,
         "sha256": "d9514692580e27bdc6c2c76df225319d461391ddca6d330f0e3bd95c1a6c6f89",
         "needed": [
@@ -946,7 +959,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libvendorsupport.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libvendorsupport.so": {
         "bytes": 35376,
         "sha256": "f416281b00e56a9c9f336c1baf8ab4f2a4734ccb114f1cf3e91c84888b74ac14",
         "needed": [
@@ -958,7 +971,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libunwindstack.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libunwindstack.so": {
         "bytes": 754464,
         "sha256": "0d07fb1844b63bb747c839e5c8b8ce872a9aa3f0c1c624e6634c96e26b277412",
         "needed": [
@@ -972,7 +985,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/liblzma.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblzma.so": {
         "bytes": 216560,
         "sha256": "e73d7dae5c90a2f7cc6f6db8625049530207fd2a4920b1204ca022f4312a2c81",
         "needed": [
@@ -981,7 +994,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libprocessgroup_setup.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprocessgroup_setup.so": {
         "bytes": 53200,
         "sha256": "194d8ae782527c3885c60bafd17a829b0b9400b632d7fb70cebcada560ddb6f9",
         "needed": [
@@ -993,7 +1006,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libjsoncpp.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libjsoncpp.so": {
         "bytes": 216968,
         "sha256": "c1c30c0d9d48d0111ba2f2049dc6acf68db4eaed37ed751aea26139cf2cfe18e",
         "needed": [
@@ -1003,7 +1016,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libprocessgroup.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprocessgroup.so": {
         "bytes": 400048,
         "sha256": "ffb58c28f177d4e057943f00ad3a5ce59ee36b99144f0f30aca128d54cb5c966",
         "needed": [
@@ -1014,7 +1027,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/liblogwrap.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblogwrap.so": {
         "bytes": 51512,
         "sha256": "1f9f309fe52bab5204468dc3f300a7880548aeca645e69d35cda6de7cf90eeda",
         "needed": [
@@ -1026,7 +1039,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/lib64/libgsi.so": {
+      "out/android-build-review/boot-images-pstore/selected/system/lib64/libgsi.so": {
         "bytes": 35824,
         "sha256": "e3bb3efc0c541e3f6a837c4ab7cf81b3707552323b4e5667ed953f0c9fbda897",
         "needed": [
@@ -1037,7 +1050,7 @@
           "libdl.so"
         ]
       },
-      "out/android-build-review/boot-images/selected/system/bin/hw/android.hardware.boot-service.r1_recovery": {
+      "out/android-build-review/boot-images-pstore/selected/system/bin/hw/android.hardware.boot-service.r1_recovery": {
         "bytes": 136496,
         "sha256": "43be882429950254bade95ac78fedccd668ea7ddb77e9d62a513c9d8ac09481b",
         "needed": [
@@ -1056,7 +1069,7 @@
     "runtime_namespace_resolution_verified": false
   },
   "normal_dependency_inventory": {
-    "elf_count": 25,
+    "elf_count": 29,
     "missing_candidates": [],
     "files": {
       "out/android/target/product/r1/system_ext/bin/r1-charging": {
@@ -1117,8 +1130,8 @@
         ]
       },
       "out/android/target/product/r1/system/lib64/liblog.so": {
-        "bytes": 102536,
-        "sha256": "ca101f7d6ff1d07869152e9f11685e51e31214c127d9e64dff993447ce2e54de",
+        "bytes": 102608,
+        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
         "needed": [
           "libc++.so",
           "libc.so",
@@ -1174,9 +1187,9 @@
           "libdl.so"
         ]
       },
-      "out/android/target/product/r1/vendor/lib64/android.hardware.boot@1.1.so": {
+      "out/android/target/product/r1/system/lib64/android.hardware.boot@1.1.so": {
         "bytes": 118960,
-        "sha256": "169003b68e36b0c666929893e6acf944bf9139b550daeee4fae6d7fe93631d9b",
+        "sha256": "deea7a497b73977edc07b836cf0bb28e8436f499e6ec9916bf8950d4ad107d31",
         "needed": [
           "android.hardware.boot@1.0.so",
           "libhidlbase.so",
@@ -1258,6 +1271,21 @@
           "libdl.so"
         ]
       },
+      "out/android/target/product/r1/system/lib64/libhidlbase.so": {
+        "bytes": 744544,
+        "sha256": "a5ca8692275dc111eaa19e348d6f08ff3eaec54e396caa7a4f6eda0ea538b0a1",
+        "needed": [
+          "libbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libvndksupport.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
       "out/android/target/product/r1/vendor/lib64/libhidlbase.so": {
         "bytes": 744600,
         "sha256": "2a1f0f06f4e592537789c11e785f70c3c9d01f27d9fad257e3f1b220b6e23fe4",
@@ -1267,6 +1295,20 @@
           "libutils.so",
           "libcutils.so",
           "libvndksupport.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "out/android/target/product/r1/system/lib64/android.hardware.boot@1.0.so": {
+        "bytes": 135656,
+        "sha256": "18ce52154dffacba66347dca8b70231a91f9e43aa77a03c3294463c048354f42",
+        "needed": [
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
           "libc++.so",
           "libc.so",
           "libm.so",
@@ -1287,9 +1329,24 @@
           "libdl.so"
         ]
       },
-      "out/android/target/product/r1/vendor/lib64/android.hardware.boot-V1-ndk.so": {
+      "out/android/target/product/r1/vendor/lib64/android.hardware.boot@1.1.so": {
+        "bytes": 118960,
+        "sha256": "169003b68e36b0c666929893e6acf944bf9139b550daeee4fae6d7fe93631d9b",
+        "needed": [
+          "android.hardware.boot@1.0.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "out/android/target/product/r1/system/lib64/android.hardware.boot-V1-ndk.so": {
         "bytes": 68848,
-        "sha256": "2e86e519800d50c8c6b6bfc91d2ea6b1eff8f53c0422cbc237666607b2f3905a",
+        "sha256": "723bcd5c9a8fb33f17357604bac4fd3641efa548cd409104c684dd2d26b6d25f",
         "needed": [
           "libbinder_ndk.so",
           "libc++.so",
@@ -1332,6 +1389,17 @@
         "needed": [
           "libdl_android.so",
           "liblog.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "out/android/target/product/r1/vendor/lib64/android.hardware.boot-V1-ndk.so": {
+        "bytes": 68848,
+        "sha256": "2e86e519800d50c8c6b6bfc91d2ea6b1eff8f53c0422cbc237666607b2f3905a",
+        "needed": [
+          "libbinder_ndk.so",
           "libc++.so",
           "libc.so",
           "libm.so",
@@ -1383,7 +1451,7 @@
     "design": "Pstore modules loaded explicitly by vendor r1-expdb after post-fs; recovery image does not load them.",
     "vendor_image_validated": false,
     "module_install_rules_present": true,
-    "note": "These targets do not install the vendor pstore modules. Expected vendor/lib/modules installation rules exist; staged module hashes match the pinned kernel. Eventual vendor image contents remain unverified."
+    "note": "Staged module hashes and any installed candidates are checked by this audit. Eventual vendor image contents remain unverified."
   },
   "lk_mode_handoff": {
     "stock_sha256": "534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e",
