@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "scope": "Actual external MODULE compilation, modpost and .ko linkage; no target execution",
+  "prepared_kernel": "/rabbitr1/out/powervr-check",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "kernel_module_symvers_sha256": "c5186d36ae85124f7d5c73e1ff12eb2046fab6c4ab15025bb832dbe26479d624",
+  "pinned_inputs": 9101,
+  "all_pinned_inputs_unchanged": true,
+  "source": {
+    "head": "3b7cc5faaedba64514f0ca432fc486410d696b83",
+    "source_files": {
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-gauge.c": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-r1-model/stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-r1-model/session.h": "38dae4045bcd1de50fb5c6ecd486c1788e7d1e944bac4a5e1ba9ae0d1ffddf4c",
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-r1-model/profile.h": "a88b1ed8662d2a1d607ceaced52402859ed07a07b06c55a9d6a824b84b9aec58",
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-r1-model/session.c": "257ea68c57b0e46eec6b778b0fa2b4e9d473ba5fd997f2997b9ddcb2473623d1",
+      "/rabbitr1/src/mainline/drivers/power/supply/mt6357-r1-model/profile.c": "247eee7d55c47960232fd28dd6254a426b0f3979c4177f9235647b2008eca8ba"
+    },
+    "gauge_sha256": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+    "module_export_table": "c5186d36ae85124f7d5c73e1ff12eb2046fab6c4ab15025bb832dbe26479d624",
+    "scope": "External SOC on/off MODULE build against current completed kernel exports; private local SOC-off preprocessing override; diagnostics enabled both."
+  },
+  "variants": {
+    "soc-on": {
+      "sha256": "e9f2fa6b08240a70adc84d3373399efe0484e4354202081684c83bdc97d5c2c7",
+      "bytes": 51864,
+      "imported_symbols": 58,
+      "result_sha256": "83715201fcfb451551a2b0d551c7322f46eaf8b584a178c2827cbbf108f309d3"
+    },
+    "soc-off": {
+      "sha256": "adf46804c22f9e05cd4b34a28dd109eee4be03ef9a2f6dbde3fab12cb2842140",
+      "bytes": 25656,
+      "imported_symbols": 55,
+      "result_sha256": "596f66e2dd769f30abd1679e351e5aecc712015ba3d9dc7f3ab22b53b2c4a228"
+    }
+  },
+  "limitations": [
+    "Prepared kernel has SOC and diagnostics enabled and the gauge built in.",
+    "SOC-off module uses a private forced header to undefine only the local SOC macro after linux/kconfig.h; no full SOC-off kernel is built.",
+    "Both modules retain diagnostics enabled.",
+    "CONFIG_MODVERSIONS and CONFIG_MODULE_SIG are disabled; no CRC-version or signature validation is claimed.",
+    "An externally built module is not loaded alongside the built-in driver; no module insertion, physical measurement, calibration or runtime behavior is tested."
+  ],
+  "original_workspace_directory": "/rabbitr1/out/battery-review/soc-state/kernel-module",
+  "evidence": {
+    "review.md": "d697c493f83d915a8acde345892ef003e4499f1986c054adf19cbf5e4c61a4de",
+    "result.json": "c190348e009c42e4ce15041e2d89ce7a0e41d5a0042ba4a3782ef62d53358a86",
+    "verify.py": "62d12ac6f54e451a11fab77ced9972d37e6fbb52a9b5161a549c00e4f4277a3c",
+    "sources.json": "131f130288397dc85774583f2806a01a7d7058c60ef7a480103dc69fdf49ffd1",
+    "inputs-before.json": "6a1a3f496dacf984c8b7f93be4f96b17295e14f5ab28bb12836ccc2dec7f2b2e",
+    "inputs-after.json": "6a1a3f496dacf984c8b7f93be4f96b17295e14f5ab28bb12836ccc2dec7f2b2e",
+    "soc-on/result.json": "83715201fcfb451551a2b0d551c7322f46eaf8b584a178c2827cbbf108f309d3",
+    "soc-off/result.json": "596f66e2dd769f30abd1679e351e5aecc712015ba3d9dc7f3ab22b53b2c4a228",
+    "soc-on/build.log": "581833bfafa74215f6af0003599453535fa7a7e3dedfb1036d382073175e73df",
+    "soc-off/build.log": "9635a0ba1f3a82bc7188d19b55a099de515e1e995b22442ef0ee05cc1203d2ac"
+  },
+  "prepared_kernel_source_commit": "ab23cfd441f21f4a5e933540ca117981746d288b"
+}

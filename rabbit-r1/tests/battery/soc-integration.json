@@ -141,7 +141,6 @@
   },
   "original_workspace_directory": "/rabbitr1/out/battery-review/soc-state/kernel-integration",
   "pending": [
-    "Gauge module .ko modpost",
     "Android same-monitor priming and readiness integration",
     "Hardware measurements and calibration"
   ],
@@ -169,5 +168,9 @@
   "full_kernel_link": {
     "record": "soc-kernel-link.json",
     "result": "passed; built-in gauge,10 other modules"
+  },
+  "module_link": {
+    "record": "soc-module-link.json",
+    "result": "passed SOC on/off external modules against real kernel exports; not loaded"
   }
 }

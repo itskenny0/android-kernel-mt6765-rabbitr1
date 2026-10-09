@@ -140,6 +140,10 @@ Image link with SOC, diagnostics and PowerVR enabled. All ten modules and the
 kernel are AArch64; the kernel has no undefined symbols. This build emitted no
 warnings or errors and reused objects from the earlier full kernel build.
 `tests/battery/soc-kernel-link.json` records the source fingerprint, config,
-artifact hashes and scope. The gauge was built-in for this check; a modular
-gauge `.ko` modpost remains separate. The shipping config, diagnostic package
-and Android kernel were not replaced.
+artifact hashes and scope. The gauge was built-in for this check. Separate
+external SOC-on/off modules also passed compilation, modpost and final `.ko`
+linking against that kernel's real exports, with no diagnostics. The off variant
+undefines the SOC option locally; it is not a complete SOC-off kernel build.
+`tests/battery/soc-module-link.json` records both module hashes and limits.
+Neither module was loaded. The shipping config, diagnostic package and Android
+kernel were not replaced.
