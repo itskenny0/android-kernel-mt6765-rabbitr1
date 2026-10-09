@@ -177,3 +177,8 @@ sequence fixture. It requires GCC with ASan/UBSan and no vendor checkout.
 The fixtures model OF, regmap and allocation; this does not test physical power
 sequencing, full probe lifetime or rendering. The six independent review
 controls remain recorded separately in mt6765-bus-protection.json.
+
+The subsequent full SOC-enabled kernel build is recorded in
+``mt6765-power-build.json``. It passed at source ``0d14e48318`` with PowerVR
+still disabled. The earlier source-contract record retains its original
+translation-unit-only scope; the full build does not establish hardware support.

@@ -32,6 +32,11 @@ board DT compilation. These are offline checks. The provider powers MFG during
 probe and may power it down at late init, so this change has runtime effects
 even without a GPU node. Physical power sequencing remains untested.
 
+The subsequent [SOC kernel build](../tests/gpu/mt6765-power-build.json) at
+`0d14e48318` passed the full kernel/DT/module build and artifact checks.
+PowerVR remains disabled. This build did not restage Android or regenerate
+the diagnostic boot images.
+
 The generic helpers still ignore individual register-write errors. Shared
 VCORE voting, mux order, hardware APM/CORE0 ownership and GPU enablement remain
 separate work; no voltage, OPP, GPU node or firmware change is included.

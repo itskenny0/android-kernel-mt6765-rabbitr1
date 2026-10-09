@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "status": "SOC-enabled kernel compiled and validated; not boot-tested",
+  "source_commit": "0d14e4831896eb0dfebaa7b77a71bd0fd716528a",
+  "ended_at": "2026-10-09T14:22:29.392408+00:00",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "config_sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f",
+  "experimental_soc_enabled": true,
+  "powervr_enabled": false,
+  "command": "JOBS=8 bash scripts/build-mainline.sh --experimental-soc",
+  "artifacts": {
+    "Image": {
+      "bytes": 35342344,
+      "sha256": "444c954c0b92674df0595ab7697a69e68188e5ac78a5e385c6ae5c7d8983b48e"
+    },
+    "Image.gz": {
+      "bytes": 12561272,
+      "sha256": "9e2944e3d13df996a9d367e838a1a3f627a4144a3799e64191655d7ff359aa77"
+    },
+    "Module.symvers": {
+      "bytes": 858554,
+      "sha256": "606c9dd4852439725db907e37ba89999774b1025d40fb2d881a44cbe2c14a322"
+    },
+    "System.map": {
+      "bytes": 7711020,
+      "sha256": "60edaa59587de0993313654cf2af62a91c68acf33959b05b9030d2b7b8bfdcf3"
+    },
+    "config": {
+      "bytes": 195221,
+      "sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f"
+    },
+    "defconfig": {
+      "bytes": 17429,
+      "sha256": "935c68830d98de62f693eaf9b4e5e4b2bc8538223320926a373960a687c9a1cb"
+    },
+    "modules.tar.gz": {
+      "bytes": 24227,
+      "sha256": "84ecb61f58d8c26e6290d3eadbf4719a7e4dc846acad33ed0df56b9b9f2e90a4"
+    },
+    "mt6765-rabbit-r1.dtb": {
+      "bytes": 28113,
+      "sha256": "9592be73f9be84c7e37ad764a54d4948a4871f49d3b94ca56610b52da89ab19c"
+    },
+    "vmlinux": {
+      "bytes": 45048160,
+      "sha256": "d7283a49f8516e6fda2a907b80e94f96715fe6eb4d794f79e3927210e18e0b6e"
+    }
+  },
+  "module_count": 10,
+  "checks": {
+    "kernel_validator": "PASS",
+    "exact_recorded_artifact_and_module_hashes": "PASS",
+    "source_clean_and_unchanged": "PASS",
+    "staged_Android_f725_files_unchanged": "PASS",
+    "log_capture_reached_EOF": true
+  },
+  "hardware_tested": false,
+  "android_images_built": false,
+  "diagnostic_images_regenerated": false,
+  "evidence": {
+    "build_record": {
+      "path": "/rabbitr1/dist/mainline/build.json",
+      "sha256": "61e4dba2a8802c9bf4b78de19e3731c3306b94da96757c36cc463d485c6be435"
+    },
+    "runner_result": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-integration/kernel-build/result.json",
+      "sha256": "24c39e804f0207ae3c18293cad6d3c476bdc5a621995d5508991922dda9444d1"
+    },
+    "runner_start": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-integration/kernel-build/start.json",
+      "sha256": "51c72979c069ea2fe73b014b300794c0e1d30c2295fb6d17f8d516388fda35e0"
+    },
+    "log": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-integration/kernel-build/build.log",
+      "sha256": "720fc402b27d0ebce2fc19d573832dbd6e30fd3b4741b6538fea95fc9fa3ce17"
+    }
+  },
+  "limits": [
+    "This records the local experimental SOC configuration; the standard CI kernel configuration disables SOC.",
+    "Staged Android still uses f725; the full image build stopped under its storage guard.",
+    "The existing diagnostic archive still carries its historical994 kernel payloads.",
+    "Kernel compilation does not establish physical boot, MFG sequencing, rendering or beta readiness."
+  ]
+}
