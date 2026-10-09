@@ -1,0 +1,35 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Collect pstore block console logs
+
+Include pstore_blk console output after the existing ramoops paths.
+Report primary access and I/O failures instead of selecting another history.
+
+---
+diff --git a/cmds/dumpstate/dumpstate.cpp b/cmds/dumpstate/dumpstate.cpp
+--- a/cmds/dumpstate/dumpstate.cpp
++++ b/cmds/dumpstate/dumpstate.cpp
+@@ -173,6 +173,7 @@
+
+ #define PSTORE_LAST_KMSG "/sys/fs/pstore/console-ramoops"
+ #define ALT_PSTORE_LAST_KMSG "/sys/fs/pstore/console-ramoops-0"
++#define BLK_PSTORE_LAST_KMSG "/sys/fs/pstore/console-pstore_blk-0"
+ #define BLK_DEV_SYS_DIR "/sys/block"
+
+ #define AFLAGS "/system/bin/aflags"
+@@ -1037,11 +1038,14 @@
+
+ static void DoKmsg() {
+     struct stat st;
+-    if (!stat(PSTORE_LAST_KMSG, &st)) {
++    // Only absence selects another backend; let DumpFile report other errors.
++    if (!stat(PSTORE_LAST_KMSG, &st) || errno != ENOENT) {
+         /* Also TODO: Make console-ramoops CAP_SYSLOG protected. */
+         DumpFile("LAST KMSG", PSTORE_LAST_KMSG);
+-    } else if (!stat(ALT_PSTORE_LAST_KMSG, &st)) {
++    } else if (!stat(ALT_PSTORE_LAST_KMSG, &st) || errno != ENOENT) {
+         DumpFile("LAST KMSG", ALT_PSTORE_LAST_KMSG);
++    } else if (!stat(BLK_PSTORE_LAST_KMSG, &st) || errno != ENOENT) {
++        DumpFile("LAST KMSG", BLK_PSTORE_LAST_KMSG);
+     } else {
+         /* TODO: Make last_kmsg CAP_SYSLOG protected. b/5555691 */
+         DumpFile("LAST KMSG", "/proc/last_kmsg");

@@ -284,6 +284,31 @@
       "sha256": "d1ac8438fd3e73b7100022c52acf4530e834eac8e22b0c4858cee3792752c8bd",
       "bytes": 44570,
       "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/rtc/rtc-mt6397.c"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/liblog.map.txt": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/liblog.map.txt",
+      "bytes": 2787,
+      "sha256": "0f6863b6ac213350f96292402c0834c8fb89fa02042e960a80428304c0355019"
+    },
+    "downloads/pstore-collection-ci/bootable/recovery/volume_manager/PublicVolume.cpp": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_bootable_recovery/37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd/volume_manager/PublicVolume.cpp",
+      "bytes": 4513,
+      "sha256": "0a9a1a7fa3129e5c12cc904635ee5a6214102da5c6bdeffe813cc3490dc0cacc"
+    },
+    "downloads/pstore-collection-ci/bootable/recovery/volume_manager/include/volume_manager/VolumeManager.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_bootable_recovery/37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd/volume_manager/include/volume_manager/VolumeManager.h",
+      "bytes": 3555,
+      "sha256": "bbad7bae25778bc161def31d046ce2781cd67cccd1ec4dec669a4533acd90929"
+    },
+    "downloads/pstore-collection-ci/bootable/recovery/recovery-persist.cpp": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_bootable_recovery/37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd/recovery-persist.cpp",
+      "bytes": 7619,
+      "sha256": "a4599bb15c2f05313348ba605f71856f177008d95ce56afb69b72b7fd2e5aee8"
+    },
+    "downloads/pstore-collection-ci/frameworks/native/cmds/dumpstate/dumpstate.cpp": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_frameworks_native/46018f54b42489de960c62c3db9de131abce43ea/cmds/dumpstate/dumpstate.cpp",
+      "bytes": 191432,
+      "sha256": "b3503963a70396094c830b5fbb5898f9b92352df4cf830fdfcb9cca4adb1db47"
     }
   }
 }

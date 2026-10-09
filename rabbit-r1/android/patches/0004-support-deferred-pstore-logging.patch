@@ -1,26 +1,37 @@
 From: itskenny0 <0@kenny.cat>
 Subject: [PATCH] Support deferred pstore logging
 
-Read pstore_blk records when ramoops is absent. Retry a missing pmsg
-device once per second so logd can start before the backend is loaded.
-Keep permanent open failures cached.
+Retry an absent pmsg device and read pstore_blk when ramoops is absent.
+Add an explicit backend reader for recovery without cross-backend fallback.
+Preserve input errors and validate filtered records before saving fragments.
 
 ---
+diff --git a/liblog/pmsg_reader.cpp b/liblog/pmsg_reader.cpp
 --- a/liblog/pmsg_reader.cpp
 +++ b/liblog/pmsg_reader.cpp
-@@ -41,14 +41,22 @@
+@@ -28,7 +28,8 @@
+
+ #include "logger.h"
+
+-int PmsgRead(struct logger_list* logger_list, struct log_msg* log_msg) {
++static int PmsgReadFromPath(struct logger_list* logger_list, struct log_msg* log_msg,
++                            const char* selected_path) {
+   ssize_t ret;
+   off_t current, next;
+   struct __attribute__((__packed__)) {
+@@ -41,14 +42,22 @@
    memset(log_msg, 0, sizeof(*log_msg));
- 
+
    if (logger_list->fd.load() <= 0) {
 -    int i, fd = open("/sys/fs/pstore/pmsg-ramoops-0", O_RDONLY | O_CLOEXEC);
 +    // Keep one backend for this reader; do not merge unrelated boot histories.
-+    const char* path = "/sys/fs/pstore/pmsg-ramoops-0";
++    const char* path = selected_path ? selected_path : "/sys/fs/pstore/pmsg-ramoops-0";
 +    int i, fd = open(path, O_RDONLY | O_CLOEXEC);
-+    if (fd < 0 && errno == ENOENT) {
++    if (!selected_path && fd < 0 && errno == ENOENT) {
 +      path = "/sys/fs/pstore/pmsg-pstore_blk-0";
 +      fd = open(path, O_RDONLY | O_CLOEXEC);
 +    }
- 
+
      if (fd < 0) {
        return -errno;
      }
@@ -33,14 +44,132 @@ Keep permanent open failures cached.
        if (fd < 0) {
          return -errno;
        }
+@@ -75,7 +84,9 @@
+       preread_count += ret;
+     }
+     if (preread_count != sizeof(buf)) {
+-      return preread_count ? -EIO : -EAGAIN;
++      // Keep the legacy EOF convention; an explicit read must distinguish
++      // clean EOF from an EAGAIN returned by read().
++      return preread_count ? -EIO : (selected_path ? 0 : -EAGAIN);
+     }
+     if ((buf.p.magic != LOGGER_MAGIC) || (buf.p.len <= sizeof(buf)) ||
+         (buf.p.len > (sizeof(buf) + LOGGER_ENTRY_MAX_PAYLOAD)) ||
+@@ -127,6 +138,20 @@
+     if (fd <= 0) {
+       return -EBADF;
+     }
++    if (selected_path) {
++      // A seek can succeed past EOF. Validate filtered payloads too before
++      // allowing the explicit file API to publish any collected fragments.
++      size_t remaining = buf.p.len - sizeof(buf);
++      char ignored[256];
++      while (remaining) {
++        size_t count = remaining < sizeof(ignored) ? remaining : sizeof(ignored);
++        ret = TEMP_FAILURE_RETRY(read(fd, ignored, count));
++        if (ret < 0) return -errno;
++        if (ret == 0) return -EIO;
++        remaining -= ret;
++      }
++      continue;
++    }
+     current = TEMP_FAILURE_RETRY(lseek(fd, (off_t)0, SEEK_CUR));
+     if (current < 0) {
+       return -errno;
+@@ -143,6 +168,10 @@
+       return -EIO;
+     }
+   }
++}
++
++int PmsgRead(struct logger_list* logger_list, struct log_msg* log_msg) {
++  return PmsgReadFromPath(logger_list, log_msg, nullptr);
+ }
+
+ void PmsgClose(struct logger_list* logger_list) {
+@@ -160,8 +189,8 @@
+   return result;
+ }
+
+-ssize_t __android_log_pmsg_file_read(log_id_t logId, char prio, const char* prefix,
+-                                     __android_log_pmsg_file_read_fn fn, void* arg) {
++static ssize_t ReadPmsgFiles(const char* selected_path, log_id_t logId, char prio,
++                             const char* prefix, __android_log_pmsg_file_read_fn fn, void* arg) {
+   ssize_t ret;
+   struct content {
+     struct listnode node;
+@@ -214,7 +243,8 @@
+
+   /* Read the file content */
+   log_msg log_msg;
+-  while (PmsgRead(&logger_list, &log_msg) > 0) {
++  int read_result;
++  while ((read_result = PmsgReadFromPath(&logger_list, &log_msg, selected_path)) > 0) {
+     const char* cp;
+     size_t hdr_size = log_msg.entry.hdr_size;
+
+@@ -374,6 +404,12 @@
+   }
+   PmsgClose(&logger_list);
+
++  // The explicit-backend API reports open/read errors and emits no partial
++  // files on failure. Keep the existing automatic API behavior unchanged.
++  const bool read_failed = selected_path &&
++      (read_result < 0 || ret == -ENOMEM);
++  if (read_failed && ret != -ENOMEM) ret = read_result;
++
+   /* Progress through all the collected files */
+   list_for_each_safe(node, n, &name_list) {
+     struct listnode *content_node, *m;
+@@ -391,6 +427,11 @@
+       ssize_t add_len;
+
+       content = node_to_item(content_node, struct content, node);
++      if (read_failed) {
++        list_remove(content_node);
++        free(content);
++        continue;
++      }
+       add_len = content->entry.len - tag_len - sizeof(prio);
+       if (add_len <= 0) {
+         list_remove(content_node);
+@@ -464,5 +505,25 @@
+     list_remove(node);
+     free(names);
+   }
+-  return (ret == SSIZE_MAX) ? -ENOENT : ret;
+-}
++  return (ret == SSIZE_MAX) ? (selected_path ? 0 : -ENOENT) : ret;
++}
++
++ssize_t __android_log_pmsg_file_read(log_id_t logId, char prio, const char* prefix,
++                                    __android_log_pmsg_file_read_fn fn, void* arg) {
++  return ReadPmsgFiles(nullptr, logId, prio, prefix, fn, arg);
++}
++
++ssize_t __android_log_pmsg_file_read_from_backend(const char* backend, log_id_t logId, char prio,
++                                                 const char* prefix,
++                                                 __android_log_pmsg_file_read_fn fn, void* arg) {
++  if (!backend) return -EINVAL;
++  const char* path;
++  if (!strcmp(backend, "ramoops")) {
++    path = "/sys/fs/pstore/pmsg-ramoops-0";
++  } else if (!strcmp(backend, "pstore_blk")) {
++    path = "/sys/fs/pstore/pmsg-pstore_blk-0";
++  } else {
++    return -EINVAL;
++  }
++  return ReadPmsgFiles(path, logId, prio, prefix, fn, arg);
++}
+diff --git a/liblog/pmsg_writer.cpp b/liblog/pmsg_writer.cpp
 --- a/liblog/pmsg_writer.cpp
 +++ b/liblog/pmsg_writer.cpp
 @@ -31,11 +31,23 @@
  #include "uio.h"
- 
+
  static std::atomic<int> pmsg_fd;
 +static std::atomic<int64_t> pmsg_retry_at;
- 
+
  static void GetPmsgFd() {
 -  // Note if open() fails and returns -1, that value is stored into pmsg_fd as an indication that
 -  // pmsg is not available and open() should not be retried.
@@ -60,7 +189,7 @@ Keep permanent open failures cached.
 +      !pmsg_retry_at.compare_exchange_strong(retry_at, now_ns + NS_PER_SEC)) {
      return;
    }
- 
+
 @@ -45,7 +57,13 @@
    // STDIN_FILENO != stdin, so we call open() to get a new fd value in this case.
    if (new_fd == 0) {
@@ -73,7 +202,7 @@ Keep permanent open failures cached.
 +  if (new_fd < 0 && errno == ENOENT) {
 +    return;
    }
- 
+
    // pmsg_fd should only be opened once.  If we see that pmsg_fd is uninitialized, we open
 @@ -66,6 +84,7 @@
      close(pmsg_fd);
@@ -81,5 +210,35 @@ Keep permanent open failures cached.
    pmsg_fd = 0;
 +  pmsg_retry_at = 0;
  }
- 
+
  int PmsgWrite(log_id_t logId, const struct timespec* ts, const struct iovec* vec, size_t nr,
+diff --git a/liblog/include/private/android_logger.h b/liblog/include/private/android_logger.h
+--- a/liblog/include/private/android_logger.h
++++ b/liblog/include/private/android_logger.h
+@@ -139,6 +139,15 @@
+                                      __android_log_pmsg_file_read_fn fn,
+                                      void* arg);
+
++/* Read exactly "ramoops" or "pstore_blk", without fallback. Returns bytes read,
++ * zero for no matching records, or negative errno. Open/read failures discard
++ * collected fragments before invoking callbacks. This does not pin an inode
++ * before open. Callers must serialize pmsg reads: the existing reader retains
++ * static preread state. */
++ssize_t __android_log_pmsg_file_read_from_backend(const char* backend, log_id_t logId, char prio,
++                                                 const char* prefix,
++                                                 __android_log_pmsg_file_read_fn fn, void* arg);
++
+ int __android_log_security_bwrite(int32_t tag, const void* payload, size_t len);
+ int __android_log_security_bswrite(int32_t tag, const char* payload);
+ int __android_log_security(); /* Device Owner is present */
+diff --git a/liblog/liblog.map.txt b/liblog/liblog.map.txt
+--- a/liblog/liblog.map.txt
++++ b/liblog/liblog.map.txt
+@@ -88,6 +88,7 @@
+ LIBLOG_PRIVATE {
+   global:
+     __android_log_pmsg_file_read;
++    __android_log_pmsg_file_read_from_backend;
+     __android_log_pmsg_file_write;
+     android_openEventTagMap;
+     android_log_processBinaryLogBuffer;

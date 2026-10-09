@@ -42,17 +42,27 @@
     "project": "system/logging",
     "base_commit": "336e1707c8258adf1f1c5c5511218b533f3a22e8",
     "patch": "0004-support-deferred-pstore-logging.patch",
-    "sha256": "9977ddc718f943ed8f38711943135a1da171184a74b01b7476c29125d1c9bf35",
+    "sha256": "b493ec2f7f43351290d7b8ed7c2ac048113cab72229384fe3e5a7daaabec7501",
     "files": [
       {
         "path": "liblog/pmsg_reader.cpp",
         "before_sha256": "13af98d8bac0b3c72e8ee422f3309e173af137023e5f88052451c3a29a0d83b4",
-        "after_sha256": "eef399460df5acfb0aa43048abadd75884125ece5e3be31e18126a10fc236cb9"
+        "after_sha256": "4e7da38ec7abc23636e02f491156ded3f0a83e1b2aa4916fbf100cc5df69da53"
       },
       {
         "path": "liblog/pmsg_writer.cpp",
         "before_sha256": "4c5119613a3f890d9003c12f8abfff759816957d60cbff1b488fcd7fd46d4cc3",
         "after_sha256": "7c497333c80eb68a2585a05535516444b882d69aa2e22d40360db94c6cdadfc0"
+      },
+      {
+        "path": "liblog/include/private/android_logger.h",
+        "before_sha256": "db48ce224fae3c3094c96ca4e95e35f4eff95e8326028d493e640058005ee322",
+        "after_sha256": "8c3d540a2f18154c5edd44a2214374d5b6a8cface1efa7b9ad9b0645d541b860"
+      },
+      {
+        "path": "liblog/liblog.map.txt",
+        "before_sha256": "0f6863b6ac213350f96292402c0834c8fb89fa02042e960a80428304c0355019",
+        "after_sha256": "6b4c47e3891a7d4a5113667bc0f268159457a40440dbab355d94f07bfb682845"
       }
     ]
   },
@@ -643,7 +653,7 @@
     "project": "bootable/recovery",
     "base_commit": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
     "patch": "0006-fix-recovery-algorithm-include.patch",
-    "sha256": "9c746d4172715e762363520bdfc12aed358bba6b42c6ee6f945483d602d50714",
+    "sha256": "a84f9d2f34bc7efc4f9cb040d0d3b10c7486a7c670a57972bfbdc84a015ff17c",
     "files": [
       {
         "path": "volume_manager/PublicVolume.cpp",
@@ -654,6 +664,24 @@
         "path": "volume_manager/include/volume_manager/VolumeManager.h",
         "before_sha256": "bbad7bae25778bc161def31d046ce2781cd67cccd1ec4dec669a4533acd90929",
         "after_sha256": "ca05ed6002eb73c7fa7bcee4bb3903b8e0bdc50421198b5ae11cf5b8cb63b7f8"
+      },
+      {
+        "path": "recovery-persist.cpp",
+        "before_sha256": "a4599bb15c2f05313348ba605f71856f177008d95ce56afb69b72b7fd2e5aee8",
+        "after_sha256": "1421f03e5fbaf7b6e5a7fae07c9dd6adb3d57bf72ba516d09cde19dff93b32c6"
+      }
+    ]
+  },
+  {
+    "project": "frameworks/native",
+    "base_commit": "46018f54b42489de960c62c3db9de131abce43ea",
+    "patch": "0007-collect-pstore-blk-console.patch",
+    "sha256": "0c1826f7df35ae7f9700bbd7daf0647a2c2e18bc4676aa1cbc1c223681ac3dfa",
+    "files": [
+      {
+        "path": "cmds/dumpstate/dumpstate.cpp",
+        "before_sha256": "b3503963a70396094c830b5fbb5898f9b92352df4cf830fdfcb9cca4adb1db47",
+        "after_sha256": "7a771cd8ff02257f0eaf5316953d0e919bd4aa1c9ff4ed3979b396199d0d6727"
       }
     ]
   }

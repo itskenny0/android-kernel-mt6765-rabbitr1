@@ -17,6 +17,7 @@ ROOT = Path('/rabbitr1')
 R1 = Path(__file__).resolve().parents[1]
 INPUT_PREFIX = 'downloads/pmsg-ci/'
 SOURCES = ('liblog/pmsg_reader.cpp', 'liblog/pmsg_writer.cpp')
+PATCH_FILES = (*SOURCES, 'liblog/include/private/android_logger.h', 'liblog/liblog.map.txt')
 
 
 def digest(data):
@@ -43,8 +44,8 @@ def main():
 
     records = patches.load_series(patches.confined(R1 / 'android/patches/series.json'))
     logging = [record for record in records if record['project'] == 'system/logging']
-    if len(logging) != 1 or {item['path'] for item in logging[0]['files']} != set(SOURCES):
-        raise ValueError('Expected one system/logging patch for the pmsg reader and writer')
+    if len(logging) != 1 or {item['path'] for item in logging[0]['files']} != set(PATCH_FILES):
+        raise ValueError('Expected one system/logging patch for the pmsg reader, writer and private API')
     patch = logging[0]
     lock = json.loads((R1 / 'sources.lock.json').read_text())
     pins = {name.removeprefix(INPUT_PREFIX): value for name, value in lock['ci_files'].items()
@@ -95,6 +96,7 @@ def main():
                  '-Wno-missing-field-initializers', '-Wno-vla',
                  '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
                  '-ffunction-sections', '-fdata-sections', '-DSNET_EVENT_LOG_TAG=1397638484',
+                 '-I' + str(patched / 'liblog/include'),
                  '-I' + str(library), '-I' + str(library / 'include'),
                  '-I' + str(original / 'system/core/libcutils/include')]
         cases = [('userdebug', 1, False, False, None),

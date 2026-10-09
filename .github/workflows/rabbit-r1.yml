@@ -98,6 +98,7 @@ jobs:
           python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
           python3 scripts/test-android-patches.py 2>&1 | tee logs/android-patches-tests.log
           python3 scripts/test-android-pmsg.py 2>&1 | tee logs/android-pmsg-tests.log
+          python3 scripts/test-android-pstore-collection.py 2>&1 | tee logs/android-pstore-collection-tests.log
           python3 scripts/test-mt6357.py 2>&1 | tee logs/mt6357-tests.log
           python3 scripts/test-mt6357-auxadc.py 2>&1 | tee logs/mt6357-auxadc-tests.log
           python3 scripts/test-mt6357-imp.py 2>&1 | tee logs/mt6357-imp-tests.log

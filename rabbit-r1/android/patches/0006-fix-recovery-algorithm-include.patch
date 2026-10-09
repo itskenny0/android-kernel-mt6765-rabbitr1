@@ -1,10 +1,12 @@
 From: itskenny0 <0@kenny.cat>
-Subject: [PATCH] Include recovery volume manager dependencies
+Subject: [PATCH] Collect recovery pstore logs
 
-Declare the owning headers for std::replace and std::vector explicitly.
-Android 17 libc++ no longer supplies them through unrelated headers.
+Include the volume manager's standard library dependencies explicitly.
+Collect one pstore backend after bounded background discovery, and compare
+identical console files without reading past EOF.
 
 ---
+diff --git a/volume_manager/PublicVolume.cpp b/volume_manager/PublicVolume.cpp
 --- a/volume_manager/PublicVolume.cpp
 +++ b/volume_manager/PublicVolume.cpp
 @@ -30,6 +30,8 @@
@@ -13,9 +15,10 @@ Android 17 libc++ no longer supplies them through unrelated headers.
  #include <private/android_filesystem_config.h>
 +
 +#include <algorithm>
- 
+
  #include <fcntl.h>
  #include <stdlib.h>
+diff --git a/volume_manager/include/volume_manager/VolumeManager.h b/volume_manager/include/volume_manager/VolumeManager.h
 --- a/volume_manager/include/volume_manager/VolumeManager.h
 +++ b/volume_manager/include/volume_manager/VolumeManager.h
 @@ -25,6 +25,7 @@
@@ -23,6 +26,191 @@ Android 17 libc++ no longer supplies them through unrelated headers.
  #include <mutex>
  #include <string>
 +#include <vector>
- 
+
  struct selabel_handle;
  class NetlinkManager;
+diff --git a/recovery-persist.cpp b/recovery-persist.cpp
+--- a/recovery-persist.cpp
++++ b/recovery-persist.cpp
+@@ -35,7 +35,10 @@
+ #include <string.h>
+ #include <unistd.h>
+
++#include <algorithm>
+ #include <array>
++#include <chrono>
++#include <thread>
+ #include <string>
+
+ #include <android-base/file.h>
+@@ -51,6 +54,52 @@
+ constexpr const char* LAST_KMSG_FILE = "/data/misc/recovery/last_kmsg";
+ constexpr const char* LAST_CONSOLE_FILE = "/sys/fs/pstore/console-ramoops-0";
+ constexpr const char* ALT_LAST_CONSOLE_FILE = "/sys/fs/pstore/console-ramoops";
++constexpr const char* BLK_LAST_PMSG_FILE = "/sys/fs/pstore/pmsg-pstore_blk-0";
++constexpr const char* BLK_LAST_CONSOLE_FILE = "/sys/fs/pstore/console-pstore_blk-0";
++
++struct PstoreFiles {
++    const char* pmsg = nullptr;
++    const char* console = nullptr;
++    bool error = false;
++    const char* backend = nullptr;
++};
++
++// Missing records are normal; permission and I/O errors must not choose a
++// different backend and silently mix histories.
++static int pstore_file_state(const char* path) {
++    if (access(path, R_OK) == 0) return 1;
++    if (errno == ENOENT) return 0;
++    PLOG(ERROR) << "Can't read " << path;
++    return -1;
++}
++
++static PstoreFiles wait_for_pstore(std::chrono::milliseconds timeout) {
++    const auto deadline = std::chrono::steady_clock::now() + timeout;
++    for (;;) {
++        int pmsg = pstore_file_state(LAST_PMSG_FILE);
++        int console = pstore_file_state(LAST_CONSOLE_FILE);
++        int alternate = pstore_file_state(ALT_LAST_CONSOLE_FILE);
++        if (pmsg < 0 || console < 0 || alternate < 0) return {nullptr, nullptr, true};
++        // Ramoops keeps its existing preference, including console-only boots.
++        if (pmsg || console || alternate) {
++            return {pmsg ? LAST_PMSG_FILE : nullptr,
++                    console ? LAST_CONSOLE_FILE : (alternate ? ALT_LAST_CONSOLE_FILE : nullptr),
++                    false, "ramoops"};
++        }
++        pmsg = pstore_file_state(BLK_LAST_PMSG_FILE);
++        console = pstore_file_state(BLK_LAST_CONSOLE_FILE);
++        if (pmsg < 0 || console < 0) return {nullptr, nullptr, true};
++        auto now = std::chrono::steady_clock::now();
++        // Registration can create the records one at a time. Give an incomplete
++        // pair the remaining budget, then retain whichever record exists.
++        if ((pmsg && console) || now >= deadline) {
++            return {pmsg ? BLK_LAST_PMSG_FILE : nullptr,
++                    console ? BLK_LAST_CONSOLE_FILE : nullptr, false, "pstore_blk"};
++        }
++        std::this_thread::sleep_for(std::min(deadline - now,
++                std::chrono::steady_clock::duration(std::chrono::milliseconds(100))));
++    }
++}
+
+ // close a file, log an error if the error indicator is set
+ static void check_and_fclose(FILE *fp, const char *name) {
+@@ -62,21 +111,23 @@
+ }
+
+ static void copy_file(const char* source, const char* destination) {
++  FILE* source_fp = fopen(source, "re");
++  if (source_fp == nullptr) {
++    PLOG(ERROR) << "Can't open " << source;
++    return;
++  }
+   FILE* dest_fp = fopen(destination, "we");
+   if (dest_fp == nullptr) {
+     PLOG(ERROR) << "Can't open " << destination;
+   } else {
+-    FILE* source_fp = fopen(source, "re");
+-    if (source_fp != nullptr) {
+-      char buf[4096];
+-      size_t bytes;
+-      while ((bytes = fread(buf, 1, sizeof(buf), source_fp)) != 0) {
+-        fwrite(buf, 1, bytes, dest_fp);
+-      }
+-      check_and_fclose(source_fp, source);
++    char buf[4096];
++    size_t bytes;
++    while ((bytes = fread(buf, 1, sizeof(buf), source_fp)) != 0) {
++      fwrite(buf, 1, bytes, dest_fp);
+     }
+     check_and_fclose(dest_fp, destination);
+   }
++  check_and_fclose(source_fp, source);
+ }
+
+ static bool file_exists(const char* filename) {
+@@ -136,6 +187,10 @@
+     std::array<uint8_t, 1024 * 16> buf2{};
+     android::base::unique_fd fd1(open(file1, O_RDONLY));
+     android::base::unique_fd fd2(open(file2, O_RDONLY));
++    if (fd1 < 0 || fd2 < 0) {
++        PLOG(ERROR) << "Failed to open files for comparison";
++        return false;
++    }
+     auto bytes_remain = file_size(file1);
+     while (bytes_remain > 0) {
+         const auto bytes_to_read = std::min<size_t>(bytes_remain, buf1.size());
+@@ -151,19 +206,14 @@
+         if (memcmp(buf1.data(), buf2.data(), bytes_to_read) != 0) {
+             return false;
+         }
++        bytes_remain -= bytes_to_read;
+     }
+     return true;
+ }
+
+-void rotate_last_kmsg() {
+-    if (rotated) {
+-        return;
+-    }
+-    if (!file_exists(LAST_CONSOLE_FILE) && !file_exists(ALT_LAST_CONSOLE_FILE)) {
+-        return;
+-    }
+-    if (!compare_file(LAST_KMSG_FILE, LAST_CONSOLE_FILE) &&
+-        !compare_file(LAST_KMSG_FILE, ALT_LAST_CONSOLE_FILE)) {
++void rotate_last_kmsg(const char* console) {
++    if (rotated || console == nullptr) return;
++    if (!compare_file(LAST_KMSG_FILE, console)) {
+         rotate_logs(LAST_LOG_FILE, LAST_KMSG_FILE);
+         rotated = true;
+     }
+@@ -211,14 +261,23 @@
+       }
+     }
+
+-    /* Is there something in pmsg? If not, no need to proceed. */
+-    if (!file_exists(LAST_PMSG_FILE)) {
+-      return 0;
+-    }
+-
+-    // Take last pmsg file contents and send it off to the logsave
+-    __android_log_pmsg_file_read(
+-        LOG_ID_SYSTEM, ANDROID_LOG_INFO, "recovery/", logsave, NULL);
++    // post-fs-data does not wait for a backend started asynchronously at
++    // post-fs. This process already runs through exec_background, so waiting
++    // for records does not block init. Do not erase pstore files after copying.
++    const auto pstore = wait_for_pstore(std::chrono::seconds(30));
++    if (pstore.error) return 1;
++    if (pstore.pmsg == nullptr && pstore.console == nullptr) return 0;
++
++    // Open only the selected backend, even if the other one appears or this
++    // record disappears after discovery. Do not silently fall back.
++    if (pstore.pmsg != nullptr) {
++        ssize_t result = __android_log_pmsg_file_read_from_backend(
++            pstore.backend, LOG_ID_SYSTEM, ANDROID_LOG_INFO, "recovery/", logsave, NULL);
++        if (result < 0) {
++            LOG(ERROR) << "Failed to read " << pstore.pmsg << ": " << strerror(-result);
++            return 1;
++        }
++    }
+
+     // For those device without /cache, the last_install file has been copied to
+     // /data/misc/recovery from pmsg. Looks for the sideload history only.
+@@ -227,15 +286,11 @@
+         PLOG(ERROR) << "Failed to unlink " << LAST_INSTALL_FILE;
+       }
+     }
+-    rotate_last_kmsg();
++    rotate_last_kmsg(pstore.console);
+
+     /* Is there a last console log too? */
+-    if (rotated) {
+-      if (file_exists(LAST_CONSOLE_FILE)) {
+-        copy_file(LAST_CONSOLE_FILE, LAST_KMSG_FILE);
+-      } else if (file_exists(ALT_LAST_CONSOLE_FILE)) {
+-        copy_file(ALT_LAST_CONSOLE_FILE, LAST_KMSG_FILE);
+-      }
++    if (rotated && pstore.console != nullptr) {
++      copy_file(pstore.console, LAST_KMSG_FILE);
+     }
+
+     return 0;
