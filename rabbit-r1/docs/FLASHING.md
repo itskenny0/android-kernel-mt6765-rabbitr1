@@ -46,18 +46,34 @@ be used with the packaged patched LK.
 
 ## Prepare the host and device backups
 
-Keep the workspace, extracted package and backups under `/rabbitr1`. The source
-release of [mtkclient v2.1.4.1](https://github.com/bkerler/mtkclient/releases/tag/v2.1.4.1)
-is already downloaded and extracted at `/rabbitr1/src/mtkclient`. The release
-has no attached binary installer. Dependencies can be installed into a local
-virtual environment:
+Keep the workspace, extracted package and backups under `/rabbitr1`. The pinned
+[mtkclient v2.1.4.1 archive](https://github.com/bkerler/mtkclient/releases/tag/v2.1.4.1)
+must be retained at `/rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz`. Prepare the
+separate patched source using the checker, manifest and patch bundled with this
+package. The original `/rabbitr1/src/mtkclient` stays unchanged.
 
 ```sh
 cd /rabbitr1
 source scripts/env.sh
+(cd dist/mtkclient && sha256sum -c SHA256SUMS)
+python3 dist/mtkclient/prepare-mtkclient.py \
+  --manifest /rabbitr1/dist/mtkclient/mtkclient-transport.json \
+  --patch /rabbitr1/dist/mtkclient/mtkclient-transport.patch
 python3 -m venv toolchains/mtkclient
-toolchains/mtkclient/bin/pip install -r src/mtkclient/requirements.txt
+toolchains/mtkclient/bin/pip install -r src/mtkclient-haretic/requirements.txt
 ```
+
+If `/rabbitr1/src/mtkclient-haretic` already exists, add `--check` to the preparer
+command to verify it. The tool never overwrites or repairs an existing tree.
+Keep `PYTHONDONTWRITEBYTECODE=1`, as set by `scripts/env.sh`; additional files,
+including bytecode caches, fail the source check. These commands install host
+dependencies but do not access a device.
+
+The [transport patch](https://github.com/haretic/android-kernel-mt6765-rabbitr1/blob/rabbit-r1/bringup/rabbit-r1/docs/MTKCLIENT.md)
+stops guarded bulk operations after uncertain transfers and propagates those
+failures through XFlash reads and writes. It does not validate every DA status
+or establish physical storage safety. Old packages and prepared scripts do not
+gain these changes automatically; prepare new scripts from this package.
 
 Host USB access and the connection sequence must work before attempting a write.
 Follow the [mtkclient usage guide](https://github.com/bkerler/mtkclient/blob/v2.1.4.1/README-USAGE.md)
@@ -83,11 +99,16 @@ source scripts/env.sh
 mkdir -p backups
 mkdir backups/r1-001
 cd backups/r1-001
-mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)
-"${mtk[@]}" printgpt
-"${mtk[@]}" gpt .
+mtk() {
+    python3 /rabbitr1/dist/mtkclient/prepare-mtkclient.py --check \
+      --manifest /rabbitr1/dist/mtkclient/mtkclient-transport.json \
+      --patch /rabbitr1/dist/mtkclient/mtkclient-transport.patch || return
+    /rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient-haretic/mtk.py "$@"
+}
+mtk printgpt
+mtk gpt .
 while read -r part length; do
-    "${mtk[@]}" r "$part" "$part.img" --parttype user --offset 0x0 --length "$length"
+    mtk r "$part" "$part.img" --parttype user --offset 0x0 --length "$length"
     test "$(stat -c %s -- "$part.img")" -eq "$((length))"
 done <<'PARTITIONS'
 boot_a 0x2000000
@@ -144,6 +165,11 @@ When ready to test the chosen slot on the connected device:
 bash /rabbitr1/prepared/r1-001-a/flash.sh --write
 ```
 
+Before each mtkclient process, the script checks its bundled transport inputs
+against the admitted package hashes and verifies the entire patched source
+tree. A failed check stops before that process starts; it never falls back to
+the original source tree.
+
 The script first checks the live GPT, LK and current contents against the
 backups. It writes `boot_a`, `dtbo_a`, `vbmeta_a`, the shared `logo`, then `lk_a`
 (or the selected `b` equivalents). LK is written last. After each write it reads
@@ -169,7 +195,10 @@ new file before booting stock firmware or another mainline attempt:
 cd /rabbitr1
 source scripts/env.sh
 test ! -e backups/r1-001/expdb-after.img
-toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-after.img --parttype user --offset 0x0 --length 0x1400000
+python3 dist/mtkclient/prepare-mtkclient.py --check \
+  --manifest /rabbitr1/dist/mtkclient/mtkclient-transport.json \
+  --patch /rabbitr1/dist/mtkclient/mtkclient-transport.patch
+toolchains/mtkclient/bin/python src/mtkclient-haretic/mtk.py r expdb backups/r1-001/expdb-after.img --parttype user --offset 0x0 --length 0x1400000
 python3 dist/mtkclient/decode-expdb.py backups/r1-001/expdb-after.img \
   --out /rabbitr1/logs/expdb-attempt-001
 ```
@@ -203,8 +232,14 @@ restoring the original shared log partition is a separate optional operation:
 cd /rabbitr1
 source scripts/env.sh
 test ! -e backups/r1-001/expdb-restored.img
-toolchains/mtkclient/bin/python src/mtkclient/mtk.py w expdb backups/r1-001/expdb.img
-toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-restored.img --parttype user --offset 0x0 --length 0x1400000
+python3 dist/mtkclient/prepare-mtkclient.py --check \
+  --manifest /rabbitr1/dist/mtkclient/mtkclient-transport.json \
+  --patch /rabbitr1/dist/mtkclient/mtkclient-transport.patch
+toolchains/mtkclient/bin/python src/mtkclient-haretic/mtk.py w expdb backups/r1-001/expdb.img
+python3 dist/mtkclient/prepare-mtkclient.py --check \
+  --manifest /rabbitr1/dist/mtkclient/mtkclient-transport.json \
+  --patch /rabbitr1/dist/mtkclient/mtkclient-transport.patch
+toolchains/mtkclient/bin/python src/mtkclient-haretic/mtk.py r expdb backups/r1-001/expdb-restored.img --parttype user --offset 0x0 --length 0x1400000
 cmp backups/r1-001/expdb.img backups/r1-001/expdb-restored.img
 ```
 

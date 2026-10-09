@@ -13,6 +13,31 @@ from lk_handoff import has_display_guard
 ROOT = Path('/rabbitr1')
 SIZES = {'boot': 32*1024*1024, 'dtbo': 8*1024*1024, 'vbmeta': 8*1024*1024,
          'lk': 1024*1024, 'logo': 11*1024*1024, 'expdb': 20*1024*1024}
+TRANSPORT_FILES = ('prepare-mtkclient.py', 'mtkclient-transport.json', 'mtkclient-transport.patch')
+TRANSPORT_DESTINATION = '/rabbitr1/src/mtkclient-haretic'
+TRANSPORT_ARCHIVE = '/rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz'
+
+
+def transport_metadata(package):
+    """Bind the flat offline checker inputs; never install or access a device."""
+    for name in TRANSPORT_FILES:
+        path = package/name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('Missing or nonregular bundled transport input: ' + name)
+    manifest = json.loads((package/'mtkclient-transport.json').read_text())
+    if type(manifest.get('schema')) is not int or manifest['schema'] != 1:
+        raise ValueError('Unsupported bundled transport manifest')
+    archive = manifest['archive']
+    if archive['filename'] != Path(TRANSPORT_ARCHIVE).name or \
+            archive['sha256'] != 'b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d':
+        raise ValueError('Unexpected pinned transport archive')
+    patch = package/'mtkclient-transport.patch'
+    if patch.stat().st_size != manifest['patch']['bytes'] or sha(patch) != manifest['patch']['sha256']:
+        raise ValueError('Bundled transport patch differs from its manifest')
+    return {'schema': 1, 'destination': TRANSPORT_DESTINATION,
+            'archive': TRANSPORT_ARCHIVE, 'archive_sha256': archive['sha256'],
+            'files': {name: {'bytes': (package/name).stat().st_size, 'sha256': sha(package/name)}
+                      for name in TRANSPORT_FILES}}
 
 
 def local(value):
@@ -88,8 +113,10 @@ def partition_name(part, slot):
     return part if part in ['expdb', 'logo'] else f'{part}_{slot}'
 
 
-def shell_script(out, slot, restore=False):
+def shell_script(out, slot, restore=False, *, transport):
     """Use exact fresh reads and verify every write before advancing."""
+    if transport_metadata(out) != transport:
+        raise ValueError('Copied transport inputs differ from admitted package metadata')
     names = ','.join(partition_name(part, slot) for part in WRITE_PARTS)
     mode = 'restore' if restore else 'flash'
     suffix = 'restore' if restore else 'new'
@@ -110,8 +137,16 @@ def shell_script(out, slot, restore=False):
         'export TMPDIR=/rabbitr1/.tmp XDG_CACHE_HOME=/rabbitr1/.cache',
         'export XDG_CONFIG_HOME=/rabbitr1/.cache/config XDG_DATA_HOME=/rabbitr1/.cache/data',
         'export PYTHONDONTWRITEBYTECODE=1',
-        'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)',
+        'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient-haretic/mtk.py)',
+        'checker=(python3 prepare-mtkclient.py --manifest mtkclient-transport.json --patch mtkclient-transport.patch',
+        '         --archive /rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz --destination /rabbitr1/src/mtkclient-haretic --check)',
         'sha256sum -c SHA256SUMS',
+        'run_mtk() {',
+        '    printf "%s\\n" ' + ' '.join(shlex.quote(facts['sha256']+'  '+name)
+                                              for name, facts in transport['files'].items()) + ' | sha256sum -c - || return',
+        '    "${checker[@]}" || return',
+        '    "${mtk[@]}" "$@"',
+        '}',
         'check_size() {',
         '    local path=$1 expected=$2',
         '    if [[ ! -f "$path" || -L "$path" || $(stat -c %s -- "$path") != "$expected" ]]; then',
@@ -125,7 +160,7 @@ def shell_script(out, slot, restore=False):
         '        echo "Refusing an existing read output: $path" >&2',
         '        return 1',
         '    fi',
-        '    "${mtk[@]}" r "$name" "$path" --parttype user --offset 0x0 --length "$length"',
+        '    run_mtk r "$name" "$path" --parttype user --offset 0x0 --length "$length"',
         '    check_size "$path" "$size"',
         '}',
     ]
@@ -134,7 +169,7 @@ def shell_script(out, slot, restore=False):
         lines.append(f'check_size {part}-{suffix}.img {SIZES[part]}')
     lines += [
         f'run=$(mktemp -d /rabbitr1/.tmp/r1-{mode}.XXXXXXXX)',
-        '"${mtk[@]}" gpt "$run"',
+        'run_mtk gpt "$run"',
         'python3 prepare-flash.py check-gpt gpt.bin "$run/gpt.bin"',
     ]
     for part in WRITE_PARTS:
@@ -146,7 +181,7 @@ def shell_script(out, slot, restore=False):
     # but still requires a complete fresh preflight dump and every readback.
     for part in WRITE_PARTS:
         lines += [
-            f'"${{mtk[@]}}" w {partition_name(part, slot)} {part}-{suffix}.img --parttype user',
+            f'run_mtk w {partition_name(part, slot)} {part}-{suffix}.img --parttype user',
             f'read_partition {partition_name(part, slot)} "$run/{part}-readback.img" '
             f'{SIZES[part]} {hex(SIZES[part])}',
             f'cmp {part}-{suffix}.img "$run/{part}-readback.img"',
@@ -182,6 +217,12 @@ def prepare(args):
         path = local(args.package/name)
         if path.stat().st_size != facts['bytes'] or sha(path) != facts['sha256']:
             raise ValueError('Package checksum mismatch: ' + name)
+    expected_transport = transport_metadata(args.package)
+    if manifest.get('mtkclient_transport') != expected_transport:
+        raise ValueError('Package lacks current pinned transport metadata; refresh host tooling')
+    for name, facts in expected_transport['files'].items():
+        if manifest['files'].get(name) != facts:
+            raise ValueError('Transport input is not covered by the package manifest: ' + name)
     gpt_path = local(args.backup/'gpt.bin')
     gpt = parse_gpt(gpt_path.read_bytes())
     backups = {}
@@ -216,6 +257,10 @@ def prepare(args):
     shutil.copyfile(gpt_path, args.out/'gpt.bin')
     for name in ['prepare-flash.py', 'lk_handoff.py']:
         shutil.copyfile(Path(__file__).with_name(name), args.out/name)
+    for name in TRANSPORT_FILES:
+        shutil.copyfile(args.package/name, args.out/name)
+    if transport_metadata(args.out) != expected_transport:
+        raise ValueError('Copied transport inputs differ from admitted package metadata')
     for part, path in backups.items():
         shutil.copyfile(path, args.out/(part+'-restore.img'))
     shutil.copyfile(args.package/f'boot-{args.profile}.img', args.out/'boot-new.img')
@@ -224,8 +269,8 @@ def prepare(args):
     # Keep the device's trailing LK partition bytes; payload edits are same-size.
     (args.out/'lk-new.img').write_bytes(lk_payload + backups['lk'].read_bytes()[len(lk_payload):])
     (args.out/'logo-new.img').write_bytes(logo_payload.ljust(SIZES['logo'], b'\0'))
-    (args.out/'flash.sh').write_text(shell_script(args.out, args.slot))
-    (args.out/'restore.sh').write_text(shell_script(args.out, args.slot, restore=True))
+    (args.out/'flash.sh').write_text(shell_script(args.out, args.slot, transport=expected_transport))
+    (args.out/'restore.sh').write_text(shell_script(args.out, args.slot, restore=True, transport=expected_transport))
     (args.out/'plan.json').write_text(json.dumps({
         'slot': args.slot, 'profile': args.profile, 'gpt': gpt,
         'write_partitions': [partition_name(p, args.slot) for p in WRITE_PARTS],
@@ -237,6 +282,7 @@ def prepare(args):
         'expdb': 'backup retained; only kernel pstore writes it after boot',
         'expdb_restore': 'manual only, after retrieving logs; not done by restore.sh',
         'slot_activation': 'unchanged; choose and verify explicitly before booting',
+        'mtkclient_transport': expected_transport,
     }, indent=2)+'\n')
     (args.out/'SHA256SUMS').write_text(''.join(f'{sha(p)}  {p.name}\n'
         for p in sorted(args.out.iterdir()) if p.name != 'SHA256SUMS'))

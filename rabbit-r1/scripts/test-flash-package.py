@@ -18,6 +18,8 @@ ROOT = Path('/rabbitr1')
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--package', type=Path, default=ROOT/'dist/mtkclient')
 parser.add_argument('--scripts', type=Path, default=Path(__file__).resolve().parent)
+parser.add_argument('--reference-package-manifest', type=Path)
+parser.add_argument('--reference-package-manifest-sha256')
 args = parser.parse_args()
 PACKAGE, SCRIPTS = args.package.resolve(), args.scripts.resolve()
 assert PACKAGE.is_relative_to(ROOT) and SCRIPTS.is_relative_to(ROOT)
@@ -64,6 +66,26 @@ def cpio(blob):
 
 
 manifest = json.loads((PACKAGE/'manifest.json').read_text())
+reference = None
+if args.reference_package_manifest is not None or args.reference_package_manifest_sha256 is not None:
+    assert args.reference_package_manifest is not None and args.reference_package_manifest_sha256 is not None
+    path = args.reference_package_manifest.resolve()
+    assert path.is_relative_to(ROOT) and path != (PACKAGE/'manifest.json').resolve()
+    data = path.read_bytes()
+    assert hashlib.sha256(data).hexdigest() == args.reference_package_manifest_sha256
+    reference = json.loads(data)
+    for name in ['source_commit', 'kernel_release', 'kernel_build', 'profiles', 'lk_build', 'initramfs_sha256']:
+        assert manifest[name] == reference[name], name
+    binary_names = {name for name in reference['files'] if name.endswith(('.img', '.bin', '.png'))}
+    assert binary_names == {name for name in manifest['files'] if name.endswith(('.img', '.bin', '.png'))}
+    for name in binary_names:
+        assert manifest['files'][name] == reference['files'][name]
+        blob = (PACKAGE/name).read_bytes()
+        assert len(blob) == reference['files'][name]['bytes']
+        assert hashlib.sha256(blob).hexdigest() == reference['files'][name]['sha256']
+assert manifest['mtkclient_transport'] == flash.transport_metadata(PACKAGE)
+for name, facts in manifest['mtkclient_transport']['files'].items():
+    assert manifest['files'][name] == facts
 assert manifest['lk_build']['relock_protection']['enabled'] is True
 assert manifest['lk_build']['kernel_mmc_pinctrl_preserved'] is True
 assert manifest['lk_build']['kernel_scp_fixup_bypassed'] is True
@@ -86,8 +108,16 @@ for profile in ['ram', 'expdb']:
     offset += (rlen+page-1)//page*page
     dt = blob[offset:offset+dtlen]
     assert not any(blob[offset+dtlen:])
-    assert kernel == (ROOT/'dist/mainline/Image.gz').read_bytes()
-    assert ramdisk == (ROOT/'dist/bringup/initramfs.cpio.gz').read_bytes()
+    if reference is None:
+        assert kernel == (ROOT/'dist/mainline/Image.gz').read_bytes()
+        assert ramdisk == (ROOT/'dist/bringup/initramfs.cpio.gz').read_bytes()
+    else:
+        facts = reference['kernel_build']['artifacts']['Image.gz']
+        assert len(kernel) == facts['bytes'] and hashlib.sha256(kernel).hexdigest() == facts['sha256']
+        image = gzip.decompress(kernel)
+        facts = reference['kernel_build']['artifacts']['Image']
+        assert len(image) == facts['bytes'] and hashlib.sha256(image).hexdigest() == facts['sha256']
+        assert hashlib.sha256(ramdisk).hexdigest() == reference['initramfs_sha256']
     digest = hashlib.sha1()
     for payload in [kernel, ramdisk, b'', b'', dt]:
         digest.update(payload)
@@ -100,7 +130,10 @@ for profile in ['ram', 'expdb']:
     assert nodes['/']['compatible'].startswith(b'rabbit,r1\0')
     entries = cpio(gzip.decompress(ramdisk))
     for module in ['pstore_zone', 'pstore_blk']:
-        assert entries[f'lib/modules/{module}.ko'] == (ROOT/f'out/mainline/fs/pstore/{module}.ko').read_bytes()
+        if reference is None:
+            assert entries[f'lib/modules/{module}.ko'] == (ROOT/f'out/mainline/fs/pstore/{module}.ko').read_bytes()
+        else:
+            assert hashlib.sha256(entries[f'lib/modules/{module}.ko']).hexdigest() == reference['kernel_build']['modules'][f'fs/pstore/{module}.ko']
         assert ('vermagic='+manifest['kernel_release']+' ').encode() in entries[f'lib/modules/{module}.ko']
     for source in ['init', 'r1-report', 'r1-log-start']:
         name = source if source == 'init' else 'bin/'+source
@@ -209,6 +242,50 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='lk-fixup-gate-') as tm
             assert not list(packager.DIST.iterdir())
 print('PASS: thirty-six stale-LK packaging/preparation cases rejected before producing flash files')
 
+# These failures must precede backup access or output creation. Images are
+# read-only fixture links; the three transport files are private regular copies.
+with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='transport-metadata-gate-') as tmp:
+    directory = Path(tmp)
+    for name in manifest['files']:
+        if name in flash.TRANSPORT_FILES:
+            shutil.copyfile(PACKAGE/name, directory/name)
+        else:
+            (directory/name).symlink_to(PACKAGE/name)
+    original_checker = (directory/'prepare-mtkclient.py').read_bytes()
+    transport_cases = 0
+    for kind in ['absent-metadata', 'stale-checker-pin', 'old-source-tree',
+                 'uncovered-checker', 'missing-checker', 'stale-checker-bytes']:
+        record = json.loads(json.dumps(manifest))
+        if kind == 'absent-metadata': del record['mtkclient_transport']
+        elif kind == 'stale-checker-pin': record['mtkclient_transport']['files']['prepare-mtkclient.py']['sha256'] = '0'*64
+        elif kind == 'old-source-tree': record['mtkclient_transport']['destination'] = '/rabbitr1/src/mtkclient'
+        elif kind == 'uncovered-checker': del record['files']['prepare-mtkclient.py']
+        elif kind == 'missing-checker': (directory/'prepare-mtkclient.py').unlink()
+        elif kind == 'stale-checker-bytes': (directory/'prepare-mtkclient.py').write_bytes(original_checker+b'\n# stale\n')
+        (directory/'manifest.json').write_text(json.dumps(record))
+        try:
+            flash.prepare(SimpleNamespace(package=directory))
+        except (ValueError, OSError) as error:
+            assert ('transport' in str(error).lower() or 'prepare-mtkclient.py' in str(error)), str(error)
+        else:
+            raise AssertionError('Stale/missing transport metadata accepted: '+kind)
+        (directory/'prepare-mtkclient.py').write_bytes(original_checker)
+        transport_cases += 1
+print(f'PASS: {transport_cases} stale/missing transport metadata and old-tree admission cases')
+with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='transport-bundle-') as tmp:
+    directory = Path(tmp)
+    packager = load('transport_packager', 'package-mtkclient.py')
+    packager.ROOT = SCRIPTS.parent
+    packager.DIST = directory
+    shutil.copyfile(SCRIPTS/'prepare-flash.py', directory/'prepare-flash.py')
+    record = packager.bundle_transport()
+    assert record == flash.transport_metadata(directory)
+    assert record['destination'] == '/rabbitr1/src/mtkclient-haretic'
+    assert set(record['files']) == set(flash.TRANSPORT_FILES)
+    for name in flash.TRANSPORT_FILES:
+        assert (directory/name).read_bytes() == (PACKAGE/name).read_bytes()
+print('PASS: actual packager copies all three flat transport inputs with matching metadata')
+
 gpt = fixture_gpt()
 assert flash.parse_gpt(gpt)['partitions']['expdb']['bytes'] == flash.SIZES['expdb']
 rejects(lambda: flash.parse_gpt(gpt[:1024]))
@@ -261,6 +338,26 @@ with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='flash-test-') as tmp:
     assert not (tmp/'prepared').exists()
     subprocess.run(cmd+['--bootloader-unlocked'], check=True)
     prepared = tmp/'prepared'
+    original_copy = shutil.copyfile
+    raced = tmp/'changed-transport-copy'
+    def changed_transport_copy(source, destination, *positional, **keywords):
+        result = original_copy(source, destination, *positional, **keywords)
+        if Path(destination) == raced/'prepare-mtkclient.py':
+            Path(destination).write_bytes(Path(destination).read_bytes()+b'\n# changed after admission\n')
+        return result
+    try:
+        shutil.copyfile = changed_transport_copy
+        try:
+            flash.prepare(SimpleNamespace(package=PACKAGE, backup=backup, out=raced,
+                slot='a', profile='expdb', bootloader_unlocked=True))
+        except ValueError as error:
+            assert 'Copied transport inputs differ' in str(error), str(error)
+        else:
+            raise AssertionError('Changed transport copy was freshly pinned')
+        assert not (raced/'flash.sh').exists() and not (raced/'restore.sh').exists()
+    finally:
+        shutil.copyfile = original_copy
+    print('PASS: changed post-admission checker copy rejected before producing either script')
     assert (prepared/'lk-new.img').read_bytes() == (PACKAGE/'lk.bin').read_bytes().ljust(flash.SIZES['lk'], b'\0')
     assert (prepared/'logo-new.img').read_bytes() == (PACKAGE/'logo.bin').read_bytes().ljust(flash.SIZES['logo'], b'\0')
     for part in flash.WRITE_PARTS:
@@ -285,6 +382,11 @@ from pathlib import Path
 root = Path(__file__).parent/'device'
 args = sys.argv[1:]
 control = json.loads((root/'control.json').read_text())
+permit = root/'permit'
+assert permit.is_file(), 'Device command without successful checker'
+permit.unlink()
+with (root/'order.jsonl').open('a') as stream:
+    stream.write(json.dumps({'event':'mtk','args':args})+'\\n')
 with (root/'calls.jsonl').open('a') as stream:
     stream.write(json.dumps(args)+'\\n')
 if args[0] == 'gpt':
@@ -321,6 +423,23 @@ elif args[0] in ['r','w']:
 else:
     raise RuntimeError('Unexpected command: '+repr(args))
 """)
+    checker = tmp/'transport-checker.py'
+    checker.write_text("""import json, sys
+from pathlib import Path
+root = Path(__file__).parent/'device'
+assert sys.argv[1:] == ['--manifest','mtkclient-transport.json','--patch','mtkclient-transport.patch',
+                       '--archive','/rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz',
+                       '--destination','/rabbitr1/src/mtkclient-haretic','--check']
+control = json.loads((root/'control.json').read_text())
+number = len((root/'checks.jsonl').read_text().splitlines())+1
+failed = control.get('kind') == 'checker-failure' and control['at'] == number
+with (root/'checks.jsonl').open('a') as stream:
+    stream.write(json.dumps({'number':number,'failed':failed})+'\\n')
+with (root/'order.jsonl').open('a') as stream:
+    stream.write(json.dumps({'event':'check','number':number,'failed':failed})+'\\n')
+if failed: sys.exit(44)
+(root/'permit').write_text(str(number))
+""")
     transfer_cases = 0
 
     def reset_device(restoring=False):
@@ -330,21 +449,44 @@ else:
             shutil.copyfile(source, device/(flash.partition_name(part,'a')+'.img'))
         (device/'calls.jsonl').write_text('')
         (device/'runs.txt').write_text('')
+        (device/'checks.jsonl').write_text('')
+        (device/'order.jsonl').write_text('')
+        (device/'permit').unlink(missing_ok=True)
 
     def simulate(script, success, control=None):
         (device/'control.json').write_text(json.dumps(control or {}))
         (device/'calls.jsonl').write_text('')
         (device/'runs.txt').write_text('')
+        (device/'checks.jsonl').write_text('')
+        (device/'order.jsonl').write_text('')
+        (device/'permit').unlink(missing_ok=True)
         text = (prepared/script).read_text()
-        old = 'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)'
+        old = 'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient-haretic/mtk.py)'
         assert text.count(old) == 1
         text = text.replace(old, f'mtk=(python3 {shlex.quote(str(simulator))})')
+        old_checker = 'checker=(python3 prepare-mtkclient.py'
+        assert text.count(old_checker) == 1
+        text = text.replace(old_checker, f'checker=(python3 {shlex.quote(str(checker))}')
+        # Record real fresh mktemp directories even when the very first checker
+        # fails, before the simulated GPT command could record its output path.
+        text = text.replace('set -euo pipefail', 'set -euo pipefail\n' +
+                            'mktemp() { command mktemp "$@" | tee -a '+shlex.quote(str(device/'runs.txt'))+'; }')
         try:
             result = subprocess.run(['bash','-c',text,'test-flash','--write'], capture_output=True, text=True)
             assert (result.returncode == 0) == success, result.stdout+result.stderr
-            return [json.loads(line) for line in (device/'calls.jsonl').read_text().splitlines()]
+            calls = [json.loads(line) for line in (device/'calls.jsonl').read_text().splitlines()]
+            order = [json.loads(line) for line in (device/'order.jsonl').read_text().splitlines()]
+            for index, event in enumerate(order):
+                if event['event'] == 'mtk':
+                    assert index and order[index-1]['event'] == 'check' and not order[index-1]['failed']
+                elif not event['failed']:
+                    assert index+1 < len(order) and order[index+1]['event'] == 'mtk'
+                else:
+                    assert index == len(order)-1
+            assert len([v for v in order if v['event']=='mtk']) == len(calls)
+            return calls
         finally:
-            for name in (device/'runs.txt').read_text().splitlines():
+            for name in set((device/'runs.txt').read_text().splitlines()):
                 run = Path(name).resolve()
                 assert run.parent == ROOT/'.tmp' and run.name.startswith('r1-')
                 shutil.rmtree(run)
@@ -422,5 +564,34 @@ else:
         (prepared/'lk-new.img').write_bytes(original)
         (prepared/'SHA256SUMS').write_text(original_sums)
     print(f'PASS: {transfer_cases} ordered transfer/preflight/readback failure cases, including silent CLI errors and stale outputs')
+    assert transfer_cases == 145
+    checker_cases = 0
+    # First GPT, a preflight read, first write, immediate readback, and both final
+    # LK operations each require a fresh check, for both flash and restore.
+    for script in ['flash.sh','restore.sh']:
+        for at in [1,2,7,8,15,16]:
+            reset_device(script=='restore.sh')
+            calls = simulate(script, False, {'kind':'checker-failure','at':at})
+            assert len(calls) == at-1
+            assert len((device/'checks.jsonl').read_text().splitlines()) == at
+            checker_cases += 1
+    # Check the embedded package pins too, without repairing them after a changed
+    # helper. The startup checksum and each per-process check are separate gates.
+    for name in flash.TRANSPORT_FILES:
+        original = (prepared/name).read_bytes()
+        sums = (prepared/'SHA256SUMS').read_text()
+        try:
+            (prepared/name).write_bytes(original+b'\n')
+            (prepared/'SHA256SUMS').write_text('\n'.join(
+                flash.sha(prepared/name)+'  '+name if line.endswith('  '+name) else line
+                for line in sums.splitlines())+'\n')
+            reset_device()
+            assert simulate('flash.sh', False) == []
+            assert (device/'checks.jsonl').read_text() == ''
+            checker_cases += 1
+        finally:
+            (prepared/name).write_bytes(original)
+            (prepared/'SHA256SUMS').write_text(sums)
+    print(f'PASS: {checker_cases} checker-failure and package-pin controls; every simulated device command follows its own successful checker')
 print('PASS: GPT CRC/bounds rejection, AVB flags only, wrong-path rejection, backup preparation, dry run and restore scripts')
 print('No hardware was accessed.')

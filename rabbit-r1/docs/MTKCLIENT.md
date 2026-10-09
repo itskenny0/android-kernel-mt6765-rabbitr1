@@ -28,10 +28,27 @@ untracked bytecode fails its strict source check. The source check does not
 validate the interpreter or installed dependencies, or prevent later changes
 between checking and execution.
 
-Existing diagnostic archives and previously generated scripts still use their
-recorded transport. Preparing this tree does not migrate those artifacts. A
-package must explicitly select and check the patched tree before it can claim
-these transport changes.
+New diagnostic packages bundle `prepare-mtkclient.py`,
+`mtkclient-transport.json` and `mtkclient-transport.patch`. Their manifest pins
+those files, the retained upstream archive and the separate patched tree.
+The flash preparer rejects missing or stale transport metadata, including a
+destination pointing to the original source tree. Copied checker inputs must
+match the admitted package pins before either flash script is produced.
+
+Generated flash and restore scripts check the three bundled file hashes and run
+the bundled checker before **every** mtkclient process: GPT, preflight reads,
+writes and immediate readbacks. A failed check prevents that process from
+starting. The checker requires the retained local archive and rechecks the
+complete derived source tree each time; it performs no download. The scripts
+select `/rabbitr1/src/mtkclient-haretic` and preserve no-bytecode mode.
+
+Existing diagnostic archives and previously generated scripts keep their
+recorded transport. Preparing the patched tree does not migrate them, and the
+new helper has no fallback for old package metadata. An explicit host-tool
+refresh can preserve older validated payloads, but must retain their original
+kernel provenance and revalidate against an independently pinned original
+manifest. See [FLASHING.md](FLASHING.md) for package use; do not substitute
+current kernel outputs into a historical package without rebuilding it.
 
 ## Changes
 
@@ -88,3 +105,11 @@ were fixtures, so this is a host-side propagation check, not a device test.
 
 The PyUSB callback tests use official 1.3.1 source. This does not pin every
 user's installed USB backend or establish hardware compatibility.
+
+The diagnostic migration retains 145 transfer/preflight/readback cases and adds
+checker-failure, bundled-pin, metadata and copy-binding controls. Recording
+checker/device fixtures prove process ordering; separate tests exercise the
+actual offline source preparer. The migration review also passed 23 independent
+controls, including changing or removing bundled inputs after the GPT read.
+These checks preserve the diagnostic package's scope; they do not establish a
+complete Android installation procedure or physical flash safety.

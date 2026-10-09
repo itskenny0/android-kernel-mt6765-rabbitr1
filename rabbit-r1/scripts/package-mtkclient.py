@@ -44,6 +44,19 @@ def pad(path, size):
         stream.write(b'\0' * (size - stream.tell()))
 
 
+def bundle_transport():
+    """Copy the reviewed offline source guard into a flat diagnostic package."""
+    for source, name in [
+            (ROOT/'scripts/prepare-mtkclient.py', 'prepare-mtkclient.py'),
+            (ROOT/'mtkclient/transport.json', 'mtkclient-transport.json'),
+            (ROOT/'patches/mtkclient/0001-guard-bulk-transfers.patch', 'mtkclient-transport.patch')]:
+        shutil.copyfile(source, DIST/name)
+    spec = importlib.util.spec_from_file_location('prepare_flash', DIST/'prepare-flash.py')
+    preparer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(preparer)
+    return preparer.transport_metadata(DIST)
+
+
 def main():
     os.environ.update(TMPDIR=str(ROOT/'.tmp'), PYTHONDONTWRITEBYTECODE='1')
     OUT.mkdir(parents=True, exist_ok=True)
@@ -132,12 +145,14 @@ def main():
                              'dtb_sha256': sha(dtb)}
     for name in ['prepare-flash.py', 'decode-expdb.py', 'lk_handoff.py']:
         shutil.copyfile(ROOT/'scripts'/name, DIST/name)
+    transport = bundle_transport()
     shutil.copyfile(ROOT/'docs/FLASHING.md', DIST/'README.md')
     manifest = {
         'project': 'haretic',
         'format': 2, 'device': 'rabbit r1', 'status': 'experimental; not boot-tested',
         'source_commit': record['source_commit'], 'kernel_release': record['kernel_release'],
         'kernel_build': record, 'profiles': profiles, 'lk_build': lk_record,
+        'mtkclient_transport': transport,
         'initramfs_sha256': sha(initramfs),
         'stock_reference': 'RabbitOS v0.8.293',
         'stock_lk_sha256': sha(STOCK/'lk.img'),

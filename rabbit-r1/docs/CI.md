@@ -20,6 +20,9 @@ pinned archive, verifies every file, and tests the [bulk transport changes](MTKC
 The checks use actual extracted methods with scripted endpoints and PyUSB source
 fixtures. They do not import USB or discover devices. Preparing that source does
 not migrate an existing diagnostic archive or establish physical flash safety.
+New packages bundle the pinned offline checker, transport manifest and patch.
+Their generated flash/restore scripts verify those inputs and check the separate
+patched source before every mtkclient process, including GPT and readback.
 
 The workflow:
 
@@ -124,6 +127,19 @@ The workflow:
    are checked; EL3 entry/return and physical DMA handoff remain untested.
 6. Checks boot headers, DT tables, module identity, target shell syntax, GPT and
    backup validation, AVB flags, checksums and repeat packaging.
+   The 145 transfer/preflight/readback cases remain, with additional transport
+   metadata, copy-binding and checker-failure tests. Recording checker/device
+   processes verify check-before-command ordering and rejection; they do not
+   import USB or substitute for the separate actual source-preparer tests.
+
+Default package tests compare the images and modules with the current build
+outputs. A historical host-tool refresh instead requires the explicit
+`--reference-package-manifest` and `--reference-package-manifest-sha256` options.
+That mode checks the independently pinned original manifest, kernel provenance
+and all unchanged binary payloads before checking embedded kernel/module/ramdisk
+bytes against the reference. It is not the default CI path and does not relabel
+older payloads as a current kernel build. Existing archives require an explicit
+refresh; installing the patched source alone leaves them unchanged.
 
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
 archive, mtklkzap, mtkclient, the mtklogo binary and checksummed MT6357 register/ADC/gauge source
