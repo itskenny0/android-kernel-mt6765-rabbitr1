@@ -80,15 +80,32 @@ read the GPT and full partitions. Use a new backup directory for each device:
 ```sh
 cd /rabbitr1
 source scripts/env.sh
-mkdir -p backups/r1-001
+mkdir -p backups
+mkdir backups/r1-001
 cd backups/r1-001
 mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)
 "${mtk[@]}" printgpt
 "${mtk[@]}" gpt .
-"${mtk[@]}" r boot_a,dtbo_a,vbmeta_a,lk_a,logo,expdb boot_a.img,dtbo_a.img,vbmeta_a.img,lk_a.img,logo.img,expdb.img
-"${mtk[@]}" r para,seccfg para.img,seccfg.img
+while read -r part length; do
+    "${mtk[@]}" r "$part" "$part.img" --parttype user --offset 0x0 --length "$length"
+    test "$(stat -c %s -- "$part.img")" -eq "$((length))"
+done <<'PARTITIONS'
+boot_a 0x2000000
+dtbo_a 0x800000
+vbmeta_a 0x800000
+lk_a 0x100000
+logo 0xb00000
+expdb 0x1400000
+para 0x80000
+seccfg 0x800000
+PARTITIONS
 sha256sum *.img gpt.bin > BACKUP-SHA256SUMS
 ```
+
+These lengths come from the stock v0.8.293 layout. Use a fresh directory and
+read each partition separately: mtkclient v2.1.4.1 reuses the first partition's
+length in a grouped read. Its return code alone does not establish a successful
+read or write. The preparer checks the saved GPT and required backup sizes.
 
 Retain these backups. Both `logo` and `expdb` are shared by both slots. The logging build replaces
 old AEE dump contents in its first 18 MiB. The last 2 MiB are excluded from our
@@ -129,8 +146,9 @@ bash /rabbitr1/prepared/r1-001-a/flash.sh --write
 
 The script first checks the live GPT, LK and current contents against the
 backups. It writes `boot_a`, `dtbo_a`, `vbmeta_a`, the shared `logo`, then `lk_a`
-(or the selected `b` equivalents). LK is written last. It reads all five back
-and compares every byte. It does not write preloader, GPT, super, userdata or
+(or the selected `b` equivalents). LK is written last. After each write it reads
+that complete partition into a fresh file and compares every byte before
+proceeding to the next partition. It does not write preloader, GPT, super, userdata or
 calibration partitions. It does not reboot
 or change the active slot. Confirm that the intended slot will be booted before
 leaving the connection mode. A failed boot may cause the stock A/B bootloader
@@ -150,7 +168,8 @@ new file before booting stock firmware or another mainline attempt:
 ```sh
 cd /rabbitr1
 source scripts/env.sh
-toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-after.img
+test ! -e backups/r1-001/expdb-after.img
+toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-after.img --parttype user --offset 0x0 --length 0x1400000
 python3 dist/mtkclient/decode-expdb.py backups/r1-001/expdb-after.img \
   --out /rabbitr1/logs/expdb-attempt-001
 ```
@@ -183,8 +202,9 @@ restoring the original shared log partition is a separate optional operation:
 ```sh
 cd /rabbitr1
 source scripts/env.sh
+test ! -e backups/r1-001/expdb-restored.img
 toolchains/mtkclient/bin/python src/mtkclient/mtk.py w expdb backups/r1-001/expdb.img
-toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-restored.img
+toolchains/mtkclient/bin/python src/mtkclient/mtk.py r expdb backups/r1-001/expdb-restored.img --parttype user --offset 0x0 --length 0x1400000
 cmp backups/r1-001/expdb.img backups/r1-001/expdb-restored.img
 ```
 

@@ -89,11 +89,10 @@ def partition_name(part, slot):
 
 
 def shell_script(out, slot, restore=False):
-    """Write the selected slot and shared logo; check GPT and every readback."""
+    """Use exact fresh reads and verify every write before advancing."""
     names = ','.join(partition_name(part, slot) for part in WRITE_PARTS)
-    inputs = ','.join(f'{part}-{ "restore" if restore else "new"}.img'
-                      for part in WRITE_PARTS)
     mode = 'restore' if restore else 'flash'
+    suffix = 'restore' if restore else 'new'
     # Everything is prepared locally. Running --write is a separate device action.
     lines = [
         '#!/usr/bin/env bash', 'set -euo pipefail',
@@ -102,28 +101,57 @@ def shell_script(out, slot, restore=False):
         'echo "Do not relock until the complete stock firmware package, including every LK slot, is restored."',
         'if [[ ${1:-} != --write ]]; then',
         f'    echo "Preview only. Run bash {mode}.sh --write to perform these writes."',
-        f'    echo {shlex.quote("mtk.py w " + names + " " + inputs)}',
+    ]
+    for part in WRITE_PARTS:
+        lines.append('    echo ' + shlex.quote(
+            f'mtk.py w {partition_name(part, slot)} {part}-{suffix}.img --parttype user'))
+    lines += [
         '    exit 0', 'fi',
         'export TMPDIR=/rabbitr1/.tmp XDG_CACHE_HOME=/rabbitr1/.cache',
         'export XDG_CONFIG_HOME=/rabbitr1/.cache/config XDG_DATA_HOME=/rabbitr1/.cache/data',
         'export PYTHONDONTWRITEBYTECODE=1',
         'mtk=(/rabbitr1/toolchains/mtkclient/bin/python /rabbitr1/src/mtkclient/mtk.py)',
         'sha256sum -c SHA256SUMS',
+        'check_size() {',
+        '    local path=$1 expected=$2',
+        '    if [[ ! -f "$path" || -L "$path" || $(stat -c %s -- "$path") != "$expected" ]]; then',
+        '        echo "Missing, nonregular or wrong-size partition file: $path" >&2',
+        '        return 1',
+        '    fi',
+        '}',
+        'read_partition() {',
+        '    local name=$1 path=$2 size=$3 length=$4',
+        '    if [[ -e "$path" || -L "$path" ]]; then',
+        '        echo "Refusing an existing read output: $path" >&2',
+        '        return 1',
+        '    fi',
+        '    "${mtk[@]}" r "$name" "$path" --parttype user --offset 0x0 --length "$length"',
+        '    check_size "$path" "$size"',
+        '}',
+    ]
+    # Complete all local and live preflight checks before the first write.
+    for part in WRITE_PARTS:
+        lines.append(f'check_size {part}-{suffix}.img {SIZES[part]}')
+    lines += [
         f'run=$(mktemp -d /rabbitr1/.tmp/r1-{mode}.XXXXXXXX)',
         '"${mtk[@]}" gpt "$run"',
         'python3 prepare-flash.py check-gpt gpt.bin "$run/gpt.bin"',
     ]
-    if not restore:
+    for part in WRITE_PARTS:
+        lines.append(f'read_partition {partition_name(part, slot)} "$run/{part}-before.img" '
+                     f'{SIZES[part]} {hex(SIZES[part])}')
+        if not restore:
+            lines.append(f'cmp {part}-restore.img "$run/{part}-before.img"')
+    # Restore accepts damaged current contents, including an interrupted LK,
+    # but still requires a complete fresh preflight dump and every readback.
+    for part in WRITE_PARTS:
         lines += [
-            f'"${{mtk[@]}}" r {names} "$run/boot-before.img,$run/dtbo-before.img,$run/vbmeta-before.img,$run/logo-before.img,$run/lk-before.img"',
-            'for part in boot dtbo vbmeta logo lk; do cmp "$part-restore.img" "$run/$part-before.img"; done',
+            f'"${{mtk[@]}}" w {partition_name(part, slot)} {part}-{suffix}.img --parttype user',
+            f'read_partition {partition_name(part, slot)} "$run/{part}-readback.img" '
+            f'{SIZES[part]} {hex(SIZES[part])}',
+            f'cmp {part}-{suffix}.img "$run/{part}-readback.img"',
         ]
     lines += [
-        f'"${{mtk[@]}}" w {names} {inputs}',
-        f'"${{mtk[@]}}" r {names} "$run/boot-readback.img,$run/dtbo-readback.img,$run/vbmeta-readback.img,$run/logo-readback.img,$run/lk-readback.img"',
-        'for part in boot dtbo vbmeta logo lk; do',
-        f'    cmp "$part-{ "restore" if restore else "new"}.img" "$run/$part-readback.img"',
-        'done',
         'echo "Readback matches. The tool has not changed the active slot or rebooted the device."',
         'echo "Device readback files: $run"',
     ]

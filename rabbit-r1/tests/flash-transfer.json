@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "scope": "Generated diagnostic flash/restore scripts with file-backed mocked mtkclient; no USB/hardware access",
+  "review": {
+    "state": "complete; canonical two-script diff ready for parent review/commit",
+    "exit_code": 0,
+    "session_id": 60501,
+    "command": [
+      "python3",
+      "src/mainline/rabbit-r1/scripts/test-flash-package.py",
+      "--package",
+      "out/flash-helper-review/package",
+      "--scripts",
+      "src/mainline/rabbit-r1/scripts"
+    ],
+    "cwd": "/rabbitr1",
+    "environment": "source /rabbitr1/scripts/env.sh; shell login:false",
+    "test_log": "/rabbitr1/out/flash-helper-review/test.log",
+    "test_log_sha256": "20724d5740ed3d5bc0957a18170f6ffa29deb310b4e87bb99b9d8d28dcddca35",
+    "sources": {
+      "/rabbitr1/src/mainline/rabbit-r1/scripts/prepare-flash.py": "f306f204776fc80f89ef2eec0e5957fae3d0dc55d4ddd193861cbcf6d3bd8023",
+      "/rabbitr1/src/mainline/rabbit-r1/scripts/test-flash-package.py": "bda80321fb6dcdb4228d5be8d3e43b408df75162cba01c2e8bbda8ef1eb4fd9d"
+    },
+    "diff": "/rabbitr1/out/flash-helper-review/scripts.patch",
+    "diff_sha256": "6dca7a1ba525876d85ec48b3804301f8021a83ba30631b0cbc362d0946b88044",
+    "diff_check": "pass",
+    "source_revision_at_handoff": "3b7cc5faaedba64514f0ca432fc486410d696b83",
+    "private_input_package": "/rabbitr1/out/flash-helper-review/package",
+    "input_package_record_sha256": "f5b0cfd0a454c1792b14af794e0cfd60e90a4cd3a7cf3bc5f530a98d3c7f0e95",
+    "tests": {
+      "ordered_transfer_preflight_readback": 145,
+      "stale_lk_packaging_preparation_rejections": 36,
+      "original_ram_and_expdb_boot_header_sha1_load_addresses_padding_dt_initramfs_aosp_unpack": true,
+      "gpt_crc_bounds_identity_avb_path_unlock_backup_preview_restore": true
+    },
+    "hardware_accessed": false,
+    "production_dist_modified": false,
+    "workspace_mirror_modified": false,
+    "android_modified": false,
+    "committed": false,
+    "notes": [
+      "Only two authorized canonical scripts edited by this agent. Parent owns FLASHING.md and package refresh.",
+      "All five live flash source partitions are compared against backups before the first write; restore accepts damaged existing contents after exact-size reads.",
+      "Each single-partition write is followed immediately by a new exact-size read and full byte comparison before a later write.",
+      "A dropped no-op write cannot be distinguished from success if the requested final bytes already match; verification correctly establishes final bytes rather than claiming hardware command execution.",
+      "No automatic rollback, activation or reboot is introduced; USB/physical-device behavior remains untested."
+    ],
+    "completed_ns": 1791527948233133614
+  },
+  "actual_mtkclient_boundary_record": {
+    "path": "out/android-flash-review/slots/mtk-boundary-replay.json",
+    "sha256": "e53eedb71730c94eed43fbb04fbc109e558b514e1ef58a798ae573c9849a4209"
+  },
+  "documentation_shell_blocks_syntax_checked": 7,
+  "original_workspace_directory": "/rabbitr1/out/flash-helper-review",
+  "package_refresh": "Pending; review used an isolated package copy"
+}
