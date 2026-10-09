@@ -7,6 +7,8 @@ TARGET_HAS_BATTERY := true
 TARGET_HEALTH_HAL := default-aidl
 TARGET_GRAPHICS := swiftshader
 TARGET_GRAPHICS_COMPOSER_HAL := drmfb-composer
+# Keep the supported ARM backends without x86-only Intel cache operations.
+TARGET_MINIGBM_PLATFORM := all_arm
 TARGET_SUPPORTS_SUSPEND := false
 TARGET_BOOT_HAL := r1
 TARGET_FOLLOWS_LATEST_VINTF_TARGET_LEVEL := true
