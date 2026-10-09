@@ -96,6 +96,13 @@ jobs:
           git -C src/mainline fetch --no-tags --depth=1 origin "$PATCH_BASE"
           python3 scripts/fetch-sources.py --profile ci 2>&1 | tee logs/fetch-ci.log
 
+      - name: Check read-only ADB backup receiver with fake processes
+        run: |
+          source scripts/env.sh
+          mkdir -p out
+          python3 scripts/test-adb-backup.py \
+            --out /rabbitr1/out/adb-backup-tests 2>&1 | tee logs/adb-backup-tests.log
+
       - name: Check mtkclient transfers and read failures
         run: |
           source scripts/env.sh

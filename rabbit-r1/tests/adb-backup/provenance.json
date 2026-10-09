@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "scope": "Generic read-only receiver and synthetic tests only; no device records, plans or captures.",
+  "receiver": {
+    "path": "scripts/receive-adb-backup.py",
+    "sha256": "3635696fc560064e478829a07bc78402b40efc059efd44de51171eaecd081f01",
+    "changes_from_reviewed_receiver": "none"
+  },
+  "fixtures": {
+    "fake-adb.py": {
+      "sha256": "0ccdf329b9e2ef5c56fc08174f4d2601ecc30afb5779eea89ae4d55e8adbca71",
+      "synthetic_only": true,
+      "changes_from_reviewed_fixture": "none"
+    },
+    "fake-dd.py": {
+      "sha256": "cc3bacacb789e099388efae144e0415882f8db99ad3b3aad405ddcfd3b6d97cd",
+      "synthetic_only": true,
+      "changes_from_reviewed_fixture": "none"
+    }
+  },
+  "portable_test": {
+    "path": "scripts/test-adb-backup.py",
+    "original_test_sha256": "66df624f3a39c56eab48fdb5c27740e0548d5eac9671cdb5e13ea8992b2ecb75",
+    "sha256": "7bb75c0d5bed898b70c90d6a751c6c9a39cd26919fb4e2d87cebdc836ef73e2f",
+    "changes": "Import and fixture paths, required new --out directory, scratch/result path only; same34 controls."
+  },
+  "hardware_testing_claimed": false,
+  "private_GPT_profile_included": false
+}
