@@ -107,6 +107,12 @@ compiled Intel intrinsics for ARM64. The r1 product now selects the existing
 allocator passes: its actual compile commands exclude i915/xe and retain the
 ARM and generic backends. The complete filesystem build must still finish.
 
+The next full-image attempt reached 66% before `system/vold` failed to compile:
+`PublicVolume.cpp` uses `std::replace` without including `<algorithm>`. Patch
+`0008-include-vold-algorithm.patch` adds that header. The preserved failure and
+targeted compile are recorded in [vold-include-build.json](../android/vold-include-build.json).
+This fixes the compilation error; it does not establish a completed image build.
+
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
 by stopping before the build. The pinned Siso tool cannot load an absolute

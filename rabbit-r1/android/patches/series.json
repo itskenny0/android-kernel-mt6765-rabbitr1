@@ -689,5 +689,18 @@
         "after_sha256": "7a771cd8ff02257f0eaf5316953d0e919bd4aa1c9ff4ed3979b396199d0d6727"
       }
     ]
+  },
+  {
+    "project": "system/vold",
+    "base_commit": "11d8982f824d52e8122c7aa732207ba66b8f23c8",
+    "patch": "0008-include-vold-algorithm.patch",
+    "sha256": "2ff13aed2bf65b5ad8de16624572009ebf9de072d887f2d6d15dbd6711a0836b",
+    "files": [
+      {
+        "path": "model/PublicVolume.cpp",
+        "before_sha256": "0e17fccedefabb20e2d8650252af8c765af68378a1d853e0fbaa6a8bd1ea67fd",
+        "after_sha256": "8ef0d44dd9acdaf718c6fe174826bf3e43a4246714e60ec8c21f67867301f97e"
+      }
+    ]
   }
 ]

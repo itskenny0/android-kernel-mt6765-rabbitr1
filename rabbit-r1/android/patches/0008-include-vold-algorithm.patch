@@ -1,0 +1,18 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Include algorithm for volume label replacement
+
+PublicVolume uses std::replace for ISO9660/UDF labels. Include its defining
+header instead of relying on transitive standard-library includes.
+
+---
+--- a/model/PublicVolume.cpp
++++ b/model/PublicVolume.cpp
+@@ -32,6 +32,8 @@
+ #include <cutils/fs.h>
+ #include <private/android_filesystem_config.h>
+ #include <utils/Timers.h>
++
++#include <algorithm>
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "purpose": "Fix the actual PublicVolume compile failure in the second complete-image build",
+  "failed_build": {
+    "status": "failed",
+    "session": 79454,
+    "exit_code": 1,
+    "compiled_source_commit": "6555dd117cf0243f14c3813fb7765b39a9011ca8",
+    "staged_kernel_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+    "log": "/rabbitr1/logs/android-full-images-6555dd117c-failed-vold.log",
+    "log_sha256": "5d5bf4fee0591937f6ed1fda8e0ed28f1c426760317b0d2a5575db7e1071cc8b",
+    "failed_target": "system/vold/model/PublicVolume.cpp",
+    "diagnostic": "no member named replace in namespace std",
+    "full_image_audit": "not run; build failed",
+    "recorded_at": "2026-10-09T05:24:36.376174+00:00"
+  },
+  "patch": {
+    "project": "system/vold",
+    "base_commit": "11d8982f824d52e8122c7aa732207ba66b8f23c8",
+    "patch": "0008-include-vold-algorithm.patch",
+    "sha256": "2ff13aed2bf65b5ad8de16624572009ebf9de072d887f2d6d15dbd6711a0836b",
+    "files": [
+      {
+        "path": "model/PublicVolume.cpp",
+        "before_sha256": "0e17fccedefabb20e2d8650252af8c765af68378a1d853e0fbaa6a8bd1ea67fd",
+        "after_sha256": "8ef0d44dd9acdaf718c6fe174826bf3e43a4246714e60ec8c21f67867301f97e"
+      }
+    ]
+  },
+  "validation": {
+    "exit_code": 0,
+    "elapsed_seconds": 2.264686325099319,
+    "source_sha256": "8ef0d44dd9acdaf718c6fe174826bf3e43a4246714e60ec8c21f67867301f97e",
+    "changes_to_original_invocation": [
+      "PWD names the Android source directory",
+      "-o and -MF point into private review directory"
+    ],
+    "original_build_session": 79454,
+    "compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "original-command.json": {
+      "bytes": 8501,
+      "sha256": "4b5559aaff6bd71eccd6f5f6b9b54f41865d77f88b2278957080e93008b8cb95"
+    },
+    "reproduction-command.json": {
+      "bytes": 8359,
+      "sha256": "84b55b19aace610828e277012dd6fbe877a313411558eefef43a3b23f72d9d3b"
+    },
+    "PublicVolume.o": {
+      "bytes": 314220,
+      "sha256": "8dcef462c8e34b9b380644b4178b6bfa4155378e99197f1e900c601a1a6df026"
+    },
+    "PublicVolume.o.d": {
+      "bytes": 83639,
+      "sha256": "c3a78967a0207054a7717d6974feaf62d6aa352f3cab7267b3e10a18869e08f5"
+    }
+  },
+  "compiler": "prebuilts/clang/host/linux-x86/clang-r584948b/bin/clang++",
+  "target_arguments": [
+    "-target",
+    "aarch64-linux-android10000",
+    "-flto=thin",
+    "-std=gnu++23"
+  ],
+  "scope": "Replay of the failed Android compiler command with only the missing standard header added, PWD set to the source directory, and private output paths. Zero diagnostics. Full image rebuild and hardware boot remain outstanding.",
+  "reproduction_directory": "/rabbitr1/out/android-build-review/vold-include",
+  "hardware_tested": false,
+  "compiler_sha256": "15261046b6ea9504da0ae57b9d65ebc869ab1942aecb1af2819762b9b5251957",
+  "object_format": "LLVM IR bitcode from the ThinLTO compile; this check did not link libvold"
+}
