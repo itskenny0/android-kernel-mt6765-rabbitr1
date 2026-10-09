@@ -51,9 +51,11 @@ product, HAL and policy errors, then inspect the generated boot header, DT table
 module hashes, super metadata, partition sizes and AVB configuration. The stock layout evidence is
 recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
-Keep `OUT_DIR` relative to the Android source root. The pinned Siso build tool
-fails to find its generated `main.star` when given an absolute config directory;
-`../../out/android` still keeps all output in `/rabbitr1/out/android`.
+The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
+to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
+by stopping before the build. The pinned Siso tool cannot load an absolute
+config directory, while Soong test packaging rejects paths containing `..`.
+The source-relative alias satisfies both and keeps the cache in the workspace.
 
 The pinned vendor image libraries need vendor builds of several dependencies.
 The tracked patches enable only the required library variants. Patch

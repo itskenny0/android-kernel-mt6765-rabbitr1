@@ -14,8 +14,23 @@ export GOCACHE="$R1_ROOT/.cache/go-build" GOPATH="$R1_ROOT/.cache/go"
 export GRADLE_USER_HOME="$R1_ROOT/.cache/gradle" ANDROID_USER_HOME="$R1_ROOT/.cache/android"
 cd "$R1_ROOT/src/android"
 
-# Siso expects its generated config path relative to the Android source root.
-export OUT_DIR=../../out/android
+# Siso requires a relative config path; Soong test packaging rejects '..'.
+# Keep the existing workspace cache behind Android's standard output path.
+python3 - <<'PY'
+from pathlib import Path
+root = Path('/rabbitr1')
+target = root / 'out/android'
+link = root / 'src/android/out'
+if target.resolve() != target:
+    raise SystemExit('Android output target must not be redirected')
+target.mkdir(parents=True, exist_ok=True)
+if link.exists() or link.is_symlink():
+    if not link.is_symlink() or link.resolve() != target:
+        raise SystemExit('Preserving existing Android out path: ' + str(link))
+else:
+    link.symlink_to('../../out/android', target_is_directory=True)
+PY
+export OUT_DIR=out
 python3 "$R1_ROOT/scripts/apply-android-patches.py" --apply
 python3 "$R1_ROOT/scripts/install-lineage-device.py"
 python3 "$R1_ROOT/toolchains/git-repo/repo" manifest -r -o "$R1_ROOT/out/lineage-resolved.xml"
