@@ -1,11 +1,13 @@
 # Mainline and LineageOS 24 porting status
 
 Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
-policy are now enabled experimentally; earlier driver-only stages below record
-their previous disabled state. Android control sources, persistence and build
-hooks are implemented, but no full Android image or physical charging test exists.
-The initial r1 Android product and pinned mainline dependencies are now tracked;
-see [ANDROID.md](ANDROID.md) for the source checkout and pending build validation.
+policy are enabled experimentally and remain physically untested. The Android
+charging APK, native services and combined SELinux policy passed their targeted
+build and artifact checks. Boot/DTBO images, recovery policy and the real system
+Binder library also built and passed offline checks. The full filesystem,
+super and vbmeta build is in progress as of 2026-10-09; no complete Android ROM
+or physical charging test exists. See [ANDROID.md](ANDROID.md) for the pinned
+inputs, build evidence and remaining validation.
 
 As of the inspected sources on 2026-10-07, the mainline fork reports Linux 7.1.0.
 This is a development fork with downstream MT6765 changes, not an upstream Linux
@@ -80,7 +82,7 @@ is useful prioritization evidence. Its Y/P/N marks are not r1 acceptance results
 | eMMC | Corrected source-clock provider; disabled in RAM profile, enabled in expdb profile | Rails and tuning verified; repeated read-only I/O before relying on logging |
 | USB | Peripheral DT, configfs functions, optional ACM initramfs and gadget power-budget source | Enumeration, console and VBUS/charger interaction |
 | I2C | MT6765 interrupts, AP channels, native counters and hardware timeout; I2C4/5 enabled at 100 kHz; [details](I2C.md) | Firmware acceptance, clock/DMA/IRQ validation and repeated transfers on actual peripherals |
-| Charging / battery | MT6370 MFD/ADC and hwmon enabled; MT6357 current/voltage/NTC measurements and MT6370 charge and input-path control plus shutdown handling added; charger node still disabled | Measurement validation, capacity and charge policy, watchdog and USB detection, measured behavior |
+| Charging / battery | MT6370 MFD/ADC and hwmon enabled; MT6357 current/voltage/NTC measurements and MT6370 charge/input-path controls implemented; charger and board policy enabled experimentally, physically untested | Measurement and capacity validation, charge-policy/lease behavior, USB detection and sustained charging/disconnect tests |
 | Display | r1 panel, selected native DSI timings and native PHY setup/shutdown match stock offline; backlight settings corrected; [details](DISPLAY.md) | Remaining host startup, clocks, routing and panel power, then measured PLL/link behavior, scanout and brightness |
 | Touch | CST836 driver compiled and host-tested; stock wiring and I2C4 enabled for experimental probing; [details](TOUCH.md) | Host transfer validation, fitted-controller identification and evdev events on hardware |
 | GPU | No working accelerated r1 stack established | Kernel/userspace compatibility and rendering tests; software rendering first |
@@ -118,8 +120,10 @@ The pinned [official manifest](https://github.com/LineageOS/android/tree/lineage
 uses branch `lineage-24.0` and AOSP tag `android-17.0.0_r1`. The inspected
 [mainline/common device tree](https://github.com/LineageOS/android_device_mainline_common/tree/lineage-24.0)
 explicitly supports mainline-style kernels. Both are cloned and pinned in
-`sources.lock.json`. The full source checkout is underway with pinned mainline
-dependencies; no Android system image has been built.
+`sources.lock.json`. The checkout and pinned mainline dependencies now support
+the completed targeted and boot builds. As of 2026-10-09, system, system_ext,
+product, vendor, super and vbmeta are building; their completion and image-size
+checks remain outstanding.
 
 The kernel enables Binder/binderfs, BPF/cgroups, SELinux, relevant filesystems,
 encryption/verity and FunctionFS as groundwork. This is not a full Android 17
@@ -154,10 +158,10 @@ Specific integration traps already found in the pinned common tree:
 
 The common tree's `lineage.dependencies` lists drm_hwcomposer-upstream,
 minigbm-upstream, linux-firmware-mainline, Mesa, hardware/mainline/common and
-vendor/mainline. Fetch these alongside the Android tree at the integration stage.
-At the initial kernel milestone about 226 GiB remained; a complete Android sync
-and build require a new capacity check. No files or caches should be moved
-outside `/rabbitr1` to work around space limits.
+vendor/mainline. These dependencies are staged with the Android checkout;
+[ANDROID.md](ANDROID.md) records their pins and intentional source changes.
+Monitor workspace capacity during the full image build. No files or caches
+should be moved outside `/rabbitr1` to work around space limits.
 
 ## Compressed memory
 

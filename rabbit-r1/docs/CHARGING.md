@@ -89,9 +89,11 @@ and BoardConfig includes once, and refuses to overwrite modified feature files.
 `--product` and `--board` select other existing makefiles within that Android tree.
 Build `R1ChargingSettings`, `r1-charging` and `selinux_policy` in the configured
 product. The initial r1 product now includes the charging feature through
-`install-lineage-device.py`; see [ANDROID.md](ANDROID.md). Its full build is
-pending. The diagnostic boot ZIP contains the kernel policy, not Android or an
-installed settings APK.
+`install-lineage-device.py`; those targets have built and passed artifact checks.
+See [ANDROID.md](ANDROID.md) and the [targeted build record](../android/targeted-build.json).
+As of 2026-10-09, the full filesystem, super and vbmeta build is in progress,
+not complete. The diagnostic boot ZIP contains the kernel policy, not Android
+or an installed settings APK.
 
 The kernel ABI is documented in
 `Documentation/ABI/testing/sysfs-platform-rabbit-r1-charging`. `r1-report` includes
@@ -109,18 +111,25 @@ current, and are unconfirmed whenever `error` is nonzero.
   lease renewal/expiry/retry and shutdown, alongside the existing current,
   power-path, fault and threaded teardown tests. Battery presence checks cover
   256 register states and 256 read failures.
-* Android resources and Java compile against the pinned Android 17 public SDK.
-  Native service/JNI sources compile against the corresponding AOSP headers.
+* The actual Android Soong build links the platform-signed charging APK and
+  native service/JNI libraries, and compiles the combined SELinux policy.
+  Artifact checks passed for the APK signature, ARM64 binaries, 16 KiB-aligned
+  JNI libraries, installed init files and compiled policy; the
+  [targeted build record](../android/targeted-build.json) pins their hashes.
   The actual reconciliation function is tested with modeled properties/sysfs,
   including deferred probe, rebind, write failure and corrupt preferences.
   The installer is tested twice to verify idempotent build hooks.
+* Separate boot/DTBO, recovery-policy and real system `libbinder_ndk` targets
+  built and passed [offline artifact checks](../android/boot-build.json).
+  These checks do not execute the image contents or establish runtime policy
+  enforcement; the product still requests global permissive mode.
 * The kernel objects, complete r1 kernel and DTB are built for AArch64. CI runs
   both new test suites and the existing packaging checks.
 
-Full Android Soong linking, combined SELinux-policy compilation, Binder/Health
-integration, on-device Settings behavior, electrical measurements and sustained
-charging/disconnect tests remain outstanding. No test above emulates a battery
-or establishes hardware safety.
+Runtime Binder/Health integration, linker namespace/APEX visibility, on-device
+Settings behavior, electrical measurements and sustained charging/disconnect
+tests remain outstanding. No test above emulates a battery or establishes
+hardware safety.
 
 Source references: Rabbit's pinned
 [`mt6357-gauge.c`](https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/power/supply/mt6357-gauge.c),

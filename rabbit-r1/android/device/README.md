@@ -1,8 +1,10 @@
 # haretic Android device configuration
 
 This is haretic's initial LineageOS 24 product for the rabbit r1 mainline kernel in this
-workspace. It is not a tested Android image. The diagnostic kernel ZIP remains
-the only assembled boot package.
+workspace. Android boot artifacts and targeted integration modules have passed
+offline checks; a complete or hardware-tested Android ROM is not available.
+The diagnostic kernel ZIP remains the assembled distribution package; Android
+images have not been added to it.
 
 The source lives in `rabbit-r1/android/device` in the kernel repository. Install
 it into `device/rabbit/r1` with `scripts/install-lineage-device.py`; edit the
@@ -25,8 +27,10 @@ both slot transitions, recovery, encryption and OTA updates still require testin
 The stock record layout is covered by LK instruction replay. The r1 boot HAL
 implements MediaTek boot-region selection and the successful-boot flag update
 with readback and failure handling. Its core has host tests; both Android
-services and the policy aggregate now compile. Recovery policy, full-image
-dependencies and physical-device checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
+services and the policy aggregate now compile. Recovery policy and real system
+`libbinder_ndk` builds also passed their artifact checks.
+Full-image dependencies, linker namespace/APEX visibility and physical-device
+checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
 
 Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL
@@ -37,17 +41,23 @@ can still shut down because the battery is present and appears empty. This
 is an Android boot blocker. Implement and validate real fuel-gauge reporting;
 do not substitute a simulated battery or suppress the shutdown check.
 The gauge now exposes the signed hardware charge counter in microamp-hours;
-this is relative accumulation, not remaining capacity. Stock profile-based
+this is relative accumulation, not remaining capacity. Live profile-based
 initialization, counter reset/rollover handling and SOC persistence remain.
 
 The asynchronous `r1-expdb` service validates the partition and its bounded
 18 MiB mapping before loading pstore. Its mocked discovery, mapping, attachment
-and failure tests pass; actual module loading, policy and persistence are unverified.
+and failure tests, Android build and compiled policy checks pass. Vendor-image
+module installation, runtime labels, module attachment and persistence remain
+unverified.
 
-The six integration targets and their artifact checks passed; no full image
-build or runtime service test has completed. Before distributing an Android
-image, complete the image and recovery-policy builds, verify image sizes and the LK/DT handoff, validate the bounded `expdb`
-logger, and test boot and recovery on an r1. Storage, graphics,
+The [six integration targets](../targeted-build.json) and the subsequent
+[boot/DTBO, recovery-policy and Binder targets](../boot-build.json) passed
+offline artifact checks. As of 2026-10-09, the system, system_ext, product,
+vendor, super and vbmeta build is in progress; it has not completed. No runtime
+service test has completed. Before distributing an Android image, complete
+those builds and their partition-size checks, verify super/vbmeta and vendor
+module contents, validate the bounded `expdb` logger, and test the LK/DT handoff,
+boot and recovery on an r1. Storage, graphics,
 battery health, charging, temperature limits, input, audio, wireless, cameras,
 modem support and suspend remain hardware validation gates. Native display and
 TCPC are still disabled in the staged DTB.
