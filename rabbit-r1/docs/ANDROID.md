@@ -96,7 +96,16 @@ Best-effort pstore has no dedicated panic writer, so neither panic persistence
 nor logs from before startup are guaranteed.
 
 Recovered files use the `pstore_blk` backend name, for example
-`/sys/fs/pstore/console-pstore_blk-0`. Android's current previous-boot liblog reader
-expects `pmsg-ramoops-0`; use direct collection or the existing expdb decoder for
-these records until that reader is integrated. Do not assume `logcat -L` collects
-them.
+`/sys/fs/pstore/console-pstore_blk-0`. The Android logging patch lets `logcat -L`
+and dumpstate's LAST LOGCAT read `pmsg-pstore_blk-0` when `pmsg-ramoops-0` is
+absent. It selects one backend and does not merge unrelated boot histories.
+The writer retries a missing `/dev/pmsg0` once per second, so starting logd
+before the expdb backend no longer permanently disables pmsg writes. Earlier
+messages are not replayed; the 64 KiB pmsg ring retains only a rolling tail.
+
+Both full reader/writer sources pass host sanitizer tests, including delayed
+availability and concurrent writers. Target compilation and reboot persistence
+remain unverified. Kernel console records still require direct collection or
+the expdb decoder; Android's separate LAST KMSG and recovery/erase paths retain
+their ramoops filenames. See [the logging tests](../tests/pmsg/README.md) for
+the access checks and remaining limitations.

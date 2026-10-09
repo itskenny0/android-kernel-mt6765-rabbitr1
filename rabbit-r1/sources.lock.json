@@ -184,6 +184,101 @@
       "url": "https://android.googlesource.com/platform/system/libbase/+/refs/tags/android-17.0.0_r1/include/android-base/errno_restorer.h?format=TEXT",
       "bytes": 1452,
       "sha256": "5909ddecf2342f11cb6dde67fb6dc64e57c2dfeb1193d34e99d9582d8288b0c6"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/pmsg_reader.cpp": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/pmsg_reader.cpp",
+      "bytes": 13461,
+      "sha256": "13af98d8bac0b3c72e8ee422f3309e173af137023e5f88052451c3a29a0d83b4"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/pmsg_writer.cpp": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/pmsg_writer.cpp",
+      "bytes": 7038,
+      "sha256": "4c5119613a3f890d9003c12f8abfff759816957d60cbff1b488fcd7fd46d4cc3"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/logger.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/logger.h",
+      "bytes": 1327,
+      "sha256": "2ec9d6bbe9333931db0d58061ba6d1623150093657d7b7bd73ce1b6d7e3434ee"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/pmsg_reader.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/pmsg_reader.h",
+      "bytes": 851,
+      "sha256": "9bc061bc8e9971eee81c2621e926c587a9f29dd4852440ed59a646e54151a81d"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/uio.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/uio.h",
+      "bytes": 763,
+      "sha256": "b9bb2ab8b0301521009384f4351605bd0508b74a5e30d99363133a45a31306af"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/android/log.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/android/log.h",
+      "bytes": 16026,
+      "sha256": "ee10b13125564cfebd95b2a37e87d3f507b502eb426c6951985abe6299a8a17f"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/private/android_logger.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/private/android_logger.h",
+      "bytes": 4707,
+      "sha256": "db48ce224fae3c3094c96ca4e95e35f4eff95e8326028d493e640058005ee322"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log.h",
+      "bytes": 4697,
+      "sha256": "a88a797a352663075686bc6e3bf76675e1606367eaf12efd70f75706b84a595c"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_id.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_id.h",
+      "bytes": 869,
+      "sha256": "c905e4e217e2bc389c0ae2d9a489ead7fbe9aef649f7d036bb8688be1ea9dd5d"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_main.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_main.h",
+      "bytes": 11033,
+      "sha256": "e402f10ca5457d85d231c831ca0daca6ab0dd22b2564dad924c2194e1132fb5c"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_radio.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_radio.h",
+      "bytes": 4782,
+      "sha256": "b84f5357c3d5cacdd034b28c67a7a3d69ee9d3dae39be9175660ed44afc5edf5"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_safetynet.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_safetynet.h",
+      "bytes": 1099,
+      "sha256": "3381a2b153f0542a47202e0230daf9d30b68b04e970690c2947940dc05312cfa"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_system.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_system.h",
+      "bytes": 4738,
+      "sha256": "35e31b751960fd45760546baa1e6b1ae5cc0f3c25d5b292c50e1487dd36670f0"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_time.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_time.h",
+      "bytes": 4593,
+      "sha256": "ba916f8fa49be1db30aeb6cbff4f7323164e0e327cfdecf7e1dc95b7f9491d9c"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_event_list.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_event_list.h",
+      "bytes": 7561,
+      "sha256": "e601c400840d9813f9dd9179026077750f0c11500c85cf6ed25cfd899de757ce"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_read.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_read.h",
+      "bytes": 4781,
+      "sha256": "9ccb638882c8abc6f30d1e7dd3bcf4eae9c6a904fe7e24e6181b86391058bb5d"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/log_properties.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/log_properties.h",
+      "bytes": 800,
+      "sha256": "257bc47a353820a54bde02bc5a208bc80a6a6703891ba75677fbe23cef27a80e"
+    },
+    "downloads/pmsg-ci/system/logging/liblog/include/log/pmsg_writer.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_logging/336e1707c8258adf1f1c5c5511218b533f3a22e8/liblog/include/log/pmsg_writer.h",
+      "bytes": 850,
+      "sha256": "562846780229351d337a84d03d74009437dcae373e8815885331da251d991aff"
+    },
+    "downloads/pmsg-ci/system/core/libcutils/include/cutils/list.h": {
+      "url": "https://raw.githubusercontent.com/LineageOS/android_system_core/7c3f32fe89c52b4176fd288ba5bb4f907809c202/libcutils/include/cutils/list.h",
+      "bytes": 2310,
+      "sha256": "a9c672c93718dc24586cbabc25170c9d242920e3c4b5af96fb2dba4afba23dd2"
     }
   }
 }

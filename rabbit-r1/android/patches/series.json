@@ -37,5 +37,23 @@
         "after_sha256": "b25e70abbc5558bea99514a3266d6bdb610013ff15799189991b72b8526dd9a2"
       }
     ]
+  },
+  {
+    "project": "system/logging",
+    "base_commit": "336e1707c8258adf1f1c5c5511218b533f3a22e8",
+    "patch": "0004-support-deferred-pstore-logging.patch",
+    "sha256": "9977ddc718f943ed8f38711943135a1da171184a74b01b7476c29125d1c9bf35",
+    "files": [
+      {
+        "path": "liblog/pmsg_reader.cpp",
+        "before_sha256": "13af98d8bac0b3c72e8ee422f3309e173af137023e5f88052451c3a29a0d83b4",
+        "after_sha256": "eef399460df5acfb0aa43048abadd75884125ece5e3be31e18126a10fc236cb9"
+      },
+      {
+        "path": "liblog/pmsg_writer.cpp",
+        "before_sha256": "4c5119613a3f890d9003c12f8abfff759816957d60cbff1b488fcd7fd46d4cc3",
+        "after_sha256": "7c497333c80eb68a2585a05535516444b882d69aa2e22d40360db94c6cdadfc0"
+      }
+    ]
   }
 ]

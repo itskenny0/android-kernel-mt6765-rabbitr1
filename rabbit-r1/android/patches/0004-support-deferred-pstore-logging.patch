@@ -1,0 +1,85 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Support deferred pstore logging
+
+Read pstore_blk records when ramoops is absent. Retry a missing pmsg
+device once per second so logd can start before the backend is loaded.
+Keep permanent open failures cached.
+
+---
+--- a/liblog/pmsg_reader.cpp
++++ b/liblog/pmsg_reader.cpp
+@@ -41,14 +41,22 @@
+   memset(log_msg, 0, sizeof(*log_msg));
+ 
+   if (logger_list->fd.load() <= 0) {
+-    int i, fd = open("/sys/fs/pstore/pmsg-ramoops-0", O_RDONLY | O_CLOEXEC);
++    // Keep one backend for this reader; do not merge unrelated boot histories.
++    const char* path = "/sys/fs/pstore/pmsg-ramoops-0";
++    int i, fd = open(path, O_RDONLY | O_CLOEXEC);
++    if (fd < 0 && errno == ENOENT) {
++      path = "/sys/fs/pstore/pmsg-pstore_blk-0";
++      fd = open(path, O_RDONLY | O_CLOEXEC);
++    }
+ 
+     if (fd < 0) {
+       return -errno;
+     }
+     if (fd == 0) { /* Argggg */
+-      fd = open("/sys/fs/pstore/pmsg-ramoops-0", O_RDONLY | O_CLOEXEC);
++      fd = open(path, O_RDONLY | O_CLOEXEC);
++      int open_errno = errno;
+       close(0);
++      errno = open_errno;
+       if (fd < 0) {
+         return -errno;
+       }
+--- a/liblog/pmsg_writer.cpp
++++ b/liblog/pmsg_writer.cpp
+@@ -31,11 +31,23 @@
+ #include "uio.h"
+ 
+ static std::atomic<int> pmsg_fd;
++static std::atomic<int64_t> pmsg_retry_at;
+ 
+ static void GetPmsgFd() {
+-  // Note if open() fails and returns -1, that value is stored into pmsg_fd as an indication that
+-  // pmsg is not available and open() should not be retried.
++  // Cache permanent errors, but allow a pstore backend loaded later to create pmsg0.
+   if (pmsg_fd != 0) {
++    return;
++  }
++
++  // Bound open attempts on devices without pmsg, including concurrent writers.
++  timespec now;
++  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
++    return;
++  }
++  const int64_t now_ns = static_cast<int64_t>(now.tv_sec) * NS_PER_SEC + now.tv_nsec;
++  int64_t retry_at = pmsg_retry_at.load();
++  if (now_ns < retry_at ||
++      !pmsg_retry_at.compare_exchange_strong(retry_at, now_ns + NS_PER_SEC)) {
+     return;
+   }
+ 
+@@ -45,7 +57,13 @@
+   // STDIN_FILENO != stdin, so we call open() to get a new fd value in this case.
+   if (new_fd == 0) {
+     new_fd = TEMP_FAILURE_RETRY(open("/dev/pmsg0", O_WRONLY | O_CLOEXEC));
++    int open_errno = errno;
+     close(0);
++    errno = open_errno;
++  }
++
++  if (new_fd < 0 && errno == ENOENT) {
++    return;
+   }
+ 
+   // pmsg_fd should only be opened once.  If we see that pmsg_fd is uninitialized, we open
+@@ -66,6 +84,7 @@
+     close(pmsg_fd);
+   }
+   pmsg_fd = 0;
++  pmsg_retry_at = 0;
+ }
+ 
+ int PmsgWrite(log_id_t logId, const struct timespec* ts, const struct iovec* vec, size_t nr,
