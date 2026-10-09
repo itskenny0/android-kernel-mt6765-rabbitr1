@@ -52,6 +52,13 @@ must be retained at `/rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz`. Prepare the
 separate patched source using the checker, manifest and patch bundled with this
 package. The original `/rabbitr1/src/mtkclient` stays unchanged.
 
+The patched source is published in [haretic/mtkclient](https://github.com/haretic/mtkclient)
+on `haretic/rabbit-r1`. Commit
+[`46d2976`](https://github.com/haretic/mtkclient/commit/46d2976cd901e3a77478165de5d41afeed27e301)
+contains the same six source changes pinned by the current transport manifest,
+including the complete GPT export. The package preparer continues to reproduce
+those changes from the pinned upstream archive and bundled patch.
+
 ```sh
 cd /rabbitr1
 source scripts/env.sh
