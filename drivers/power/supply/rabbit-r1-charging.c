@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Board policy for the r1's MT6357 battery and MT6370 charger. */
 #include <linux/device.h>
+#include <linux/i2c.h>
 #include <linux/jiffies.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/property.h>
@@ -388,17 +390,79 @@ static void r1_charge_stop(void *data)
 	mutex_unlock(&p->lock);
 }
 
-static int r1_charge_supply(struct device *dev, const char *name, struct power_supply **psy)
+/* The r1 supplies are platform children; optional TCPM may be an I2C client. */
+static struct device *r1_charge_provider(struct device_node *node)
 {
-	*psy = devm_power_supply_get_by_reference(dev, name);
-	if (IS_ERR(*psy))
-		return PTR_ERR(*psy);
-	if (!*psy)
+	struct platform_device *pdev;
+
+	pdev = of_find_device_by_node(node);
+	if (pdev) {
+		/* The MUSB child reuses usb2's node but does not own its supply. */
+		if (dev_of_node_reused(&pdev->dev)) {
+			put_device(&pdev->dev);
+			return NULL;
+		}
+		return &pdev->dev;
+	}
+#if IS_REACHABLE(CONFIG_I2C)
+	{
+		struct i2c_client *client = of_find_i2c_device_by_node(node);
+
+		if (client)
+			return &client->dev;
+	}
+#endif
+	return NULL;
+}
+
+static int r1_charge_supply(struct device *dev, const char *name,
+			    struct power_supply **psy)
+{
+	struct power_supply *supply;
+	struct device_node *node;
+	struct device *provider;
+	int ret;
+
+	/* Each supply property names one provider, without phandle arguments. */
+	ret = of_count_phandle_with_args(dev->of_node, name, NULL);
+	if (ret != 1)
+		return ret < 0 ? ret : -EINVAL;
+	node = of_parse_phandle(dev->of_node, name, 0);
+	if (!node)
+		return -EINVAL;
+	provider = r1_charge_provider(node);
+	of_node_put(node);
+	if (!provider)
 		return -EPROBE_DEFER;
-	/* Unbind the consumer before a supplier frees its private driver data. */
-	if (!device_link_add(dev, (*psy)->dev.parent, DL_FLAG_AUTOREMOVE_CONSUMER))
-		return -ENOMEM;
-	return 0;
+	ret = -EINVAL;
+	if (provider == dev)
+		goto put_provider;
+	ret = -EPROBE_DEFER;
+	/* Do not wait on a supplier lock while holding the consumer probe lock. */
+	if (!device_trylock(provider))
+		goto put_provider;
+	if (!device_is_bound(provider) ||
+	    READ_ONCE(provider->links.status) != DL_DEV_DRIVER_BOUND)
+		goto unlock_provider;
+	ret = -ENOMEM;
+	if (!device_link_add(dev, provider, DL_FLAG_AUTOREMOVE_CONSUMER))
+		goto unlock_provider;
+	/* The link protects provider resources before a supply can be retained. */
+	supply = devm_power_supply_get_by_parent(dev, provider);
+	if (IS_ERR(supply)) {
+		ret = PTR_ERR(supply);
+		goto unlock_provider;
+	}
+	ret = -EPROBE_DEFER;
+	if (!supply)
+		goto unlock_provider;
+	*psy = supply;
+	ret = 0;
+unlock_provider:
+	device_unlock(provider);
+put_provider:
+	put_device(provider);
+	return ret;
 }
 
 static int r1_charge_probe(struct platform_device *pdev)

@@ -117,6 +117,7 @@ jobs:
           python3 scripts/test-mt6370-current.py 2>&1 | tee logs/mt6370-current-tests.log
           python3 scripts/test-musb-budget.py 2>&1 | tee logs/musb-budget-tests.log
           python3 scripts/test-r1-charging.py 2>&1 | tee logs/r1-charging-tests.log
+          python3 scripts/test-r1-charging-suppliers.py 2>&1 | tee logs/r1-charging-suppliers-tests.log
           python3 scripts/test-android-charging.py 2>&1 | tee logs/android-charging-tests.log
           python3 scripts/test-r1-boot-control.py 2>&1 | tee logs/r1-boot-control-tests.log
           python3 scripts/test-mt6370-backlight.py 2>&1 | tee logs/mt6370-backlight-tests.log

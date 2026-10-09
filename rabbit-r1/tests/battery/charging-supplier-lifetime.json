@@ -1,0 +1,80 @@
+{
+  "status": "private_patch_ready",
+  "canonical_writes": false,
+  "base_head": "ab23cfd441f21f4a5e933540ca117981746d288b",
+  "source_before_sha256": "a39e7351b68dfd7f833cc14adf488b999ab6118d8fafcc257202ea19ff5887c8",
+  "source_after_sha256": "1620368039b0961a2da3b5c076b1378275b38daab0fc6194d77c51661110c5ca",
+  "patch_replay_exact": true,
+  "tests": {
+    "supplier_probe_stop_each_i2c_variant": 79,
+    "i2c_reachable": [
+      0,
+      1
+    ],
+    "core_helper": 10,
+    "policy_decisions": 815304,
+    "unsafe_helper_mutations_rejected": 4,
+    "unsafe_policy_mutations_rejected": 4,
+    "asan_ubsan": true
+  },
+  "arm64": "W=1 -Werror external object pass; not .ko/full kernel/physical execution",
+  "files": {
+    "charging-supplier-lifetime.patch": "1c9e832652fcde815e952254d0d61d3a9612cf4d3d724e60f2752121d2522785",
+    "prototype/drivers/power/supply/rabbit-r1-charging.c": "1620368039b0961a2da3b5c076b1378275b38daab0fc6194d77c51661110c5ca",
+    "tests/test-suppliers.py": "4a24432fdc466180d6faa8cd616d1bcbc658fe244632f4ab7d23170428f4d9a1",
+    "tests/suppliers.c": "b484459950598b1963db75a3f4429e88c8fda8348b6bf7ad5c630eef6f666a4a",
+    "tests/results/result.json": "c9153e459c7da65ddcf67c1e10f8e1f833941d9f4e4b4c38169789cfed7425f2",
+    "tests/test-parent-helper.py": "a1598f80469532d86e979a160d3c4d454594f9018cee1b4e58ca80344151c99e",
+    "tests/core-helper/helper-result.json": "e6d5ca7716fcdc077e86db2e95e6255748fb43a38662f19506de07f81d96fc6e",
+    "tests/reproduce-match.py": "63fa712feb0e2cab841e74351409cda80c9f9e2a134f8663118888d6b349a221",
+    "tests/match-reproduction/result.json": "ae5a23b5f27d36942aad569a559b0ef06df1b4870e2a5dbd18ca3d4f3d5cdc71",
+    "tests/policy.log": "c0855c337de966048c89bffb3d97e449434c37b88e5be57425922501ba6c47b4",
+    "tests/run-policy.py": "3406840f8c481047c013848c5e5866fec429628b3cfd38617eb27362ccf97f09",
+    "tests/mutations/result.json": "e0668a24da52c019bfbc325ec2258302af739536d8ace484103edb12a0b27d45",
+    "arm64/result.json": "19e1b73af367f4f9adc4250d4b7c09819e5e5d5830abdde51e7c2e8aa05db17f",
+    "arm64/final-build.log": "009e00f3613be36712c9d4c2bd2755a5ba484de2566809dfe8a727dd82ecb578",
+    "arm64/inputs-before.json": "a28f9c8dec7e39fa2d059df1a78fddacb1c1486bbe621a40d2151c96df88d443",
+    "arm64/inputs-after.json": "a28f9c8dec7e39fa2d059df1a78fddacb1c1486bbe621a40d2151c96df88d443",
+    "checkpatch.log": "b8a97f41c37dab1c205bce6c622b47690974a89748108ee5f6ba31c1c5fae21f",
+    "inputs.json": "20b70e98ec7e0f12d5969b68d76e88b92b69350ded84a230867731cfc69f4aee",
+    "review.md": "2e6add50cfe869f0ca20ec3a13ef017ba974d2cae674cd5937eda4ebd6d13cb4"
+  },
+  "baseline_files": {
+    "arch/arm64/boot/dts/mediatek/mt6765.dtsi": "bbfaffdef31e9c8433a45895eea4c84a8ec6e3de227d485fda54fb71726a6fe2",
+    "arch/arm64/boot/dts/mediatek/mt6765-rabbit-r1.dts": "dc549c22dd8aa885ea1c2e8f80cbfd3b7b8e7f73bfbd45f40a3c5fdff8d8f189",
+    "Documentation/devicetree/bindings/power/supply/rabbit,r1-charging-policy.yaml": "276ee0776550af38bef7170cea3bb3695448fba283c4a65ce9fef58fedbb3d92",
+    "include/linux/i2c.h": "f36f4c56bd2d85d314687efcc03a8451d9a4e1ac53b45834030c645672e91867",
+    "include/linux/power_supply.h": "4eb79755476f32d3e672d4016a37c5c8298c292a8f6a43e1cf8250267679d77d",
+    "include/linux/device.h": "18541adf10d0dc1555f543a60e4acd9a8429bb963836ce515ddfea395f175621",
+    "drivers/of/platform.c": "76511351e585839cd944ac59f7e92f45c3cda2b6eb855da86a865c13e8cef57d",
+    "drivers/i2c/i2c-core-base.c": "27292509c7f46b54c80d8e9dbba3b0b5ae5240a143bba6b203ac69d6e379ea19",
+    "drivers/base/property.c": "d5f0ac720e818a4845077db8c61049426ff4134eebfa1596d82cf3c3d15979d2",
+    "drivers/base/class.c": "46f854c0d0b78fd0673c87817fd92524875966621b4d9107e21ce958a1979b0a",
+    "drivers/base/core.c": "fa223c8f9f1bb40ca52c73f156439d311065e9be04efa2c6cf57039940e1c9fa",
+    "drivers/base/bus.c": "ca5c7869054b603b64c21df45279decf32f540c2f29c801e851e94fe2f788a4a",
+    "drivers/base/dd.c": "12b0555ee317adb59b09dc16c6fc7113c72e7148961f772d3f51f9a0c8dcb9b3",
+    "drivers/power/supply/rabbit-r1-charging.c": "a39e7351b68dfd7f833cc14adf488b999ab6118d8fafcc257202ea19ff5887c8",
+    "drivers/power/supply/power_supply_core.c": "c2448e55ce430ddb688de62a5df8dc0ae7bc9af92099ad8fc9297b3bc131c722",
+    "drivers/power/supply/Kconfig": "49c7d4433cc2898860080d9ea4860e21633f756f6b38949231b06c3423266f2e",
+    "drivers/power/supply/mt6357-gauge.c": "79e742ad80eae9b2e281d463c4393443fd7e2a531db3d1c0ccfbfd7dac43a686",
+    "drivers/usb/musb/mediatek.c": "54ebbd1e74488c19c2af7c097e4102f0d21badd793394488152fc7e64d59beb6",
+    "drivers/usb/typec/tcpm/tcpm.c": "e15f7f35d0390e182be4fe85fab8049fbe20c484f9a975d356ade7a4ff6c9cde",
+    "drivers/usb/typec/tcpm/fusb302.c": "c871d0070633f12584334e0ca402f5db6a4093c7152d844cee49dc75d32db383",
+    "rabbit-r1/tests/r1-charging-test.c": "7293d6c9fb80fd2e539772aa61458d3ddaf8c1e38ca647d560a6662f1c862dd9",
+    "rabbit-r1/scripts/test-r1-charging.py": "0ae9ad44d4b5924bf986bcca7bcfd370c9363dbe21549af6b4995b51a8df8a1e"
+  },
+  "canonical_patch": "patches/mainline/0078-pin-r1-charging-suppliers.patch",
+  "original_workspace_directory": "/rabbitr1/out/charging-lifetime-review",
+  "integration_note": "Private handoff state is historical; root applied exact reviewed patch and retained test fixture with canonical path/default adaptations.",
+  "canonical_validation": {
+    "cases_per_i2c_config": 79,
+    "i2c_configs": [
+      0,
+      1
+    ],
+    "host_log_sha256": "37cdd0e2d535927672be9a10e54a3e3e043b297db97836869095c1d42a9795f0",
+    "kernel_patch_replay_count": 78,
+    "kernel_patch_replay_files": 93,
+    "kernel_patch_replay_log_sha256": "9c5369814cc65fe9dc067637b18a02d6a94ab2f532abe6c6ea571aa0be3742ba"
+  }
+}

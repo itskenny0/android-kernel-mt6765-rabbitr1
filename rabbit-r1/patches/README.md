@@ -11,6 +11,12 @@ uncalibrated. The shipping configuration remains unchanged; see
 `docs/MT6357-SOC.md` and `tests/battery/soc-integration.json` for the tests and
 remaining Android and hardware requirements.
 
+Patch 0078 retains each charging-policy provider before looking up its power
+supply. It rejects an unbinding provider and the MUSB child that reuses its
+parent's OF node, and covers optional I2C Type-C providers. Charging limits and
+policy are unchanged. `tests/battery/charging-supplier-lifetime.json` records
+the source review, fault tests and ARM64 object check.
+
 | Patch | Purpose |
 | --- | --- |
 | 0001 | Experimental rabbit r1 DTS, DTB target and board/vendor bindings |
