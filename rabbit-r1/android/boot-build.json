@@ -1,175 +1,1096 @@
 {
   "format": 1,
   "project": "haretic",
-  "status": "offline Android boot artifact checks passed; not a flashable complete ROM",
-  "build_targets": [
-    "recovery-persist",
-    "dumpstate",
-    "out/target/product/r1/system/lib64/liblog.so",
-    "out/target/product/r1/recovery/root/system/lib64/liblog.so",
-    "com.android.hardware.graphics.allocator.minigbm_upstream",
-    "bootimage",
-    "dtboimage",
-    "sepolicy.recovery",
-    "out/target/product/r1/system/lib64/libbinder_ndk.so"
-  ],
-  "build_log": {
-    "path": "/rabbitr1/logs/android-pstore-graphics-boot-b970f300bd.log",
-    "bytes": 2380998,
-    "sha256": "353cef216009b22b86d7c96d2e6801549f291222b568d95acf7b605141938fae"
-  },
-  "device_source_commit": "b970f300bdf7b320c6c897ca66e0f225d449d93f",
-  "audit_source_commit": "ea55ec9d2699b2e49b2aabe789e2650230fab699",
+  "build_start_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
   "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+  "build_log": {
+    "path": "/rabbitr1/logs/android-full-images-0a2a56a30e.log",
+    "bytes": 546500,
+    "sha256": "555d601bb7b0131d4083480385065bba3097ccb7d3fc2f0c79a506cf41a732bc"
+  },
+  "hardware_tested": false,
+  "target_code_executed": false,
+  "flash_tested": false,
+  "whole_rom_validated": false,
+  "runtime_selinux_enforcement_verified": false,
+  "runtime_linker_namespace_resolution_verified": false,
+  "status": "offline Android boot artifact checks passed; not a complete ROM readiness claim",
+  "device_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+  "build_identity": {
+    "build_start": {
+      "path": "/rabbitr1/out/android-build-review/full-images/retry-current-source/build-start.json",
+      "bytes": 1454,
+      "sha256": "b67b7c1379f2f6a15d50ef4e92247f6f54b883e4bb10dea4f7d6067493a33990"
+    },
+    "build_result": {
+      "path": "/rabbitr1/out/android-build-review/full-images/retry-current-source/build-result.json",
+      "bytes": 576,
+      "sha256": "c6b056e19619c070660eb748049c0bb1b01a683d89e1ea529b74499d641360ae"
+    },
+    "audit_results": {
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/boot/results.json",
+      "bytes": 154268,
+      "sha256": "93b2590173ce577a7e365ac2fd7e43cedd7fd5b044b176130d2988a41bc6ab10"
+    },
+    "audit_verifier": {
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/boot/verify.py",
+      "bytes": 27804,
+      "sha256": "6cc7d86f9ef4e2c7c7168d918890884b9dd9c5883aee033a9bf0554b04c8d311"
+    },
+    "audit_guard": {
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/provenance.py",
+      "bytes": 14153,
+      "sha256": "78f4c7313e76738b1e1366e2f712010ead05389c5aa1dd74af794dc6785258c5"
+    }
+  },
   "provenance": {
     "installer_manifest": {
-      "path": "src/android/.r1-install.json",
-      "bytes": 7236,
-      "sha256": "3d3dcb8b443c49cd785efcab777f760b7966c3c2e0db78e5a2cb218e166b42a6"
+      "path": "/rabbitr1/src/android/.r1-install.json",
+      "bytes": 9496,
+      "sha256": "346a4b3c328cd662ef5248862f4ff2bc1992e8757ee3860371603d9e5c4687b2"
     },
-    "all_managed_files_sha256_verified": true,
-    "managed_file_count": 61,
-    "kernel_build_record": {
-      "path": "src/android/device/rabbit/r1/prebuilt/kernel-build.json",
-      "bytes": 3428,
-      "sha256": "13be2b287d5ac2f9f7dcf68127c18a5aceb84dcf143a0e530739a25ad7dfd86c"
-    },
-    "sources_lock": {
-      "path": "src/mainline/rabbit-r1/sources.lock.json",
-      "bytes": 18272,
-      "sha256": "17f55d01c07b387f98f8e3cc77625db6dd9ca615f2c6c941d20e5f094b40bbcc"
-    },
-    "android_patch_series": {
-      "path": "src/mainline/rabbit-r1/android/patches/series.json",
-      "bytes": 34097,
-      "sha256": "d0a71e3ee94a9a41d60cdb0b376f1e49525978e3ef6e4974add0d45725ff6f87"
-    },
-    "verified_applied_patches": [
-      {
-        "project": "external/google-highway",
-        "base_commit": "94b90ab8cb9df9b3719a64751ea2fcb62caa3391",
-        "patch": "0001-enable-vendor-libhwy.patch",
-        "sha256": "e1f59fd959dbf72b5924deb8748dd7015f90690d9f3e65ae66fa6b19cacbce1b",
-        "verified_applied_file_count": 1
+    "source_identity": {
+      "build_start_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+      "installer_manifest": {
+        "path": "/rabbitr1/src/android/.r1-install.json",
+        "bytes": 9496,
+        "sha256": "346a4b3c328cd662ef5248862f4ff2bc1992e8757ee3860371603d9e5c4687b2"
       },
-      {
-        "project": "external/skia",
-        "base_commit": "508606366e71a3daa933a4e08bc49b84e387ec18",
-        "patch": "0002-enable-vendor-skcms.patch",
-        "sha256": "a2f3836d3eab8664e63e9b991857b6a6aaaa2d40bc2c6809f67c06e0b7804c68",
-        "verified_applied_file_count": 1
+      "staged_files_verified": 77,
+      "canonical_templates_verified": 60,
+      "templates": {
+        "device/rabbit/r1/AndroidProducts.mk": {
+          "source_path": "rabbit-r1/android/device/AndroidProducts.mk",
+          "sha256": "8da626792e53f42f7361ed02bc639d2853c516447e837aaaec0f347db27ca6db"
+        },
+        "device/rabbit/r1/BoardConfig.mk": {
+          "source_path": "rabbit-r1/android/device/BoardConfig.mk",
+          "sha256": "8bfff4237592102a19038fbe3f9249b8c3485c1e47fa286f67aa12c883325c39"
+        },
+        "device/rabbit/r1/README.md": {
+          "source_path": "rabbit-r1/android/device/README.md",
+          "sha256": "af2b6482faa7ccd9b501fb0b4f2b7dfe26378bc2c671dca95ddb28a38ff4828a"
+        },
+        "device/rabbit/r1/boot/Android.bp": {
+          "source_path": "rabbit-r1/android/device/boot/Android.bp",
+          "sha256": "2c75daca20749ad769c1f5689bd9767819932fb310336a8318cdd40f8070a6ae"
+        },
+        "device/rabbit/r1/boot/BootControl.cpp": {
+          "source_path": "rabbit-r1/android/device/boot/BootControl.cpp",
+          "sha256": "3703676d33d667193ac8f6dd1a5f6bf8e3a6900ee477e60a8532a0af210b0cc8"
+        },
+        "device/rabbit/r1/boot/BootControl.h": {
+          "source_path": "rabbit-r1/android/device/boot/BootControl.h",
+          "sha256": "d203a76a6baeba846944aed4b83f4810d083f52367b703245521d76853010d9e"
+        },
+        "device/rabbit/r1/boot/Control.cpp": {
+          "source_path": "rabbit-r1/android/device/boot/Control.cpp",
+          "sha256": "d2ab15496faffbdca77094c9d06033eea93b06965c0bdc19ed1db501de6ecd66"
+        },
+        "device/rabbit/r1/boot/Control.h": {
+          "source_path": "rabbit-r1/android/device/boot/Control.h",
+          "sha256": "3d2b2354b35d77827da04d8fc37af706dd187777919d382204458d9a1fdd0887"
+        },
+        "device/rabbit/r1/boot/LinuxStorage.cpp": {
+          "source_path": "rabbit-r1/android/device/boot/LinuxStorage.cpp",
+          "sha256": "d9fb5c3f765a3d27de929f6fd42ed7c31f9c2bfc8b7420bfa663b2374bba1557"
+        },
+        "device/rabbit/r1/boot/LinuxStorage.h": {
+          "source_path": "rabbit-r1/android/device/boot/LinuxStorage.h",
+          "sha256": "c602615893cb07511fc6f415d1a3105dad1c293457977a37e28fba04180cc1d3"
+        },
+        "device/rabbit/r1/boot/android.hardware.boot-service.r1.rc": {
+          "source_path": "rabbit-r1/android/device/boot/android.hardware.boot-service.r1.rc",
+          "sha256": "bf8e7423ff28c5f13f48fd2521d35431b31b78a2d16ef0c45073d182db1f5ac9"
+        },
+        "device/rabbit/r1/boot/android.hardware.boot-service.r1.xml": {
+          "source_path": "rabbit-r1/android/device/boot/android.hardware.boot-service.r1.xml",
+          "sha256": "b49c28a208965a31f79585a909a223b3ac5c4f18d13b00863bd4548ef2e91443"
+        },
+        "device/rabbit/r1/boot/android.hardware.boot-service.r1_recovery.rc": {
+          "source_path": "rabbit-r1/android/device/boot/android.hardware.boot-service.r1_recovery.rc",
+          "sha256": "65bdc0238912bbd04d1f74ca092adf91d0e85d09a403fdef80252521a21fd311"
+        },
+        "device/rabbit/r1/boot/main.cpp": {
+          "source_path": "rabbit-r1/android/device/boot/main.cpp",
+          "sha256": "3610e6b8079a4852ac9ad3003a1688090ad7f52e1a6e580e8354514cbd28444b"
+        },
+        "device/rabbit/r1/device.mk": {
+          "source_path": "rabbit-r1/android/device/device.mk",
+          "sha256": "4678c16ee5b3aa3a6e6bf5f0b95b873fa0e20703cbb468185303dd146ad404fc"
+        },
+        "device/rabbit/r1/health/Android.bp": {
+          "source_path": "rabbit-r1/android/device/health/Android.bp",
+          "sha256": "8e79dec7cb6e50485e17b0d8ef05859847344e803674963817138fb0d304a95c"
+        },
+        "device/rabbit/r1/health/Readiness.cpp": {
+          "source_path": "rabbit-r1/android/device/health/Readiness.cpp",
+          "sha256": "a313d3471750a268106fb9f352a4f73de9108eb34ba02a2e2e85cc337016ebba"
+        },
+        "device/rabbit/r1/health/Readiness.h": {
+          "source_path": "rabbit-r1/android/device/health/Readiness.h",
+          "sha256": "3059366c4271bd0c56baa5594ef0485a386ed5d31d4f887c440a2530217edc81"
+        },
+        "device/rabbit/r1/health/StartupOps.h": {
+          "source_path": "rabbit-r1/android/device/health/StartupOps.h",
+          "sha256": "1698b8eabbfa94427c36e0bc09c9be18dabe4f7f3491d86bae98ddd9e3efbc97"
+        },
+        "device/rabbit/r1/health/health.r1.rc": {
+          "source_path": "rabbit-r1/android/device/health/health.r1.rc",
+          "sha256": "4fc14d55f19936b3f48cf41067895c8bcbeb2ed4cd28af96f8944686f9587d7d"
+        },
+        "device/rabbit/r1/health/health.r1.xml": {
+          "source_path": "rabbit-r1/android/device/health/health.r1.xml",
+          "sha256": "5492e2b7c3954aa6b6362762f6c499da3652cfb81690977570edb222f7185616"
+        },
+        "device/rabbit/r1/health/initial-ready.cpp": {
+          "source_path": "rabbit-r1/android/device/health/initial-ready.cpp",
+          "sha256": "06ca4f92bb9ee6d4d558252d7380f457c4f81de92aaca825a44842dc44e96dbc"
+        },
+        "device/rabbit/r1/health/main.cpp": {
+          "source_path": "rabbit-r1/android/device/health/main.cpp",
+          "sha256": "93e71c0ba411249e73f8dd912b7c955c1f017067ec51a6f9d0fcf80eac2adc02"
+        },
+        "device/rabbit/r1/health/product.mk": {
+          "source_path": "rabbit-r1/android/device/health/product.mk",
+          "sha256": "919d47651771914e58d7466c2811929d2b87f9f39559693ee4ad7dc6d10ea0d6"
+        },
+        "device/rabbit/r1/health/sepolicy/file_contexts": {
+          "source_path": "rabbit-r1/android/device/health/sepolicy/file_contexts",
+          "sha256": "e7c8bf270d6e575702c38da77bf03abd9b6f3155a0b6b0176192a10670c3701f"
+        },
+        "device/rabbit/r1/health/sepolicy/genfs_contexts": {
+          "source_path": "rabbit-r1/android/device/health/sepolicy/genfs_contexts",
+          "sha256": "a36e5cf2cb38af60a8415c0f98ec78269ee5ffd830c74b8915a3274e4c1ec082"
+        },
+        "device/rabbit/r1/health/sepolicy/r1_health_ready.te": {
+          "source_path": "rabbit-r1/android/device/health/sepolicy/r1_health_ready.te",
+          "sha256": "aac6404e56f9b2770ee139c94ac4ec1e083150f40fe0a83f49b9b1df8e3c0493"
+        },
+        "device/rabbit/r1/lineage_r1.mk": {
+          "source_path": "rabbit-r1/android/device/lineage_r1.mk",
+          "sha256": "dc0e78623a74247deecb15202eb8801fcdf6e6b1d42d4b4c4891dac8712fb079"
+        },
+        "device/rabbit/r1/lineage_r1_soc.mk": {
+          "source_path": "rabbit-r1/android/device/lineage_r1_soc.mk",
+          "sha256": "e297eefd1c8f433bfc0b9b24ed975cfa7e6679e970b5366dc49d9674e90f5a21"
+        },
+        "device/rabbit/r1/logging/Android.bp": {
+          "source_path": "rabbit-r1/android/device/logging/Android.bp",
+          "sha256": "1563fbb8c2631e3ac6d3ca382a33ffa9d24fe30a325f73a6745052f31cff5ece"
+        },
+        "device/rabbit/r1/logging/Expdb.cpp": {
+          "source_path": "rabbit-r1/android/device/logging/Expdb.cpp",
+          "sha256": "e854d089ce0f6dbe2fc52aeb075d2f732dc6ca40cbe965f01988fdda99456be6"
+        },
+        "device/rabbit/r1/logging/Expdb.h": {
+          "source_path": "rabbit-r1/android/device/logging/Expdb.h",
+          "sha256": "1f24371fabd5546d6d70befe0d060b9cadfef56fcb386293c3d963e8daf45f40"
+        },
+        "device/rabbit/r1/logging/ExpdbLayout.h": {
+          "source_path": "rabbit-r1/android/device/logging/ExpdbLayout.h",
+          "sha256": "dd57d5810eedac7b589cece1afa8dde96429f0a78842ff4a1d96d3ef68b2b34a"
+        },
+        "device/rabbit/r1/logging/main.cpp": {
+          "source_path": "rabbit-r1/android/device/logging/main.cpp",
+          "sha256": "7aab7b10e1f52ff3011dd23d9148306eb320ff98446bc5cc63e0825e087e1005"
+        },
+        "device/rabbit/r1/logging/r1-expdb.rc": {
+          "source_path": "rabbit-r1/android/device/logging/r1-expdb.rc",
+          "sha256": "f2e3459039cb17e70fbd464d99379bbabc9bb9b9ca44707847b71b3f8232eb2b"
+        },
+        "device/rabbit/r1/logging/tests/loader.cpp": {
+          "source_path": "rabbit-r1/android/device/logging/tests/loader.cpp",
+          "sha256": "d184d43b4e9ea6c2a3235d8b9fe2554b5b2e632765f281f32124842adc42325b"
+        },
+        "device/rabbit/r1/logging/tests/run.py": {
+          "source_path": "rabbit-r1/android/device/logging/tests/run.py",
+          "sha256": "b2e619a7607c042416f4e768c92e24bc2e3d0ae30dae1464f625af5bde56263e"
+        },
+        "device/rabbit/r1/rootdir/fstab.r1": {
+          "source_path": "rabbit-r1/android/device/rootdir/fstab.r1",
+          "sha256": "6f8f6ad884e5b4144f07f341cd9981851a96628041eab1ef4f292bfe3b024f36"
+        },
+        "device/rabbit/r1/rootdir/init.r1.rc": {
+          "source_path": "rabbit-r1/android/device/rootdir/init.r1.rc",
+          "sha256": "e6e1e28e3d284f102edab176cd739bfdb3633493e311e5e8e2eee568ecdc4ac1"
+        },
+        "device/rabbit/r1/sepolicy/file_contexts": {
+          "source_path": "rabbit-r1/android/device/sepolicy/file_contexts",
+          "sha256": "6aac7a4a014d2702aa144f15e93ec2e91052dad3938d03734682b7e6e870440e"
+        },
+        "device/rabbit/r1/sepolicy/genfs_contexts": {
+          "source_path": "rabbit-r1/android/device/sepolicy/genfs_contexts",
+          "sha256": "e53e0f3b13f06e906d36f8c3aee3c895f267e0e2bd2155a26bc9fa7b2604dda5"
+        },
+        "device/rabbit/r1/sepolicy/hal_bootctl_r1.te": {
+          "source_path": "rabbit-r1/android/device/sepolicy/hal_bootctl_r1.te",
+          "sha256": "a5316a9cd299465401c214790eb92cdb043db33b52e6ffd6776cf0a46196d4fc"
+        },
+        "device/rabbit/r1/sepolicy/property_contexts": {
+          "source_path": "rabbit-r1/android/device/sepolicy/property_contexts",
+          "sha256": "27585d3a4bcf9996110c8b402e94790a6c8ea5652f0431b6cb1beb4f644e18c1"
+        },
+        "device/rabbit/r1/sepolicy/r1_expdb.te": {
+          "source_path": "rabbit-r1/android/device/sepolicy/r1_expdb.te",
+          "sha256": "3fd00e221185609e969fe692a54a618f6b0cea14629239c8b9510349a9e576a9"
+        },
+        "device/rabbit/r1/charging/Android.bp": {
+          "source_path": "rabbit-r1/android/charging/Android.bp",
+          "sha256": "563dc5578c614a0bd525234dd29c212db804faba2087baf24664cb879d7b65a7"
+        },
+        "device/rabbit/r1/charging/app/AndroidManifest.xml": {
+          "source_path": "rabbit-r1/android/charging/app/AndroidManifest.xml",
+          "sha256": "0c06dfcbe3779df59fefd1571fae0a04e569f5859d59813cb90f462538553340"
+        },
+        "device/rabbit/r1/charging/app/res/values/strings.xml": {
+          "source_path": "rabbit-r1/android/charging/app/res/values/strings.xml",
+          "sha256": "39b87d55df0073f241aa52f35eb984e0571e0cb72b0a65ea330fc914f832b9f4"
+        },
+        "device/rabbit/r1/charging/app/src/cat/kenny/r1/charging/ChargingActivity.java": {
+          "source_path": "rabbit-r1/android/charging/app/src/cat/kenny/r1/charging/ChargingActivity.java",
+          "sha256": "472b58ca345e7199bc73dc4dc3dce55a7ada7ea3077e4d299c970b792b7ba15d"
+        },
+        "device/rabbit/r1/charging/board.mk": {
+          "source_path": "rabbit-r1/android/charging/board.mk",
+          "sha256": "18f9c3bb689e9c622de184ae8c7c836ccc08ef8d6078d5bdc75e9407972c4c76"
+        },
+        "device/rabbit/r1/charging/native/choice.h": {
+          "source_path": "rabbit-r1/android/charging/native/choice.h",
+          "sha256": "cf5be445793d853df9123c592adac6fdbf54cd44d49a685d0dfae65ee83006a6"
+        },
+        "device/rabbit/r1/charging/native/jni.cpp": {
+          "source_path": "rabbit-r1/android/charging/native/jni.cpp",
+          "sha256": "ee97528c7fce1992b79e4d56072ef17837820531acd6084fba54ab411accad8f"
+        },
+        "device/rabbit/r1/charging/native/service.cpp": {
+          "source_path": "rabbit-r1/android/charging/native/service.cpp",
+          "sha256": "ed98957fd556865668c3a567077bdcc77a93cb4d4813fe3611ca7949a54e0ab8"
+        },
+        "device/rabbit/r1/charging/product.mk": {
+          "source_path": "rabbit-r1/android/charging/product.mk",
+          "sha256": "ac778ea6e976c6f87ef33be129262d4fe1005278c7975e505ed235c662f4f3a7"
+        },
+        "device/rabbit/r1/charging/r1-charging.rc": {
+          "source_path": "rabbit-r1/android/charging/r1-charging.rc",
+          "sha256": "a76d222b187492d36aa2c7bdcf2a6214adf58e5ac250ffadde81f75a980f6dd6"
+        },
+        "device/rabbit/r1/charging/sepolicy/file_contexts": {
+          "source_path": "rabbit-r1/android/charging/sepolicy/file_contexts",
+          "sha256": "da38f45b1bac964ae8b2505e6a068dbf06f6aef5564786890c046642d0a82c03"
+        },
+        "device/rabbit/r1/charging/sepolicy/genfs_contexts": {
+          "source_path": "rabbit-r1/android/charging/sepolicy/genfs_contexts",
+          "sha256": "f379f94986fd7331143cd0cb8edcd91f2f35d9361d2bd2585ab45d8d70cf1ce8"
+        },
+        "device/rabbit/r1/charging/sepolicy/property_contexts": {
+          "source_path": "rabbit-r1/android/charging/sepolicy/property_contexts",
+          "sha256": "4bfd0c8abd75e3e4f64bdd3bba4453076af23d5f825a38741396acfef004217b"
+        },
+        "device/rabbit/r1/charging/sepolicy/r1_charging.te": {
+          "source_path": "rabbit-r1/android/charging/sepolicy/r1_charging.te",
+          "sha256": "b0624efbe397fd5caae00fabe489d9e78715743ead8f29ee28a9a49bf8c83ae2"
+        },
+        "device/rabbit/r1/charging/sepolicy/seapp_contexts": {
+          "source_path": "rabbit-r1/android/charging/sepolicy/seapp_contexts",
+          "sha256": "e792f9cac58720aff35a26876a1a40f262a78831a8038f0161c4a51888af0bae"
+        },
+        ".repo/local_manifests/r1.xml": {
+          "source_path": "rabbit-r1/android/local_manifests/r1.xml",
+          "sha256": "dd3ceebc531d30e109aeb9210645cdcb2947bfee9a84bea16057ef8d83248f25"
+        }
       },
-      {
-        "project": "external/XMP-Toolkit-SDK",
-        "base_commit": "45acb237cd13c19708f963247c732250cd43a4a5",
-        "patch": "0003-enable-vendor-xmp.patch",
-        "sha256": "624e4665dad7f0d301c9a8223094d422b5d3c91dcecdac626b308b7ac990c6f0",
-        "verified_applied_file_count": 1
-      },
-      {
-        "project": "system/logging",
-        "base_commit": "336e1707c8258adf1f1c5c5511218b533f3a22e8",
-        "patch": "0004-support-deferred-pstore-logging.patch",
-        "sha256": "b493ec2f7f43351290d7b8ed7c2ac048113cab72229384fe3e5a7daaabec7501",
-        "verified_applied_file_count": 4
-      },
-      {
-        "project": "external/mesa",
-        "base_commit": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
-        "patch": "0005-update-mesa-26.2.4.patch",
-        "sha256": "59756d6f6329c211d4db1c73bb5f3f6dab65ca136a0e5e189cc7a04a17154923",
-        "verified_applied_file_count": 115
-      },
-      {
-        "project": "bootable/recovery",
-        "base_commit": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
-        "patch": "0006-fix-recovery-algorithm-include.patch",
-        "sha256": "a84f9d2f34bc7efc4f9cb040d0d3b10c7486a7c670a57972bfbdc84a015ff17c",
-        "verified_applied_file_count": 3
-      },
-      {
-        "project": "frameworks/native",
-        "base_commit": "46018f54b42489de960c62c3db9de131abce43ea",
-        "patch": "0007-collect-pstore-blk-console.patch",
-        "sha256": "0c1826f7df35ae7f9700bbd7daf0647a2c2e18bc4676aa1cbc1c223681ac3dfa",
-        "verified_applied_file_count": 1
-      }
-    ],
-    "android_project_commits": {
-      "build/make": "92a87b9506e5d1c961292cc8138036ccbe190ada",
-      "system/core": "7c3f32fe89c52b4176fd288ba5bb4f907809c202",
-      "system/sepolicy": "d61fd80832f558d52de026097d30d695634e8b0f",
-      "frameworks/native": "46018f54b42489de960c62c3db9de131abce43ea",
-      "bootable/recovery": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
-      "external/avb": "cb5eae91a6b83e1394882decbf6de133239107e1",
-      "system/tools/mkbootimg": "4a27dd13adf9846e12d585d6fe99a375ebb58396"
-    },
-    "verifier": {
-      "path": "out/android-build-review/boot-images-pstore/verify.py",
-      "bytes": 27197,
-      "sha256": "93629ba91f694b63c8b0d299021f1a495e10277b467bb8a0bb36fcce2f7e71d8"
-    },
-    "detailed_results": {
-      "path": "out/android-build-review/boot-images-pstore/results.json",
-      "bytes": 94202,
-      "sha256": "c237ea6ec5451a7b9749067acf630104df459435e07179c9b18e9d44ddb4a679"
-    },
-    "lk_replay_source": {
-      "path": "out/android-build-review/boot-images-pstore/replay-lk-normal-boot.py",
-      "bytes": 4191,
-      "sha256": "fd6b9583458a0aa53a418ff033be9a222c5cd7afba76335b5aff6a175922c0c9"
+      "generated_inputs_pinned_by_build_start": [
+        "device/rabbit/r1/prebuilt/Image.gz",
+        "device/rabbit/r1/prebuilt/clk-mt8196-disp0.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-disp1.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-mfg.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-ovl0.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-ovl1.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-vdec.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-vdisp_ao.ko",
+        "device/rabbit/r1/prebuilt/clk-mt8196-venc.ko",
+        "device/rabbit/r1/prebuilt/dtb/table.dtb",
+        "device/rabbit/r1/prebuilt/dtbo.img",
+        "device/rabbit/r1/prebuilt/health-mode.json",
+        "device/rabbit/r1/prebuilt/health-prebuilt.mk",
+        "device/rabbit/r1/prebuilt/kernel-build.json",
+        "device/rabbit/r1/prebuilt/kernel-config",
+        "device/rabbit/r1/prebuilt/pstore_blk.ko",
+        "device/rabbit/r1/prebuilt/pstore_zone.ko"
+      ],
+      "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+      "android_patch_series_sha256": "1f429251c1f0dec1073656c01e64b554bf9a6c7a3e9d5ff75e63082e03b49514",
+      "sources_lock_sha256": "17f55d01c07b387f98f8e3cc77625db6dd9ca615f2c6c941d20e5f094b40bbcc",
+      "verified_applied_patches": [
+        {
+          "project": "external/google-highway",
+          "base_commit": "94b90ab8cb9df9b3719a64751ea2fcb62caa3391",
+          "patch": "0001-enable-vendor-libhwy.patch",
+          "sha256": "e1f59fd959dbf72b5924deb8748dd7015f90690d9f3e65ae66fa6b19cacbce1b",
+          "files": [
+            {
+              "path": "Android.bp",
+              "before_sha256": "043564212b6144f4dbf84b1cbc5b0248f388a3d454d0be96a88a648232dc0dc8",
+              "after_sha256": "1b55ec8dab5eafbe8fd44479e5b5471febde2eb12fafb9a8a0973bb8323ad485"
+            }
+          ]
+        },
+        {
+          "project": "external/skia",
+          "base_commit": "508606366e71a3daa933a4e08bc49b84e387ec18",
+          "patch": "0002-enable-vendor-skcms.patch",
+          "sha256": "a2f3836d3eab8664e63e9b991857b6a6aaaa2d40bc2c6809f67c06e0b7804c68",
+          "files": [
+            {
+              "path": "Android.bp",
+              "before_sha256": "0b3e8a4595941e2a0151dc3faeeb1fd1a84ee3ef51f5ad7652e4afc21cbbaa1c",
+              "after_sha256": "14acd0fa5df66b3fe9ded651bb265c1e10742b7797903f19d1658b8cba86e50f"
+            }
+          ]
+        },
+        {
+          "project": "external/XMP-Toolkit-SDK",
+          "base_commit": "45acb237cd13c19708f963247c732250cd43a4a5",
+          "patch": "0003-enable-vendor-xmp.patch",
+          "sha256": "624e4665dad7f0d301c9a8223094d422b5d3c91dcecdac626b308b7ac990c6f0",
+          "files": [
+            {
+              "path": "Android.bp",
+              "before_sha256": "2c888a382881b1604579c270de34f4f1cc195e7b1afd1280028e055b3a77796a",
+              "after_sha256": "b25e70abbc5558bea99514a3266d6bdb610013ff15799189991b72b8526dd9a2"
+            }
+          ]
+        },
+        {
+          "project": "system/logging",
+          "base_commit": "336e1707c8258adf1f1c5c5511218b533f3a22e8",
+          "patch": "0004-support-deferred-pstore-logging.patch",
+          "sha256": "b493ec2f7f43351290d7b8ed7c2ac048113cab72229384fe3e5a7daaabec7501",
+          "files": [
+            {
+              "path": "liblog/pmsg_reader.cpp",
+              "before_sha256": "13af98d8bac0b3c72e8ee422f3309e173af137023e5f88052451c3a29a0d83b4",
+              "after_sha256": "4e7da38ec7abc23636e02f491156ded3f0a83e1b2aa4916fbf100cc5df69da53"
+            },
+            {
+              "path": "liblog/pmsg_writer.cpp",
+              "before_sha256": "4c5119613a3f890d9003c12f8abfff759816957d60cbff1b488fcd7fd46d4cc3",
+              "after_sha256": "7c497333c80eb68a2585a05535516444b882d69aa2e22d40360db94c6cdadfc0"
+            },
+            {
+              "path": "liblog/include/private/android_logger.h",
+              "before_sha256": "db48ce224fae3c3094c96ca4e95e35f4eff95e8326028d493e640058005ee322",
+              "after_sha256": "8c3d540a2f18154c5edd44a2214374d5b6a8cface1efa7b9ad9b0645d541b860"
+            },
+            {
+              "path": "liblog/liblog.map.txt",
+              "before_sha256": "0f6863b6ac213350f96292402c0834c8fb89fa02042e960a80428304c0355019",
+              "after_sha256": "6b4c47e3891a7d4a5113667bc0f268159457a40440dbab355d94f07bfb682845"
+            }
+          ]
+        },
+        {
+          "project": "external/mesa",
+          "base_commit": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
+          "patch": "0005-update-mesa-26.2.4.patch",
+          "sha256": "2438fc0c4ddb150d7e064255c31036788f663eef60b7b931ddae5f7dfb000796",
+          "files": [
+            {
+              "path": ".pick_status.json",
+              "before_sha256": "0e0ce1c446f410a8a246b3d4c643e0672c492e1ed85870539e127d3b9d99fc35",
+              "after_sha256": "d600dd33c1c415f83dbaeaff1a80fda06c5edff96e45fa000682759bee830aec"
+            },
+            {
+              "path": "VERSION",
+              "before_sha256": "9576076381e107da92785b6bc34ee8783107388ff244831c8db8169a9b84eb77",
+              "after_sha256": "6fdb5e1a17496d2a90f08d87bf219fa0cbe025d0b95962ed326788c76ebbc947"
+            },
+            {
+              "path": "android/Android.mk",
+              "before_sha256": "f3e48e113675e703a6184dbca637e8e2090ff23cfce42128887a7f940069f9af",
+              "after_sha256": "340899802abd768882efe85fe47032a63d9ee3ce6283fe16c6d448202b833253"
+            },
+            {
+              "path": "docs/relnotes.rst",
+              "before_sha256": "69e55a8c558946eca68953f57517e7f823ff7c8e4444599ea7bd150a9f6f4506",
+              "after_sha256": "789c249c9336156c93ccd09ae058b42b3f5fa53123c9f4cb125f41379a224cab"
+            },
+            {
+              "path": "docs/relnotes/26.2.4.rst",
+              "before_sha256": null,
+              "after_sha256": "3483742c6ca1cdbd89a0e6baf7c3c6cb4d82e972101d47df80b846e8e5501510"
+            },
+            {
+              "path": "meson.build",
+              "before_sha256": "36ffc38aea3d9a29f6b4eb585e73ec6ad097c85d18c3dffddfb56e9c2e1bb2c3",
+              "after_sha256": "2ef3a9d67e66903f12b030203e5160c1a40ac5deae9073409ec105451ef43785"
+            },
+            {
+              "path": "src/amd/common/ac_gpu_info.c",
+              "before_sha256": "0abe2dbb6500a49b471af7ceff72d9ee1bf96fe2d52fa2079cef372cb52f83cd",
+              "after_sha256": "0cede344881cdac51dcdc2f3ca5ba1ffc7bdf6ee1a89d5eed4c90b0b37fc15e1"
+            },
+            {
+              "path": "src/amd/common/ac_video.c",
+              "before_sha256": "8174af60d49a4db18eefab8d2a82124053388b191f89100e7ad7396ab9d1f956",
+              "after_sha256": "648581d00ce026a80224c78ea23ba1333b51e6ffdc00676d598554777c0950f9"
+            },
+            {
+              "path": "src/amd/compiler/aco_insert_fp_mode.cpp",
+              "before_sha256": "2d5b5757abd4655a3753470072992ccb462da3863a48e394620c32e58156e9e7",
+              "after_sha256": "b8a30bd6835a54c566ba2c5add63ef423ece47b2cc4ce21edda0562c206247dc"
+            },
+            {
+              "path": "src/amd/compiler/aco_opcodes.py",
+              "before_sha256": "21d9c086dd32b0dbe094f1523ac337d350258a3fb973a510a46fbea85a56bee1",
+              "after_sha256": "18556f741f8818bae953eff4bb602bff5f57aceb98ac918eb13d817ac3294e3e"
+            },
+            {
+              "path": "src/amd/compiler/aco_optimizer.cpp",
+              "before_sha256": "4d40ffa9af823cf2563cfbfd96a77c7b62d1ea425441c70589817bb28aa5b1eb",
+              "after_sha256": "88da817fea2011af66f44c439ca5ced65c33524f2d8c313a08b81ec1eab97242"
+            },
+            {
+              "path": "src/amd/compiler/aco_register_allocation.cpp",
+              "before_sha256": "c4a20592054f26528b9d36948f919573deed549033496534cf050b53040ae0aa",
+              "after_sha256": "d0e505fdd8e44280ce8481b57b9ac99e4dfd5e5deeeb6bc96a803d3d18c17205"
+            },
+            {
+              "path": "src/amd/compiler/aco_scheduler_ilp.cpp",
+              "before_sha256": "96fa9c84a1388776b5c6b131e0589528aa48b9b9087176c2532d83674d8e50e4",
+              "after_sha256": "ad56a3a68f68684d5cb41f782bff821a462f9901326fb22ff92892844eed635e"
+            },
+            {
+              "path": "src/amd/compiler/tests/test_scheduler.cpp",
+              "before_sha256": "82811255795f4b753e2871a9b2ab5a422b927229e08d78974536c8af96cbb74a",
+              "after_sha256": "3678985fa4fa9602463b01278d65b4bf39d85e58e73512994eeadae22dc93cc1"
+            },
+            {
+              "path": "src/amd/vulkan/00-radv-defaults.conf",
+              "before_sha256": "0613b987fa05e14321f9c40c20a1777865ba1c0effcaf53bd2fb484fd53505b3",
+              "after_sha256": "1fc423ad425fd57311e391ec589c9a863fbeb7728652b5fb337910aee7e9f5d6"
+            },
+            {
+              "path": "src/amd/vulkan/meta/radv_meta_clear.c",
+              "before_sha256": "c4733f6c8ae680ae668f60e500a88a9d05e3f171462d71dd50d3a64fb8b8d233",
+              "after_sha256": "59719bdaf1cef3aa11b2b6849519cd035df7b28390bef0113cd4d586b8e9539c"
+            },
+            {
+              "path": "src/amd/vulkan/meta/radv_meta_resolve.c",
+              "before_sha256": "38ffc79ae5c173ba793742b08eeec27b99d36bef0bf744db1f710e02913ad449",
+              "after_sha256": "fd832d1e6af8d75a28dde22a9a630fb77f5a28b11b8678f9ccd2187d7645733a"
+            },
+            {
+              "path": "src/amd/vulkan/nir/radv_nir_rt_traversal_shader.c",
+              "before_sha256": "28e9ba718f3ab7713ce2f7cafdb4aa524b1a97d9d165248aac0142627623475d",
+              "after_sha256": "6bc93a1233480910194dd085e48891ca06b8a0c40e30e320f3933d5e301492f8"
+            },
+            {
+              "path": "src/amd/vulkan/radv_cmd_buffer.c",
+              "before_sha256": "a256461f316fb3e71d1a17fef6682af64e432fbe8e3fc0eee276ef5b36d245e6",
+              "after_sha256": "6ac657d0dda0f508dd2a598852970151228e5ddb1abed30fd8b63ad8004ec055"
+            },
+            {
+              "path": "src/amd/vulkan/radv_descriptor_update_template.c",
+              "before_sha256": "2b275857da7fb12f2f6a8da194ff7ec87106383fed3b62bff4ece27eb2cbb96f",
+              "after_sha256": "9dabd9c33f40eb3febfc079ffbee01ce265a89ea2e6931ee8efd7af400217c40"
+            },
+            {
+              "path": "src/amd/vulkan/radv_descriptor_update_template.h",
+              "before_sha256": "1dbd5b73f5caeeb9b07f3b1df2fa1864333b3122690f7e99b25a1f04279f302e",
+              "after_sha256": "e6a4ced6132c56c37b8413da5b04a5213ff6a4f0bb27403f83877ac107cf5062"
+            },
+            {
+              "path": "src/amd/vulkan/radv_device.c",
+              "before_sha256": "412a0da7edd11dd18a249788d946b90b0dc62c33c42efbeb40197d8bc689ff19",
+              "after_sha256": "627545c71cf4f52707aa04c54dc62a7dacd1b6c7b5ad9b8092190876b06fb89f"
+            },
+            {
+              "path": "src/amd/vulkan/radv_drirc_gen.py",
+              "before_sha256": "31ac54a512f9a8b8fe7a072dc127014cdabb840cfcd261a883fea48a5b1ca694",
+              "after_sha256": "bda309cdb9e68633cf71f5b3706e4e714a0904501c07be31130a52a87c18ed66"
+            },
+            {
+              "path": "src/amd/vulkan/radv_image.c",
+              "before_sha256": "22ec2feb2df840459a0cdb020959f0451857c3f5154f3187c82e4e5eb259d42d",
+              "after_sha256": "1a0f0995484a70a3e30141d0f25b735e9416af4bce63c454f1efdc70d2677268"
+            },
+            {
+              "path": "src/amd/vulkan/radv_pipeline_graphics.c",
+              "before_sha256": "7066034bf60c969551dcb371df6ba34a5be7e02b409cb479bcff1aeed4cce6d0",
+              "after_sha256": "0499d501f3ad047e5d03ca5caf24af30d51e6a3d7c010dd0efa14212596c305e"
+            },
+            {
+              "path": "src/amd/vulkan/radv_video.c",
+              "before_sha256": "ee2da7a630c3a5773ae0a6c821fce93f42e47ac17cee6dd618301087f7f3a035",
+              "after_sha256": "95005acd9a817d90e8e72aad169a66c74c4adaa19d365b9706363a5e92fe94a8"
+            },
+            {
+              "path": "src/amd/vulkan/radv_video_enc.c",
+              "before_sha256": "49656511714eb574729bb9fbc780e07b720eeac3860660b4b62427228aa88b1e",
+              "after_sha256": "286cf56876dcef1a3d12e8b30376b0a0535c8087f5fdcbb79ec8f393ba6df7df"
+            },
+            {
+              "path": "src/amd/vulkan/tools/radv_debug_hang.c",
+              "before_sha256": "eee05b997465a95e5270dedd69b18a54e49cd0b53642fc649211824558b91e80",
+              "after_sha256": "3a51f8d8e944fa8412959945ae7be7c2ba4042a63e85dcb055da77aa440e4fda"
+            },
+            {
+              "path": "src/asahi/compiler/agx_nir_algebraic.py",
+              "before_sha256": "48e30a43bc45335b634753d7f6d614b21b9ef2ded38a79ec36c58220b70a49e2",
+              "after_sha256": "b9a48b840908a89b4bd802666a1ebb5a890179d3279809483250f36d59538e99"
+            },
+            {
+              "path": "src/broadcom/ci/broadcom-rpi3-fails.txt",
+              "before_sha256": "aa8dc4d66321ae10f171b039fcad31e0a5100b0e36127405a727fcb3b49ec3f8",
+              "after_sha256": "79e4f0ac6ab2e7e056239897a00bc380a9e5868f482902c4814adf9036e3ec17"
+            },
+            {
+              "path": "src/broadcom/ci/broadcom-rpi3-skips.txt",
+              "before_sha256": "2215b92a363ec18bde13e8096fbab15401d41532d27c6d2cf207ae1f5c3514b8",
+              "after_sha256": "8c0e4017c9c1312e91b28e8e4060504c49a9caad330b306493a10b72cb6c9d52"
+            },
+            {
+              "path": "src/compiler/nir/nir_builtin_builder.c",
+              "before_sha256": "15af115edd1ccaaee884a990601afe58204a26f1d993ab0b9cfe2ef129f842c6",
+              "after_sha256": "85c60f1045020c04b626c1eafece738d8d6a709bdec34734530b22f6f15a9b8e"
+            },
+            {
+              "path": "src/compiler/nir/nir_constant_expressions.py",
+              "before_sha256": "b359ce2aeae5a970e289a0b5282a65ef7e4495a81247988638a2442974e7e034",
+              "after_sha256": "5ab0439097d5bf42e97f55719bf9610bd59d0bf79dcdee080f97aac6abb44121"
+            },
+            {
+              "path": "src/compiler/nir/nir_lower_abort.c",
+              "before_sha256": "c4699aa5ac9342992372577b8b9052ebe7e002e72244e4e98a7f9fbcfd9d849c",
+              "after_sha256": "497d032fe574e65645d3109d0669e11853913e1536e483a3deebeca9106f0266"
+            },
+            {
+              "path": "src/compiler/nir/nir_lower_input_attachments.c",
+              "before_sha256": "6f10a535c2d61fba29a4177cd6b34d385fb4a54f47534d2b5f976b3bf02b73fc",
+              "after_sha256": "34a2c1dec25a0404678769ac3059f744341e615f5c32741af05cdf95fba75cbc"
+            },
+            {
+              "path": "src/compiler/nir/nir_lower_subgroups.c",
+              "before_sha256": "c4e8d8c3f19756479115209d8274b430fbcaa4670d1382a7f3abc41f41f2f8bb",
+              "after_sha256": "c30e55e3666e352257995dc6937850a9bcd61284a46ea5a9d9c45ef8c5146b48"
+            },
+            {
+              "path": "src/compiler/nir/nir_lower_tex.c",
+              "before_sha256": "68c3d2619e447f5c47c06b77f9237d80df5360ac923f4e2d9c5ccd1c5156a0e2",
+              "after_sha256": "4713950b483f811c37717f5923a436a5a97c2e236c64191eb2479a603cd5e281"
+            },
+            {
+              "path": "src/egl/main/egldisplay.c",
+              "before_sha256": "f694506a9ea074a5d4d498583e76caaf53da3ced2ee6d5b838ec21f2d4282742",
+              "after_sha256": "3be21251b6bf7ef5df61992daf680271dfa6b4bb3c2e93d1c58802d45ec7068a"
+            },
+            {
+              "path": "src/freedreno/ci/freedreno-a200-fails.txt",
+              "before_sha256": "b592e8445dfe8f0c4a6d541be95eb6cdeb9140c7c0cfa5120f13fda190f30e56",
+              "after_sha256": "fc624c8dc02ed522f2b9a52be28afc6146d5dd701e3a1fe1c3ddd8cd939b1a05"
+            },
+            {
+              "path": "src/freedreno/ir3/ir3_a6xx.c",
+              "before_sha256": "328f913f63c889035dd5eb97effab0935ff9c5a7e0ee28ec741037df45fa487f",
+              "after_sha256": "1a43be38a58b590f315e4c37c30fe786728633bc6f262372ebe4e3069fb2e3e4"
+            },
+            {
+              "path": "src/freedreno/ir3/ir3_nir.c",
+              "before_sha256": "f17495fc0642a6e0eb1de98998af624c3f7d9525c986bd506b2721651ad62866",
+              "after_sha256": "5eff1e9fab4f1ec097756953d081ddf1470401cc3d0b28f365970983dec381f3"
+            },
+            {
+              "path": "src/freedreno/qrisc/util.h",
+              "before_sha256": "4a2eabef6a8433a8605ecb745ac5154a58bbcdfe28c5e156bd1b1927587f2aa8",
+              "after_sha256": "bd30427d3b7aaa83b479ca598e964bedc7cc61af7a2e90813b26b132399d55cc"
+            },
+            {
+              "path": "src/freedreno/vulkan/tu_clear_blit.cc",
+              "before_sha256": "392e38baa0127e0454f5b1ddb732456dc06d5154ebacd133fc2eb75390880090",
+              "after_sha256": "ad1b4c67547ed1b74fd83e6df259cff7f9b9fa9c93105725eebb1091f89d4af8"
+            },
+            {
+              "path": "src/freedreno/vulkan/tu_device.h",
+              "before_sha256": "bcfc1ab5c0ce12ad9a2f551abc1ee13a8e2cea11407858f46f5ab4f7bde93982",
+              "after_sha256": "b2ca2fec823f0134479020326d01cc64f1edb7eb0c270bbac7421761968ef27d"
+            },
+            {
+              "path": "src/freedreno/vulkan/tu_formats.cc",
+              "before_sha256": "bdd51ac5333526100a7637fddd997bb67c0f9dc9039730e69b0e1101a46cb7ef",
+              "after_sha256": "023617597287e87f55c7dae44ba1813895729edd8120296d8df1893d6d48ba2e"
+            },
+            {
+              "path": "src/freedreno/vulkan/tu_formats.h",
+              "before_sha256": "6c955f9265d4bdd616e1c995ebb447b3833f932adb8682c3bc1020ffdc5646c5",
+              "after_sha256": "184cd8e965e4817d415f54667788052181dbacf25f21b3624aee6367f9d468f5"
+            },
+            {
+              "path": "src/gallium/auxiliary/gallivm/lp_bld_misc.cpp",
+              "before_sha256": "a2971f17a847396024cc681e2949175539a86eeba9eaf7f80b8706afd5ad44a2",
+              "after_sha256": "4220148cecff490da961b1cb75d5498483182e6f5d835d44fc6e6bb4a799091a"
+            },
+            {
+              "path": "src/gallium/auxiliary/gallivm/lp_bld_sample_soa.c",
+              "before_sha256": "f658ffa8a33ba44bb8bf993b1de0c024af6f6093ab3281bebf497bd524f0e8b9",
+              "after_sha256": "4f333f9556449e9f17b357b24769cd1c63062a3aa05ccd1a57a6db6b294bb990"
+            },
+            {
+              "path": "src/gallium/drivers/etnaviv/etnaviv_context.c",
+              "before_sha256": "ac0490c7a61ef31eda4737e040376ec4ae8429e27794ef0290105ec200248438",
+              "after_sha256": "c14ce5325b436cdb6edca26e630389c38c7cc58599921a891154d32910e23780"
+            },
+            {
+              "path": "src/gallium/drivers/etnaviv/etnaviv_internal.h",
+              "before_sha256": "c845321c24bd3f0c7d16d48115a0b56f4affe45c9a383e8ade3fac69488acb67",
+              "after_sha256": "02b74ad683de24668cba930b7c29b038c7e98be26b5e562019f56b375693854d"
+            },
+            {
+              "path": "src/gallium/drivers/etnaviv/etnaviv_shader.c",
+              "before_sha256": "30505a9868f80828ae200c89b5ca630c6dc010f2224e41d87ef40b3a7b6f64fa",
+              "after_sha256": "864617bbc3a19e610aac2cee68a5b74f61b70b7f99ce186d8907a82517600d77"
+            },
+            {
+              "path": "src/gallium/drivers/etnaviv/etnaviv_state.c",
+              "before_sha256": "9c3343409165fb9de16ff5ac0a534880eba58d5226db8186df0fcecfb3e166f9",
+              "after_sha256": "e75679738feec37aea399c35c708622f21f58e94b62fdb492749315c2c441b03"
+            },
+            {
+              "path": "src/gallium/drivers/freedreno/a2xx/ir2_nir.c",
+              "before_sha256": "544eed622528de43fee81d31945315ada1e5099ed4185a618921f6604101315c",
+              "after_sha256": "0dd45392af10bea014882b816857ee9ad80d6c5e3335a8bac8bc54a7c144ae20"
+            },
+            {
+              "path": "src/gallium/drivers/freedreno/a6xx/fd6_emit.cc",
+              "before_sha256": "231953e795796894fcc8ac4888362102dc6f3eb0d91a5fcf5c21ea334857fc4c",
+              "after_sha256": "89aafd5caf7958733d11aa9c1693d6d1c764895c702f189718d9255f09475ad4"
+            },
+            {
+              "path": "src/gallium/drivers/freedreno/a6xx/fd6_texture.cc",
+              "before_sha256": "39eb196dc43dc17dc649cb2a7b11058c2d87a40f856e25755dfcbea3d158d73a",
+              "after_sha256": "0ac8a99519fe9df74bb70b7059c5ae6d41c94187dc2cf0fc67e112844e333780"
+            },
+            {
+              "path": "src/gallium/drivers/llvmpipe/ci/llvmpipe-fails.txt",
+              "before_sha256": "0d6636efc316aa6c1b5ac052ce13a78d8eed6921a4190d07bac01a66e056b881",
+              "after_sha256": "c51eaf2199b96b573bfebfd49bda7f3c484c527af72606e9ee1f6f795ae0acca"
+            },
+            {
+              "path": "src/gallium/drivers/llvmpipe/lp_setup.c",
+              "before_sha256": "89f655b3c3fb17155242e71ed8d41248c2e8c485d35a42e6df36e75946baf9f8",
+              "after_sha256": "1f5c1c3b366d6af87df782de22290a92e1739498b8d442eec0054d2c009082b4"
+            },
+            {
+              "path": "src/gallium/drivers/llvmpipe/lp_setup.h",
+              "before_sha256": "c6aea07929b85e365831e250b9edfe55996403f84481791e985455acd554e9f9",
+              "after_sha256": "d282de759d1507e1805591435f434e83e283f80ebc181c6b820b184eea55b210"
+            },
+            {
+              "path": "src/gallium/drivers/llvmpipe/lp_state_derived.c",
+              "before_sha256": "c345bd89da85482efd8022d7897d779274623fee50e24ffccc75f49cb8d64818",
+              "after_sha256": "85c05d83bab409f0f1a80db1a8f00bd8baeff1e59a5f9706617b924511285e7c"
+            },
+            {
+              "path": "src/gallium/drivers/llvmpipe/lp_texture.c",
+              "before_sha256": "b6acccf2e43b3cbfc6c4c0a15fd7030bf1291355caf34ed91185804d4e8cdbcc",
+              "after_sha256": "baab739e64e98383c9786e2786a2955759b5e304cf58047e0600505971eced11"
+            },
+            {
+              "path": "src/gallium/drivers/nouveau/nv30/nvfx_fragprog.c",
+              "before_sha256": "eb4a84c34233bc8d65c90be91b2c731607b78a67cb3a5472bd1e806e86860fcd",
+              "after_sha256": "b8649792cba11813a26423abd8cfeb1297d06fb6173d787d746ca480564fa2e4"
+            },
+            {
+              "path": "src/gallium/drivers/radeonsi/si_gfx_cs.c",
+              "before_sha256": "429691801c7cd70878697a51ad598aad1b19601275d8cdffc8fb147ea2a83019",
+              "after_sha256": "1e0f4cbb5ecc13864e66d5bcb5886becf0444e74297c59823d7b095dd5a20ec6"
+            },
+            {
+              "path": "src/gallium/drivers/vc4/vc4_context.h",
+              "before_sha256": "b0d2d1c73a0c02bc1b9fc1074c250c5c48e51ac66f8495d2982e48300d900a82",
+              "after_sha256": "924db7734a368dd1ffc77974336f5509784c9bf2e646ca006d1253656554a59d"
+            },
+            {
+              "path": "src/gallium/drivers/vc4/vc4_draw.c",
+              "before_sha256": "79b9b78046896dae9378d9e16ecee87bac658e69dbf9b422637b9690e25dad48",
+              "after_sha256": "0e6723018e01a5492548e8e01bf5320c2ff8aecce4e9e9c3a86be07270211179"
+            },
+            {
+              "path": "src/gallium/drivers/vc4/vc4_emit.c",
+              "before_sha256": "e45fa1d66c490563c013f624ee981c4a05881535ef717662cdfa2b0e7d8cf72e",
+              "after_sha256": "c871fa797c1e6e9ca3ba0d514d1cb4b3bcdcb264c991953d25b736556369b0fc"
+            },
+            {
+              "path": "src/gallium/drivers/zink/ci/zink-lavapipe-fails.txt",
+              "before_sha256": "24270bcaa03697be3c19cca721a055a7d5bff836db6eaa7fd76af66c93b14366",
+              "after_sha256": "355749a71faeb9d0d1d4d2d50dcfb74b818889fad5457acfbdcc72debba42307"
+            },
+            {
+              "path": "src/gallium/drivers/zink/zink_kopper.c",
+              "before_sha256": "f815a4a0cb2a853ccc5d83820679e1ad8187054f89f0ba34c7f674d7f2cbe715",
+              "after_sha256": "53d1b514d0ce409aa775d59426387003f81c9d0f2d3cc9d9dfb172f99d83dc04"
+            },
+            {
+              "path": "src/gallium/drivers/zink/zink_screen.c",
+              "before_sha256": "71183857797a9b11bc07dbae0614b002662db663fee64f70fbbba3aec3ffe3c0",
+              "after_sha256": "c027c29e3ddffcb1993d8cf77d110f63e51520c8e73728b7c0f2be2d0a3aa6c6"
+            },
+            {
+              "path": "src/gallium/frontends/dri/dri2.c",
+              "before_sha256": "f3d23836144b82ec3454ca99cce4ef4f1631ec6b4260f35db68eb725994b5a4d",
+              "after_sha256": "1946a9dde91351be717032125d494c7f5e45c2a49d6be6f6a83300c72c6c1abb"
+            },
+            {
+              "path": "src/gallium/frontends/dri/dri_drawable.c",
+              "before_sha256": "ec349b792d7d63c26c078d3302489d790638770b4aa07cac31ef90d7bd91bc66",
+              "after_sha256": "ee3c57c5aba9fa24bdf64a9537832a5c495206bf39a82a5e6227c9d5024bf9c1"
+            },
+            {
+              "path": "src/gallium/frontends/dri/dri_drawable.h",
+              "before_sha256": "d3e55d03f9c30c0291b17251a5652ac0da9e41f3e5b7041d489d0fcc78fcb768",
+              "after_sha256": "d8838e910eae2e973e294aa1d5c4a1e2711474ed764338daa2847c2d1b644d76"
+            },
+            {
+              "path": "src/gallium/frontends/dri/dri_helpers.c",
+              "before_sha256": "287ca481c0f5b7b930c24672932698d5a3983bc266f92fdff796778217d2b0b4",
+              "after_sha256": "926fc50799392eb43703870b9a26d01b2807727053923e6311643bdce36e38b8"
+            },
+            {
+              "path": "src/gallium/frontends/dri/drisw.c",
+              "before_sha256": "f6570d85261b7e5737511dbeb17b342a65d95a040fe5199cb0bada00ff711562",
+              "after_sha256": "51ee2e393dc9d1c7405b5babd35d8e1804b98e603df978735ac84d527a049cce"
+            },
+            {
+              "path": "src/gallium/frontends/lavapipe/ci/lvp-vkd3d-fails.txt",
+              "before_sha256": "5fc8f12e2dc3064260ad7c49b9f4c91e1bb9bdce42ebcc5309a60d6b517d4c2b",
+              "after_sha256": "935c7d370778f585c54f5c86cf42d0555c5ad773b998948991be457e3e3e50cf"
+            },
+            {
+              "path": "src/gallium/frontends/lavapipe/lvp_descriptor_set.c",
+              "before_sha256": "4238a5a180d82373e25ea936f224ff6dd6184f41aa05b16689a5094e135900a5",
+              "after_sha256": "fd66474930b2b55c8e97e8e2277e314a2696cdae24ea88238e6e866e0f8275cb"
+            },
+            {
+              "path": "src/gallium/frontends/lavapipe/lvp_device.c",
+              "before_sha256": "445a7c7a99583dfbe0ca2a08d836d47bd803389b0ddb78d425ca9c675b48d15a",
+              "after_sha256": "1f60fbe672435221dffd38e4da63648a14b144595c08ce6403f923b683494b57"
+            },
+            {
+              "path": "src/gallium/frontends/lavapipe/lvp_execute.c",
+              "before_sha256": "5c5b2f5f56a5b101a9202b27eb37afd246bc5b285396ebca1d8bd5f963080571",
+              "after_sha256": "1f917d9178c1ebdcc2ecf44b73187619082f912db5fdfdb15aaf2258b3fad9f5"
+            },
+            {
+              "path": "src/gallium/frontends/lavapipe/lvp_pipeline_cache.c",
+              "before_sha256": "85e82f9127900b02e3f6b6864f229151eb8da7e564f4fca5e635c41c688a72cb",
+              "after_sha256": "11fa03625deb31fdb04f13b3c99b70d7a7fe1eb46d0e990d09c493b97a436881"
+            },
+            {
+              "path": "src/gallium/frontends/rusticl/core/kernel.rs",
+              "before_sha256": "67fec9764004c9c6c3f8de07a0444bbd2661c608c4e0116fcee4e8ac0a5fd4d4",
+              "after_sha256": "7a0e3d7add24b6b0e1bfe02970fb72d712d21e56cacca8cf7b7c33feb85e4ce1"
+            },
+            {
+              "path": "src/gallium/frontends/va/picture.c",
+              "before_sha256": "b76ab9c935e054263ced2d15296e4fbf032169c685938c4a38b9521f3d5ce416",
+              "after_sha256": "1ffd3f5258189b5c7eb4e7dc30a0d98dbed77eed848da0b7a0585b8a16eb41f2"
+            },
+            {
+              "path": "src/gallium/frontends/va/postproc.c",
+              "before_sha256": "c4c56428ea76c39b9534f6772b47ec3e92fd6d1beb788cc89847d88eb1c4ce50",
+              "after_sha256": "92f21ab9e987c9b87796306de9b8ba6371d921625ae5203e46452110cba0edf8"
+            },
+            {
+              "path": "src/imagination/vulkan/meson.build",
+              "before_sha256": "385da3310098328d4ae8c896bf593444b1865508231817a8bc7e928a0ea1b059",
+              "after_sha256": "e8764f24f1338e390a8176d0b1a4dfec45691129d44f1eb793a7f6fecaddd214"
+            },
+            {
+              "path": "src/imagination/vulkan/pvr_device.c",
+              "before_sha256": "271845c2699f80c409ecadc5991674718611a664f0c44a66853328e2c68120b8",
+              "after_sha256": "8b625923869a4e0ab6a567d95b32f6a96653c905458f3ff3087da629b4832805"
+            },
+            {
+              "path": "src/imagination/vulkan/winsys/powervr/pvr_drm.c",
+              "before_sha256": "4056097980f548671c7f8d398a53d812d4ae835799c276433aa95bc9be8884e4",
+              "after_sha256": "ab6e80f788f3b02a25fbe55ffad19916a97b2f2d7c010dc744212dd48d3477f5"
+            },
+            {
+              "path": "src/intel/blorp/blorp_genX_exec_brw.h",
+              "before_sha256": "f464717ccb5a5da46eca0c3de4223c0f44fed639e8288c10e637ddbbaf4c227b",
+              "after_sha256": "d8148369abe274dea5fa7da39e7202da5a21dfaf90fdf6f999ad927fce1e61bb"
+            },
+            {
+              "path": "src/intel/compiler/brw/brw_compile_mesh.cpp",
+              "before_sha256": "03eb6d143a0fac1709cc6fb5f84df6d8b1820a93d77223a5ea3cd434638ca11c",
+              "after_sha256": "fdb15327ca64a2bce07a01a2f9ff60d740bda9cb166ef33e61d9aa59c196ab12"
+            },
+            {
+              "path": "src/intel/compiler/brw/brw_from_nir.cpp",
+              "before_sha256": "b556e40865f89bf4724ce17d9321c8aa4b777be7987f29d1a74ef8fe0bbbdc93",
+              "after_sha256": "b68013886748786fa4818d73fe9a77402082e054c85fa13d465ea55a0475cb0e"
+            },
+            {
+              "path": "src/intel/compiler/brw/brw_workaround.cpp",
+              "before_sha256": "52cc78e2ee9f5a934995842a235128e44b80d2c0973905e676b973b76c1c2947",
+              "after_sha256": "a0ec66399f0ea8309dda5c4b9cc24770fa29a147ba14e4087cdc1987750f5dd8"
+            },
+            {
+              "path": "src/intel/vulkan/00-anv-defaults.conf",
+              "before_sha256": "e631cb063aa8dadf81321f18cb6b54b4ab4ca494f7a3b4698960cee11a580049",
+              "after_sha256": "0f60e698d2040555681717a2570ee3a872bf2bb990b6305fc6e4429775501930"
+            },
+            {
+              "path": "src/intel/vulkan/anv_device.c",
+              "before_sha256": "7f5eaed72767ee688581a8309e9c9a855956df66ecc1bc74629558c939b5aad6",
+              "after_sha256": "548a438421a304e2235f23d0ad24d8e09c007ac1e3a0c32574bcd92adfa460c6"
+            },
+            {
+              "path": "src/intel/vulkan/anv_drirc_gen.py",
+              "before_sha256": "4d712390ce60ac6ac6c432cd39e2dae1c75b4ce63f0abe7e9d35749157a01bf7",
+              "after_sha256": "bf0b261b2e450bd12286be6fc0ae77858d5edd96f4609f31d36825b0ac7aafdd"
+            },
+            {
+              "path": "src/intel/vulkan/anv_nir_lower_descriptor_heap.c",
+              "before_sha256": "d792ace8ea3af3dc8ce87e5257370c1e1f29ed0e4b19b18524e546ba3c388d3b",
+              "after_sha256": "6b4378a2fc93beb216c50a30b691ce0125ac8f0dab4e83dc4d395c735b1fe620"
+            },
+            {
+              "path": "src/intel/vulkan/anv_shader_compile.c",
+              "before_sha256": "a721f41e890c090bfb45bc7dd697030ab089b4992210b874ae3c6385161eb8f8",
+              "after_sha256": "93f2ec12ba1c056e618a4158e9700f0ae21f03f132d069ac69e9014b9a999714"
+            },
+            {
+              "path": "src/intel/vulkan/genX_cmd_dgc.c",
+              "before_sha256": "8314a7eebd4327d85a08229ea28d4b7f75c5e125e09bebd047cce349263a8620",
+              "after_sha256": "4d5ab6df7c84e6849a64534b158cb0f2eb00e43b1d5e32d88e8a764547fadbbc"
+            },
+            {
+              "path": "src/mesa/main/formatquery.c",
+              "before_sha256": "9a0fa510b2f716d5eb1e0aa97e500435e5a48a9d048c34b56fa0f6824ecc2710",
+              "after_sha256": "d01599709d6876a2d045d5391b39915cb4760b7cb4e9ca94699d2a5dc2af733a"
+            },
+            {
+              "path": "src/mesa/main/get.c",
+              "before_sha256": "dd21cedc75470d6550f7568cca2fdf0e4b2ebbdd382b6ba5b53a87fd209ec3fa",
+              "after_sha256": "7c934fd5eb2ac866a9eab4744ec2437dc48a6cf3b74081c28b601c5bc3274ebc"
+            },
+            {
+              "path": "src/mesa/main/teximage.c",
+              "before_sha256": "1296f344ff67c53a361c285291466fa3286efaecb7098130c2a9ed0a85eb5c7f",
+              "after_sha256": "b158124574a9a39017f3010b8682f75bda747e895b66879a727a0f9af092fa59"
+            },
+            {
+              "path": "src/panfrost/compiler/bifrost/bi_ra.c",
+              "before_sha256": "120116d7438ed76ae0ebddbad13d46ff1e16face4bc9a2dbf603ab75efcd5952",
+              "after_sha256": "f54b90e0738dab986ab5ac18ba4fbb72dfd33f820d02fde2cc317ff57fea9d6c"
+            },
+            {
+              "path": "src/panfrost/compiler/kraid/opt_copy_prop.rs",
+              "before_sha256": "689c8010f631bbf13330f1a2c77665cb3b4e8624d7eb20983d0c02d1264b5896",
+              "after_sha256": "88c2abac6f706e3b29152c3d2fb135945b4745b5095f25a81864342312580018"
+            },
+            {
+              "path": "src/panfrost/lib/kmod/pan_kmod.h",
+              "before_sha256": "956ecfa91716d6034f30803a03b24fff58cf1fd8056e12182c3c1879b1986b07",
+              "after_sha256": "55fa7f89e5728a209fb615a26ee4099733bba29cee0695c754878f0c5dc6c4c4"
+            },
+            {
+              "path": "src/panfrost/lib/kmod/panthor_kmod.c",
+              "before_sha256": "b011e67c3cfc4eaf91aa1651c97cbf713f1f50ce6b7955f23b838baa770be206",
+              "after_sha256": "37267ca9436efcfccc080bd44dee73fded4032a2e8dad5ce68f56dde04ca68c9"
+            },
+            {
+              "path": "src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c",
+              "before_sha256": "fe7b49cf1ad132afb3b85cd502c38041b9f0a9e95fdf65af689fc10195cbce20",
+              "after_sha256": "82c275e760010f6f2322bd9595d0849ed22406dc084879212f76dcf133b77a67"
+            },
+            {
+              "path": "src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c",
+              "before_sha256": "f4ef0abc0ce83366350f85359537266ddd9b0a09ce9978b7d6a868ef7b60377c",
+              "after_sha256": "f9021166841fc90ad51c7b0f9cc5fdd3becb285a341559e42b102ec9c8c021fa"
+            },
+            {
+              "path": "src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c",
+              "before_sha256": "53816844ee6f74d4bb1a896b6a483a3cafd795f6bde3eea167137aa59c6b224d",
+              "after_sha256": "637c5664695015677997795e60b023be67e99386c2819b5f3b1c6477823aa121"
+            },
+            {
+              "path": "src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c",
+              "before_sha256": "5bbad32c327fdf7db47aba496d6ec160658879fb64363e5c0a8ff42eed04f8a5",
+              "after_sha256": "dfc16a2d4083c80d380b524ad9c663f9c05947960e5048a831911363ef7e5a09"
+            },
+            {
+              "path": "src/panfrost/vulkan/panvk_vX_shader.c",
+              "before_sha256": "0802c2d22dde8c497172855ea6b3ee029725867e087d9ecf53415e0088a33f99",
+              "after_sha256": "da5e6cd92513e786a45700ee0ac028122c76cafd2ada90b84c8938b23b3b52f6"
+            },
+            {
+              "path": "src/tool/pps/pps_counter.h",
+              "before_sha256": "c1286eb8fd766e912829cbeaf39a668f65a429469b8aed261b26245e3adbc1f9",
+              "after_sha256": "1598907243f7b88d28631cb2eca43dc39d0dea171ec6b9d5dab00ac2c4de975a"
+            },
+            {
+              "path": "src/util/format/u_format_fxt1.c",
+              "before_sha256": "0a27eec71adb609f742f3ea684c45d9845f656d45b8de4fe4d3477b282a51c0f",
+              "after_sha256": "0bccc59010eb333d546e05ca9949ef690084cea023078e40ce49f84d71b0e662"
+            },
+            {
+              "path": "src/util/format/u_format_other.c",
+              "before_sha256": "bd2f0d5e8b6d82f4d45437549b45ea7a6fd196e8d1239e13d0f28e63bf19d764",
+              "after_sha256": "2ad80a82a02ed075ea3ff8c622b206ef6e9867edaf0cfc7bfdbdac1f93b767b8"
+            },
+            {
+              "path": "src/util/texcompress_astc.cpp",
+              "before_sha256": "3181a6e71d45ccac9e59cf1da72f7472672cfe4b15f7619cc0d2d3ed27794124",
+              "after_sha256": "d12cecd1168e44374bfa39e669734e8500e7b177b230462f4f582c4e51f04dde"
+            },
+            {
+              "path": "src/util/u_gralloc/meson.build",
+              "before_sha256": "16b94f931f4115252030f627e28309362718edfe66d45d2eabd90202f68c2c06",
+              "after_sha256": "9b3b5aa2c49d17b4c494cf7c9443cbf31f1ef0bc65de9e74c190d6642791f055"
+            },
+            {
+              "path": "src/util/u_pack_color.h",
+              "before_sha256": "eb3c34794d8fbd741b56a7c86ab0da2af88fbd1c3f54ab74f37560e2909c9b28",
+              "after_sha256": "695dbdfb1d4643a117d9b42586aa770e0f33ded0e7e460d63d54f697b4ed0717"
+            },
+            {
+              "path": "src/util/vl_bitstream.h",
+              "before_sha256": "a24ffe1c00659b9695a333a7c586cf831f0b56029450c402bfcd8f45fa6764c2",
+              "after_sha256": "3cde2fe340a02c726bf64abd17f383304e36739c930eb4915ad595b07829cb51"
+            },
+            {
+              "path": "src/virtio/vulkan/vn_renderer_virtgpu.c",
+              "before_sha256": "5800328b9d70d001a1518485afdd5821853908bf5a5b81059c4665f67d66d00d",
+              "after_sha256": "ae0d164cfc4609b6c497037d565b03dd4c5da890e1153794a9cc45e844e88e38"
+            },
+            {
+              "path": "src/vulkan/anti-lag-layer/anti_lag_layer.h",
+              "before_sha256": "c1ba09b0d48f078328d90bfc83b5475453472f50fc4481ef73f6b087d794f352",
+              "after_sha256": "e871607acf111a6159d4f880854306c2e333005f8653dc1a227953acd794e014"
+            },
+            {
+              "path": "src/vulkan/overlay-layer/overlay.cpp",
+              "before_sha256": "0eb3bc6dfaae397499d8e3e81ad0c2c8762b33b5411c89e132dc8bf0ea0ddd67",
+              "after_sha256": "0921786495c26ea95d223bb3b5bb65563e78231381241cae57d8f51bc92822f9"
+            },
+            {
+              "path": "src/vulkan/runtime/vk_video.c",
+              "before_sha256": "1d9150cc5380fb7de311a3687a7fd752c8f2fd4afcc87d5f1d76ab47bf050435",
+              "after_sha256": "234285260c92f868dce611d9757fb0c99e3de12108500ae15a975385760bb6c4"
+            },
+            {
+              "path": "src/vulkan/wsi/wsi_common.c",
+              "before_sha256": "8a35d9e5fab62cd1ea940270b8d273df2bd88c773140fa6a3274950e1f3ff1c4",
+              "after_sha256": "5871e660c2bc597f70c6a2d80deb7c5ebd507ab901afca0e8e7f8fa54c167ada"
+            }
+          ]
+        },
+        {
+          "project": "bootable/recovery",
+          "base_commit": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
+          "patch": "0006-fix-recovery-algorithm-include.patch",
+          "sha256": "a84f9d2f34bc7efc4f9cb040d0d3b10c7486a7c670a57972bfbdc84a015ff17c",
+          "files": [
+            {
+              "path": "volume_manager/PublicVolume.cpp",
+              "before_sha256": "0a9a1a7fa3129e5c12cc904635ee5a6214102da5c6bdeffe813cc3490dc0cacc",
+              "after_sha256": "7281faeb8bfee4bc3c7ca6b79f62556682e924f0c18bc563b0b49c47f92cda60"
+            },
+            {
+              "path": "volume_manager/include/volume_manager/VolumeManager.h",
+              "before_sha256": "bbad7bae25778bc161def31d046ce2781cd67cccd1ec4dec669a4533acd90929",
+              "after_sha256": "ca05ed6002eb73c7fa7bcee4bb3903b8e0bdc50421198b5ae11cf5b8cb63b7f8"
+            },
+            {
+              "path": "recovery-persist.cpp",
+              "before_sha256": "a4599bb15c2f05313348ba605f71856f177008d95ce56afb69b72b7fd2e5aee8",
+              "after_sha256": "1421f03e5fbaf7b6e5a7fae07c9dd6adb3d57bf72ba516d09cde19dff93b32c6"
+            }
+          ]
+        },
+        {
+          "project": "frameworks/native",
+          "base_commit": "46018f54b42489de960c62c3db9de131abce43ea",
+          "patch": "0007-collect-pstore-blk-console.patch",
+          "sha256": "0c1826f7df35ae7f9700bbd7daf0647a2c2e18bc4676aa1cbc1c223681ac3dfa",
+          "files": [
+            {
+              "path": "cmds/dumpstate/dumpstate.cpp",
+              "before_sha256": "b3503963a70396094c830b5fbb5898f9b92352df4cf830fdfcb9cca4adb1db47",
+              "after_sha256": "7a771cd8ff02257f0eaf5316953d0e919bd4aa1c9ff4ed3979b396199d0d6727"
+            }
+          ]
+        },
+        {
+          "project": "system/vold",
+          "base_commit": "11d8982f824d52e8122c7aa732207ba66b8f23c8",
+          "patch": "0008-include-vold-algorithm.patch",
+          "sha256": "2ff13aed2bf65b5ad8de16624572009ebf9de072d887f2d6d15dbd6711a0836b",
+          "files": [
+            {
+              "path": "model/PublicVolume.cpp",
+              "before_sha256": "0e17fccedefabb20e2d8650252af8c765af68378a1d853e0fbaa6a8bd1ea67fd",
+              "after_sha256": "8ef0d44dd9acdaf718c6fe174826bf3e43a4246714e60ec8c21f67867301f97e"
+            }
+          ]
+        },
+        {
+          "project": "hardware/interfaces",
+          "base_commit": "1b92b77fe1f2f2c820c51b0b1e366c17d6b9911b",
+          "patch": "0009-include-audio-scheduler-header-and-health-prime.patch",
+          "sha256": "ed67323848b520e3105777161c29ada086c2ce075a4fa0c20aace20a69793314",
+          "files": [
+            {
+              "path": "audio/aidl/default/include/core-impl/ChildInterface.h",
+              "before_sha256": "f831161cff6610e2936fa25200905333cdb7ba6f3cc7db1a3754be8e9f0c3652",
+              "after_sha256": "5829d631947957a8b83b30f7d3ac1d3abef824d2c165daa6d39d515f38a77f42"
+            },
+            {
+              "path": "health/aidl/default/Health.cpp",
+              "before_sha256": "9078170dc915bbba6d0be195676b039317a62230ead340807957cd078fcf770e",
+              "after_sha256": "e8e5b12cff70e170be327a493871b945769c7e8afcedd8a99efb98428fd19ab3"
+            },
+            {
+              "path": "health/aidl/default/include/health-impl/Health.h",
+              "before_sha256": "5cb21c83f4dab63e52123703892c51a7039b78e9303715623424e12126f0fa6e",
+              "after_sha256": "15559c1c6b9bac35ab5342822bf822500a88ada39baafc6468ce82e43d295e4c"
+            }
+          ]
+        },
+        {
+          "project": "system/core",
+          "base_commit": "7c3f32fe89c52b4176fd288ba5bb4f907809c202",
+          "patch": "0010-prime-initial-battery-level.patch",
+          "sha256": "ea65ab5a8332d59f0cb603eb4f63c1386c4728f168d95c4f684acf0043527fe9",
+          "files": [
+            {
+              "path": "healthd/BatteryMonitor.cpp",
+              "before_sha256": "54a134e69b56d32db2782a9f42ef3c30f11c08c6fdb3f7ecdc68fbff5b3701ce",
+              "after_sha256": "75f823cacfbabd1a901ffd5bed389fa6c9fdabd4848ea28431b0d36ce39e6c57"
+            },
+            {
+              "path": "healthd/include/healthd/BatteryMonitor.h",
+              "before_sha256": "cfe869785539bbfe005bede01ae0724dc44e1540e68d0b3a199c2158c71ca9a9",
+              "after_sha256": "257514f99cc5864b0cb141b7c567ca98b894c5013d8af8527f680f8538752889"
+            }
+          ]
+        }
+      ]
     }
   },
   "artifact_hashes": {
     "out/android/target/product/r1/boot.img": {
-      "path": "out/android/target/product/r1/boot.img",
+      "path": "/rabbitr1/out/android/target/product/r1/boot.img",
       "bytes": 33554432,
-      "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e"
+      "sha256": "32e25b3fc07a938b46d5ae8a3881e1ccb764254bb3629d0e0f6f68e385bf11b4"
     },
     "out/android/target/product/r1/dtbo.img": {
-      "path": "out/android/target/product/r1/dtbo.img",
+      "path": "/rabbitr1/out/android/target/product/r1/dtbo.img",
       "bytes": 8388608,
       "sha256": "595f3edd36057d87ca7a53c5e32f25c16617c1018efa92c9e35f3138ac47e037"
-    },
-    "out/android/target/product/r1/ramdisk-recovery.img": {
-      "path": "out/android/target/product/r1/ramdisk-recovery.img",
-      "bytes": 16199271,
-      "sha256": "b33b9c7d298ec354569424e6e647aebef1e181a5667fb5e5879a1544f3d131d2"
-    },
-    "out/android/target/product/r1/recovery/root/sepolicy": {
-      "path": "out/android/target/product/r1/recovery/root/sepolicy",
-      "bytes": 936696,
-      "sha256": "3b55d7496fca92857831c12c16a78407d791070d86e599cc3e0c17389e0fdd76"
-    },
-    "out/android/target/product/r1/recovery/root/system/bin/init": {
-      "path": "out/android/target/product/r1/recovery/root/system/bin/init",
-      "bytes": 2652808,
-      "sha256": "d9514692580e27bdc6c2c76df225319d461391ddca6d330f0e3bd95c1a6c6f89"
-    },
-    "out/android/target/product/r1/recovery/root/system/bin/linker64": {
-      "path": "out/android/target/product/r1/recovery/root/system/bin/linker64",
-      "bytes": 2400968,
-      "sha256": "b6b407257fd521518efc0a24a74fad20bd84db3df54e90dfb292030391e61525"
-    },
-    "out/android/target/product/r1/recovery/root/system/bin/recovery": {
-      "path": "out/android/target/product/r1/recovery/root/system/bin/recovery",
-      "bytes": 3064656,
-      "sha256": "bde7420bd7be6ac06229c7b571b6070460f7ac5188284dcf8458a7848f93cf24"
-    },
-    "out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.boot-service.r1_recovery": {
-      "path": "out/android/target/product/r1/recovery/root/system/bin/hw/android.hardware.boot-service.r1_recovery",
-      "bytes": 136496,
-      "sha256": "43be882429950254bade95ac78fedccd668ea7ddb77e9d62a513c9d8ac09481b"
-    },
-    "out/android/target/product/r1/recovery/root/first_stage_ramdisk/fstab.r1": {
-      "path": "out/android/target/product/r1/recovery/root/first_stage_ramdisk/fstab.r1",
-      "bytes": 1008,
-      "sha256": "6f8f6ad884e5b4144f07f341cd9981851a96628041eab1ef4f292bfe3b024f36"
-    },
-    "out/android/target/product/r1/system/lib64/libbinder_ndk.so": {
-      "path": "out/android/target/product/r1/system/lib64/libbinder_ndk.so",
-      "bytes": 205640,
-      "sha256": "3a40712239c78061ccb1a6c8cb005ad8c8464ad9cdfd9f1309a31eb820f32088"
     }
   },
   "checks": [
@@ -212,16 +1133,20 @@
     {
       "name": "real platform libbinder_ndk and installed dependency inventory",
       "status": "pass"
+    },
+    {
+      "name": "unchanged build records, source and primary artifacts",
+      "status": "pass"
     }
   ],
   "boot": {
     "path": "/rabbitr1/out/android/target/product/r1/boot.img",
     "bytes": 33554432,
-    "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e",
+    "sha256": "32e25b3fc07a938b46d5ae8a3881e1ccb764254bb3629d0e0f6f68e385bf11b4",
     "header": {
       "kernel_size": 12546227,
       "kernel_addr": 1074266112,
-      "ramdisk_size": 16199271,
+      "ramdisk_size": 16231059,
       "ramdisk_addr": 1370488832,
       "second_size": 0,
       "second_addr": 0,
@@ -245,14 +1170,14 @@
     },
     "cmdline": "firmware_class.path=/vendor/firmware/ log_buf_len=4M loop.max_part=7 printk.devkmsg=on rw vt.global_cursor_default=0 audit=0 panic=-1 androidboot.init_fatal_reboot_target=recovery androidboot.boot_devices=any androidboot.selinux=permissive bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1 earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 maxcpus=1 clk_ignore_unused regulator_ignore_unused",
     "normal_boot_token_in_header": false,
-    "payload_end_before_avb": 28778496
+    "payload_end_before_avb": 28811264
   },
   "boot_avb": {
     "path": "/rabbitr1/out/android/target/product/r1/boot.img",
     "bytes": 33554432,
-    "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e",
-    "original_image_size": 28778496,
-    "vbmeta_offset": 28778496,
+    "sha256": "32e25b3fc07a938b46d5ae8a3881e1ccb764254bb3629d0e0f6f68e385bf11b4",
+    "original_image_size": 28811264,
+    "vbmeta_offset": 28811264,
     "vbmeta_bytes": 704,
     "algorithm_type": 0,
     "signed": false,
@@ -296,1252 +1221,23 @@
     },
     "explanation": "AOSP AVB build replaces the stock footer; full-image hash equality is not required."
   },
-  "recovery_cpio": {
-    "compression": "gzip",
-    "uncompressed_bytes": 40369920,
-    "entries": 598,
-    "archive_sha256": "a5a1d205bdb274b45ef1be53ce53c7fe8e465238339c5d65b7787faae9b9689f",
-    "extraction": "CPIO parsed in memory; selected regular files copied only; no archive symlinks/devices materialized"
-  },
   "first_stage": {
     "fstab": {
-      "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/first_stage_ramdisk/fstab.r1",
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/boot/selected/first_stage_ramdisk/fstab.r1",
       "bytes": 1008,
       "sha256": "6f8f6ad884e5b4144f07f341cd9981851a96628041eab1ef4f292bfe3b024f36"
     },
     "build_metadata": {
-      "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/first_stage_ramdisk/system/etc/ramdisk/build.prop",
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/boot/selected/first_stage_ramdisk/system/etc/ramdisk/build.prop",
       "bytes": 935,
-      "sha256": "3092c464778140436ede0715237a6e224cbdb70274ca78629917232e6467ef05"
-    },
-    "fixed_in_commit": "c3ae6a96e421f4bfc7f14ce6a7b5687a40fea4a1",
-    "fix": "Stage first-stage fstab under TARGET_COPY_OUT_ROOT so recovery-as-boot includes it.",
-    "initial_failure_record": {
-      "path": "out/android-build-review/boot-images-pstore/results-before-fstab-fix.json",
-      "bytes": 84852,
-      "sha256": "d2a45bc16018aa5c773197b5f4903373fbf06dc51f7de463dae4e34476bd8337"
-    },
-    "init_layout": "/init points to /system/bin/init; recovery init and linker dependencies exist in the ramdisk. FirstStageMain mounts system before its next exec; no separate first_stage_ramdisk init/linker is required."
-  },
-  "recovery_policy": {
-    "path": "/rabbitr1/out/android-build-review/boot-images-pstore/selected/sepolicy",
-    "bytes": 936696,
-    "sha256": "3b55d7496fca92857831c12c16a78407d791070d86e599cc3e0c17389e0fdd76",
-    "per_domain_permissive_declarations": [
-      "recovery",
-      "su",
-      "backuptool"
-    ],
-    "boot_domain_attributes": [
-      "domain",
-      "halserverdomain",
-      "hal_bootctl_server"
-    ],
-    "compiled_permission_presence_queries": [
-      {
-        "query": "neverallow hal_bootctl_r1 rootfs:file entrypoint;",
-        "expected_conflict_proves_allow": "allow hal_bootctl_r1 rootfs:file { entrypoint }",
-        "tool_exit": 255
-      },
-      {
-        "query": "neverallow init hal_bootctl_r1:process transition;",
-        "expected_conflict_proves_allow": "allow init hal_bootctl_r1:process { transition }",
-        "tool_exit": 255
-      },
-      {
-        "query": "neverallow hal_bootctl_r1 rootfs:file execute;",
-        "expected_conflict_proves_allow": "allow hal_bootctl_r1 rootfs:file { execute }",
-        "tool_exit": 255
-      },
-      {
-        "query": "neverallow init rootfs:file execute;",
-        "expected_conflict_proves_allow": "allow init rootfs:file { execute }",
-        "tool_exit": 255
-      }
-    ],
-    "global_permissive_boot_requested": true,
-    "runtime_enforcement_verified": false
-  },
-  "recovery_dependency_inventory": {
-    "elf_count": 56,
-    "missing": [],
-    "files": {
-      "out/android-build-review/boot-images-pstore/selected/system/bin/recovery": {
-        "bytes": 3064656,
-        "sha256": "bde7420bd7be6ac06229c7b571b6070460f7ac5188284dcf8458a7848f93cf24",
-        "needed": [
-          "android.hardware.health@2.0.so",
-          "libbinder_ndk.so",
-          "android.hardware.boot@1.0.so",
-          "android.hardware.boot@1.1.so",
-          "libboot_control_client.so",
-          "libcutils.so",
-          "liblp.so",
-          "libprotobuf-cpp-lite-6.33.5.so",
-          "libvolume_manager.so",
-          "libbase.so",
-          "libbootloader_message.so",
-          "libcrypto.so",
-          "libext4_utils.so",
-          "libfs_mgr.so",
-          "libfusesideload.so",
-          "libhidl-gen-utils.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libselinux.so",
-          "libtinyxml2.so",
-          "libutils.so",
-          "libz.so",
-          "libziparchive.so",
-          "android.hardware.health-V5-ndk.so",
-          "android.hardware.boot-V1-ndk.so",
-          "librecovery_ui.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/bin/linker64": {
-        "bytes": 2400968,
-        "sha256": "b6b407257fd521518efc0a24a74fad20bd84db3df54e90dfb292030391e61525",
-        "needed": []
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libdl.so": {
-        "bytes": 50832,
-        "sha256": "07c06e846de6ad6bad95e771f494b4b0db8b02f98fc9b0d7a5d75b8e31f8c612",
-        "needed": [
-          "ld-android.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/ld-android.so": {
-        "bytes": 34160,
-        "sha256": "5dbbe8389b417d3abea5f022cf630cf79bc6909b8404a8765c271978c7bd655e",
-        "needed": []
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libm.so": {
-        "bytes": 265384,
-        "sha256": "98b05b7977800503776c9e5dbcc015cbb145df1908952f998b6cfc3531bf4746",
-        "needed": [
-          "libc.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libc.so": {
-        "bytes": 1329624,
-        "sha256": "214813846cef24997ac74dd74c0fa500026b2c4c038ea368f41b4d630a642d38",
-        "needed": [
-          "ld-android.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libc++.so": {
-        "bytes": 1152760,
-        "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/librecovery_ui.so": {
-        "bytes": 433864,
-        "sha256": "58d443ac7a7ffd46b727e65b402acd9b150ed0ffdd10490984483114b7575caa",
-        "needed": [
-          "android.hardware.health-V5-ndk.so",
-          "libbase.so",
-          "libcutils.so",
-          "libhidlbase.so",
-          "libpng.so",
-          "libutils.so",
-          "libz.so",
-          "libvolume_manager.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libvolume_manager.so": {
-        "bytes": 254920,
-        "sha256": "7c25c27a55167a5c3e742ee7913143f38e285d1b25e13f585c37e966398724bc",
-        "needed": [
-          "libbase.so",
-          "libcutils.so",
-          "liblog.so",
-          "libselinux.so",
-          "libsgdisk.so",
-          "libsysutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsysutils.so": {
-        "bytes": 69736,
-        "sha256": "980ca28bf4325fe2ebe38dbbf59392cffa425c9f2f42b1b39521a04c0659d25e",
-        "needed": [
-          "libbase.so",
-          "libcutils.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblog.so": {
-        "bytes": 102608,
-        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
-        "needed": [
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcutils.so": {
-        "bytes": 118336,
-        "sha256": "544f15cb5e9230b494538db9e64d92f4c736e59e09b6a4fd55adb9210ea0880e",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbase.so": {
-        "bytes": 234920,
-        "sha256": "f64d7ced8ea4629653a912b1810961f237a96c961a3eaa61ee7a5bc91e4ab8fd",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsgdisk.so": {
-        "bytes": 298416,
-        "sha256": "94afcc796b7f0db78f9954620fdf71075285611a97690d9dfb767f3308f37a80",
-        "needed": [
-          "libext2_uuid.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libext2_uuid.so": {
-        "bytes": 51448,
-        "sha256": "e5af2aeb114d0ac6dd89699cb672aef889556a2457322b0e13b83e14fb54db7a",
-        "needed": [
-          "libc++.so",
-          "libc.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libselinux.so": {
-        "bytes": 135432,
-        "sha256": "973cdf64e46565c71a7d2a74e213a808545e2cae09868b6dd8805b495e7adb95",
-        "needed": [
-          "libpcre2.so",
-          "liblog.so",
-          "libpackagelistparser.so",
-          "libc.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpackagelistparser.so": {
-        "bytes": 51648,
-        "sha256": "e2d0b7721349331e84a56e86dec4878cf813cdd1ccbe96730f82276b181c7927",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpcre2.so": {
-        "bytes": 412712,
-        "sha256": "308d11a715405c2549bb0708c1d273d579bcab5977be169995a62620bfdc3def",
-        "needed": [
-          "libc.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libz.so": {
-        "bytes": 134448,
-        "sha256": "7ea13eda543ff64056a4145d96dcb88d6d0d7ee33e38a105a78dfae046e4defa",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libutils.so": {
-        "bytes": 168720,
-        "sha256": "4d1e70eea5e7bfd3f8eb36362c84e3e8af1616b74786c951485425e03d07b911",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libpng.so": {
-        "bytes": 284440,
-        "sha256": "0f7912c1cc4f4b8a3178a1d6212773b721a26713f553fa32713763caa29453bd",
-        "needed": [
-          "libz.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libhidlbase.so": {
-        "bytes": 744504,
-        "sha256": "405f21e2b53cd48ea2ffd8e1b876dac66139701a1bab4142f8e963a41cee4b04",
-        "needed": [
-          "libbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health-V5-ndk.so": {
-        "bytes": 85768,
-        "sha256": "58693b945cedb61b144d419400e02a3d67d2e5d58f1e8dc0991546df601f0c76",
-        "needed": [
-          "libbinder_ndk.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbinder_ndk.so": {
-        "bytes": 205640,
-        "sha256": "3a40712239c78061ccb1a6c8cb005ad8c8464ad9cdfd9f1309a31eb820f32088",
-        "needed": [
-          "libbinder.so",
-          "liblog.so",
-          "libutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbinder.so": {
-        "bytes": 1002128,
-        "sha256": "14163a88ac585a8994da701c9935bc68f18a156612618dece9777811965ede9c",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot-V1-ndk.so": {
-        "bytes": 68848,
-        "sha256": "723bcd5c9a8fb33f17357604bac4fd3641efa548cd409104c684dd2d26b6d25f",
-        "needed": [
-          "libbinder_ndk.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libziparchive.so": {
-        "bytes": 119408,
-        "sha256": "1189dd0dcc9c312c8b79263ab2c69f1d16bcb3340f1f06fe7076a575a29f02b3",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libz.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libtinyxml2.so": {
-        "bytes": 150856,
-        "sha256": "de2789367174cfe0f32b557b8f509adb9e34c271562deb933100c92dc8a3629c",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libhidl-gen-utils.so": {
-        "bytes": 69144,
-        "sha256": "c1208a0bc4ce65b1a9c4d485da901ef33f42f1ff0d6f197c9026ce45ef4d9f8b",
-        "needed": [
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfusesideload.so": {
-        "bytes": 69832,
-        "sha256": "b5eb1e95e3c03bdf2262ca673b3d8251963e6965317f96e409d98f7eec0bc6ae",
-        "needed": [
-          "libbase.so",
-          "libcrypto.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcrypto.so": {
-        "bytes": 1978408,
-        "sha256": "87eef555d150b4d01cb9846cf9f596032d8b93d5e53dc45a7394e6330f806fbd",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfs_mgr.so": {
-        "bytes": 647488,
-        "sha256": "0eb5de6973f8f35f1721e82b9d116ca015f332d3b7a88852d090288e0c79a6bb",
-        "needed": [
-          "libbase.so",
-          "libcrypto.so",
-          "libcrypto_utils.so",
-          "libcutils.so",
-          "libext4_utils.so",
-          "libfec.so",
-          "liblog.so",
-          "liblp.so",
-          "libselinux.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblp.so": {
-        "bytes": 217600,
-        "sha256": "e04abb143567e9a6216aee852277ba0d96a75169ae4c519216dcc989a9b3fd9d",
-        "needed": [
-          "libcrypto.so",
-          "libbase.so",
-          "liblog.so",
-          "libcrypto_utils.so",
-          "libsparse.so",
-          "libext4_utils.so",
-          "libz.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libext4_utils.so": {
-        "bytes": 51376,
-        "sha256": "3ee0f64674b9f9cd7deedaf3537e66f1f7082a6fbd3612cd94439d3c00d9a60e",
-        "needed": [
-          "libz.so",
-          "libbase.so",
-          "libcutils.so",
-          "libext2_uuid.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libsparse.so": {
-        "bytes": 52408,
-        "sha256": "c2012649992323cf5d4efd87de211b64be20d54b3412c1e0d52d20ae62d7f673",
-        "needed": [
-          "libz.so",
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libcrypto_utils.so": {
-        "bytes": 35400,
-        "sha256": "2214c9221a9abd560953ea08c014818d87a63a8b66a9bd0244a9422f6e2b740b",
-        "needed": [
-          "libcrypto.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfec.so": {
-        "bytes": 118000,
-        "sha256": "cda626ccd26b7b458d8e5cc68a091f7fe1416e899de22a668adc043dafbc918b",
-        "needed": [
-          "libbase.so",
-          "libcrypto.so",
-          "libcrypto_utils.so",
-          "libcutils.so",
-          "libext4_utils.so",
-          "libfec_rs.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libfec_rs.so": {
-        "bytes": 51704,
-        "sha256": "dfac7cfcb2cefa665628104b8eb18e30065919b323490738ab15e993f7f68f61",
-        "needed": [
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libbootloader_message.so": {
-        "bytes": 135328,
-        "sha256": "7b7fedc69ace47fcf5f0eb673aaa435f97a6d16e4b179f10055f5302ee17e2a3",
-        "needed": [
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprotobuf-cpp-lite-6.33.5.so": {
-        "bytes": 1497016,
-        "sha256": "a5980cf4db6e938c9dca91a4669e8bd73eead3641a1a396d3f5e0a91cb184a27",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libboot_control_client.so": {
-        "bytes": 68848,
-        "sha256": "feaa46b14a3f0156146d00a8ce9237e03f3ca2500c3c81341a52b2dca030cb31",
-        "needed": [
-          "android.hardware.boot-V1-ndk.so",
-          "android.hardware.boot@1.0.so",
-          "android.hardware.boot@1.1.so",
-          "android.hardware.boot@1.2.so",
-          "libhidlbase.so",
-          "libbinder_ndk.so",
-          "libbase.so",
-          "libcutils.so",
-          "libutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.2.so": {
-        "bytes": 118976,
-        "sha256": "5738b4bdaad2cf99f672c920428b84420eb2b67512509220d6ab0257b0c528c6",
-        "needed": [
-          "android.hardware.boot@1.0.so",
-          "android.hardware.boot@1.1.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.1.so": {
-        "bytes": 118960,
-        "sha256": "deea7a497b73977edc07b836cf0bb28e8436f499e6ec9916bf8950d4ad107d31",
-        "needed": [
-          "android.hardware.boot@1.0.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.boot@1.0.so": {
-        "bytes": 135656,
-        "sha256": "18ce52154dffacba66347dca8b70231a91f9e43aa77a03c3294463c048354f42",
-        "needed": [
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health@2.0.so": {
-        "bytes": 219384,
-        "sha256": "10ca1dd041e5173dd3136933f39b5c108d4ef91eb4a05abb5984b620ca105374",
-        "needed": [
-          "android.hardware.health@1.0.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/android.hardware.health@1.0.so": {
-        "bytes": 35312,
-        "sha256": "c25abfc1ba8b3e8615da74af0601cb57a1580596b623d2dcb0ea4949a0992dfb",
-        "needed": [
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/bin/init": {
-        "bytes": 2652808,
-        "sha256": "d9514692580e27bdc6c2c76df225319d461391ddca6d330f0e3bd95c1a6c6f89",
-        "needed": [
-          "libbase.so",
-          "libcutils.so",
-          "libext4_utils.so",
-          "libfs_mgr.so",
-          "libgsi.so",
-          "liblog.so",
-          "liblogwrap.so",
-          "liblp.so",
-          "libprocessgroup.so",
-          "libprocessgroup_setup.so",
-          "libselinux.so",
-          "libunwindstack.so",
-          "libvendorsupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libvendorsupport.so": {
-        "bytes": 35376,
-        "sha256": "f416281b00e56a9c9f336c1baf8ab4f2a4734ccb114f1cf3e91c84888b74ac14",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libunwindstack.so": {
-        "bytes": 754464,
-        "sha256": "0d07fb1844b63bb747c839e5c8b8ce872a9aa3f0c1c624e6634c96e26b277412",
-        "needed": [
-          "libbase.so",
-          "liblog.so",
-          "liblzma.so",
-          "libz.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblzma.so": {
-        "bytes": 216560,
-        "sha256": "e73d7dae5c90a2f7cc6f6db8625049530207fd2a4920b1204ca022f4312a2c81",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprocessgroup_setup.so": {
-        "bytes": 53200,
-        "sha256": "194d8ae782527c3885c60bafd17a829b0b9400b632d7fb70cebcada560ddb6f9",
-        "needed": [
-          "libbase.so",
-          "libjsoncpp.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libjsoncpp.so": {
-        "bytes": 216968,
-        "sha256": "c1c30c0d9d48d0111ba2f2049dc6acf68db4eaed37ed751aea26139cf2cfe18e",
-        "needed": [
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libprocessgroup.so": {
-        "bytes": 400048,
-        "sha256": "ffb58c28f177d4e057943f00ad3a5ce59ee36b99144f0f30aca128d54cb5c966",
-        "needed": [
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/liblogwrap.so": {
-        "bytes": 51512,
-        "sha256": "1f9f309fe52bab5204468dc3f300a7880548aeca645e69d35cda6de7cf90eeda",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/lib64/libgsi.so": {
-        "bytes": 35824,
-        "sha256": "e3bb3efc0c541e3f6a837c4ab7cf81b3707552323b4e5667ed953f0c9fbda897",
-        "needed": [
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android-build-review/boot-images-pstore/selected/system/bin/hw/android.hardware.boot-service.r1_recovery": {
-        "bytes": 136496,
-        "sha256": "43be882429950254bade95ac78fedccd668ea7ddb77e9d62a513c9d8ac09481b",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libbinder_ndk.so",
-          "android.hardware.boot-V1-ndk.so",
-          "android.hardware.boot@1.1.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      }
-    },
-    "runtime_namespace_resolution_verified": false
-  },
-  "normal_dependency_inventory": {
-    "elf_count": 29,
-    "missing_candidates": [],
-    "files": {
-      "out/android/target/product/r1/system_ext/bin/r1-charging": {
-        "bytes": 51784,
-        "sha256": "cd74d224ada6448d9c6a2e701b98d3dbc248631db0f64a088768dfe49e208b61",
-        "needed": [
-          "libbase.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/bootstrap/libdl.so": {
-        "bytes": 50832,
-        "sha256": "07c06e846de6ad6bad95e771f494b4b0db8b02f98fc9b0d7a5d75b8e31f8c612",
-        "needed": [
-          "ld-android.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/ld-android.so": {
-        "bytes": 34160,
-        "sha256": "5dbbe8389b417d3abea5f022cf630cf79bc6909b8404a8765c271978c7bd655e",
-        "needed": []
-      },
-      "out/android/target/product/r1/system/lib64/bootstrap/libm.so": {
-        "bytes": 265384,
-        "sha256": "98b05b7977800503776c9e5dbcc015cbb145df1908952f998b6cfc3531bf4746",
-        "needed": [
-          "libc.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/bootstrap/libc.so": {
-        "bytes": 1329624,
-        "sha256": "214813846cef24997ac74dd74c0fa500026b2c4c038ea368f41b4d630a642d38",
-        "needed": [
-          "ld-android.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libc++.so": {
-        "bytes": 1152760,
-        "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/libc++.so": {
-        "bytes": 1152760,
-        "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
-        "needed": [
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/liblog.so": {
-        "bytes": 102608,
-        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
-        "needed": [
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libbase.so": {
-        "bytes": 234920,
-        "sha256": "f64d7ced8ea4629653a912b1810961f237a96c961a3eaa61ee7a5bc91e4ab8fd",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/libbase.so": {
-        "bytes": 234920,
-        "sha256": "cb16800085980bde1230fb22a8cf9eb234702b5ca71e95749b28efecdc54bf9c",
-        "needed": [
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/bin/r1-expdb": {
-        "bytes": 68768,
-        "sha256": "1a07fa34c2d6afc0e1e8177ec1f5a4835a01995a03d13780678c7cdfdc065c3c",
-        "needed": [
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/bin/hw/android.hardware.boot-service.r1": {
-        "bytes": 136312,
-        "sha256": "575c41719a8c45cf698578ce63b24a27eac044aa272505d8c4373c2ad6e9260c",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libbinder_ndk.so",
-          "android.hardware.boot-V1-ndk.so",
-          "android.hardware.boot@1.1.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/android.hardware.boot@1.1.so": {
-        "bytes": 118960,
-        "sha256": "deea7a497b73977edc07b836cf0bb28e8436f499e6ec9916bf8950d4ad107d31",
-        "needed": [
-          "android.hardware.boot@1.0.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libcutils.so": {
-        "bytes": 118336,
-        "sha256": "5966143242e107d01acdf4dd1ee721306741a5be0c895563f6a74be8e21a8c1d",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/libcutils.so": {
-        "bytes": 118312,
-        "sha256": "b51648c421e03ac000269ce719f68e893e082fffcff8ee503036955705a46489",
-        "needed": [
-          "liblog.so",
-          "libbase.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libutils.so": {
-        "bytes": 168728,
-        "sha256": "690fc2e2ea720a9c450c4100decb385cb6779373a396d5423783b1eff87fa317",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libvndksupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libvndksupport.so": {
-        "bytes": 51424,
-        "sha256": "e393b1afbcd146ebdde90d977d218ad93e3daa232f68065789cdc62aee7a807e",
-        "needed": [
-          "libdl_android.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/bootstrap/libdl_android.so": {
-        "bytes": 34744,
-        "sha256": "8539bae35dcbe8ec59e30c7db056c20a2180269d3f67eef7963769709053e668",
-        "needed": [
-          "ld-android.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/libutils.so": {
-        "bytes": 168728,
-        "sha256": "b644139ddf147e3333f4fcfe95f864b5724e7ce88853b74f27da53c817a02277",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libvndksupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libhidlbase.so": {
-        "bytes": 744544,
-        "sha256": "a5ca8692275dc111eaa19e348d6f08ff3eaec54e396caa7a4f6eda0ea538b0a1",
-        "needed": [
-          "libbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libvndksupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/libhidlbase.so": {
-        "bytes": 744600,
-        "sha256": "2a1f0f06f4e592537789c11e785f70c3c9d01f27d9fad257e3f1b220b6e23fe4",
-        "needed": [
-          "libbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libvndksupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/android.hardware.boot@1.0.so": {
-        "bytes": 135656,
-        "sha256": "18ce52154dffacba66347dca8b70231a91f9e43aa77a03c3294463c048354f42",
-        "needed": [
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/android.hardware.boot@1.0.so": {
-        "bytes": 135656,
-        "sha256": "0161ec725439915d971b54e49a2274564025909323d8d93cc9a389975a5262e1",
-        "needed": [
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/android.hardware.boot@1.1.so": {
-        "bytes": 118960,
-        "sha256": "169003b68e36b0c666929893e6acf944bf9139b550daeee4fae6d7fe93631d9b",
-        "needed": [
-          "android.hardware.boot@1.0.so",
-          "libhidlbase.so",
-          "liblog.so",
-          "libutils.so",
-          "libcutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/android.hardware.boot-V1-ndk.so": {
-        "bytes": 68848,
-        "sha256": "723bcd5c9a8fb33f17357604bac4fd3641efa548cd409104c684dd2d26b6d25f",
-        "needed": [
-          "libbinder_ndk.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libbinder_ndk.so": {
-        "bytes": 205640,
-        "sha256": "3a40712239c78061ccb1a6c8cb005ad8c8464ad9cdfd9f1309a31eb820f32088",
-        "needed": [
-          "libbinder.so",
-          "liblog.so",
-          "libutils.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libbinder.so": {
-        "bytes": 1002152,
-        "sha256": "978170dd70e1cb0db37a43ef940312a3fa9b681f7fd713c70d7403a67a832ce4",
-        "needed": [
-          "libcutils.so",
-          "liblog.so",
-          "libutils.so",
-          "libapexsupport.so",
-          "libvndksupport.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/system/lib64/libapexsupport.so": {
-        "bytes": 186200,
-        "sha256": "49a9d5b8def383f6dd6c3b488c8fcd74a1e0ab41b8f39cdeccb29b16589f9a52",
-        "needed": [
-          "libdl_android.so",
-          "liblog.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      },
-      "out/android/target/product/r1/vendor/lib64/android.hardware.boot-V1-ndk.so": {
-        "bytes": 68848,
-        "sha256": "2e86e519800d50c8c6b6bfc91d2ea6b1eff8f53c0422cbc237666607b2f3905a",
-        "needed": [
-          "libbinder_ndk.so",
-          "libc++.so",
-          "libc.so",
-          "libm.so",
-          "libdl.so"
-        ]
-      }
-    },
-    "runtime_namespace_resolution_verified": false
-  },
-  "real_platform_binder": {
-    "path": "/rabbitr1/out/android/target/product/r1/system/lib64/libbinder_ndk.so",
-    "bytes": 205640,
-    "sha256": "3a40712239c78061ccb1a6c8cb005ad8c8464ad9cdfd9f1309a31eb820f32088",
-    "needed": [
-      "libbinder.so",
-      "liblog.so",
-      "libutils.so",
-      "libc++.so",
-      "libc.so",
-      "libm.so",
-      "libdl.so"
-    ],
-    "interpreter": []
-  },
-  "pstore": {
-    "pstore_modules": [
-      {
-        "module": "pstore_zone.ko",
-        "staged": {
-          "path": "/rabbitr1/src/android/device/rabbit/r1/prebuilt/pstore_zone.ko",
-          "bytes": 21128,
-          "sha256": "c1efcae655d9a448252a73b4e37b88b0ae092104be2502f41244ed946759dd51"
-        },
-        "installed_vendor_candidates": [],
-        "recovery_ramdisk_paths": []
-      },
-      {
-        "module": "pstore_blk.ko",
-        "staged": {
-          "path": "/rabbitr1/src/android/device/rabbit/r1/prebuilt/pstore_blk.ko",
-          "bytes": 18024,
-          "sha256": "fc8264d7bf5322a823fef8f830ef96a2d2375f4cb6612994b9815998b2f1e4d5"
-        },
-        "installed_vendor_candidates": [],
-        "recovery_ramdisk_paths": []
-      }
-    ],
-    "vendor_autoload_lists": [],
-    "design": "Pstore modules loaded explicitly by vendor r1-expdb after post-fs; recovery image does not load them.",
-    "vendor_image_validated": false,
-    "module_install_rules_present": true,
-    "note": "Staged module hashes and any installed candidates are checked by this audit. Eventual vendor image contents remain unverified."
-  },
-  "lk_mode_handoff": {
-    "stock_sha256": "534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e",
-    "patched_sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0",
-    "unchanged_ranges": [
-      {
-        "start": "0x1d9d4",
-        "end_exclusive": "0x1dc8c",
-        "sha256": "241d0045a22f3ecfb4a94c5ec21f17c2483bc60b59ae0f3bd20349afbd81c064"
-      },
-      {
-        "start": "0x20be4",
-        "end_exclusive": "0x20c8c",
-        "sha256": "350e92663f2c899eac711caf8e487aef1b40335e2dd1c77501f50999ebb305af"
-      },
-      {
-        "start": "0x7a164",
-        "end_exclusive": "0x7a183",
-        "sha256": "305238e0b53f8f7c43d11458ac011e22d257856bd970750199d69955e605e119"
-      }
-    ],
-    "scope": "Bounded binary instruction replay of mode dispatch and command-line append only",
-    "modeled": "Single-thread CPU critical-section enter/exit return; no loader, partition access, firmware authentication, peripheral or full boot execution",
-    "cases": [
-      {
-        "image": "stock",
-        "boot_mode": 0,
-        "mode": "normal",
-        "dispatch_target": "0x1db18",
-        "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1 androidboot.force_normal_boot=1",
-        "normal_boot_token_count": 1,
-        "modeled_critical_calls": [
-          "0x18198",
-          "0x18188"
-        ],
-        "writes": 45
-      },
-      {
-        "image": "stock",
-        "boot_mode": 2,
-        "mode": "recovery",
-        "dispatch_target": "0x1dac2",
-        "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1",
-        "normal_boot_token_count": 0,
-        "modeled_critical_calls": [],
-        "writes": 0
-      },
-      {
-        "image": "patched",
-        "boot_mode": 0,
-        "mode": "normal",
-        "dispatch_target": "0x1db18",
-        "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1 androidboot.force_normal_boot=1",
-        "normal_boot_token_count": 1,
-        "modeled_critical_calls": [
-          "0x18198",
-          "0x18188"
-        ],
-        "writes": 45
-      },
-      {
-        "image": "patched",
-        "boot_mode": 2,
-        "mode": "recovery",
-        "dispatch_target": "0x1dac2",
-        "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1",
-        "normal_boot_token_count": 0,
-        "modeled_critical_calls": [],
-        "writes": 0
-      }
-    ],
-    "conclusion": "LK appends force_normal_boot=1 in normal mode and omits it in recovery; the relevant code and string are unchanged by current LK patches. Do not add the token unconditionally to the boot header."
+      "sha256": "b37dc8ea85edb5d21352f49176eec82afb8937ff1c863b245f03619011db6d28"
+    }
   },
   "limitations": [
     "AVB integrity/self-signature checks do not establish a trusted key or a complete vbmeta chain. --flags 3 configures top-level vbmeta, not boot/DTBO footers.",
     "Bounded stock/patched LK instruction replay confirms mode 0 appends androidboot.force_normal_boot=1 and mode 2 omits it. This establishes the intended normal/recovery handoff logic, not whole-loader execution or hardware boot.",
     "Current product boot arguments request global permissive SELinux mode. Policy analysis below checks per-domain declarations only.",
     "Installed normal-system library candidates do not establish linker namespace/APEX runtime visibility.",
-    "No image contents are executed; no drivers, modules, devices, APKs or partitions are loaded or accessed.",
-    "pstore_zone.ko vendor install not present in this target set; must be present in the eventual vendor image before expdb startup.",
-    "pstore_blk.ko vendor install not present in this target set; must be present in the eventual vendor image before expdb startup."
-  ],
-  "hardware_tested": false,
-  "flash_tested": false,
-  "whole_rom_validated": false,
-  "runtime_selinux_enforcement_verified": false,
-  "runtime_linker_namespace_resolution_verified": false,
-  "checker_corrections": [
-    "Recovery uses rootfs labels plus explicit service seclabel; required permissions confirmed in binary policy.",
-    "VINTF assembler normalizes schema and omits default AIDL version 1; service contract checked semantically.",
-    "Recovery init is dynamically linked; its complete ramdisk library closure was checked instead of assuming static linking."
+    "No image contents are executed; no drivers, modules, devices, APKs or partitions are loaded or accessed."
   ]
 }
