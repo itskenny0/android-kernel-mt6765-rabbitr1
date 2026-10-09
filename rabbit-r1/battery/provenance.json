@@ -1,0 +1,72 @@
+{
+  "hardware_tested": false,
+  "battery_profile_id": 0,
+  "source_files_sha256": {
+    "firmware/stock-v0.8.293/merged.dtb": "e2b20d7cfc48bbf4498e8fd12610328eac8d2f6887d19d2c1df149e3145c87f4",
+    "out/stock-kernel.elf": "a03b5ff0b811de4c3d2b8c971b213b36274106536191f6588b2fca7372d4be75",
+    "src/kernel/drivers/power/supply/mtk_battery_algo.c": "77fe6b856ef762f92d79c0fded5d0382dd89ff9c87412685ddeb48b29aeabbb8",
+    "src/kernel/drivers/power/supply/mtk_battery_table.h": "9a0a18613be721cfb16f2a0a2e0d9159e1939a1fc96fbd0624736f9b4ec228f3",
+    "src/kernel/drivers/power/supply/mtk_battery.h": "1539e6415c87ddcc9d652e07c9e6bc1bb9e150e8d21f69fb83324ac9b9c652a2",
+    "src/kernel/arch/arm64/boot/dts/mediatek/bat_setting/mt6765_battery_table.dtsi": "de9e7650a298f7a986c5419fe7ef6a02a3bcd3eb600d3223097d9a45cf0878a3",
+    "out/battery-review/stock-soc-math-replay.json": "aef27bd2249edc6ed4e0f1efe8276f3ed82f39b33822fee540011c51b2f63e04"
+  },
+  "boundary_capture_sha256": "a623aebfa7903b1a31488825cfb9b8658378599dd312117b24bfe89518dbfe45",
+  "stock_function_hashes": {
+    "fgr_construct_battery_profile": {
+      "address": "0xffffff8008adc62c",
+      "size": 1476,
+      "sha256": "9ed8925904a18a59a1d2e242e7ce7995a1998ddde2a95d8a3c052cb67cf56845"
+    },
+    "fgauge_get_profile_id": {
+      "address": "0xffffff8008ad64ec",
+      "size": 24,
+      "sha256": "61801e64de6ba0ad6a0ad1ec9c2ea812a610f098e99843007842ef18e7ab18d0"
+    },
+    "fg_construct_battery_profile_by_qmax": {
+      "address": "0xffffff8008adcc80",
+      "size": 264,
+      "sha256": "500e5618839c7632cb8a35daa2080d69c38b2af514258d8ded758b3aafe5e814"
+    },
+    "SOC_to_OCV_c": {
+      "address": "0xffffff8008addd44",
+      "size": 316,
+      "sha256": "73832640ac2e0e59d89f32672a616880b016ff9e04731355deeaf2c339236eb0"
+    },
+    "DOD_to_OCV_c": {
+      "address": "0xffffff8008adde80",
+      "size": 304,
+      "sha256": "e312e353395c003415b372e97ee94b73a7d00717a16c80e5045754370c200b98"
+    },
+    "OCV_to_SOC_c": {
+      "address": "0xffffff8008addfb0",
+      "size": 312,
+      "sha256": "c329443bd50d103f8f2d5adde9d9f3e6b307cd40bef51c304de9a91c1d0675f7"
+    },
+    "OCV_to_DOD_c": {
+      "address": "0xffffff8008ade0e8",
+      "size": 304,
+      "sha256": "6916ded6dd113e4aab547bc67f8fc013953e6cdce79354e11692690f488fed47"
+    },
+    "fg_construct_battery_profile_by_vboot": {
+      "address": "0xffffff8008adcd88",
+      "size": 868,
+      "sha256": "195a2479e39a81683f8611dfafdd65b85b0acb3bf568beb8e65d08513b11eedb"
+    },
+    "fg_compensate_battery_voltage_from_low": {
+      "address": "0xffffff8008add45c",
+      "size": 960,
+      "sha256": "b1ba53f21d2fcb6e7555e3d5355087874f0209a09e54f11907a874db8744d196"
+    },
+    "fgr_update_c_dod": {
+      "address": "0xffffff8008ade2ac",
+      "size": 172,
+      "sha256": "2d536835353aa1f0eb2986a24f42fd0ef19a6e07bbb0206c958bbad72c63e84d"
+    }
+  },
+  "replay_script_sha256": "1ead340a5843f813ad555a68a125afe431345905f5bcfc4730baae8a87025563",
+  "generated_sha256": {
+    "stock_profiles.c": "ccee21787720bb4bd815e0961fce22dd7a12c0bd7e7b5623607fe95b8bd8264e",
+    "tests/stock-oracles.json": "f1a6969466a1165083dbf3b54bbb1acbd4b3f7e2e8138a3dfba9e26325b72116"
+  },
+  "scope": "53 explicit DT rows only; usable capacities in conversion fixtures are supplied inputs, not measured capacity. No cutoff/RAC estimator or initialization is implemented."
+}
