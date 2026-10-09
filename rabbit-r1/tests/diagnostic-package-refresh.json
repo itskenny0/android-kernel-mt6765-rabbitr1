@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "scope": "Archive integrity and exact-byte identity with the independently tested diagnostic package; no USB or device boot",
+  "created_at": "2026-10-09T06:50:28.570612+00:00",
+  "review_helper_selection": "The 145-case review explicitly selected canonical scripts with --scripts; the private package bundled the prior helper.",
+  "tooling_commit": "5a50b63f0ec60ae411198bae95126c9bf369ce6b",
+  "kernel_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+  "hardware_tested": false,
+  "complete_android_firmware": false,
+  "checks": {
+    "zip_crc": "pass",
+    "archive_matches_package_directory": "pass",
+    "diagnostic_scope_preserved": "pass",
+    "manifest_and_checksum_set": "pass",
+    "archive_sha256": "pass",
+    "binary_payloads_and_other_helpers_unchanged": "pass",
+    "helper_matches_145_case_review": "pass",
+    "readme_matches_reviewed_documentation": "pass"
+  },
+  "archive": {
+    "path": "dist/rabbit-r1-mainline-mtkclient.zip",
+    "bytes": 28484461,
+    "sha256": "a2a543dc07d14af92b3ac0e2b69679242d37a200ebaa219048e505e6bd3b6aa0"
+  },
+  "previous_archive": {
+    "path": "out/flash-helper-review/prior-diagnostic-package.zip",
+    "bytes": 28483883,
+    "sha256": "bbdf642a4063e01b429a2bec90983acaf93cbf62393e752bb15abff0d992c2ab"
+  },
+  "manifest_sha256": "f80211577f977521670884ca73f7ec2aa0557223d8c358c02b419ebc2be655a0",
+  "helper_sha256": "f306f204776fc80f89ef2eec0e5957fae3d0dc55d4ddd193861cbcf6d3bd8023",
+  "readme_sha256": "433f1c0af94898be4f70cf78f724d218d870988fb6f1a135e4214d557e3f7c4c",
+  "unchanged_payloads": {
+    "boot-expdb.img": "abe62f73658c6819e144d67d7f7473eca8e29b2bf038fa02e1045e270d81cb5a",
+    "boot-ram.img": "d8ab24da2ea2fa62eee3dbbdde7d67913a75c318d6fc5ae3843fce5b5df34e13",
+    "decode-expdb.py": "c90be70ae49f0c91a5ce9c762a225a8bba53f2f83ce0ce442620a7cca6dd298b",
+    "dtbo.img": "de91deb66ca18aada0e3fd1ad3766cc7d3e96c578cd02c35e9d88bffa815be2e",
+    "lk.bin": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0",
+    "lk_handoff.py": "2a9b892dc432b626dc2a2fa5409f3dd0d6620ee56ae3a289ef4a49fe6885375a",
+    "logo.bin": "f08895b8a03caa2c36e20b9e82a1f0fe0b6ee55aae38c4a7508045146dcc484d",
+    "splash.png": "a6027fe2f968200fc095b0818ade06f5e5dad369fdeb21f248ec7f4ce94e0f44"
+  },
+  "transfer_test_log": {
+    "path": "out/flash-helper-review/test.log",
+    "sha256": "20724d5740ed3d5bc0957a18170f6ffa29deb310b4e87bb99b9d8d28dcddca35",
+    "ordered_transfer_cases": 145,
+    "stale_lk_rejections": 36
+  }
+}

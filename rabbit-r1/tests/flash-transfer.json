@@ -3,7 +3,7 @@
   "result": "pass",
   "scope": "Generated diagnostic flash/restore scripts with file-backed mocked mtkclient; no USB/hardware access",
   "review": {
-    "state": "complete; canonical two-script diff ready for parent review/commit",
+    "state": "Completed review; implemented in commit70f2380536",
     "exit_code": 0,
     "session_id": 60501,
     "command": [
@@ -54,5 +54,11 @@
   },
   "documentation_shell_blocks_syntax_checked": 7,
   "original_workspace_directory": "/rabbitr1/out/flash-helper-review",
-  "package_refresh": "Pending; review used an isolated package copy"
+  "package_refresh": {
+    "status": "complete",
+    "record": "tests/diagnostic-package-refresh.json",
+    "sha256": "c095efa8ee84e6f789e86aea3b13f229a70d59e070ed97e33e60a3f3f1ef871c",
+    "complete_android_firmware": false,
+    "hardware_tested": false
+  }
 }
