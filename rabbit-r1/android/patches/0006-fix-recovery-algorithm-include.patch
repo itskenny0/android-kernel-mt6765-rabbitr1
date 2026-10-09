@@ -1,0 +1,18 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Include algorithm in recovery volume manager
+
+PublicVolume uses std::replace for ISO volume labels. Include its owning
+header explicitly for the Android 17 libc++ build.
+
+---
+--- a/volume_manager/PublicVolume.cpp
++++ b/volume_manager/PublicVolume.cpp
+@@ -30,6 +30,8 @@
+ #include <android-base/stringprintf.h>
+ #include <cutils/fs.h>
+ #include <private/android_filesystem_config.h>
++
++#include <algorithm>
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>
