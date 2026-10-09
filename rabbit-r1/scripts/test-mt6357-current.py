@@ -190,7 +190,8 @@ static int queue_delayed_work(void *q, struct delayed_work *w, unsigned long del
 static int mod_delayed_work(void *q, struct delayed_work *w, unsigned long delay) { assert(false); return 0; }
 static void cancel_delayed_work_sync(struct delayed_work *w) { assert(false); }
 static int of_count_phandle_with_args(void *n, const char *p, void *a) { assert(false); return 0; }
-static struct power_supply *devm_power_supply_get_by_reference(struct device *d, const char *p) { assert(false); return NULL; }
+static struct device_node *of_parse_phandle(void *n, const char *p, int i) { assert(false); return NULL; }
+static struct power_supply *devm_power_supply_get_by_parent(struct device *d, struct device *p) { assert(false); return NULL; }
 static bool provider_busy, provider_unbound, provider_locked;
 static int device_trylock(struct device *d) { assert(!provider_locked); if (provider_busy) return 0; provider_locked=true; return 1; }
 static bool device_is_bound(struct device *d) { assert(provider_locked); return !provider_unbound; }
