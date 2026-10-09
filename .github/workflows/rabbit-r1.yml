@@ -89,6 +89,7 @@ jobs:
           PATCH_BASE: ${{ steps.pins.outputs.patch-base }}
         run: |
           source scripts/env.sh
+          python3 scripts/test-source-downloads.py 2>&1 | tee logs/source-download-tests.log
           git -C src/mainline fetch --no-tags --depth=1 origin "$PATCH_BASE"
           python3 scripts/fetch-sources.py --profile ci 2>&1 | tee logs/fetch-ci.log
 

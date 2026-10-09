@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import tarfile
-import urllib.request
+from locked_download import download_locked
 
 ROOT = Path('/rabbitr1')
 parser = argparse.ArgumentParser(description=__doc__)
@@ -70,13 +70,7 @@ for name, item in lock['archives'].items():
         continue
     dest = local('downloads/'+name)
     if not dest.exists():
-        partial = dest.with_suffix(dest.suffix+'.part')
-        with urllib.request.urlopen(item['url'], timeout=120) as response, partial.open('wb') as f:
-            while chunk := response.read(1024*1024):
-                f.write(chunk)
-        if partial.stat().st_size != item['bytes'] or sha(partial) != item['sha256']:
-            raise SystemExit('Download checksum mismatch: '+name)
-        partial.rename(dest)
+        download_locked(item, dest)
     if dest.stat().st_size != item['bytes'] or sha(dest) != item['sha256']:
         raise SystemExit('Archive checksum mismatch: '+name)
     if item['extract_to']:
@@ -105,13 +99,7 @@ if args.profile == 'ci':
         dest = local(name)
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            partial = dest.with_suffix(dest.suffix+'.part')
-            with urllib.request.urlopen(item['url'], timeout=120) as response, partial.open('wb') as f:
-                while chunk := response.read(1024*1024):
-                    f.write(chunk)
-            if partial.stat().st_size != item['bytes'] or sha(partial) != item['sha256']:
-                raise SystemExit('Download checksum mismatch: '+name)
-            partial.rename(dest)
+            download_locked(item, dest)
         if dest.stat().st_size != item['bytes'] or sha(dest) != item['sha256']:
             raise SystemExit('Reference checksum mismatch: '+name)
         print(name, 'SHA256 verified', flush=True)
