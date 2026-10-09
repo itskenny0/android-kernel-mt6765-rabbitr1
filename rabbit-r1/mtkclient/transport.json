@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "archive": {
+    "url": "https://api.github.com/repos/bkerler/mtkclient/tarball/v2.1.4.1",
+    "sha256": "b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d",
+    "bytes": 31733040,
+    "prefix": "bkerler-mtkclient-5a863ee/",
+    "filename": "mtkclient-v2.1.4.1.tar.gz"
+  },
+  "patch": {
+    "path": "patches/mtkclient/0001-guard-bulk-transfers.patch",
+    "sha256": "b1b193f9cf838bc7b05d03e29a43f288a182b867a3f3f5e45ec9d0eb7cf096b4",
+    "bytes": 18639
+  },
+  "files": [
+    {
+      "path": "mtkclient/Library/Connection/usblib.py",
+      "before_sha256": "844d47a0b71b562d1a3e283ee939f85eb550c34b4724213708e93c920c283e18",
+      "after_sha256": "58248442049d932e8c0e59eb8e7fc12bb94e1da3a216c243bce2ba4ae65799fb",
+      "before_bytes": 31621,
+      "after_bytes": 35789
+    },
+    {
+      "path": "mtkclient/Library/Port.py",
+      "before_sha256": "a13955e1fddcc27be3a305eb56cae7268d5b9604c2e9c65389353004a612d1cc",
+      "after_sha256": "2277e690dc8e572315939c5830e6b01d2af4aaef0466fae47be26cab3ca8df38",
+      "before_bytes": 9339,
+      "after_bytes": 9947
+    },
+    {
+      "path": "mtkclient/Library/DA/xflash/xflash_lib.py",
+      "before_sha256": "cd55b262d1acfbda33833aabf3669997cb81d1b58b3c1844d4b4bef71f446b7b",
+      "after_sha256": "155cf23ffd373e24a03b2f1d2bc12104ad77a98e8a716511c172ebebd867320e",
+      "before_bytes": 53694,
+      "after_bytes": 54268
+    }
+  ]
+}

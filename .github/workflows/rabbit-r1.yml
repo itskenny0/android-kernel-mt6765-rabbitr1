@@ -83,8 +83,9 @@ jobs:
             /rabbitr1/downloads/busybox-1.37.0.tar.bz2
             /rabbitr1/downloads/rabbit_OS_v0.8.293.zip
             /rabbitr1/downloads/mtklogo-v0.1.2.tgz
+            /rabbitr1/downloads/mtkclient-v2.1.4.1.tar.gz
             /rabbitr1/downloads/android-lp
-          key: r1-sources-v1-${{ runner.os }}-${{ steps.pins.outputs.cache-key }}
+          key: r1-sources-v2-${{ runner.os }}-${{ steps.pins.outputs.cache-key }}
 
       - name: Fetch build inputs
         env:
@@ -94,6 +95,20 @@ jobs:
           python3 scripts/test-source-downloads.py 2>&1 | tee logs/source-download-tests.log
           git -C src/mainline fetch --no-tags --depth=1 origin "$PATCH_BASE"
           python3 scripts/fetch-sources.py --profile ci 2>&1 | tee logs/fetch-ci.log
+
+      - name: Check mtkclient bulk transfers
+        run: |
+          source scripts/env.sh
+          mkdir -p out
+          python3 scripts/prepare-mtkclient.py 2>&1 | tee logs/mtkclient-prepare.log
+          python3 scripts/prepare-mtkclient.py --check 2>&1 | tee logs/mtkclient-check.log
+          python3 scripts/test-mtkclient-preparer.py \
+            --out /rabbitr1/out/mtkclient-preparer-tests 2>&1 | tee logs/mtkclient-preparer-tests.log
+          python3 scripts/test-mtkclient-transport.py \
+            --original /rabbitr1/src/mtkclient \
+            --candidate /rabbitr1/src/mtkclient-haretic \
+            --fixtures /rabbitr1/tests/mtkclient/fixtures \
+            --out /rabbitr1/out/mtkclient-transport-tests 2>&1 | tee logs/mtkclient-transport-tests.log
 
       - name: Check source and logging helpers
         run: |

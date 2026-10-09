@@ -15,6 +15,12 @@ after transient transport failures. Every completed download must match its lock
 size and SHA-256 before publication. Checksum mismatches, certificate errors
 and permanent HTTP errors stop immediately; existing files are preserved.
 
+Before compiling, CI prepares the separate patched mtkclient source from its
+pinned archive, verifies every file, and tests the [bulk transport changes](MTKCLIENT.md).
+The checks use actual extracted methods with scripted endpoints and PyUSB source
+fixtures. They do not import USB or discover devices. Preparing that source does
+not migrate an existing diagnostic archive or establish physical flash safety.
+
 The workflow:
 
 1. Installs the tracked workspace tools and fetches pinned build inputs.
@@ -120,7 +126,7 @@ The workflow:
    backup validation, AVB flags, checksums and repeat packaging.
 
 `fetch-sources.py --profile ci` fetches mkbootimg, BusyBox, the stock firmware
-archive, mtklkzap, the mtklogo binary and checksummed MT6357 register/ADC/gauge source
+archive, mtklkzap, mtkclient, the mtklogo binary and checksummed MT6357 register/ADC/gauge source
 references. The ADC harness checks voltage units, channel requests, mux cleanup,
 scaling, reset/probe errors and timeout locking; the driver is now linked into
 the AArch64 kernel for battery measurements. The impedance harness checks MT6357 start/stop ordering,

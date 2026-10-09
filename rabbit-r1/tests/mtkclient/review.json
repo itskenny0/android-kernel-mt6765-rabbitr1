@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-09",
+  "scope": "Host-only pinned mtkclient bulk transfer patch and offline preparation; no USB/device test",
+  "archive_sha256": "b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d",
+  "patch_sha256": "b1b193f9cf838bc7b05d03e29a43f288a182b867a3f3f5e45ec9d0eb7cf096b4",
+  "manifest_sha256": "2fb66c3eb6dd389b2d298f24bf8225a398dbcb7d119fd928958eb9e85be46f68",
+  "transport": {
+    "methods": 9,
+    "portable_controls": 77,
+    "independent_controls": 12,
+    "canonical_installed_tree_controls": 77,
+    "read_final_failure_propagates": true,
+    "write_failure_cli_exits_nonzero": true,
+    "cli_scope": "Actual extracted writeflash, DAloader, DaHandler and Main tail; initialization and failure trigger are fixtures"
+  },
+  "preparer": {
+    "methods": 7,
+    "controls": 21,
+    "independent_controls": 18,
+    "actual_archive_files": 1164,
+    "actual_archive_directories": 40,
+    "original_source_unchanged": true
+  },
+  "review_records": {
+    "transport_handoff": "d1ec138a33f6606e95056561464f50d65c69ade6402ad33dcb4b86a039e532df",
+    "transport_independent": "19ed23c697037b3c7c0fb243564fc4df8254d3f2b1721b78f227906cb730473f",
+    "cli": "f41c1db959c854fbdfeb3448f93908d1c743ae1ff81bd485e5249e3f874eeb2a",
+    "preparer_handoff": "41dc63961757356d98faba03dc3b5101d73e5c8618fcb46e5b2cacfa5d2bdc7c",
+    "preparer_independent": "0d656cdfa58f689924d12ae07890a44b856b5814a68ffd1a41ca95ad23c0963e",
+    "canonical_install": "9b9e666e19401e382759425c51ee45181265114131b547b60a829c8d1bd11790"
+  },
+  "hardware_tested": false,
+  "existing_diagnostic_package_migrated": false,
+  "limits": [
+    "Finite budgets are engineering choices, not measured device compatibility.",
+    "No preemption of a USB backend ignoring its timeout.",
+    "Raw control/exploit/discovery and healthy handshake/XML raw paths are outside the bulk guarantee.",
+    "DA framing/status, partition selection, cold state and media durability remain unproved.",
+    "Source checker trusts reviewed manifest and host filesystem; it is not a hostile-writer sandbox or durable transaction.",
+    "Existing diagnostic artifacts retain their original transport until explicitly migrated."
+  ]
+}

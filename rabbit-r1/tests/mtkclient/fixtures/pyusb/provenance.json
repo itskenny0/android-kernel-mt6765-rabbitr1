@@ -1,0 +1,51 @@
+{
+  "scope": "official PyUSB release chosen for source semantics, not installed or imported",
+  "release": "v1.3.1",
+  "commit": "89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47",
+  "fetched_utc": "2026-10-09T11:19:50.397542+00:00",
+  "files": [
+    {
+      "url": "https://api.github.com/repos/pyusb/pyusb/git/ref/tags/v1.3.1",
+      "resolved_url": "https://api.github.com/repos/pyusb/pyusb/git/ref/tags/v1.3.1",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/tag-ref.json",
+      "bytes": 321,
+      "sha256": "1286ae678d04b24b2fc74f0d532624058c5c972f7b32bc26c3af42ea7121301d"
+    },
+    {
+      "url": "https://api.github.com/repos/pyusb/pyusb/git/tags/b9b8a2b1ecb822af0c0f1d2cf0c0ec69f19765e3",
+      "resolved_url": "https://api.github.com/repos/pyusb/pyusb/git/tags/b9b8a2b1ecb822af0c0f1d2cf0c0ec69f19765e3",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/tag-object.json",
+      "bytes": 2508,
+      "sha256": "9a6db8496db435656ffd9afe73c35e6650b942076192c021306526bfc92cfc49"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/core.py",
+      "resolved_url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/core.py",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/core.py",
+      "bytes": 48671,
+      "sha256": "aa6089accb592aecb18e1eb8bba9ea62b0a1eee7df4e564b8d4b5a0877bc7c7c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/backend/libusb1.py",
+      "resolved_url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/backend/libusb1.py",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/libusb1.py",
+      "bytes": 36215,
+      "sha256": "ea13c99dbe9667904ad1d3f364a147cf75bfdf98111b3426ceec20d055f3203d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/_interop.py",
+      "resolved_url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/_interop.py",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/_interop.py",
+      "bytes": 2726,
+      "sha256": "4a216f41bebf83dfa6fa05169db5589f29c343c2742eb7137ea4f431968870c2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/util.py",
+      "resolved_url": "https://raw.githubusercontent.com/pyusb/pyusb/89ea84d6c9e4cb81bc6e40d7df849d0cbd7dfd47/usb/util.py",
+      "path": "/rabbitr1/out/android-flash-review/clean-install/xflash-io-independent-review/pyusb/util.py",
+      "bytes": 12094,
+      "sha256": "4be8a03d725fb82f773ed79b890ba3167781e9cee722015228d369c25cd19294"
+    }
+  ],
+  "libusb_docs_url": "https://libusb.sourceforge.io/api-1.0/group__libusb__syncio.html"
+}
