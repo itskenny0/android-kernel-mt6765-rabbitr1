@@ -44,7 +44,7 @@ SOC_CHECKS = ('completed build and staged provenance',
  'image immutability during read-only audit')
 AUDIT_PROFILES = {'soc-cp2a-18': SOC_CHECKS, 'legacy-default-10': LEGACY_CHECKS}
 SOC_KERNEL = 'e98ffe5fcee6ce89fb754003059334ba1cf50b5c'
-SOC_PRODUCER = {'verify.py': 'd1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670',
+SOC_PRODUCER = {'verify.py': '04f03038f1b4c7ae60b30cf1cbb1f49edeb87c14676255233d746d2d6a10a28e',
  'provenance.py': '36f06211b062b409ae42833c54e3e51e2c3e493861305d040101028644b00473',
  'health_checks.py': '5562be046530280189632a49b3b9e23b1a10a175ad1df17e4f50d04a402a6176'}
 SOC_TARGETS = {'bootimage',

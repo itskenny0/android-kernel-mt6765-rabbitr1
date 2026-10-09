@@ -11,9 +11,9 @@ payload/durability tests remain in the separate test-android-super.py suite.
 Producer fixture boundary
 -------------------------
 
-producer/*.py.txt contains the exact three reviewed producer source snapshots:
-verify.py 58,863 bytes, provenance.py 12,021 bytes, health_checks.py 18,458 bytes
-(total 89,342). They are data files, non-executable and never imported. Tests
+The three current producer/*.py.txt snapshots preserve the reviewed sources:
+verify.py 61,212 bytes, provenance.py 12,021 bytes, health_checks.py 18,458 bytes
+(total 91,691). They are data files, non-executable and never imported. Tests
 copy their bytes into a fresh private output's producer/ directory under the
 precise names required by the consumer's production hash checks. The consumer's
 SOC_PRODUCER constants are never patched or replaced with synthetic hashes.
@@ -33,7 +33,7 @@ The originals were project-authored private audit helpers with no SPDX headers.
 No header is inserted into these immutable snapshots. This fixture adds no
 firmware, AOSP tool binary, APK or real audit/image record. Distribution licensing
 follows the maintainer's project policy; the new runner is Apache-2.0 like its
-existing sibling. The 89,342-byte fixture set is intentional: removing producer
+existing sibling. The 91,691-byte current fixture set is intentional: removing producer
 bytes would require mocking the very source-integrity gate under test.
 
 Running and scope
@@ -53,8 +53,8 @@ existing /rabbitr1 and out/android-super confinement; this change does not make
 production outputs arbitrary host paths. Use a fresh --out each time. Existing,
 outside-tree and symlink output paths reject before creation.
 
-The 134 cases preserve the prior 131 admission, CLI, fixture-execution,
-image-open and --out controls. Three additional negatives coherently bind the
+The 135 cases preserve the prior 131 admission, CLI, fixture-execution,
+image-open and --out controls. Three negatives coherently bind the
 old f725 kernel, or restore one exact historical imported producer at a time,
 and require the intended kernel/producer rejection before any image is opened. Current soc-cp2a-18 is the actual default. Legacy is accepted
 only with explicit legacy-default-10 and carries its historical mock-Health
@@ -72,10 +72,25 @@ E98 producer rebinding
 
 The current SOC profile is bound to kernel
 e98ffe5fcee6ce89fb754003059334ba1cf50b5c. Only the two imported helpers' kernel
-constants changed; the main eighteen-check verifier is byte-identical. Fixture
+constants changed in the earlier e98 rebind. The current verifier also includes
+the reviewed directory-diagnostic and mapper-placement corrections. Fixture
 provenance preserves the prior review pin and separately names the new producer
 preparation handoff. This rebinding is not an executed Android image audit.
 
 The previous f725 SOC producer is not an automatic compatibility profile. The
 current default must reject its kernel/producer bindings. The separate explicit
 legacy-default-10 mode keeps its existing historical scope and limitation.
+
+Corrected verifier binding
+--------------------------
+
+The current verifier accepts only the exact requested-path debugfs missing
+optional directory diagnostic, and checks mapper placement against the resolved
+Soong flag. Standalone vendor mapper bytes must match installed output; both
+placements retain ELF/export and exact VINTF checks. All eighteen check names,
+all remaining audit code and both imported helpers are unchanged.
+
+producer/verify-before-corrections.py.txt retains the exact 58,863-byte old e98
+verifier as data for one additional negative control. Its unchanged check names
+do not admit it: the current consumer rejects its historical source hash. This
+fixture is never executed, and does not represent a completed or passing audit.

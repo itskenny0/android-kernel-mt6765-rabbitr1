@@ -3,9 +3,9 @@
   "producer_files": {
     "verify.py": {
       "fixture": "producer/verify.py.txt",
-      "sha256": "d1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670",
-      "bytes": 58863,
-      "origin": "out/android-build-review/soc-cp2a/full-images/retry-e98/verification/verify.py",
+      "sha256": "04f03038f1b4c7ae60b30cf1cbb1f49edeb87c14676255233d746d2d6a10a28e",
+      "bytes": 61212,
+      "origin": "out/android-build-review/soc-cp2a/full-images/retry-e98/verification-corrected/verify.py",
       "execution": "data only; hash and AST parse, never import"
     },
     "provenance.py": {
@@ -25,6 +25,17 @@
   },
   "licensing_note": "Original private snapshots have no SPDX headers. Bytes are preserved for exact source pins; no third-party firmware, AOSP binaries or Android images are included. Distribution licensing remains the project maintainer policy; no header is invented inside pinned data.",
   "prior_source_review_handoff_sha256": "a93d66c4885ced523f25f2bf38c0065c4c1cf6911d4b2f727412a3ef0a079013",
-  "source_preparation_handoff_sha256": "9da34a5eea23157d5f8f9eefedec77ca2e9d980bc9968c44b9d472b69e767d93",
-  "kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c"
+  "source_preparation_handoff_sha256": "2433f492d361657128cc044ef623c49135ee31b6ce24c6abfaed59a5b8fcc2c4",
+  "kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+  "historical_producer_files": {
+    "verify-before-corrections.py": {
+      "fixture": "producer/verify-before-corrections.py.txt",
+      "sha256": "d1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670",
+      "bytes": 58863,
+      "origin": "out/android-build-review/soc-cp2a/full-images/retry-e98/verification/verify.py",
+      "execution": "data only; hash and AST parse, never import",
+      "scope": "Exact old e98 producer; admission must reject despite unchanged18check names."
+    }
+  },
+  "prior_source_preparation_handoff_sha256": "9da34a5eea23157d5f8f9eefedec77ca2e9d980bc9968c44b9d472b69e767d93"
 }

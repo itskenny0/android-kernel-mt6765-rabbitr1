@@ -424,12 +424,7 @@ check('compiled SOC split and recovery policy',health.policy)
 def image_directory(part,path,tag):
     text=run([DEBUGFS,'-R','ls -l -p '+path,P/(part+'.img')],tag)
     if 'File not found by ext2_lookup' in text:
-        lines=[line.strip() for line in text.splitlines() if line.strip()]
-        missing=path+': File not found by ext2_lookup'
-        banner=r'debugfs [0-9]+(?:\.[0-9]+)* \([^()\r\n]+\)'
-        ensure(lines.count(missing)==1 and len(lines)<=2 and
-               all(line==missing or re.fullmatch(banner,line) for line in lines),
-               'Ambiguous missing image directory')
+        ensure(not any(line.startswith('/') for line in text.splitlines()),'Ambiguous missing image directory')
         return []
     rows=[];parsed=False
     for line in text.splitlines():
@@ -715,18 +710,7 @@ def allocator_configuration():
             'compiler_commands_parsed':False,'runtime_graphics_verified':False}
 check('resolved ARM allocator configuration',allocator_configuration)
 
-def allocator_mapper_location(config):
-    ensure(config['platform'] == 'all_arm', 'Unexpected allocator platform')
-    flag = config['RELEASE_SM_OPEN_DECLARED_PASSTHROUGH_HAL']
-    # These are the explicitly supported audit profiles; unknown spellings fail.
-    ensure(type(flag) is str and flag in ('', 'false', 'true'), 'Unsupported mapper placement flag')
-    return 'apex' if flag == 'true' else 'vendor'
-
 def allocator_apex():
-    variables_path = O/'soong/soong.lineage_r1_soc.variables'
-    config = json.loads(variables_path.read_text())['VendorVars']['minigbm_upstream']
-    mapper_location = allocator_mapper_location(config)
-    guard.watch([variables_path])
     apex_path = globals()['extracted'][('vendor','/apex/com.android.hardware.graphics.allocator.minigbm_upstream.apex')]
     install = info(apex_path)
     payload = H/'apex_payload.img'
@@ -786,24 +770,8 @@ def allocator_apex():
     android_manifest = command([O/'host/linux-x86/bin/aapt2','dump','xmltree',apex_path,'--file','AndroidManifest.xml'], 'apex-android-manifest')
     ensure('package="com.android.hardware.graphics.allocator"' in android_manifest, 'Wrong APEX Android package')
     r['apex_manifest_host_tool'] = info(deapexer)
-    required = ['/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream','/lib64/libminigbm_gralloc_upstream.so','/etc/vintf/allocator.minigbm_upstream.xml','/etc/linker.config.pb','/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc']
-    mapper_names = ['/lib64/hw/mapper.minigbm_upstream.so','/etc/vintf/mapper.minigbm_upstream.xml']
-    mapper_files = {}
-    if mapper_location == 'apex':
-        required += mapper_names
-        for name in mapper_names:
-            ensure(name in extracted, 'APEX missing '+name)
-            mapper_files[name] = extracted[name]
-    else:
-        ensure(not any(row['path'] in mapper_names for row in listing), 'Unexpected APEX mapper with standalone configuration')
-        for apex_name, vendor_name in zip(mapper_names, ['/lib64/hw/mapper.minigbm_upstream.so','/etc/vintf/manifest/mapper.minigbm_upstream.xml']):
-            path = dump('vendor', vendor_name, 'allocator-vendor-'+Path(vendor_name).name)
-            ensure(sha(path) == sha(P/'vendor'/vendor_name.lstrip('/')), 'Packaged standalone mapper differs from installed output')
-            mapper_files[apex_name] = path
+    required = ['/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream','/lib64/hw/mapper.minigbm_upstream.so','/lib64/libminigbm_gralloc_upstream.so','/etc/vintf/allocator.minigbm_upstream.xml','/etc/vintf/mapper.minigbm_upstream.xml','/etc/linker.config.pb','/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc']
     for name in required: ensure(name in extracted, 'APEX missing '+name)
-    mapper_binary = elf(mapper_files[mapper_names[0]], 'allocator-mapper')
-    symbols = run([READELF,'--dyn-syms','--wide',mapper_files[mapper_names[0]]], 'allocator-mapper-symbols')
-    ensure(re.search(r'\bGLOBAL\s+DEFAULT\s+(?!UND\b)\S+\s+AIMapper_loadIMapper(?:\s|$)',symbols), 'Mapper implementation export missing')
     rc = read(extracted['/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc'])
     ensure(b'/apex/com.android.hardware.graphics.allocator/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream' in rc, 'Wrong APEX service path')
     binaries = {}
@@ -823,14 +791,12 @@ def allocator_apex():
         return [element.tag,dict(element.attrib),(element.text or '').strip(),[semantic(child) for child in element]]
     vintf = {}
     for name,expected in expected_vintf.items():
-        path = mapper_files[mapper_names[1]] if name == 'mapper' else extracted['/etc/vintf/allocator.minigbm_upstream.xml']
-        actual = semantic(ET.fromstring(read(path)))
+        actual = semantic(ET.fromstring(read(extracted['/etc/vintf/'+name+'.minigbm_upstream.xml'])))
         ensure(actual == semantic(ET.fromstring(expected)), 'Unexpected packaged VINTF declaration '+name)
         vintf[name] = actual
     ensure(not any(name.startswith('/lib/') for name in binaries), 'Unexpected 32-bit APEX variant')
     return {**install,'manifest':manifest,'payload':info(payload),'payload_filesystem':filesystem,'archive_members':archive_names,
             'required_files':{name:info(extracted[name]) for name in required},'elfs':binaries,'external_needed_declared_in_manifest':external_needed,'vintf_declarations':vintf,
-            'mapper':{'placement':mapper_location,'resolved_flag':config['RELEASE_SM_OPEN_DECLARED_PASSTHROUGH_HAL'],'library':mapper_binary,'vintf':info(mapper_files[mapper_names[1]]),'variables':info(variables_path)},
             'signature_trust_verified':False,'runtime_dependency_resolution_verified':False}
 check('current allocator APEX payload, ARM64 libraries, init and VINTF',allocator_apex)
 guard.watch([O/'host/linux-x86/bin/aapt2',O/'host/linux-x86/bin/deapexer'])

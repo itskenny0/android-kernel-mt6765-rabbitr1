@@ -209,6 +209,18 @@ for name,constant,wanted in (
     details(old,0)['build_identity']['guard']=m.digest_file(directory/'provenance.py')
     reject_historical('historical-'+name,old,'Unreviewed SOC audit producer: '+name)
 
+# The old e98 verifier has the same 18 check names but predates the two
+# reviewed corrections. Its exact bytes must not satisfy the current profile.
+old_verifier = provenance['historical_producer_files']['verify-before-corrections.py']
+old_source = FIXTURES/old_verifier['fixture']
+assert old_source.suffix == '.txt' and not old_source.stat().st_mode & 0o111
+assert old_source.stat().st_size == old_verifier['bytes']
+assert hashlib.sha256(old_source.read_bytes()).hexdigest() == old_verifier['sha256']
+directory=badproducer/'historical-verify';shutil.copytree(producer,directory)
+shutil.copyfile(old_source,directory/'verify.py')
+old=copy.deepcopy(audit);old['verifier']=m.digest_file(directory/'verify.py')
+reject_historical('historical-uncorrected-e98-verifier',old,'Unreviewed SOC audit producer: verify.py')
+
 # Explicit historical profile preserves reproduction while default SOC refuses
 # to bless the known incomplete old Health-provider coverage.
 legacy=copy.deepcopy(audit);legacy['checks']=[{'name':n,'status':'pass','details':{}} for n in m.LEGACY_CHECKS]
