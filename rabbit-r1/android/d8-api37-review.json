@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-10-09",
+  "scope": "Static compiler selection and bounded live-log observation; no generated dex, packaged-image or runtime verification",
+  "selected_prebuilt": {
+    "project": "prebuilts/r8",
+    "commit": "65fe8f9f5c6769d35f91fe67b786b767a2db5249",
+    "matches_official_tag": "android-17.0.0_r1",
+    "version": "9.2.12-dev",
+    "upstream_commit": "3bec476bbff78407704bff11caa40ea817fcb8fa",
+    "jar_bytes": 20640990,
+    "jar_sha256": "49a6139b96a272482570cb8f32685cc89c27f2457e5d0ec9f447689e52ec9779",
+    "local_jar_matches_git_blob": true,
+    "generated_host_wrapper_jar_inspected": false
+  },
+  "api37_diagnostic": {
+    "severity_in_matching_source": "warning",
+    "latest_modeled_api": "36.1",
+    "numeric_37_maps_to": "MAIN",
+    "minimum_api_clamped_to_36": false,
+    "also_observed_after_runtime_directed_actions": [
+      "framework-minus-apex d8",
+      "ext d8",
+      "telephony-common r8",
+      "ims-common d8"
+    ],
+    "final_packaged_membership_verified": false,
+    "invalid_runtime_bytecode_demonstrated": false,
+    "runtime_correctness_demonstrated": false
+  },
+  "upstream_comparison": {
+    "commit": "9c6309bc902f879538074bfb74771b3a47f003e6",
+    "api37_explicitly_modeled": true,
+    "validated_prebuilt_replacement": false
+  },
+  "build_action": "Preserve the running build and its pinned compiler. Record the caveat with completed-build evidence; investigate any concrete dex/runtime failure before selecting and validating a separate compiler update.",
+  "sources": [
+    "https://android.googlesource.com/platform/prebuilts/r8/+/refs/tags/android-17.0.0_r1",
+    "https://r8.googlesource.com/r8/+/3bec476bbff78407704bff11caa40ea817fcb8fa/src/main/java/com/android/tools/r8/BaseCompilerCommand.java",
+    "https://r8.googlesource.com/r8/+/3bec476bbff78407704bff11caa40ea817fcb8fa/src/main/java/com/android/tools/r8/utils/AndroidApiLevel.java",
+    "https://r8.googlesource.com/r8/+/9c6309bc902f879538074bfb74771b3a47f003e6/src/main/java/com/android/tools/r8/utils/AndroidApiLevel.java"
+  ],
+  "local_evidence": {
+    "directory": "/rabbitr1/out/android-build-review/soc-cp2a/d8-api37-review",
+    "handoff_sha256": "b7bc53512c17f4d9660b84e6a6b9781ead9f23b19f59052a90e1ee0d9fad332c",
+    "review_sha256": "fd2b4e2c27972fee6734e8012acdbbcdb409235f26a4f450d7aeff1f4cd1010f",
+    "static_local_inputs_checked": 19,
+    "captured_sources_bundled_in_repository": false
+  }
+}

@@ -36,6 +36,15 @@ and declares October 1, 2026, overriding the AOSP-only flag values. These are
 configuration values; the security-patch property alone does not establish
 security-patch coverage in the custom kernel or vendor implementation.
 
+The current `cp2a` build also emits a D8/R8 warning about API 37. The selected
+R8 9.2.12-dev jar matches the official Android 17 release prebuilt. Its source
+models APIs through 36.1 and treats 37 as `MAIN`; it warns without rejecting 37
+or reducing the minimum API to 36. The warning appears after runtime-directed
+actions as well as stubs. The [compiler review](../android/d8-api37-review.json)
+records the exact jar and source pins. It establishes neither invalid bytecode
+nor runtime correctness. Preserve the pinned compiler during this build; the
+image audit does not replace ART/device testing.
+
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
 Both liblog variants export the private backend reader, recovery-persist imports
