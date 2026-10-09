@@ -16,6 +16,11 @@ slots. Device boot remains untested at this milestone; hardware validation and
 the complete Android flash procedure remain outstanding. The diagnostic
 mtkclient package still contains no Android filesystem images.
 
+The [offline layout inspector](INSTALL-LAYOUT.md) checks saved paired GPT extents
+and pinned storage observations, with an explicit zero-disk-GUID profile for
+the observed r1 format. Its report establishes layout consistency only; fresh
+device identity and the remaining physical-installation gates stay separate.
+
 The [earlier default build](../android/full-image-build.json) uses `trunk_staging`:
 Android 17/API 37 and Lineage 24.0, with preview SDK 1 and the inherited `Baklava` codename. It is a development
 configuration, not finalized `REL`. The [version review](../android/version-status.json)
