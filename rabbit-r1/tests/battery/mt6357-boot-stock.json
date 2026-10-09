@@ -1,0 +1,299 @@
+{
+  "hardware_tested": false,
+  "stock_kernel_elf_sha256": "a03b5ff0b811de4c3d2b8c971b213b36274106536191f6588b2fca7372d4be75",
+  "stock_gauge_source_sha256": "4def22ad2b77e2b470c151b9b6b9bd48fcc344f459e737849109da22f59a25ae",
+  "conversion": {
+    "file": "mt6357-boot-stock-conversion.u32le",
+    "sha256": "83f59ea7bdf08deab6ecd5600cac8f1e5c5fddf565337ab40c59bbf6b6fb7578",
+    "format": "32768 little-endian u32 values in 0.1 mV, indexed by raw 15-bit code",
+    "instruction": {
+      "address": "0xffffff8008ae13fc",
+      "end": "0xffffff8008ae146c",
+      "sha256": "193067620dcd3cd3531cef0b50712e451ceaabefd2582eb20f89e2b15d3fee5e"
+    }
+  },
+  "physical_registers": [
+    4268,
+    4288,
+    2592,
+    3482,
+    3592
+  ],
+  "stock_lk_sha256": "534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e",
+  "replayed_patched_lk_sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0",
+  "lk_cases": [
+    {
+      "profile": "ram",
+      "input": [
+        0,
+        0,
+        0
+      ],
+      "output": {
+        "atag,fg_swocv_v": "0",
+        "atag,fg_swocv_i": "0",
+        "atag,shutdown_time": "0"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 1,
+          "value_hex": "30"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 1,
+          "value_hex": "30"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 1,
+          "value_hex": "30"
+        }
+      ],
+      "final_fdt_sha256": "96f6ca3f35086412b74afc0a7b060b3e9a59a7a10d390d10d7483ad1e478f46f"
+    },
+    {
+      "profile": "ram",
+      "input": [
+        40123,
+        -1234,
+        321
+      ],
+      "output": {
+        "atag,fg_swocv_v": "40123",
+        "atag,fg_swocv_i": "-1234",
+        "atag,shutdown_time": "321"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 5,
+          "value_hex": "3430313233"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 5,
+          "value_hex": "2d31323334"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 3,
+          "value_hex": "333231"
+        }
+      ],
+      "final_fdt_sha256": "3bdf5488ed0718b62d177a21b2f11892aa3f3ef579b8257f7c452e853cc5b6ab"
+    },
+    {
+      "profile": "ram",
+      "input": [
+        38217,
+        987,
+        86400
+      ],
+      "output": {
+        "atag,fg_swocv_v": "38217",
+        "atag,fg_swocv_i": "987",
+        "atag,shutdown_time": "86400"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 5,
+          "value_hex": "3338323137"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 3,
+          "value_hex": "393837"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 5,
+          "value_hex": "3836343030"
+        }
+      ],
+      "final_fdt_sha256": "4e1773235ab07684a78f270a221ea9fb7c68555c6221874d476f2350d8954c8c"
+    },
+    {
+      "profile": "ram",
+      "input": [
+        2147483647,
+        -2147483648,
+        2147483647
+      ],
+      "output": {
+        "atag,fg_swocv_v": "2147483647",
+        "atag,fg_swocv_i": "-2147483648",
+        "atag,shutdown_time": "2147483647"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 10,
+          "value_hex": "32313437343833363437"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 11,
+          "value_hex": "2d32313437343833363438"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 10,
+          "value_hex": "32313437343833363437"
+        }
+      ],
+      "final_fdt_sha256": "f27e15f98a6e5a15c6066300c7c40b5c5c1d445be3545fa2f834cc09a858db0b"
+    },
+    {
+      "profile": "expdb",
+      "input": [
+        0,
+        0,
+        0
+      ],
+      "output": {
+        "atag,fg_swocv_v": "0",
+        "atag,fg_swocv_i": "0",
+        "atag,shutdown_time": "0"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 1,
+          "value_hex": "30"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 1,
+          "value_hex": "30"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 1,
+          "value_hex": "30"
+        }
+      ],
+      "final_fdt_sha256": "10bbbd026b6a1f77de37dda0290de0cd0208429daf30dcf18fa0db78e149cf15"
+    },
+    {
+      "profile": "expdb",
+      "input": [
+        40123,
+        -1234,
+        321
+      ],
+      "output": {
+        "atag,fg_swocv_v": "40123",
+        "atag,fg_swocv_i": "-1234",
+        "atag,shutdown_time": "321"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 5,
+          "value_hex": "3430313233"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 5,
+          "value_hex": "2d31323334"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 3,
+          "value_hex": "333231"
+        }
+      ],
+      "final_fdt_sha256": "4ded6b4cfca816df5ae5deddbbcbb90609c403366adc0faea768c4fef1ac0a56"
+    },
+    {
+      "profile": "expdb",
+      "input": [
+        38217,
+        987,
+        86400
+      ],
+      "output": {
+        "atag,fg_swocv_v": "38217",
+        "atag,fg_swocv_i": "987",
+        "atag,shutdown_time": "86400"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 5,
+          "value_hex": "3338323137"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 3,
+          "value_hex": "393837"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 5,
+          "value_hex": "3836343030"
+        }
+      ],
+      "final_fdt_sha256": "67968a3760ad37df2710fc69bbb946c61176beadf8741f098a31a53c5f07354b"
+    },
+    {
+      "profile": "expdb",
+      "input": [
+        2147483647,
+        -2147483648,
+        2147483647
+      ],
+      "output": {
+        "atag,fg_swocv_v": "2147483647",
+        "atag,fg_swocv_i": "-2147483648",
+        "atag,shutdown_time": "2147483647"
+      },
+      "fdt_setprop_calls": [
+        {
+          "property": "atag,fg_swocv_v",
+          "caller_offset": "0x1c42e",
+          "length": 10,
+          "value_hex": "32313437343833363437"
+        },
+        {
+          "property": "atag,fg_swocv_i",
+          "caller_offset": "0x1c48c",
+          "length": 11,
+          "value_hex": "2d32313437343833363438"
+        },
+        {
+          "property": "atag,shutdown_time",
+          "caller_offset": "0x1c4ea",
+          "length": 10,
+          "value_hex": "32313437343833363437"
+        }
+      ],
+      "final_fdt_sha256": "41ff077e4ffe63ed29d78f9646520ace8a08f39ef55bd858fc32130098e8e274"
+    }
+  ],
+  "scope": "Independent actual stock ARM64 conversion outputs and actual patched LK decimal property payloads; all hardware inputs in replay were modeled. No SOC or measurement validity claim."
+}

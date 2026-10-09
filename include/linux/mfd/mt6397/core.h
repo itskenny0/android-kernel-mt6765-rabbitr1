@@ -7,6 +7,7 @@
 #ifndef __MFD_MT6397_CORE_H__
 #define __MFD_MT6397_CORE_H__
 
+#include <linux/mfd/mt6357/boot.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
 
@@ -73,6 +74,7 @@ struct mt6397_chip {
 	u16 int_status[3];
 	u16 chip_id;
 	void *irq_data;
+	struct mt6357_boot_snapshot boot_snapshot;
 };
 
 int mt6358_irq_init(struct mt6397_chip *chip);

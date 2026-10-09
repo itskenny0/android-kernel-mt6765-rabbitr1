@@ -5,6 +5,7 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/ktime.h>
 #include <linux/ioport.h>
 #include <linux/irqdomain.h>
 #include <linux/module.h>
@@ -346,6 +347,70 @@ static const struct chip_data mt6397_core = {
 	.irq_init = mt6397_irq_init,
 };
 
+static struct platform_driver mt6397_driver;
+
+static void mt6357_boot_capture(struct mt6397_chip *pmic, u16 swcid)
+{
+	static const unsigned int registers[MT6357_BOOT_FIELD_COUNT] = {
+		[MT6357_BOOT_POWER_ON] = MT6357_AUXADC_ADC20,
+		[MT6357_BOOT_PLUGIN] = MT6357_AUXADC_ADC31,
+		[MT6357_BOOT_STARTUP] = MT6357_STRUP_CON6,
+		[MT6357_BOOT_SYSTEM_INFO] = MT6357_SYSTEM_INFO_CON0,
+		[MT6357_BOOT_BATTERY_STATUS] = MT6357_BATON_ANA_CON0,
+	};
+	struct mt6357_boot_snapshot *s = &pmic->boot_snapshot;
+	unsigned int i, value;
+
+	if (s->observed)
+		return;
+	s->started_ns = ktime_get_boottime_ns();
+	s->swcid = swcid;
+	for (i = 0; i < ARRAY_SIZE(registers); i++) {
+		s->words[i].error = regmap_read(pmic->regmap, registers[i], &value);
+		if (!s->words[i].error)
+			s->words[i].raw = value;
+	}
+	s->finished_ns = ktime_get_boottime_ns();
+	s->observed = true;
+	/* Raw observations only: readiness does not establish valid boot OCV. */
+	dev_info(pmic->dev,
+		 "boot capture ns=%llu..%llu swcid=%04x pon=%04x/%d plugin=%04x/%d ready=%d/%d startup=%04x/%d info=%04x/%d battery=%04x/%d (raw/errno)\n",
+		 s->started_ns, s->finished_ns, s->swcid,
+		 s->words[0].raw, s->words[0].error,
+		 s->words[1].raw, s->words[1].error,
+		 s->words[0].error ? -1 : !!(s->words[0].raw & BIT(15)),
+		 s->words[1].error ? -1 : !!(s->words[1].raw & BIT(15)),
+		 s->words[2].raw, s->words[2].error,
+		 s->words[3].raw, s->words[3].error,
+		 s->words[4].raw, s->words[4].error);
+}
+
+int mt6357_boot_snapshot_get(struct device *parent, struct mt6357_boot_snapshot *out)
+{
+	struct mt6397_chip *pmic;
+	int ret = 0;
+
+	if (!parent || !out)
+		return -EINVAL;
+	/* Never wait: parent probe/removal can be waiting on a child caller. */
+	if (!device_trylock(parent))
+		return -EAGAIN;
+	if (parent->driver != &mt6397_driver.driver) {
+		ret = -ENODEV;
+		goto unlock;
+	}
+	pmic = dev_get_drvdata(parent);
+	if (!pmic || pmic->chip_id != MT6357_CHIP_ID || !pmic->boot_snapshot.observed) {
+		ret = -ENODEV;
+		goto unlock;
+	}
+	*out = pmic->boot_snapshot;
+unlock:
+	device_unlock(parent);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mt6357_boot_snapshot_get);
+
 static int mt6397_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -378,6 +443,10 @@ static int mt6397_probe(struct platform_device *pdev)
 	}
 
 	pmic->chip_id = (id >> pmic_core->cid_shift) & 0xff;
+
+	/* Capture before any child can reset AUXADC or consume boot state. */
+	if (pmic_core == &mt6357_core && pmic->chip_id == MT6357_CHIP_ID)
+		mt6357_boot_capture(pmic, id);
 
 	platform_set_drvdata(pdev, pmic);
 
