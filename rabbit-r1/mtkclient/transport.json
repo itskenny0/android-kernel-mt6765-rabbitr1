@@ -9,16 +9,16 @@
   },
   "patch": {
     "path": "patches/mtkclient/0001-guard-bulk-transfers.patch",
-    "sha256": "0e75f67941e756a89459bad84a07bcd29fccc39576dcbd0572b62040dfa0dbd9",
-    "bytes": 31145
+    "sha256": "7661c68f98dfa8934cba028523de05c481ba5a50b18d2459ccd4d08fba8f6514",
+    "bytes": 32252
   },
   "files": [
     {
       "path": "mtkclient/Library/Connection/usblib.py",
       "before_sha256": "844d47a0b71b562d1a3e283ee939f85eb550c34b4724213708e93c920c283e18",
-      "after_sha256": "58248442049d932e8c0e59eb8e7fc12bb94e1da3a216c243bce2ba4ae65799fb",
+      "after_sha256": "17337a3c032779e3fa89557ae08939671a50558e4e9bac3479e4b74d5e43844f",
       "before_bytes": 31621,
-      "after_bytes": 35789
+      "after_bytes": 35849
     },
     {
       "path": "mtkclient/Library/Port.py",
@@ -30,9 +30,9 @@
     {
       "path": "mtkclient/Library/DA/xflash/xflash_lib.py",
       "before_sha256": "cd55b262d1acfbda33833aabf3669997cb81d1b58b3c1844d4b4bef71f446b7b",
-      "after_sha256": "f72bf84c3f26138237a295908270ecf4914891734ed29cad8d3037a5e2cdd8cb",
+      "after_sha256": "96aa1ef4e6cd219e0cc5bd80c43f2946623e40fc9d2ad9f5dc0fa6b94453c54f",
       "before_bytes": 53694,
-      "after_bytes": 57471
+      "after_bytes": 58503
     }
   ]
 }

@@ -37,7 +37,7 @@ diff --git a/mtkclient/Library/Connection/usblib.py b/mtkclient/Library/Connecti
          if self.connected:
              self.close()
              self.connected = False
-@@ -388,70 +402,168 @@
+@@ -388,70 +402,169 @@
          return False
  
      def close(self, reset=False):
@@ -181,8 +181,9 @@ diff --git a/mtkclient/Library/Connection/usblib.py b/mtkclient/Library/Connecti
 +                    if count > size:
 +                        self._io_fail("overlong bulk read buffer")
 +                    data = raw
-+                # A read ZLP is terminal only in the explicit short-read mode.
-+                if count == 0 and size != 0 and not (operation == "read" and short_read):
++                # Exact reads may cross a successful ZLP; it consumes the same
++                # call/deadline budget. Short-read mode still terminates below.
++                if count == 0 and size != 0 and operation == "write":
 +                    self._io_fail("bulk transfer made no progress")
 +                done += count
 +                pending = False
@@ -259,7 +260,7 @@ diff --git a/mtkclient/Library/Connection/usblib.py b/mtkclient/Library/Connecti
  
      def get_read_packetsize(self):
          return self.EP_IN.wMaxPacketSize
-@@ -460,77 +572,20 @@
+@@ -460,77 +573,20 @@
          return self.EP_OUT.wMaxPacketSize
  
      def usbread(self, resplen=None, maxtimeout=100, w_max_packet_size=None):
@@ -345,7 +346,7 @@ diff --git a/mtkclient/Library/Connection/usblib.py b/mtkclient/Library/Connecti
          res = bytearray()
          timeout = 0
          loglevel = self.loglevel
-@@ -590,11 +645,12 @@
+@@ -590,11 +646,12 @@
          return ids
  
      def usbwrite(self, data, pktsize=None):
@@ -427,7 +428,7 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
                  status = self.status()
                  if status == 0x0:
                      return True
-@@ -700,107 +703,166 @@
+@@ -700,107 +703,180 @@
                  self.error(f"Error on reading data: {self.eh.status(status)}")
          return False
  
@@ -556,6 +557,7 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
 +            if hasattr(cdc, "check_io"):
 +                cdc.check_io()
 +            bytesread = 0
++            last_status_offset = None
 +            while bytesread < length:
 +                header = self.usbread(12, maxtimeout=5000)
 +                if len(header) != 12:
@@ -563,10 +565,23 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
 +                magic, _, slength = unpack("<III", header)
 +                if magic != 0xFEEEEEEF:
 +                    raise IOError("Invalid read data magic")
-+                # Four-byte in-data frames were statuses in this protocol path.
-+                # Their payload/status distinction is unproved: never guess data.
-+                if slength <= 4:
-+                    raise IOError("Early status or ambiguous/invalid read data length")
++                if slength == 4:
++                    # The observed eMMC sector-read protocol sends raw-zero
++                    # status frames before/between data. Never count them as data.
++                    # Other read shapes retain the four-byte ambiguity rejection.
++                    if storage != 1 or addr % 512 or length % 512 or bytesread % 512:
++                        raise IOError(f"Ambiguous four-byte frame at {bytesread}/{length} bytes outside sector read")
++                    # At most one status at each aligned byte offset. Data must
++                    # advance before another: at most length/512 statuses total.
++                    if last_status_offset == bytesread:
++                        raise IOError(f"Repeated four-byte status at {bytesread}/{length} bytes")
++                    last_status_offset = bytesread
++                    status = self.usbread(4, w_max_packet_size=4)
++                    if len(status) != 4 or unpack("<I", status)[0] != 0:
++                        raise IOError(f"Read intermediate status is not raw zero at {bytesread}/{length} bytes (frame length 4)")
++                    continue
++                if slength < 4:
++                    raise IOError(f"Invalid read data length {slength} at {bytesread}/{length} bytes")
 +                if slength > length - bytesread:
 +                    raise IOError("Read frame exceeds selected remaining length")
 +                remaining = slength
@@ -685,7 +700,7 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
  
      class ShutDownModes:
          NORMAL = 0
-@@ -880,6 +942,9 @@
+@@ -880,6 +956,9 @@
                  status = self.status()
                  if status == 0x0:
                      self.send_devctrl(self.cmd.CC_OPTIONAL_DOWNLOAD_ACT)
@@ -695,7 +710,7 @@ diff --git a/mtkclient/Library/DA/xflash/xflash_lib.py b/mtkclient/Library/DA/xf
                      if display:
                          pg.done()
                      if fh:
-@@ -892,6 +957,9 @@
+@@ -892,6 +971,9 @@
                  self.error(str(e))
                  if fh:
                      fh.close()

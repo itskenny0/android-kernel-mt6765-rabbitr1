@@ -161,6 +161,37 @@ class Tests(unittest.TestCase):
         link,ns,_=load();link.EP_IN=In([])
         self.assertEqual(link.usbread(0),b'');self.assertEqual(link.EP_IN.calls,[]);self.note('read-zero-local')
 
+    def test_exact_read_zlp_bounds(self):
+        for fast in (False,True):
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'',b'A',b'',b'BC'])
+            self.assertEqual(link.usbread(3),b'ABC')
+            self.assertEqual([c[0] for c in link.EP_IN.calls],[3,3,2,2])
+            self.assertIsNone(link._io_failure);self.note('read-ZLP-fragments-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'']*4);link.BULK_MAX_CALLS=3
+            self.rejected(link,ns,lambda:link.usbread(3))
+            self.assertEqual(len(link.EP_IN.calls),3)
+            self.assertIn('call budget exhausted',link._io_failure);self.note('read-ZLP-call-budget-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'A',b'',b'B']);link.BULK_MAX_CALLS=2
+            self.rejected(link,ns,lambda:link.usbread(2))
+            self.assertEqual(len(link.EP_IN.calls),2)
+            self.assertIn('acknowledged 1/2',link._io_failure);self.note('read-ZLP-partial-budget-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'',b'A']);link.BULK_TOTAL_TIMEOUT_MS=2
+            ticks=iter([0,0,1000000,1500000]);ns['time'].monotonic_ns=lambda:next(ticks)
+            self.rejected(link,ns,lambda:link.usbread(1))
+            self.assertEqual(len(link.EP_IN.calls),1)
+            self.assertIn('no complete timeout millisecond',link._io_failure);self.note('read-ZLP-total-deadline-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'',b'A'])
+            ticks=iter([0,0,1000000000]);ns['time'].monotonic_ns=lambda:next(ticks)
+            self.rejected(link,ns,lambda:link.usbread(1))
+            self.assertEqual(len(link.EP_IN.calls),1)
+            self.assertIn('completion reached its deadline',link._io_failure);self.note('read-ZLP-call-deadline-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'',OSError('unknown transfer'),b'A']);link.EP_OUT=Out()
+            self.rejected(link,ns,lambda:link.usbread(1));self.rejected(link,ns,lambda:link.usbwrite(b'next'))
+            self.assertEqual(len(link.EP_IN.calls),2);self.assertEqual(link.EP_OUT.calls,[])
+            self.note('read-ZLP-then-exception-'+str(fast))
+            link,ns,_=load();link.fast=fast;link.EP_IN=In([b'',4 if fast else b'LONG'])
+            self.rejected(link,ns,lambda:link.usbread(3));self.note('read-ZLP-then-invalid-count-'+str(fast))
+
     def test_invalid_counts_errors_no_later_traffic(self):
         for bad in (0,-1,9,True,False,None,1.0,OSError('uncertain partial write'),KeyboardInterrupt()):
             link,ns,_=load();link.EP_OUT=Out([2,bad]);link.EP_IN=In([])
@@ -170,8 +201,8 @@ class Tests(unittest.TestCase):
                 self.rejected(link,ns,call)
             self.assertEqual(len(link.EP_OUT.calls),2);self.assertEqual(link.EP_IN.calls,[])
             self.note('invalid-write-'+repr(bad))
-        for fast,bad in ((False,b''),(False,b'LONG'),(False,2),(False,True),(False,array.array('H',[1])),
-                         (False,OSError('partial read unknown')),(True,0),(True,-1),(True,4),(True,True)):
+        for fast,bad in ((False,b'LONG'),(False,2),(False,True),(False,array.array('H',[1])),
+                         (False,OSError('partial read unknown')),(True,-1),(True,4),(True,True)):
             link,ns,_=load();link.fast=fast;link.EP_IN=In([bad]);link.EP_OUT=Out()
             self.rejected(link,ns,lambda:link.usbread(3));self.rejected(link,ns,lambda:link.usbwrite(b'next'))
             self.assertEqual(len(link.EP_IN.calls),1);self.assertEqual(link.EP_OUT.calls,[])
@@ -266,8 +297,8 @@ class Tests(unittest.TestCase):
         link,ns,_=load();model=mod.Model([(-7,2,None),(0,2,None)]);link.EP_OUT=model.out
         self.assertTrue(link.usbwrite(b'ABCD'));self.assertEqual(bytes(model.acknowledged),b'ABCD');self.note('actual-PyUSB-positive-timeout-suffix')
         for fast in (False,True):
-            link,ns,_=load();model=mod.Model([(-7,2,b'AB'),(0,2,b'CD')]);link.EP_IN=model.into;link.fast=fast
-            self.assertEqual(link.usbread(4,w_max_packet_size=4),b'ABCD');self.note('actual-PyUSB-read-'+str(fast))
+            link,ns,_=load();model=mod.Model([(0,0,b''),(-7,2,b'AB'),(0,0,b''),(0,2,b'CD')]);link.EP_IN=model.into;link.fast=fast
+            self.assertEqual(link.usbread(4,w_max_packet_size=4),b'ABCD');self.note('actual-PyUSB-read-ZLP-'+str(fast))
         link,ns,_=load();model=mod.Model([(-1,2,None)]);link.EP_OUT=model.out
         self.rejected(link,ns,lambda:link.usbwrite(b'ABCD'));self.assertEqual(len(model.calls),1)
         self.rejected(link,ns,lambda:link.usbwrite(b'ABCD'));self.assertEqual(len(model.calls),1);self.note('actual-PyUSB-error-unknown-no-retry')

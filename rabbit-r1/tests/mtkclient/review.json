@@ -1,58 +1,53 @@
 {
-  "schema": 2,
+  "schema": 3,
   "recorded_utc": "2026-10-09",
-  "scope": "Host-only USB bulk guard, XFlash read acceptance and offline preparation; no device test",
+  "scope": "Bounded USB ZLP reads and intermediate XFlash status frames; host tests plus limited read-only r1 observations.",
+  "previous_review_commit": "1e7e3a6b82b914188fd1a9a202f8a7c93958b8a7",
+  "previous_review_sha256": "cb597ea7301884b564fe6a1c61f390ed9f69d59faf011ab70c714be1c9aba85b",
   "archive_sha256": "b305b5a7bf8243bf7f5a7b5fa5d5e419624e78e14a0d4d6e19cb4d19e930e34d",
-  "patch_sha256": "0e75f67941e756a89459bad84a07bcd29fccc39576dcbd0572b62040dfa0dbd9",
-  "manifest_sha256": "dc9e43fb6ce0cf0c0f19a39106f844b443d28680f1653b0a9613a0fee6691e37",
-  "previous_review_commit": "d2d29c12423299cdd798c945edfb4c8747a9ef37",
+  "patch_sha256": "7661c68f98dfa8934cba028523de05c481ba5a50b18d2459ccd4d08fba8f6514",
+  "manifest_sha256": "ddc40695b181d29ea32b1a0a4eccf7c0d891886e7bd40ea67593390a08a2e834",
   "bulk_transport": {
-    "methods": 9,
-    "current_controls": 77,
-    "result_sha256": "a0eb7f5a31383f02839a2df160457a1cf050c5d1dffdb09cf0e5c87bea1be424",
-    "usblib_and_Port_unchanged": true,
-    "initial_independent_controls": 12,
-    "initial_independent_provenance_sha256": "19ed23c697037b3c7c0fb243564fc4df8254d3f2b1721b78f227906cb730473f"
+    "methods": 10,
+    "current_controls": 89,
+    "result_sha256": "b125b32c24f5b93d8ef98f836b9b493e3292fab98a2a1bff92692f717a8dfb4e",
+    "script_sha256": "116c37018f3be6f58abb7d947be7a2066daf28adcb1f39738d380dceb3db6e52",
+    "source_sha256": "17337a3c032779e3fa89557ae08939671a50558e4e9bac3479e4b74d5e43844f",
+    "fixture_change": "Two immediate-zero-read rejection cases are replaced by bounded read-ZLP cases; zero-write and exception rejection remain."
   },
   "read_correction": {
-    "source_sha256": "f72bf84c3f26138237a295908270ecf4914891734ed29cad8d3037a5e2cdd8cb",
-    "owner_controls": 61,
-    "independent_controls": 6,
+    "current_controls": 99,
+    "result_sha256": "c87ae69c8b76e45804751d5fb8bbfccb1bfdba0c87a643f2c695292842f66167",
+    "script_sha256": "da7b092fb7736bf2065456684289569b93b211f3f56707dce339d46cb5e111d0",
+    "fixture_sha256": "52a04e0c61d953b422dc42d320dd6bc08558f7304355d132d634183ed39b01c1",
+    "source_sha256": "96aa1ef4e6cd219e0cc5bd80c43f2946623e40fc9d2ad9f5dc0fa6b94453c54f",
     "cli_exit_code": 1,
     "next_shell_process_ran": false,
-    "owner_handoff_sha256": "40c89e0a33e48e2995e1349c0757dbfc8126dd02a18006ca5aa729df8d9c1841",
-    "independent_provenance_sha256": "890b8a0982df4576afc81dfc138f1acde1fa50f93b7b934eaa83395444d50d0f",
-    "scope": "Actual extracted read/DAloader/DaHandler/Main tail; setup/query/storage are modeled except dedicated command control",
-    "portable_test": {
-      "script_sha256": "c1df5de070377c689d82cd6d44317cce0b3cba21e3610ccc2775a8ff85403da7",
-      "fixture_sha256": "52a04e0c61d953b422dc42d320dd6bc08558f7304355d132d634183ed39b01c1",
-      "handoff_sha256": "f32a84216d077afab3e0e5d65a545f8fa4fdc096662e141a89fcdc8d002069b5",
-      "controls": 61,
-      "path_controls": 8,
-      "source_trees_tested": 2,
-      "normalized_traces_match_reviewed_controls": true,
-      "source_mutations": false
-    }
+    "existing_cli_dump_preserved": true,
+    "scope": "Actual extracted read/command-handler/CLI chain; query/storage/initial command modeled except dedicated command control."
   },
   "preparer": {
-    "methods": 7,
-    "current_controls": 21,
-    "result_sha256": "36f75788f993375edad2e84b29459a0d042c449c2309b8d08f66cbae3cad5834",
+    "current_archive_prepare_and_full_check_passed": true,
     "actual_archive_files": 1164,
     "actual_archive_directories": 40,
-    "original_source_unchanged": true,
-    "initial_independent_controls": 18,
-    "initial_independent_provenance_sha256": "0d656cdfa58f689924d12ae07890a44b856b5814a68ffd1a41ca95ad23c0963e"
+    "preparer_source_unchanged": true,
+    "older21_control_suite_rerun": false
   },
-  "integration_result_sha256": "af686f3401cc32e4fc62bd493ab88aa6580246a271f3f1851f9478cb1d8eefe6",
-  "hardware_tested": false,
-  "diagnostic_packaging": "New packages bind the current transport inputs; existing archives and generated scripts need explicit refresh.",
+  "physical_read_observations": {
+    "source_hashes_match_tested_candidates": true,
+    "repeated_1_MiB_head_and_tail_pairs_identical": true,
+    "aligned_4_MiB_reads_completed": true,
+    "intermediate_zero_status_observed_after_data": true,
+    "media_write_tested": false,
+    "complete_backup_claimed": false,
+    "identifiers_and_partition_hashes_omitted": true
+  },
   "limits": [
-    "Engineering USB budgets are not measured device compatibility; uncooperative backends are not preempted.",
-    "Raw control/exploit/discovery, other DA protocols, global status parsing, partition selection and physical media durability remain outside the read acceptance proof.",
-    "XFlash header datatypes and four-byte data/status distinction are unresolved; in-data frames of four bytes or less are rejected.",
-    "A missing packet-size query result stops the read; this deliberately removes the old 1MiB fallback and may reject a usable DA.",
-    "Published dumps require ordinary non-symlink paths and regular single-link destinations and use mode 0600; old inode/metadata are not retained.",
-    "Source checks and file publication assume a trusted single-owner host; no concurrent hostile-writer sandbox or power-loss durability is claimed."
+    "A successful zero-length exact USB read consumes the original endpoint-call and monotonic-time budgets; exceptions are never retried.",
+    "Intermediate raw-zero statuses are restricted to eMMC storage 1 and 512-aligned address, selected length and current byte offset. One status per offset bounds the total by length/512; four-byte payload data is unsupported.",
+    "Header datatypes, global status parsing, other DA protocols, partition selection and physical media durability remain outside this change.",
+    "A drained zero-status frame or a newly opened USB handle alone does not prove protocol quiescence.",
+    "The finite engineering budgets cannot preempt an uncooperative USB backend and may reject slow valid operations.",
+    "Old packages and prepared scripts retain their old transport pins until explicitly refreshed."
   ]
 }

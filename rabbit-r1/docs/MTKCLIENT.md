@@ -2,8 +2,10 @@
 
 haretic carries a host-side patch for mtkclient v2.1.4.1. It stops guarded USB
 bulk operations after an uncertain transfer and propagates those failures
-through XFlash reads and writes. It has been tested with scripted endpoints and
-actual extracted upstream methods; it has not been tested on an r1.
+through XFlash reads and writes. Tests cover scripted endpoints and actual
+extracted upstream methods. A read-only r1 trial also completed repeated 1 MiB GPT
+windows and aligned 4 MiB reads; it does not establish a complete backup or flash
+procedure.
 
 ## Prepare and check the source
 
@@ -58,6 +60,11 @@ and could reuse a buffer larger than the final remainder. The patched methods
 validate counts, advance only by acknowledged bytes, use finite timeouts and
 reject later guarded operations after a failure.
 
+Successful zero-length USB reads are allowed during an exact read. They consume
+the existing call and time budgets without advancing the byte count or restarting
+a deadline. A zero count during a nonempty write still fails. USB exceptions
+remain fatal; this does not retry transfers with unknown results.
+
 The patch also fixes two misleading results. A failed final read acknowledgement
 could return a complete-looking buffer. A write failure could be logged and
 converted to `False`, which the command-line handlers could ignore before
@@ -69,6 +76,15 @@ resolver. Malformed headers, oversized frames, failed commands or acknowledgemen
 and a nonzero terminal status raise an error instead of returning a partial dump.
 The terminal frame must contain exactly four bytes with raw status zero. A read
 failure now reaches the command-line caller as a nonzero exit status.
+
+The r1 DA also sends intermediate four-byte raw-zero statuses between data
+frames. Sector-aligned eMMC reads accept one such status at each current byte
+offset; data must advance before another status is accepted. Each admitted
+offset is a multiple of 512 and less than the selected length, so their total
+is bounded by length/512. Statuses are neither appended nor acknowledged as
+data. A repeated status at the same offset, a nonzero status, or one of these
+frames in an unaligned read fails. Final completion still requires the full data count and its own
+raw-zero terminal frame.
 
 File reads stream into a private temporary file beside the destination. Exact
 write counts, final size and successful close are checked before replacement.
@@ -86,7 +102,9 @@ owned temporary file when possible and issues no device command.
 Intentional zero-length writes, explicit short reads (`maxtimeout=-1`) and
 healthy reconnects remain supported. A failed instance cannot reconnect; a new
 session is required. Closing that instance releases host resources without
-requesting a device reset. It cannot undo device-side effects.
+requesting a device reset. It cannot undo device-side effects. Reopening the
+host handle or draining a zero-status frame does not establish the DA's protocol
+state; an intermediate status can still have unread data behind it.
 
 ## Limits
 
@@ -94,21 +112,25 @@ The separate software budgets are a 1 MiB endpoint chunk limit, 65,536 endpoint
 calls, and 120 seconds of observed completion time per logical transfer. Each
 call receives a positive timeout capped by the existing 1,000 ms default.
 `maxtimeout` remains a legacy read-mode selector; its nonnegative values are not
-reinterpreted as milliseconds. These budgets have not been measured on the r1.
-A slow valid operation can fail, and a backend that ignores its timeout can
-still block.
+reinterpreted as milliseconds. The limited physical reads passed within these
+budgets; they do not calibrate every device or workload. A slow valid operation
+can fail, and a backend that ignores its timeout can still block.
 
 The guard assumes one serialized caller. Raw control transfers, discovery,
 exploits and direct endpoint access are outside its scope. Handshake entry and
 the old `usbxmlread` method reject an existing failure; their own raw transfer
 logic remains unchanged. The XFlash read checks cover its data count, magic,
-acknowledgements and terminal status. Header datatypes and four-byte data/status
-ambiguity remain unresolved: data frames of four bytes or less are rejected.
+acknowledgements and terminal status. Header datatypes remain unvalidated.
+Four-byte payload data is unsupported: the restricted aligned eMMC path treats
+raw-zero four-byte frames only as intermediate statuses, following the observed
+protocol and upstream reader. Alignment limits compatibility; it does not prove
+the meaning of arbitrary four-byte data. Other read shapes reject the ambiguous
+frame, and frames shorter than four bytes are rejected.
 The old 1 MiB fallback for an unavailable packet-size query is removed. That
 query cannot distinguish an unsupported command from other failures, so either
-case now stops the read. This can reject a previously usable DA; physical
-compatibility has not been tested. Other DA framing/status paths, optional-command
-semantics, partition selection and media durability remain separate work.
+case now stops the read. The tested r1 DA supports the query, but other usable
+DAs may be rejected. Other DA framing/status paths, optional-command semantics,
+partition selection and media durability remain separate work.
 
 This patch does not establish a complete firmware installation procedure.
 The diagnostic package and a full Android image set need their own validation.
@@ -134,9 +156,12 @@ user's installed USB backend or establish hardware compatibility.
 The read correction passed 61 actual-method controls and six independent
 controls, including incomplete frames, file errors, destination preservation and
 cleanup. Its extracted read/command-handler/exit chain exits nonzero and stops
-the next shell process. The existing 77 bulk controls also pass with the combined
-patch. Query/storage setup remains modeled in the read tests; they do not prove
-the DA's complete protocol or physical read behavior.
+the next shell process. The current suites pass 89 bulk controls and 99 read
+controls, including zero-length USB reads, their unchanged budgets, intermediate
+statuses after data, duplicate/nonzero statuses, and 1 MiB/4 MiB exact file reads.
+Query/storage setup remains modeled in the host tests; they do not prove the
+DA's complete protocol. The separate physical trial validates only the observed
+read path, with no media writes or complete-backup claim.
 
 The diagnostic migration retains 145 transfer/preflight/readback cases and adds
 checker-failure, bundled-pin, metadata and copy-binding controls. Recording

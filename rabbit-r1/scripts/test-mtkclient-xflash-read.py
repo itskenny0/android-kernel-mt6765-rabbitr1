@@ -307,6 +307,60 @@ def main():
  case('raw-magic-terminal',[header(8),b'ABCDEFGH',*terminal(MAGIC)],file=True)
  case('data-frame-three',[header(3),b'ABC',*terminal()],file=True)
  case('physical-partial-payload',[header(8),b'ABC',b''],file=True)
+ # Sector reads admit one raw-zero status at each progressing aligned byte offset.
+ payload=bytes(range(256))*2
+ for file in (False,True):
+  suffix='file' if file else 'buffer'
+  row=case('one-prefix-'+suffix,[*terminal(),header(512),payload,*terminal()],length=512,file=file,success=True,data=payload)
+  assert len([e for e in row['events'] if e[0]=='write'])==2  # data ACK only
+  assert not row['remaining_scripted_reads']
+  row=case('between-two-data-'+suffix,[header(512),payload,*terminal(),header(512),payload,*terminal()],length=1024,file=file,success=True,data=payload*2)
+  assert len([e for e in row['events'] if e[0]=='write'])==4
+  case('prefix-plus-between-'+suffix,[*terminal(),header(512),payload,*terminal(),header(512),payload,*terminal()],length=1024,file=file,success=True,data=payload*2)
+  case('nonzero-prefix-'+suffix,[*terminal(1),header(512),payload,*terminal()],length=512,file=file)
+  case('nonzero-between-'+suffix,[header(512),payload,*terminal(1),header(512),payload,*terminal()],length=1024,file=file)
+  row=case('duplicate-prefix-'+suffix,[*terminal(),*terminal(),header(512),payload,*terminal()],length=512,file=file)
+  assert 'Repeated four-byte status at 0/512' in row['error']['message']
+  assert row['application_reads']==[[12,{'maxtimeout':5000}],[4,{'w_max_packet_size':4}],[12,{'maxtimeout':5000}]]
+  case('duplicate-between-'+suffix,[header(512),payload,*terminal(),*terminal(),header(512),payload,*terminal()],length=1024,file=file)
+  case('nonzero-final-'+suffix,[*terminal(),header(512),payload,*terminal(1)],length=512,file=file)
+  case('missing-final-'+suffix,[*terminal(),header(512),payload],length=512,file=file)
+  case('prefix-no-data-'+suffix,[*terminal()],length=512,file=file)
+  case('ambiguous-four-byte-data-'+suffix,[*terminal(),*terminal()],length=4,file=file)
+  case('unaligned-total-'+suffix,[*terminal(),header(8),b'ABCDEFGH',*terminal()],length=8,file=file)
+  case('unaligned-current-position-'+suffix,[header(8),b'ABCDEFGH',*terminal(),header(504),payload[:504],*terminal()],length=512,file=file)
+  case('not-emmc-'+suffix,[*terminal(),header(512),payload,*terminal()],length=512,file=file,selected=(2,8,512))
+  case('oversized-data-after-status-'+suffix,[*terminal(),header(1024),payload*2,*terminal()],length=512,file=file)
+  case('bad-magic-status-'+suffix,[*terminal(magic=0),header(512),payload,*terminal()],length=512,file=file)
+  case('write-failure-after-status-'+suffix,[*terminal(),header(512),payload,*terminal()],length=512,file=True,fault='write-short')
+ # Each data frame is followed by the DA status before another frame. This must
+ # work beyond16 frames, and a prefix status must not reduce the later allowance.
+ for size in (1048576,4194304):
+  data=bytes(range(256))*(size//256);chunks=terminal();frames=size//65536
+  for i in range(frames):
+   chunks.extend([header(65536),data[i*65536:(i+1)*65536]])
+   if i+1<frames:chunks.extend(terminal())
+  chunks.extend(terminal())
+  row=case('sector-status-'+str(size),chunks,length=size,file=True,success=True,data=data)
+  assert len([e for e in row['events'] if e[0]=='write'])==frames*2
+  assert not row['remaining_scripted_reads']
+ # Direct method boundary short status must fail even if a faulty reader bypasses
+ # the actual exact-USB guarantee. Ordinary endpoint short reads are accumulated.
+ x,cdc,_,_,_,env,trace=create([*terminal(),header(512),payload,*terminal()]);read=x.usbread;calls=[]
+ def short_status(*a,**kw):
+  calls.append(a[0]);return b'\0\0' if len(calls)==2 else read(*a,**kw)
+ x.usbread=short_status
+ try:x.readflash(0,512,'',display=False)
+ except env['UsbTransferError'] as e:assert 'intermediate status is not raw zero at 0/512' in str(e)
+ else:raise AssertionError('short status accepted')
+ cases.append({'case':'direct-short-status','success':False})
+ # Misaligned address rejects before consuming the ambiguous4-byte payload.
+ x,cdc,_,_,events,env,trace=create([*terminal(),header(512),payload,*terminal()])
+ try:x.readflash(1,512,'',display=False)
+ except env['UsbTransferError'] as e:assert 'outside sector read' in str(e)
+ else:raise AssertionError('unaligned address accepted')
+ assert trace.reads==[[12,{'maxtimeout':5000}]]
+ cases.append({'case':'unaligned-address','success':False})
  # Original actual CLI caller-chain tail, not a fabricated exit-code shim.
  next_process=directory/'next-process'
  shell='set -euo pipefail\n'+shlex.join([sys.executable,str(Path(__file__).resolve()),'--source',str(SOURCE),'--out',str(OUTPUT/'cli-replay'),'--cli-child'])+'\n'+shlex.join([sys.executable,'-c','from pathlib import Path;Path('+repr(str(next_process))+').write_text("ran")'])
