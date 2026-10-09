@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "source_sha256": "bc19f73f5057edef3cd11ad819eb09efe15f320f21775c9182896e0aa9596923",
+  "scope": "Host raw-file conversion; no flash/device access",
+  "review": {
+    "result": "pass",
+    "tests": 13,
+    "independent_controls": [
+      {
+        "name": "all-hole",
+        "pass": true,
+        "aosp_image_handler_agrees": true,
+        "raw_sha256": "f3cc103136423a57975750907ebc1d367e2985ac6338976d4d5a439f50323f4a",
+        "allocated_bytes": 0,
+        "logical_bytes": 12288
+      },
+      {
+        "name": "small-block-fill",
+        "pass": true,
+        "aosp_image_handler_agrees": true,
+        "raw_sha256": "1e4c3cf384292f60f9c01900af4dc706903747b7c3e172da13b8cb8a33cd2418",
+        "allocated_bytes": 1200128,
+        "logical_bytes": 1200012
+      }
+    ],
+    "resolved_findings": [
+      {
+        "issue": "Buffered flush+close failure skipped temporary cleanup",
+        "fix": "Cleanup unlink is in a nested finally, independently of close success",
+        "regression": "test_flush_and_close_failures_still_remove_temporary"
+      },
+      {
+        "issue": "Pathname parent replacement followed a new symlink after preflight",
+        "fix": "Pinned no-follow directory traversal and relative source/create/link/unlink operations; verify original chains before publication",
+        "regressions": [
+          "test_source_parent_substitution_reads_only_pinned_directory",
+          "test_output_parent_substitution_never_follows_new_symlink"
+        ]
+      }
+    ],
+    "source_mutation_and_no_clobber_regressions_pass": true,
+    "scope": "Small regular-file fixtures and mocked syscall error/race boundaries; no Android build, device access, or repeated stock-image scan",
+    "prior_stock_validation": "Existing 8,792,064,000-byte AOSP hash comparison retained without rerun; sparse parser and emit logic unchanged by these fixes",
+    "publication_limit": "The parent chain is rechecked immediately before link; a later concurrent directory rename can change its pathname, but relative operations remain on the pinned descriptors. Complete output publication is atomic/no-clobber, not a claim of directory-entry crash durability.",
+    "hashes": {
+      "expand_android_sparse.py": "bc19f73f5057edef3cd11ad819eb09efe15f320f21775c9182896e0aa9596923",
+      "test_sparse.py": "dfc5287bc78f7eeeefc3aa330fb56792f04e1530e8fe3f16f124ae0d71abb9ad",
+      "independent-review/original-expand_android_sparse.py": "5e93550b35fe04b3aa2cd6ad71c5b8134287f032c9d66a1f87b7e92ce2f1d684",
+      "independent-review/original-test_sparse.py": "072d4f03a855b232d5d9b225fcf65eefe7dccb551b6dbb9437d50a3ef1f70fb8",
+      "independent-review/review.py": "70811b65b46fda2536a967b746adb71b5bca1aadf16dc534ff7f86193d78f149",
+      "independent-review/result.json": "b7b069d55fe8d0d3fe6e426c56f4caf1013240468535fb5e6cddc45b5a1df59c",
+      "independent-review/verify-fixed.py": "547de16c99e22e4839d0cc325d0d8cda8354a1d2d564e4e166687814f481fc18",
+      "independent-review/fixed-run/tests.log": "3ab8b808b126fba1ed1838bdb9d793ba1a346085d54375c9a62ae410715bcb4e",
+      "stock-validation.json": "aa240b7b62facce5fd4674b8f3735484a7c331fc154cbc632a3ce2aee8b099c4",
+      "mtkclient-raw-write-replay.json": "a4449708f34847a5ec32687453accccc6b63c9154e2a047c82ea821a9fc82866"
+    }
+  },
+  "stock_validation": {
+    "result": "pass",
+    "expansion": {
+      "input": "/rabbitr1/firmware/stock-v0.8.293/super.img",
+      "sparse_bytes": 2110680916,
+      "sparse_sha256": "d723922e8b0308c1c2363da513592a44cb20c21ed4023e55f05f3a0b8578b7a2",
+      "raw_bytes": 8792064000,
+      "raw_sha256": "aca8e739f217f552d12323b36df4f0e7a5d9df0d95cb01d3724d2532e0028049",
+      "raw_crc32": "efe1d892",
+      "block_size": 4096,
+      "minor_version": 0,
+      "chunks": {
+        "raw": 1458,
+        "fill": 1451,
+        "dont_care": 4,
+        "crc32": 0
+      },
+      "output": null,
+      "hardware_accessed": false
+    },
+    "independent_oracle": {
+      "path": "/rabbitr1/src/android/external/avb/avbtool.py",
+      "sha256": "aa080bb3dd613cbbcaea410a8cff62225811fc79a4af05613a63ec3acec7ab92",
+      "raw_bytes": 8792064000,
+      "raw_sha256": "aca8e739f217f552d12323b36df4f0e7a5d9df0d95cb01d3724d2532e0028049",
+      "raw_crc32": "efe1d892"
+    },
+    "source_unchanged": true,
+    "raw_image_written": false,
+    "hardware_accessed": false,
+    "elapsed_seconds": 78.16450048494153,
+    "scope": "Validate pre-existing extracted stock super against AOSP read-only ImageHandler; does not re-extract/authenticate the whole firmware archive or inspect incomplete new images"
+  },
+  "mtkclient_boundary": {
+    "source_sha256": "cd55b262d1acfbda33833aabf3669997cb81d1b58b3c1844d4b4bef71f446b7b",
+    "method_sha256": "6beed03b3ee5da7348dba8795eb6045443da9754115f1b2196243ed80dc3795e",
+    "observations": [
+      {
+        "input": "input.img",
+        "requested_bytes": 12800,
+        "sent_sha256": "9eddc31d584739bd9cf8c89aba10165679a0da3114cd3b55559f2da1e4af60d6",
+        "sparse_magic_sent": "3aff26ed"
+      },
+      {
+        "input": "raw.img",
+        "requested_bytes": 57344,
+        "sent_sha256": "f36ea5b2ba818363737450aed8520e484e723735c90112ccb05448e9e45098d2",
+        "sparse_magic_sent": "00010203"
+      }
+    ],
+    "hardware_accessed": false,
+    "scope": "Actual xflash writeflash with mocked storage/USB/progress boundaries"
+  },
+  "original_workspace_directory": "/rabbitr1/out/android-flash-review/sparse",
+  "portable_ci": "Synthetic bytes/format/CRC/path/failure tests. AOSP/mtkclient comparisons require explicitly supplied pinned sources; full Android checkout is not required in CI.",
+  "canonical_validation": {
+    "android-sparse-canonical.log": {
+      "path": "logs/android-sparse-canonical.log",
+      "sha256": "1ddf7649af37f825badbb6e444396369af25eb6d86243f54866186f8167dcde6"
+    },
+    "android-sparse-ci.log": {
+      "path": "logs/android-sparse-ci.log",
+      "sha256": "ebabc802df094d59fdef3c478e54ed58d73fd2175873d2de38fb32bde6d69817"
+    }
+  },
+  "canonical_test_sha256": "e37f3f97683aa6ffe2389127e7764a3c704d6ef3df5bc3e724cce83b967a2f9d"
+}

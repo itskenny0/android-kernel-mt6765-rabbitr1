@@ -101,6 +101,16 @@ leaves B's logical partitions empty. The future Android flash procedure must
 select and verify A while preserving the previous slot state for restoration,
 or supply populated B images. A device's existing active slot cannot be assumed.
 
+The pinned mtkclient writes file bytes directly; it does not expand Android
+sparse images. `scripts/expand-android-sparse.py` validates a pinned sparse-file
+hash and expected partition size, checks chunk bounds and CRCs, and produces a
+new raw file without replacing an existing output. DONT_CARE blocks become
+zero bytes, stored as host filesystem holes. It can also validate without
+creating an output. [Conversion evidence](../tests/android-sparse-conversion.json)
+includes independent AOSP comparisons and the actual mtkclient write method
+replayed with mocked device I/O. This is a host preparation tool; the complete
+Android flashing procedure is still unfinished.
+
 The first full-image attempt failed when minigbm's default `all` backend set
 compiled Intel intrinsics for ARM64. The r1 product now selects the existing
 `all_arm` set before inheriting the common device configuration. The rebuilt
