@@ -9,6 +9,11 @@ case "$R1_ANDROID_PRODUCT" in
     lineage_r1|lineage_r1_soc) ;;
     *) echo 'R1_ANDROID_PRODUCT must be lineage_r1 or lineage_r1_soc.' >&2; exit 1 ;;
 esac
+R1_ANDROID_RELEASE=${R1_ANDROID_RELEASE-cp2a}
+case "$R1_ANDROID_RELEASE" in
+    cp2a|trunk_staging) ;;
+    *) echo 'R1_ANDROID_RELEASE must be cp2a or trunk_staging.' >&2; exit 1 ;;
+esac
 R1_ANDROID_JOBS=${R1_ANDROID_JOBS:-8}
 [[ $R1_ANDROID_JOBS =~ ^[1-9][0-9]*$ ]] || {
     echo 'R1_ANDROID_JOBS must be a positive integer.' >&2
@@ -55,14 +60,22 @@ fi
 # Android's shell setup expects unset variables and manages command failures.
 set +eu
 source build/envsetup.sh
-lunch "$R1_ANDROID_PRODUCT" trunk_staging userdebug > "$R1_ROOT/logs/android-lunch.log" 2>&1
+r1_build_context="Android configuration: $R1_ANDROID_PRODUCT $R1_ANDROID_RELEASE userdebug"
+echo "$r1_build_context"
+{
+    echo "$r1_build_context"
+    lunch "$R1_ANDROID_PRODUCT" "$R1_ANDROID_RELEASE" userdebug
+} > "$R1_ROOT/logs/android-lunch.log" 2>&1
 r1_status=$?
 if ((r1_status)); then
     cat "$R1_ROOT/logs/android-lunch.log"
     exit "$r1_status"
 fi
 echo "Android build log: $R1_ROOT/logs/android-targeted-build.log"
-m -j"$R1_ANDROID_JOBS" "${targets[@]}" > "$R1_ROOT/logs/android-targeted-build.log" 2>&1
+{
+    echo "$r1_build_context"
+    m -j"$R1_ANDROID_JOBS" "${targets[@]}"
+} > "$R1_ROOT/logs/android-targeted-build.log" 2>&1
 r1_status=$?
 python3 - "$R1_ROOT/logs/android-targeted-build.log" <<'PY'
 from collections import deque

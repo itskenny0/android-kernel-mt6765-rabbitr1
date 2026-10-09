@@ -12,12 +12,14 @@ passes all ten [filesystem, AVB and super-image checks](../android/full-image-bu
 Hardware testing and the complete Android flash procedure remain outstanding.
 No Android image has been added to the mtkclient package.
 
-The checked build uses `trunk_staging`: Android 17/API 37 and Lineage 24.0,
+The previously checked build uses `trunk_staging`: Android 17/API 37 and Lineage 24.0,
 with preview SDK 1 and the inherited `Baklava` codename. It is a development
 configuration, not finalized `REL`. The [version review](../android/version-status.json)
-traces these values to the pinned release flags. Selecting the finalized `cp2a`
-configuration would also change vendor API and feature flags and requires a new
-build and audit. The declared security patch level remains June 5, 2026.
+traces these values to the pinned release flags. New builds default to the
+finalized `cp2a` configuration: `REL`, preview SDK 0 and vendor API 202604.
+This changes vendor API and feature flags and requires a new build and audit;
+the earlier development build does not validate it. The declared security patch
+level remains June 5, 2026.
 
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
@@ -62,6 +64,13 @@ Once sync completes, run the actual product configuration and targeted build:
 bash /rabbitr1/scripts/build-android.sh
 ```
 
+`R1_ANDROID_RELEASE` accepts only `cp2a` (the default) or `trunk_staging`.
+The chosen product, release and variant are recorded in both lunch and build
+logs. To reproduce the earlier development configuration explicitly, use
+`R1_ANDROID_RELEASE=trunk_staging bash /rabbitr1/scripts/build-android.sh`.
+Changing the release selects its complete pinned configuration; the helper does
+not override version, codename or security-patch properties.
+
 The helper checks and applies the pinned Android compatibility patches, stages
 the device files and kernel, records the resolved manifest, selects the product
 and builds charging controls, the expdb logger, both boot services and policy.
@@ -103,7 +112,7 @@ After the boot and recovery checks pass, build the filesystem images and their
 AVB/super dependencies with the explicit size check:
 
 ```bash
-R1_ANDROID_JOBS=12 bash /rabbitr1/scripts/build-android.sh \
+R1_ANDROID_RELEASE=cp2a R1_ANDROID_JOBS=12 bash /rabbitr1/scripts/build-android.sh \
     systemimage systemextimage productimage vendorimage \
     superimage vbmetaimage check-all-partition-sizes
 ```
@@ -231,7 +240,8 @@ the matching kernel and select the product explicitly:
 
 ```sh
 bash scripts/build-mainline.sh --experimental-soc
-R1_ANDROID_PRODUCT=lineage_r1_soc bash scripts/build-android.sh
+R1_ANDROID_PRODUCT=lineage_r1_soc R1_ANDROID_RELEASE=cp2a \
+    bash scripts/build-android.sh
 ```
 
 The kernel command replaces `out/mainline` and `dist/mainline`. Preserve any

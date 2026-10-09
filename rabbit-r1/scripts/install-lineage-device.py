@@ -126,7 +126,7 @@ def main():
         'files': {name: digest(data) for name, data in sorted(files.items())},
     }, indent=2) + '\n')
     print(f'Installed {len(files)} files into {tree}')
-    print(f'Select: lunch {args.product} trunk_staging userdebug')
+    print(f'Installed product: {args.product}; select its release with scripts/build-android.sh')
     print('eMMC enabled; hardware validation outstanding')
 
 

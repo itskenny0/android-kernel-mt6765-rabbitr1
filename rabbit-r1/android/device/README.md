@@ -1,8 +1,9 @@
 # haretic Android device configuration
 
 This is haretic's initial LineageOS 24 product for the rabbit r1 mainline kernel in this
-workspace. Android boot artifacts and targeted integration modules have passed
-offline checks; a complete or hardware-tested Android ROM is not available.
+workspace. The default `lineage_r1` product at source `0a2a56a30e`, built with
+`trunk_staging`, completed its full image build and offline artifact checks.
+No hardware-tested Android ROM or complete flashing package is available.
 The diagnostic kernel ZIP remains the assembled distribution package; Android
 images have not been added to it.
 
@@ -29,8 +30,9 @@ implements MediaTek boot-region selection and the successful-boot flag update
 with readback and failure handling. Its core has host tests; both Android
 services and the policy aggregate now compile. Recovery policy and real system
 `libbinder_ndk` builds also passed their artifact checks.
-Full-image dependencies, linker namespace/APEX visibility and physical-device
-checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
+The full image build and packaged service, library and allocator APEX checks
+also passed. Runtime linker namespace/APEX visibility and physical-device
+checks remain. See [boot control](../../docs/BOOT-CONTROL.md).
 
 Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL
@@ -41,23 +43,35 @@ shutdown. The explicit `lineage_r1_soc` product requires a kernel built with
 initial capacity and requests shutdown if initialization fails. It retains real
 zero and normal runtime shutdown behavior. The live stock-profile model and
 charge-counter integration have offline tests, but are uncalibrated. Physical
-validation, hidden counter resets and persistence remain open. See
+validation, hidden counter resets and persistence remain open. The SOC Health
+service and readiness helper have host tests and ARM64 compilation checks;
+their actual product build, link, split policy and packaging checks remain
+pending. See
 [Android integration](../../docs/ANDROID.md) for selection and validation scope.
 
 The asynchronous `r1-expdb` service validates the partition and its bounded
 18 MiB mapping before loading pstore. Its mocked discovery, mapping, attachment
-and failure tests, Android build and compiled policy checks pass. Vendor-image
-module installation, runtime labels, module attachment and persistence remain
+and failure tests, Android build and compiled policy checks pass. The completed
+vendor-image audit also verified module membership and hashes against the
+staged kernel. Runtime labels, module attachment and persistence remain
 unverified.
 
 The [six integration targets](../targeted-build.json) and the subsequent
 [boot/DTBO, recovery-policy and Binder targets](../boot-build.json) passed
-offline artifact checks. As of 2026-10-09, the system, system_ext, product,
-vendor, super and vbmeta build is in progress; it has not completed. No runtime
-service test has completed. Before distributing an Android image, complete
-those builds and their partition-size checks, verify super/vbmeta and vendor
-module contents, validate the bounded `expdb` logger, and test the LK/DT handoff,
-boot and recovery on an r1. Storage, graphics,
+offline artifact checks. The [full-image audit](../full-image-build.json)
+verified system, system_ext, product, vendor, super and vbmeta, partition-size
+checks and packaged contents. A separate [dual-slot super build](../dual-slot-super-build.json)
+verified both logical slots contain the audited images. These results cover
+the default product's `trunk_staging` build, with experimental SOC Health off.
+
+`scripts/build-android.sh` now defaults to the finalized Android 17 `cp2a`
+release configuration. Set `R1_ANDROID_RELEASE=trunk_staging` to reproduce the
+earlier development configuration. The `cp2a` configuration, including the
+explicit `lineage_r1_soc` product, still needs its own build and artifact audit;
+the earlier results do not cover that change. No runtime service test has
+completed. Before distributing an Android image, finish the complete flashing
+package, validate the bounded `expdb` logger, and test the LK/DT handoff, boot
+and recovery on an r1. Storage, graphics,
 battery health, charging, temperature limits, input, audio, wireless, cameras,
 modem support and suspend remain hardware validation gates. Native display and
 TCPC are still disabled in the staged DTB.
