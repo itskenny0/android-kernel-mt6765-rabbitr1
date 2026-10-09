@@ -80,6 +80,15 @@ no UM configuration/core/feature-table header or reference to the 11 missing
 numeric ``RGX_FEATURE`` names was found in those GPU C/header trees. This
 does not establish that no licensed source exists elsewhere.
 
+A static inspection of the stock GLES, Vulkan, services and USC compiler
+libraries also established none of the eleven missing limits. All four are
+stripped of full symbol and type information. Services exports
+``RGXGetFeatureValue``, but the available headers do not define its signature
+or selectors. The matching DDK's 24 kernel-mode selectors belong to a separate
+accessor and do not name these limits. ``stock-user-metadata.json`` records
+input hashes, observations and the bounded search scope; no vendor code was
+executed, disassembled or imported.
+
 Obtain license-permitted exact-BVNC user-mode definitions and the producer's
 ABI enums, classify the extra bits, then implement required handling.
 Actual device tests must establish firmware communication and rendering.

@@ -1,0 +1,224 @@
+{
+  "date": "2026-10-09",
+  "bvnc": "22.87.104.18",
+  "result": "No values established for the eleven missing Mesa limits.",
+  "scope": "Static ELF sections, dynamic symbols and strings from four stock ARM64 libraries; no vendor execution or disassembly.",
+  "inspected": [
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock/libGLESv2_mtk.so",
+      "bytes": 1820624,
+      "sha256": "b008191ff39a67f7f00b06c856966e48c2a277e4b1b5adf5b1af961f69e234eb",
+      "elf_class": "ELF64 little-endian AArch64",
+      "full_symtab_present": false,
+      "debug_or_type_sections": [],
+      "feature_accessor_symbols": [],
+      "missing_limit_label_hits": {
+        "max_instances_per_pds_task": [],
+        "max_multisample": [],
+        "max_usc_tasks": [],
+        "tpu_parallel_instances": [],
+        "unified_store_depth": [],
+        "usc_itr_parallel_instances": [],
+        "usc_slots": [],
+        "uvs_banks": [],
+        "uvs_pba_entries": [],
+        "uvs_vtx_entries": [],
+        "vdm_cam_size": []
+      }
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock/vulkan.mt6765.so",
+      "bytes": 677360,
+      "sha256": "94f72bb4efd844a7a66f728ad821a986931c4d6f4531be577f61f18534f2bf5a",
+      "elf_class": "ELF64 little-endian AArch64",
+      "full_symtab_present": false,
+      "debug_or_type_sections": [],
+      "feature_accessor_symbols": [],
+      "missing_limit_label_hits": {
+        "max_instances_per_pds_task": [],
+        "max_multisample": [],
+        "max_usc_tasks": [],
+        "tpu_parallel_instances": [],
+        "unified_store_depth": [],
+        "usc_itr_parallel_instances": [],
+        "usc_slots": [],
+        "uvs_banks": [],
+        "uvs_pba_entries": [],
+        "uvs_vtx_entries": [],
+        "vdm_cam_size": []
+      }
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/dependencies/libsrv_um.so",
+      "bytes": 416160,
+      "sha256": "5b3048e576df364bf82e9d85e2a61e05726fae03778b2c7f6f4c4df036658641",
+      "elf_class": "ELF64 little-endian AArch64",
+      "full_symtab_present": false,
+      "debug_or_type_sections": [],
+      "feature_accessor_symbols": [
+        {
+          "name": "RGXGetFeatureString",
+          "type": 2,
+          "section_index": 15,
+          "address": "0x3bc68",
+          "bytes": 24
+        },
+        {
+          "name": "RGXGetFeatureValue",
+          "type": 2,
+          "section_index": 15,
+          "address": "0x3bc50",
+          "bytes": 24
+        },
+        {
+          "name": "RGXGetBVNC",
+          "type": 2,
+          "section_index": 15,
+          "address": "0x3bca4",
+          "bytes": 8
+        },
+        {
+          "name": "RGXIsFeatureSupported",
+          "type": 2,
+          "section_index": 15,
+          "address": "0x3bc80",
+          "bytes": 20
+        },
+        {
+          "name": "RGXGetHWPerfBvncFeatureFlags",
+          "type": 2,
+          "section_index": 15,
+          "address": "0x5360c",
+          "bytes": 296
+        }
+      ],
+      "missing_limit_label_hits": {
+        "max_instances_per_pds_task": [],
+        "max_multisample": [],
+        "max_usc_tasks": [],
+        "tpu_parallel_instances": [],
+        "unified_store_depth": [],
+        "usc_itr_parallel_instances": [],
+        "usc_slots": [],
+        "uvs_banks": [],
+        "uvs_pba_entries": [],
+        "uvs_vtx_entries": [],
+        "vdm_cam_size": []
+      }
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/dependencies/libusc.so",
+      "bytes": 2472552,
+      "sha256": "55f45926b4a5ef4568b25c0312e21c360279dfdc48cc9586521dd33feb093f71",
+      "elf_class": "ELF64 little-endian AArch64",
+      "full_symtab_present": false,
+      "debug_or_type_sections": [],
+      "feature_accessor_symbols": [],
+      "missing_limit_label_hits": {
+        "max_instances_per_pds_task": [],
+        "max_multisample": [],
+        "max_usc_tasks": [],
+        "tpu_parallel_instances": [],
+        "unified_store_depth": [],
+        "usc_itr_parallel_instances": [],
+        "usc_slots": [],
+        "uvs_banks": [],
+        "uvs_pba_entries": [],
+        "uvs_vtx_entries": [],
+        "vdm_cam_size": []
+      }
+    }
+  ],
+  "selector_evidence": {
+    "stock_ddk_version": "m1.13ED5776728",
+    "binary_build_string": "1.13@5776728",
+    "header_scope": "kernel mode",
+    "files": [
+      {
+        "path": "/rabbitr1/src/kernel/drivers/gpu/mediatek/gpu_rgx/m1.13ED5776728/hwdefs/rogue/km/rgx_bvnc_defs_km.h",
+        "sha256": "412939386f98966a7b051d001ff06aa283ed5359d55b62c982f6ea4beeaeada2",
+        "matched_lines": [
+          216
+        ],
+        "enum_names": [
+          "RGX_FEATURE_CDM_CONTROL_STREAM_FORMAT_IDX",
+          "RGX_FEATURE_FBCDC_ALGORITHM_IDX",
+          "RGX_FEATURE_FBCDC_ARCHITECTURE_IDX",
+          "RGX_FEATURE_LAYOUT_MARS_IDX",
+          "RGX_FEATURE_META_IDX",
+          "RGX_FEATURE_META_COREMEM_BANKS_IDX",
+          "RGX_FEATURE_META_COREMEM_SIZE_IDX",
+          "RGX_FEATURE_META_DMA_CHANNEL_COUNT_IDX",
+          "RGX_FEATURE_NUM_CLUSTERS_IDX",
+          "RGX_FEATURE_NUM_ISP_IPP_PIPES_IDX",
+          "RGX_FEATURE_NUM_OSIDS_IDX",
+          "RGX_FEATURE_NUM_RASTER_PIPES_IDX",
+          "RGX_FEATURE_PHYS_BUS_WIDTH_IDX",
+          "RGX_FEATURE_SCALABLE_TE_ARCH_IDX",
+          "RGX_FEATURE_SCALABLE_VCE_IDX",
+          "RGX_FEATURE_SIMPLE_PARAMETER_FORMAT_VERSION_IDX",
+          "RGX_FEATURE_SLC_BANKS_IDX",
+          "RGX_FEATURE_SLC_CACHE_LINE_SIZE_BITS_IDX",
+          "RGX_FEATURE_SLC_SIZE_IN_BYTES_IDX",
+          "RGX_FEATURE_SLC_SIZE_IN_KILOBYTES_IDX",
+          "RGX_FEATURE_VIRTUAL_ADDRESS_SPACE_BITS_IDX",
+          "RGX_FEATURE_XPU_MAX_REGBANKS_ADDR_WIDTH_IDX",
+          "RGX_FEATURE_XPU_MAX_SLAVES_IDX",
+          "RGX_FEATURE_XPU_REGISTER_BROADCAST_IDX",
+          "RGX_FEATURE_WITH_VALUES_MAX_IDX"
+        ],
+        "value_selector_count_excluding_sentinel": 24
+      },
+      {
+        "path": "/rabbitr1/src/kernel/drivers/gpu/mediatek/gpu_rgx/m1.13ED5776728/services/server/devices/rgxbvnc.h",
+        "sha256": "2305d2330dc5f2db568e31a95e7b0f9fd7463f04a5a3e21d108c9ca054092c6a",
+        "matched_lines": [
+          78
+        ]
+      },
+      {
+        "path": "/rabbitr1/src/kernel/drivers/gpu/mediatek/gpu_rgx/m1.13ED5776728/services/server/devices/rogue/rgxdevice.h",
+        "sha256": "3d5a03eec9a336a838777fb4641cd6824ebc91f5cac89027a6a5988fdbb57295",
+        "matched_lines": [
+          178,
+          186,
+          190
+        ]
+      }
+    ],
+    "conclusion": "The version-matched stock header labels 24 kernel-mode feature-value selectors and a separate kernel accessor. None of the eleven missing Mesa limits is enumerated. No declaration of RGXGetFeatureValue, RGXGetFeatureString, RGXIsFeatureSupported or RGXPopulateFeatureConfig was found in the searched stock kernel/modules C/header trees. No authoritative linkage from the exported UM accessor to this KM enum was established."
+  },
+  "evidence": [
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/report.json",
+      "bytes": 18377,
+      "sha256": "49e99581825354b7060d31b80079c4e6206efc2b7584c97c143b450f91f25245"
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/report.rst",
+      "bytes": 4991,
+      "sha256": "85e65884dd28a25c055151211d8c53326ece31f67e0abffd954581446fe7c211"
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/inspect-metadata.py",
+      "bytes": 6553,
+      "sha256": "99adef4508e8d2e7faca7b19b6f010fcc4241d79596f29b552f683c7e7cf725c"
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/available-ddk-selector-search.json",
+      "bytes": 807,
+      "sha256": "0ef99cf0154a5f44cee7cefdc8c2b9c9bc0540a54055932169d4b0359c29e4f6"
+    },
+    {
+      "path": "/rabbitr1/out/r1-gpu-audit/stock-user-metadata/version-matched-km-enum.json",
+      "bytes": 2602,
+      "sha256": "32f4e679471fc3dbed64a1ac31784b464e2cfa218a974de7b0a2ee2ccf2ce5d4"
+    }
+  ],
+  "limits": [
+    "Bounded inspection; not an exhaustive analysis of every stock library.",
+    "A function export does not define its C signature or selector mapping.",
+    "The separate kernel-mode selector enum cannot be substituted for an unknown user-mode API.",
+    "No proprietary binary or code is bundled and no GPU configuration is enabled."
+  ]
+}
