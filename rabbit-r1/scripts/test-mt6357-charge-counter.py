@@ -147,17 +147,21 @@ typedef int64_t ktime_t;
 #define do_div(n,d) ((n)/=(d))
 #define bm_debug(...) ((void)0)
 #define dev_err_ratelimited(...) ((void)0)
-struct device { int unused; };
+struct device { struct device *parent; void *driver_data; void *of_node; };
+struct work_struct { void (*fn)(struct work_struct *); };
+struct delayed_work { struct work_struct work; };
 struct regmap { int unused; };
 struct mutex { pthread_mutex_t raw; unsigned int owner; };
-struct power_supply { void *drvdata; };
+struct power_supply { void *drvdata; struct device dev; };
+struct notifier_block { int (*notifier_call)(struct notifier_block *, unsigned long, void *); };
 union power_supply_propval { int intval; };
 enum power_supply_property {
     POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW,
     POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW,
-    POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY,
+    POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY, POWER_SUPPLY_PROP_STATUS,
 };
 struct power_supply_desc {
+    void (*external_power_changed)(struct power_supply *);
     const char *name; int type;
     const enum power_supply_property *properties;
     unsigned int num_properties;
@@ -266,6 +270,7 @@ static int regmap_update_bits(struct regmap *m, unsigned int reg, unsigned int m
     return old == next ? 0 : regmap_write(m,reg,next);
 }
 /* Other properties are exercised by test-mt6357-current.py, not these stubs. */
+static int mt6357_gauge_read_status(struct mt6357_gauge *g, int *out) { return -ENODATA; }
 static int mt6357_gauge_read_present(struct mt6357_gauge *g, int *out) { return -ENODATA; }
 static int mt6357_gauge_read_voltage(struct mt6357_gauge *g, int *out) { return -ENODATA; }
 static int mt6357_gauge_read_temperature(struct mt6357_gauge *g, int *out) { return -ENODATA; }

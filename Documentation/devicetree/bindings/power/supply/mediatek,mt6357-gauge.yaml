@@ -34,6 +34,12 @@ properties:
   compatible:
     const: mediatek,mt6357-gauge
 
+  power-supplies:
+    description:
+      The single charger supplying this battery. Its charge state provides
+      battery status; this does not provide battery health or state of charge.
+    maxItems: 1
+
   shunt-resistor-micro-ohms:
     description: Battery current sense resistor resistance in microohms.
     minimum: 1

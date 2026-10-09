@@ -78,6 +78,7 @@ prelude = r'''
 #include <sched.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,16 +104,18 @@ typedef int64_t ktime_t;
 #define GFP_KERNEL 0
 #define PTR_ERR_OR_ZERO(p) ((intptr_t)(p) < 0 ? (int)(intptr_t)(p) : 0)
 #define ERR_PTR(e) ((void *)(intptr_t)(e))
-struct device { struct device *parent; void *driver_data; struct regmap *regmap; };
+struct device { void *of_node; struct device *parent; void *driver_data; struct regmap *regmap; };
 struct mt6397_chip { struct regmap *regmap; };
 struct platform_device { struct device dev; };
 struct mutex { pthread_mutex_t raw; unsigned int owner; bool initialized; };
 struct regmap { int unused; };
-struct power_supply { void *drvdata; };
+struct power_supply { void *drvdata; struct device dev; };
+struct notifier_block { int (*notifier_call)(struct notifier_block *, unsigned long, void *); };
 union power_supply_propval { int intval; };
-enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY };
+enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY, POWER_SUPPLY_PROP_STATUS };
 #define POWER_SUPPLY_TYPE_BATTERY 1
 struct power_supply_desc {
+    void (*external_power_changed)(struct power_supply *);
     const char *name; int type;
     const enum power_supply_property *properties;
     size_t num_properties;
@@ -139,6 +142,32 @@ static void usleep_range(unsigned int lo, unsigned int hi) { assert(lo && lo<=hi
 #define might_sleep_if(x) ((void)0)
 #define barrier() asm volatile("" ::: "memory")
 #define cpu_relax() sched_yield()
+'''
+prelude += r'''
+/* The current/ADC suite deliberately has no charger; STATUS is tested separately. */
+struct work_struct { void (*fn)(struct work_struct *); };
+struct delayed_work { struct work_struct work; };
+#define HZ 100
+#define container_of(p,t,m) ((t *)((char *)(p)-offsetof(t,m)))
+#define to_delayed_work(p) container_of(p,struct delayed_work,work)
+#define INIT_DELAYED_WORK(p,f) ((p)->work.fn=(f))
+#define system_power_efficient_wq NULL
+#define DL_FLAG_AUTOREMOVE_CONSUMER 1
+#define PSY_EVENT_PROP_CHANGED 1
+#define NOTIFY_DONE 0
+#define POWER_SUPPLY_STATUS_UNKNOWN 0
+#define POWER_SUPPLY_STATUS_FULL 4
+static int power_supply_reg_notifier(struct notifier_block *nb) { assert(false); return -EIO; }
+static void power_supply_unreg_notifier(struct notifier_block *nb) { assert(false); }
+static int power_supply_get_property(struct power_supply *p, enum power_supply_property prop, union power_supply_propval *v) { assert(false); return -EIO; }
+static void power_supply_changed(struct power_supply *p) { assert(false); }
+static int queue_delayed_work(void *q, struct delayed_work *w, unsigned long delay) { assert(false); return 0; }
+static int mod_delayed_work(void *q, struct delayed_work *w, unsigned long delay) { assert(false); return 0; }
+static void cancel_delayed_work_sync(struct delayed_work *w) { assert(false); }
+static int of_count_phandle_with_args(void *n, const char *p, void *a) { assert(false); return 0; }
+static struct power_supply *devm_power_supply_get_by_reference(struct device *d, const char *p) { assert(false); return NULL; }
+static void *device_link_add(struct device *c, struct device *s, unsigned int flags) { assert(false); return NULL; }
+static int devm_add_action_or_reset(struct device *d, void (*fn)(void *), void *data) { assert(false); return -EIO; }
 '''
 prelude += f'\n#include "{SRC}/include/linux/mfd/mt6357/registers.h"\n'
 for name in ('poll_timeout_us', 'read_poll_timeout'):
@@ -246,6 +275,7 @@ static int device_property_read_u32(struct device *d, const char *name, u32 *out
 }
 static bool device_property_present(struct device *d, const char *name)
 {
+    if (!strcmp(name,"power-supplies")) return false; /* STATUS has its own supplier suite. */
     if (!strcmp(name,"io-channels")) return adc_present;
     assert(!strcmp(name,"mediatek,current-gain-permille")); return gain_present;
 }
@@ -297,7 +327,7 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
 {
     assert(config->drv_data == &gauge && config->fwnode == dev);
     assert(!strcmp(desc->name,"mt6357-battery") && desc->type == POWER_SUPPLY_TYPE_BATTERY);
-    assert(desc == &gauge.desc);
+    assert(desc == gauge.desc);
     assert(desc->num_properties == (adc_present ? 5U : 3U) && desc->properties[0] == POWER_SUPPLY_PROP_PRESENT);
     assert(desc->properties[1] == POWER_SUPPLY_PROP_CURRENT_NOW && desc->properties[2] == POWER_SUPPLY_PROP_CHARGE_COUNTER);
     if (adc_present) {

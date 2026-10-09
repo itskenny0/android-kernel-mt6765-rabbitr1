@@ -102,7 +102,7 @@ jobs:
           python3 scripts/test-mt6357-auxadc.py 2>&1 | tee logs/mt6357-auxadc-tests.log
           python3 scripts/test-mt6357-imp.py 2>&1 | tee logs/mt6357-imp-tests.log
           python3 scripts/test-mt6357-current.py 2>&1 | tee logs/mt6357-current-tests.log
-          python3 scripts/test-mt6357-charge-counter.py 2>&1 | tee logs/mt6357-charge-counter-tests.log
+          python3 scripts/test-mt6357-status.py 2>&1 | tee logs/mt6357-status-tests.log
           python3 battery/tests/run.py 2>&1 | tee logs/battery-profile-tests.log
           python3 scripts/test-mt6370.py 2>&1 | tee logs/mt6370-tests.log
           python3 scripts/test-mt6370-limits.py 2>&1 | tee logs/mt6370-limits-tests.log

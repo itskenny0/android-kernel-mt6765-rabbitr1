@@ -36,5 +36,58 @@ current, voltage, temperature and presence paths.
 `CHARGE_COUNTER` is the signed hardware accumulator, not remaining charge or
 percentage. It can wrap or reset; this increment neither tracks those events
 nor initializes a state-of-charge estimate. No physical-device test has occurred.
-Android battery percentage, status, health and shutdown behavior still require
-separate work; passing these counter tests does not establish beta readiness.
+Android battery percentage, health and shutdown behavior still require separate
+work; passing these counter tests does not establish beta readiness.
+
+
+# MT6357 battery status
+
+Run `python3 /rabbitr1/src/mainline/rabbit-r1/scripts/test-mt6357-status.py`.
+This runs the counter suite first, then reuses its actual production current and
+counter functions and independent PMIC transaction model. The STATUS harness
+extracts the production status read, worker, blocking notifier, teardown,
+supplier initialization and probe. It also executes the real MT6370 online and
+status functions against mocked attachment/register states. ASan/UBSan and
+pthreads exercise error propagation, registration callbacks, failed probe,
+repeated writes, policy feedback, periodic and immediate transitions, teardown
+while a supplier read or entered notifier blocks, static descriptor lifetime,
+and competing status/current/counter reads.
+Framework workqueues, a blocking notifier chain, device links, devres, OF
+references and bus reads are
+modeled; these are not physical-device or kernel scheduler tests. The existing
+current/ADC suite separately covers the real ADC initialization.
+
+The r1 gauge references only `r1_charger` through `power-supplies`. Without that
+optional reference the generic gauge does not advertise STATUS. A reference
+and a device link retain the supplier and order consumer teardown before
+supplier driver data disappears. Work starts only after battery registration
+and its managed stop action. A blocking notifier accepts only property changes
+from the bound charger. The stop action first disables scheduling, unregisters
+and synchronously drains that notifier, then drains work before unregistering
+the battery. Early registration events and events after stopping cannot start
+work. Descriptors and property arrays have static lifetime, so a power-supply
+class iterator retaining the supply after driver unbind cannot dereference a
+freed descriptor. The descriptor has no external-power callback. Measurement
+and status scheduling use separate mutexes, and supplier I/O holds neither.
+
+Reads return the actual supplier STATUS and propagate its errors without
+publishing a stale value. Invalid status enums fail with ERANGE. Notifications
+occur on the initial observation, a status change, or a change between valid
+and failed reads. Changing one read error into another does not trigger a new
+notification, but direct reads still return the exact error. Repeated charger
+writes can notify without changing state; filtering prevents those events from
+cycling through the r1 charging policy and battery. The worker refreshes every
+five seconds to observe charger transitions without an IRQ, and supplier events
+request an immediate refresh. A newly queued event is not postponed by the
+periodic refresh.
+
+For the current MT6370 driver, detached means DISCHARGING; attached READY/FAULT
+means NOT_CHARGING, charge-in-progress means CHARGING and charge-done means FULL.
+FULL describes the charger's termination state under the active configuration;
+it does not establish 100% of a calibrated battery capacity. Attachment state
+comes from the existing charger attachment path. No charging settings, IRQs,
+CAPACITY, HEALTH or shutdown policy are changed. Charger input faults and chip
+thermal regulation are not interpreted as battery health. Runtime attachment,
+notification latency, teardown ordering and real charge completion remain
+hardware validation requirements. STATUS alone does not resolve the missing
+capacity estimate or make Android firmware beta-ready.

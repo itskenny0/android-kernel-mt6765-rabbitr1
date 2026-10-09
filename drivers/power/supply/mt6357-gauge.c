@@ -14,6 +14,7 @@
 #include <linux/power_supply.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
+#include <linux/workqueue.h>
 
 #define MT6357_FG_ON		BIT(0)
 #define MT6357_FG_CLOCK_PD	(BIT(3) | BIT(4))
@@ -26,6 +27,7 @@
 #define MT6357_FG_POLL_US	100
 #define MT6357_FG_TIMEOUT_US	20000
 #define MT6357_THERMISTOR_MAX_POINTS 64
+#define MT6357_STATUS_POLL_INTERVAL (5 * HZ)
 
 struct mt6357_thermistor_point {
 	s32 temperature_mc;
@@ -39,7 +41,16 @@ struct mt6357_gauge {
 	u32 shunt_uohms;
 	u32 gain_permille;
 	bool needs_release;
-	struct power_supply_desc desc;
+	const struct power_supply_desc *desc;
+	struct notifier_block status_nb;
+	struct power_supply *charger;
+	struct power_supply *psy;
+	struct mutex status_lock;
+	struct delayed_work status_work;
+	bool status_active;
+	bool status_seen;
+	bool status_valid;
+	int status;
 	struct iio_channel *voltage;
 	struct iio_channel *thermistor;
 	struct iio_channel *reference;
@@ -292,6 +303,75 @@ static int mt6357_gauge_read_present(struct mt6357_gauge *gauge, int *present)
 	return 0;
 }
 
+static int mt6357_gauge_read_status(struct mt6357_gauge *gauge, int *status)
+{
+	union power_supply_propval val;
+	int ret;
+
+	if (!gauge->charger)
+		return -ENODATA;
+	ret = power_supply_get_property(gauge->charger, POWER_SUPPLY_PROP_STATUS, &val);
+	if (ret)
+		return ret;
+	if (val.intval < POWER_SUPPLY_STATUS_UNKNOWN || val.intval > POWER_SUPPLY_STATUS_FULL)
+		return -ERANGE;
+	*status = val.intval;
+	return 0;
+}
+
+static void mt6357_gauge_status_work(struct work_struct *work)
+{
+	struct mt6357_gauge *gauge = container_of(to_delayed_work(work),
+						 struct mt6357_gauge, status_work);
+	bool valid, changed;
+	int status = POWER_SUPPLY_STATUS_UNKNOWN;
+
+	/* Supplier I/O never holds the measurement or notification mutex. */
+	valid = !mt6357_gauge_read_status(gauge, &status);
+	mutex_lock(&gauge->status_lock);
+	if (!gauge->status_active) {
+		mutex_unlock(&gauge->status_lock);
+		return;
+	}
+	changed = !gauge->status_seen || valid != gauge->status_valid ||
+		  (valid && status != gauge->status);
+	gauge->status_seen = true;
+	gauge->status_valid = valid;
+	gauge->status = status;
+	/* Do not postpone an immediate supplier event queued during this read. */
+	queue_delayed_work(system_power_efficient_wq, &gauge->status_work,
+			   MT6357_STATUS_POLL_INTERVAL);
+	mutex_unlock(&gauge->status_lock);
+	if (changed)
+		power_supply_changed(gauge->psy);
+}
+
+static int mt6357_gauge_status_notify(struct notifier_block *nb,
+				       unsigned long event, void *data)
+{
+	struct mt6357_gauge *gauge = container_of(nb, struct mt6357_gauge, status_nb);
+
+	if (event != PSY_EVENT_PROP_CHANGED || data != gauge->charger)
+		return NOTIFY_DONE;
+	mutex_lock(&gauge->status_lock);
+	if (gauge->status_active)
+		mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
+	mutex_unlock(&gauge->status_lock);
+	return NOTIFY_DONE;
+}
+
+static void mt6357_gauge_stop_status(void *data)
+{
+	struct mt6357_gauge *gauge = data;
+
+	mutex_lock(&gauge->status_lock);
+	gauge->status_active = false;
+	mutex_unlock(&gauge->status_lock);
+	/* Drain callbacks running on the supplier's workqueue before freeing us. */
+	power_supply_unreg_notifier(&gauge->status_nb);
+	cancel_delayed_work_sync(&gauge->status_work);
+}
+
 static int mt6357_gauge_get_property(struct power_supply *psy,
 				     enum power_supply_property psp,
 				     union power_supply_propval *val)
@@ -299,6 +379,8 @@ static int mt6357_gauge_get_property(struct power_supply *psy,
 	struct mt6357_gauge *gauge = power_supply_get_drvdata(psy);
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_STATUS:
+		return mt6357_gauge_read_status(gauge, &val->intval);
 	case POWER_SUPPLY_PROP_PRESENT:
 		return mt6357_gauge_read_present(gauge, &val->intval);
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
@@ -322,14 +404,43 @@ static const enum power_supply_property mt6357_gauge_properties[] = {
 	POWER_SUPPLY_PROP_TEMP,
 };
 
-static const struct power_supply_desc mt6357_gauge_desc = {
-	.name = "mt6357-battery",
-	.type = POWER_SUPPLY_TYPE_BATTERY,
-	.properties = mt6357_gauge_properties,
-	/* The ADC properties are added only when all their inputs are supplied. */
-	.num_properties = 3,
-	.get_property = mt6357_gauge_get_property,
+static const enum power_supply_property mt6357_gauge_status_properties[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_STATUS,
 };
+
+static const enum power_supply_property mt6357_gauge_adc_status_properties[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_STATUS,
+};
+
+/* A class iterator may retain psy after unregister, so keep its descriptor static. */
+#define MT6357_GAUGE_DESC(_properties, _count) { \
+	.name = "mt6357-battery", \
+	.type = POWER_SUPPLY_TYPE_BATTERY, \
+	.properties = (_properties), \
+	.num_properties = (_count), \
+	.get_property = mt6357_gauge_get_property, \
+}
+
+static const struct power_supply_desc mt6357_gauge_desc =
+	MT6357_GAUGE_DESC(mt6357_gauge_properties, 3);
+static const struct power_supply_desc mt6357_gauge_adc_desc =
+	MT6357_GAUGE_DESC(mt6357_gauge_properties, ARRAY_SIZE(mt6357_gauge_properties));
+static const struct power_supply_desc mt6357_gauge_status_desc =
+	MT6357_GAUGE_DESC(mt6357_gauge_status_properties,
+			  ARRAY_SIZE(mt6357_gauge_status_properties));
+static const struct power_supply_desc mt6357_gauge_adc_status_desc =
+	MT6357_GAUGE_DESC(mt6357_gauge_adc_status_properties,
+			  ARRAY_SIZE(mt6357_gauge_adc_status_properties));
+
+#undef MT6357_GAUGE_DESC
 
 static int mt6357_gauge_get_channel(struct device *dev, const char *name,
 				   struct iio_channel **channel)
@@ -399,7 +510,36 @@ static int mt6357_gauge_init_adc(struct mt6357_gauge *gauge)
 			return -EINVAL;
 	}
 
-	gauge->desc.num_properties = ARRAY_SIZE(mt6357_gauge_properties);
+	gauge->desc = &mt6357_gauge_adc_desc;
+	return 0;
+}
+
+static int mt6357_gauge_init_status(struct mt6357_gauge *gauge)
+{
+	struct device *dev = gauge->dev;
+	int ret;
+
+	if (!device_property_present(dev, "power-supplies"))
+		return 0;
+	/* This OF binding describes exactly one charger with no arguments. */
+	ret = of_count_phandle_with_args(dev->of_node, "power-supplies", NULL);
+	if (ret != 1)
+		return ret < 0 ? ret : -EINVAL;
+	gauge->charger = devm_power_supply_get_by_reference(dev, "power-supplies");
+	if (IS_ERR(gauge->charger))
+		return PTR_ERR(gauge->charger);
+	if (!gauge->charger)
+		return -EPROBE_DEFER;
+	/* A power_supply reference alone does not retain supplier driver data. */
+	if (!device_link_add(dev, gauge->charger->dev.parent, DL_FLAG_AUTOREMOVE_CONSUMER))
+		return -ENOMEM;
+	ret = devm_mutex_init(dev, &gauge->status_lock);
+	if (ret)
+		return ret;
+	INIT_DELAYED_WORK(&gauge->status_work, mt6357_gauge_status_work);
+	gauge->status_nb.notifier_call = mt6357_gauge_status_notify;
+	gauge->desc = gauge->desc == &mt6357_gauge_adc_desc ?
+		&mt6357_gauge_adc_status_desc : &mt6357_gauge_status_desc;
 	return 0;
 }
 
@@ -439,18 +579,37 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
 	if (!full_scale)
 		return dev_err_probe(dev, -EINVAL, "Current calibration loses all resolution\n");
 
-	gauge->desc = mt6357_gauge_desc;
+	gauge->desc = &mt6357_gauge_desc;
 	ret = mt6357_gauge_init_adc(gauge);
 	if (ret)
 		return dev_err_probe(dev, ret, "Invalid battery ADC inputs\n");
 	ret = devm_mutex_init(dev, &gauge->lock);
 	if (ret)
 		return ret;
+	ret = mt6357_gauge_init_status(gauge);
+	if (ret)
+		return dev_err_probe(dev, ret, "Invalid battery charger supplier\n");
 	gauge->needs_release = true;
 	config.drv_data = gauge;
 	config.fwnode = dev_fwnode(dev);
-	psy = devm_power_supply_register(dev, &gauge->desc, &config);
-	return PTR_ERR_OR_ZERO(psy);
+	psy = devm_power_supply_register(dev, gauge->desc, &config);
+	if (IS_ERR(psy))
+		return PTR_ERR(psy);
+	if (!gauge->charger)
+		return 0;
+	gauge->psy = psy;
+	ret = power_supply_reg_notifier(&gauge->status_nb);
+	if (ret)
+		return ret;
+	/* Added after registration, so work stops before the supply is removed. */
+	ret = devm_add_action_or_reset(dev, mt6357_gauge_stop_status, gauge);
+	if (ret)
+		return ret;
+	mutex_lock(&gauge->status_lock);
+	gauge->status_active = true;
+	mod_delayed_work(system_power_efficient_wq, &gauge->status_work, 0);
+	mutex_unlock(&gauge->status_lock);
+	return 0;
 }
 
 static const struct of_device_id mt6357_gauge_of_match[] = {
