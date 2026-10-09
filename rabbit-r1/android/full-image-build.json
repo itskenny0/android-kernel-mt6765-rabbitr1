@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "result": "pass",
+  "scope": "Completed default lineage_r1 Android image build and read-only artifact audit; no device boot or flash.",
+  "build_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+  "evidence_commit": "f9e2acaee6c7e363dbc60f55b7a015ff15e60f6a",
+  "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+  "product": "lineage_r1",
+  "experimental_soc_health": false,
+  "hardware_tested": false,
+  "beta_ready": false,
+  "complete_flash_package": false,
+  "build_start": {
+    "path": "/rabbitr1/out/android-build-review/full-images/retry-current-source/build-start.json",
+    "bytes": 1454,
+    "sha256": "b67b7c1379f2f6a15d50ef4e92247f6f54b883e4bb10dea4f7d6067493a33990"
+  },
+  "build_result": {
+    "path": "/rabbitr1/out/android-build-review/full-images/retry-current-source/build-result.json",
+    "bytes": 576,
+    "sha256": "c6b056e19619c070660eb748049c0bb1b01a683d89e1ea529b74499d641360ae"
+  },
+  "build_log": {
+    "path": "/rabbitr1/logs/android-full-images-0a2a56a30e.log",
+    "bytes": 546500,
+    "sha256": "555d601bb7b0131d4083480385065bba3097ccb7d3fc2f0c79a506cf41a732bc"
+  },
+  "installer": {
+    "path": "/rabbitr1/src/android/.r1-install.json",
+    "bytes": 9496,
+    "sha256": "346a4b3c328cd662ef5248862f4ff2bc1992e8757ee3860371603d9e5c4687b2"
+  },
+  "managed_files": 77,
+  "android_patch_projects": 10,
+  "android_patch_files": 135,
+  "detailed_results": {
+    "path": "out/android-build-review/first-stage-contexts/upcoming-audits/full-v2/results.json",
+    "bytes": 176277,
+    "sha256": "5b7f1d7c82dcb7fdb6e2e1bf01a9292681a0cabf95c8cf24d7a69e2ed81cd50e"
+  },
+  "verifier": {
+    "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/full-v2/verify.py",
+    "bytes": 30395,
+    "sha256": "817d29d62cac5bb23f104955b276457fab62a2baef61d57c7e772d28fdff2a63"
+  },
+  "guard": {
+    "path": "out/android-build-review/first-stage-contexts/upcoming-audits/provenance.py",
+    "bytes": 14153,
+    "sha256": "78f4c7313e76738b1e1366e2f712010ead05389c5aa1dd74af794dc6785258c5"
+  },
+  "checks": [
+    {
+      "name": "completed build and staged provenance",
+      "status": "pass"
+    },
+    {
+      "name": "image hashes and logical partition budgets",
+      "status": "pass"
+    },
+    {
+      "name": "actual check-all-partition-sizes result",
+      "status": "pass"
+    },
+    {
+      "name": "full vbmeta signature, descriptors and image correspondence",
+      "status": "pass"
+    },
+    {
+      "name": "sparse super metadata, A/B layout and actual extent payloads",
+      "status": "pass"
+    },
+    {
+      "name": "actual ext4 contents: init, fstab, VINTF, services, app and modules",
+      "status": "pass"
+    },
+    {
+      "name": "filesystem pstore and allocator payloads match committed target audit",
+      "status": "pass"
+    },
+    {
+      "name": "packaged ARM64 services and charging APK metadata",
+      "status": "pass"
+    },
+    {
+      "name": "vendor pstore module kernel match and explicit-load packaging",
+      "status": "pass"
+    },
+    {
+      "name": "image immutability during read-only audit",
+      "status": "pass"
+    }
+  ],
+  "images": {
+    "system": {
+      "path": "/rabbitr1/out/android/target/product/r1/system.img",
+      "bytes": 885796864,
+      "sha256": "c2ec28b5e0ad2e85cae8cfea9799f1eb673b8be19eb893d3d367cb5c93938161",
+      "logical_bytes": 885796864,
+      "android_sparse": false,
+      "host_allocated_bytes": 885800960
+    },
+    "system_ext": {
+      "path": "/rabbitr1/out/android/target/product/r1/system_ext.img",
+      "bytes": 478613504,
+      "sha256": "7dbc2a4a5eac528b7b23ae4596baf01700cdc3ee42d4bb01f5d9fd86cdb9b263",
+      "logical_bytes": 478613504,
+      "android_sparse": false,
+      "host_allocated_bytes": 476999680
+    },
+    "product": {
+      "path": "/rabbitr1/out/android/target/product/r1/product.img",
+      "bytes": 468570112,
+      "sha256": "13b9e97d5856896807b532df876adbc1070b5231e68fc54c989d82c7f62ccb05",
+      "logical_bytes": 468570112,
+      "android_sparse": false,
+      "host_allocated_bytes": 467021824
+    },
+    "vendor": {
+      "path": "/rabbitr1/out/android/target/product/r1/vendor.img",
+      "bytes": 85786624,
+      "sha256": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb",
+      "logical_bytes": 85786624,
+      "android_sparse": false,
+      "host_allocated_bytes": 85430272
+    },
+    "super": {
+      "path": "/rabbitr1/out/android/target/product/r1/super.img",
+      "bytes": 1911717032,
+      "sha256": "eefe7e4c2c6ca6bcc365c0d1ec851cd3a157730ee6ab7dcda6cdbe6c2eeba462",
+      "logical_bytes": 8792064000,
+      "android_sparse": true,
+      "host_allocated_bytes": 1911721984
+    },
+    "vbmeta": {
+      "path": "/rabbitr1/out/android/target/product/r1/vbmeta.img",
+      "bytes": 65536,
+      "sha256": "ddf566476b116e74ccf262f687282a97a33450823e66b741181e83f82e63295a",
+      "logical_bytes": 65536,
+      "android_sparse": false,
+      "host_allocated_bytes": 8192
+    },
+    "boot": {
+      "path": "/rabbitr1/out/android/target/product/r1/boot.img",
+      "bytes": 33554432,
+      "sha256": "32e25b3fc07a938b46d5ae8a3881e1ccb764254bb3629d0e0f6f68e385bf11b4",
+      "logical_bytes": 33554432,
+      "android_sparse": false,
+      "host_allocated_bytes": 28819456
+    },
+    "dtbo": {
+      "path": "/rabbitr1/out/android/target/product/r1/dtbo.img",
+      "bytes": 8388608,
+      "sha256": "595f3edd36057d87ca7a53c5e32f25c16617c1018efa92c9e35f3138ac47e037",
+      "logical_bytes": 8388608,
+      "android_sparse": false,
+      "host_allocated_bytes": 53248
+    }
+  },
+  "dynamic_group": {
+    "image_total_bytes": 1918767104,
+    "maximum_bytes": 4294967296,
+    "remaining_bytes": 2376200192
+  },
+  "partition_size_check": {
+    "log": {
+      "path": "/rabbitr1/out/android/target/product/r1/obj/PACKAGING/check-all-partition-sizes_intermediates/check_all_partition_sizes.log",
+      "bytes": 1485,
+      "sha256": "20fd8f5fa64f1ca83dbc0495b715f621decb410e5e0617d881a4a6e84dfbba26"
+    },
+    "input": {
+      "path": "/rabbitr1/out/android/target/product/r1/obj/PACKAGING/check-all-partition-sizes_intermediates/misc_info.txt",
+      "bytes": 684,
+      "sha256": "3d1c608ae35aaf1f26536a0bfe43c254018ab967dff21b0ba435d85e6233352b"
+    },
+    "warnings": [],
+    "group_budget_independently_checked": true
+  },
+  "avb": {
+    "algorithm": "SHA256_RSA4096",
+    "flags": 3,
+    "public_development_key": {
+      "path": "/rabbitr1/src/android/external/avb/test/data/testkey_rsa4096_pub.pem",
+      "bytes": 800,
+      "sha256": "6f897d4a56162fa622458514d206894b0a577961a99d87e45398cbd19b290d67"
+    },
+    "descriptor_payloads_verified": true,
+    "hashtrees_verified": true,
+    "fec_parity_verified": false,
+    "trusted_production_chain": false
+  },
+  "factory_super": {
+    "geometry": {
+      "metadata_max_size": 65536,
+      "metadata_slot_count": 3,
+      "logical_block_size": 4096,
+      "sha256": "bb51bbfa583316a57f8a78459c926727d8d4a007b1b43129613294c4f84e1108"
+    },
+    "primary_backup_and_all_slots_identical": true,
+    "logical_extent_image_sha256": {
+      "system_a": "c2ec28b5e0ad2e85cae8cfea9799f1eb673b8be19eb893d3d367cb5c93938161",
+      "system_ext_a": "7dbc2a4a5eac528b7b23ae4596baf01700cdc3ee42d4bb01f5d9fd86cdb9b263",
+      "product_a": "13b9e97d5856896807b532df876adbc1070b5231e68fc54c989d82c7f62ccb05",
+      "vendor_a": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb"
+    },
+    "nonoverlapping_extents": [
+      [
+        1048576,
+        886845440,
+        "system_a"
+      ],
+      [
+        887095296,
+        1365708800,
+        "system_ext_a"
+      ],
+      [
+        1366294528,
+        1834864640,
+        "product_a"
+      ],
+      [
+        1835008000,
+        1920794624,
+        "vendor_a"
+      ]
+    ],
+    "populated_slot": "a",
+    "empty_slot": "b",
+    "group_used_bytes": 1918767104,
+    "group_remaining_bytes": 2376200192,
+    "raw_super_expanded_or_written": false
+  },
+  "immutability": {
+    "image_sizes_and_mtimes_unchanged": true,
+    "no_writable_image_handles_used": true,
+    "source_records_and_full_artifact_hashes": {
+      "unchanged": true,
+      "source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+      "watched_artifacts": 10
+    }
+  },
+  "checker_correction": {
+    "initial_failed_report": {
+      "path": "out/android-build-review/first-stage-contexts/upcoming-audits/full/results.json",
+      "bytes": 174356,
+      "sha256": "b4b8e75ddb71f71abe7d43da20d2d632004db5d8802a883ae4ed7bfacfedced4"
+    },
+    "correction": {
+      "path": "out/android-build-review/first-stage-contexts/upcoming-audits/full-v2/correction.json",
+      "bytes": 3761,
+      "sha256": "f93281dc24f767122d62705fe10a168ad63d98c3b851d4aa2739f74f297a1770"
+    },
+    "reason": "The new target summary retains the actual payload_filesystem field; the full checker had expected its old filesystem alias. Only this report key changed; all six payload comparisons already passed."
+  },
+  "limitations": [
+    "Packaging presence and static data integrity do not establish boot, HAL/service startup, linker namespace/APEX behavior, power/charging correctness or hardware support.",
+    "Factory super populates A only; a future installer must verify/select A or supply populated B images. Active device slot was not queried.",
+    "Top-level vbmeta flags 3 disable verification/hashtree enforcement. Public development-key signature checks do not establish a production trust chain or relock safety.",
+    "Current kernel arguments request global permissive SELinux. No runtime enforcing-policy validation is performed.",
+    "AOSP avbtool verifies hashtree/root integrity but does not regenerate/check FEC correction parity; that limitation remains explicit.",
+    "The default staged kernel keeps the experimental capacity estimator disabled. Normal Android battery startup remains a separate release gate.",
+    "GPU remains disabled; the product uses SwiftShader.",
+    "A complete clean-install/restore transaction and hardware validation remain required."
+  ]
+}

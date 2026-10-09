@@ -7,8 +7,10 @@ native services and the SELinux policy aggregate, built successfully on
 init/VINTF files and compiled policy. [Results and hashes](../android/targeted-build.json)
 record their scope. The subsequent boot, DTBO, recovery-policy and real Binder
 runtime targets also built; [boot-image evidence](../android/boot-build.json)
-records their artifact checks. Complete filesystem images and hardware testing
-remain outstanding. No Android image has been added to the mtkclient package.
+records their artifact checks. The complete default product image build now
+passes all ten [filesystem, AVB and super-image checks](../android/full-image-build.json).
+Hardware testing and the complete Android flash procedure remain outstanding.
+No Android image has been added to the mtkclient package.
 
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
@@ -70,11 +72,16 @@ permissive mode.
 
 The boot image retains the stock v2 header, load addresses and Android DT table.
 Its normal-boot fstab must be copied to `root/first_stage_ramdisk`, which the
-recovery-as-boot rule includes in its CPIO. The stock DTBO payload is unchanged;
+recovery-as-boot rule includes in its CPIO. These root files also enter the system
+image; two exact board-owned `rootfs` labels allow image creation without changing
+the layout. [Label validation](../android/first-stage-contexts-build.json) reproduces
+the original error and verifies the resulting ext4 labels. The stock DTBO payload is unchanged;
 Android replaces its AVB footer. Both boot and DTBO footers use algorithm `NONE`
 with valid hash descriptors, and do not establish a complete or trusted vbmeta
-chain. Vendor module installation, super metadata, complete partition sizes and
-top-level vbmeta remain to be checked after the filesystem build. The stock layout
+chain. The completed filesystem audit verifies vendor module installation,
+super metadata, partition sizes and all six top-level vbmeta partition descriptors.
+Top-level vbmeta uses the public Android RSA4096 development key and flags 3;
+these integrity checks do not establish production trust or enforcement. The stock layout
 evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 The recovery-as-boot image relies on LK to select normal Android startup.
@@ -89,14 +96,15 @@ After the boot and recovery checks pass, build the filesystem images and their
 AVB/super dependencies with the explicit size check:
 
 ```bash
-R1_ANDROID_JOBS=24 bash /rabbitr1/scripts/build-android.sh \
+R1_ANDROID_JOBS=12 bash /rabbitr1/scripts/build-android.sh \
     systemimage systemextimage productimage vendorimage \
     superimage vbmetaimage check-all-partition-sizes
 ```
 
 These targets exclude the 48 GiB userdata image. The configured super partition
-allows a 4 GiB group per slot, including filesystem and AVB overhead; actual
-image fit still needs the size check. Factory super populates only slot A and
+allows a 4 GiB group per slot, including filesystem and AVB overhead. The checked
+images total 1,918,767,104 bytes per slot; the size check passes without warnings.
+Factory super populates only slot A and
 leaves B's logical partitions empty. The future Android flash procedure must
 select and verify A while preserving the previous slot state for restoration,
 or supply populated B images. A device's existing active slot cannot be assumed.
@@ -104,8 +112,9 @@ or supply populated B images. A device's existing active slot cannot be assumed.
 The [offline super builder](ANDROID-SUPER.md) can construct and verify identical
 populated A/B partition sets from four completed, audited filesystem images.
 Its raw output and metadata checks have 67 synthetic tests using AOSP `lpmake`.
-Real image generation still requires the completed full-image audit, and this
-tool does not perform flashing, slot selection or snapshot cleanup.
+The completed full-image audit now supplies its verified input images; generating
+the populated A/B image is the next packaging step. This tool does not perform
+flashing, slot selection or snapshot cleanup.
 
 The pinned mtkclient writes file bytes directly; it does not expand Android
 sparse images. `scripts/expand-android-sparse.py` validates a pinned sparse-file
@@ -121,19 +130,19 @@ The first full-image attempt failed when minigbm's default `all` backend set
 compiled Intel intrinsics for ARM64. The r1 product now selects the existing
 `all_arm` set before inheriting the common device configuration. The rebuilt
 allocator passes: its actual compile commands exclude i915/xe and retain the
-ARM and generic backends. The complete filesystem build must still finish.
+ARM and generic backends. The complete filesystem build and artifact audit now pass.
 
 The next full-image attempt reached 66% before `system/vold` failed to compile:
 `PublicVolume.cpp` uses `std::replace` without including `<algorithm>`. Patch
 `0008-include-vold-algorithm.patch` adds that header. The preserved failure and
 targeted compile are recorded in [vold-include-build.json](../android/vold-include-build.json).
-This fixes the compilation error; it does not establish a completed image build.
+The complete build now also verifies this fix beyond the targeted compilation.
 
 The following attempt stopped in the audio HAL: `ChildInterface.h` uses
 `SCHED_NORMAL` without including `<sched.h>`. Patch 0009 adds that public header.
 The [compiler replay](../android/audio-scheduler-include-build.json) reproduced
 the failure and then compiled the actual translation unit without diagnostics.
-The complete image build remains outstanding.
+The complete image build now passes with this fix applied.
 
 The build helper verifies the pinned ARM64 WebView APK before invoking Android's
 build. If the checkout contains its Git LFS pointer, it fetches only that asset
