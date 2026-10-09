@@ -209,6 +209,9 @@ jobs:
         run: |
           source scripts/env.sh
           toolchains/boot-tools/bin/python scripts/build-lk.py 2>&1 | tee logs/build-lk.log
+          python3 scripts/test-lk-slots.py --stock firmware/stock-v0.8.293/lk.img \
+            --patched dist/lk/lk.bin --build-record dist/lk/build.json \
+            --out out/lk-slots-tests 2>&1 | tee logs/lk-slots-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk.py 2>&1 | tee logs/lk-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-mmc-fixup.py 2>&1 | tee logs/lk-mmc-fixup-tests.log
           toolchains/boot-tools/bin/python scripts/test-lk-platform-fixup.py 2>&1 | tee logs/lk-platform-fixup-tests.log
