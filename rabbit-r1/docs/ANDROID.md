@@ -10,6 +10,14 @@ runtime targets also built; [boot-image evidence](../android/boot-build.json)
 records their artifact checks. Complete filesystem images and hardware testing
 remain outstanding. No Android image has been added to the mtkclient package.
 
+The updated recovery log collector, dumpstate, system/recovery liblog and ARM
+graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
+Both liblog variants export the private backend reader, recovery-persist imports
+it, and the boot ramdisk contains the checked recovery library. The allocator
+APEX contains 20 AArch64 binaries with the expected service, mapper and VINTF
+declarations. Its external library declarations match the ELF imports; runtime
+APEX/linker behavior still needs testing.
+
 `android/local_manifests/r1.xml` pins the common mainline device tree and its ten
 direct and transitive dependencies. Use it with the LineageOS manifest commit in `sources.lock.json`.
 The upstream manifest uses the Android 17 release tag for AOSP projects and
@@ -93,6 +101,12 @@ leaves B's logical partitions empty. The future Android flash procedure must
 select and verify A while preserving the previous slot state for restoration,
 or supply populated B images. A device's existing active slot cannot be assumed.
 
+The first full-image attempt failed when minigbm's default `all` backend set
+compiled Intel intrinsics for ARM64. The r1 product now selects the existing
+`all_arm` set before inheriting the common device configuration. The rebuilt
+allocator passes: its actual compile commands exclude i915/xe and retain the
+ARM and generic backends. The complete filesystem build must still finish.
+
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
 by stopping before the build. The pinned Siso tool cannot load an absolute
@@ -119,8 +133,11 @@ application and repeat checks passed. The PowerVR Vulkan library also passed
 a separate x86_64 Linux host build; Android/ARM64 userspace compilation remains
 pending. [Compile evidence](../tests/gpu/mesa-host-build.json) records its scope.
 
-The kernel PowerVR driver matches the complete Linux 7.2.9 subtree, including
-its unchanged UAPI. A separate CI configuration enables the driver, debugfs
+The kernel PowerVR driver uses the complete Linux 7.2.9 subtree, including
+its unchanged UAPI, plus the upstream scheduler timeout fix in patch 0075.
+The fix gives firmware recovery time to finish before the host timeout callback;
+it also delays host diagnosis when firmware fails to recover. A separate CI
+configuration enables the driver, debugfs
 and tracing and compiles all 28 ARM64 objects with `W=1`; warnings fail the
 check. [Driver pins and compile scope](../tests/gpu/README.rst) record the
 source and validation. The shipping configuration keeps PowerVR disabled.

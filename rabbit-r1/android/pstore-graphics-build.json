@@ -1,0 +1,732 @@
+{
+  "format": 1,
+  "status": "pass",
+  "build_session": 80019,
+  "build_exit_code": 0,
+  "build_start_source_commit": "b970f300bdf7b320c6c897ca66e0f225d449d93f",
+  "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+  "audit_head": "83cbd9b71f3c7e8248eea9dddf0af34e843416fb",
+  "build_log": {
+    "path": "/rabbitr1/logs/android-pstore-graphics-boot-b970f300bd.log",
+    "bytes": 2380998,
+    "sha256": "353cef216009b22b86d7c96d2e6801549f291222b568d95acf7b605141938fae"
+  },
+  "installer": {
+    "path": "/rabbitr1/src/android/.r1-install.json",
+    "bytes": 7236,
+    "sha256": "3d3dcb8b443c49cd785efcab777f760b7966c3c2e0db78e5a2cb218e166b42a6"
+  },
+  "unchanged_installed_source_checks": {
+    "managed_files": 61,
+    "seven_patch_after_hashes": 126,
+    "series_sha256": "d0a71e3ee94a9a41d60cdb0b376f1e49525978e3ef6e4974add0d45725ff6f87"
+  },
+  "verification": {
+    "checks_passed": 9,
+    "source_result": {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/result.json",
+      "bytes": 34747,
+      "sha256": "4d0a57079ffc5d50a4b33a7bd3aee2158e5f8b2b7806a283093ac1fd61286fba"
+    },
+    "checker": {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/verify.py",
+      "bytes": 20575,
+      "sha256": "717ad581ba11e18ba270f0931cca82182d478c6801fe7426edc24bdf60461c96"
+    },
+    "readelf": {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/llvm-readelf",
+      "bytes": 6818576,
+      "sha256": "4e6528df071ce0d90a5b51d76dc2a2d6d1f275f07619c91328d8ddf37edf3fe7"
+    },
+    "erofs_extractor": {
+      "path": "/rabbitr1/out/android/host/linux-x86/bin/fsck.erofs",
+      "bytes": 1228088,
+      "sha256": "d97975db9cf0bc2892da6a39485e882260064d5e0ff264e11451f78ff8d15765"
+    },
+    "apex_manifest_decoder": {
+      "path": "/rabbitr1/out/android/host/linux-x86/bin/deapexer",
+      "bytes": 23177728,
+      "sha256": "3f316f2969918dc24391e8f40512d3549505e903d04a617cc1d028458837b927"
+    }
+  },
+  "pstore_artifacts": {
+    "system-liblog": {
+      "path": "/rabbitr1/out/android/target/product/r1/system/lib64/liblog.so",
+      "bytes": 102608,
+      "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
+      "soong_variant": {
+        "path": "/rabbitr1/src/android/out/soong/.intermediates/system/logging/liblog/liblog/android_arm64_armv8-a_cortex-a53_shared/liblog.so",
+        "bytes": 102608,
+        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0"
+      },
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ],
+      "backend_api_symbols": [
+        "153: 000000000000f910   168 FUNC    GLOBAL DEFAULT    16 __android_log_pmsg_file_read_from_backend@@LIBLOG_PRIVATE"
+      ],
+      "present_path_strings": [
+        "/sys/fs/pstore/pmsg-ramoops-0",
+        "/sys/fs/pstore/pmsg-pstore_blk-0"
+      ]
+    },
+    "recovery-liblog": {
+      "path": "/rabbitr1/out/android/target/product/r1/recovery/root/system/lib64/liblog.so",
+      "bytes": 102608,
+      "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
+      "soong_variant": {
+        "path": "/rabbitr1/src/android/out/soong/.intermediates/system/logging/liblog/liblog/android_recovery_arm64_armv8-a_cortex-a53_shared/liblog.so",
+        "bytes": 102608,
+        "sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0"
+      },
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ],
+      "backend_api_symbols": [
+        "153: 000000000000f910   168 FUNC    GLOBAL DEFAULT    16 __android_log_pmsg_file_read_from_backend@@LIBLOG_PRIVATE"
+      ],
+      "present_path_strings": [
+        "/sys/fs/pstore/pmsg-ramoops-0",
+        "/sys/fs/pstore/pmsg-pstore_blk-0"
+      ]
+    },
+    "recovery-persist": {
+      "path": "/rabbitr1/out/android/target/product/r1/system/bin/recovery-persist",
+      "bytes": 51912,
+      "sha256": "01e8d27ec213605f9c822773530efd628f4a3e899413d8253f551888b6f77204",
+      "soong_variant": {
+        "path": "/rabbitr1/src/android/out/soong/.intermediates/bootable/recovery/recovery-persist/android_arm64_armv8-a_cortex-a53/recovery-persist",
+        "bytes": 51912,
+        "sha256": "01e8d27ec213605f9c822773530efd628f4a3e899413d8253f551888b6f77204"
+      },
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libbase.so",
+        "liblog.so",
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ],
+      "backend_api_symbols": [
+        "19: 0000000000000000     0 FUNC    GLOBAL DEFAULT   UND __android_log_pmsg_file_read_from_backend@LIBLOG_PRIVATE"
+      ],
+      "present_path_strings": [
+        "/sys/fs/pstore/console-ramoops",
+        "/sys/fs/pstore/console-pstore_blk-0",
+        "/sys/fs/pstore/pmsg-ramoops-0",
+        "/sys/fs/pstore/pmsg-pstore_blk-0"
+      ]
+    },
+    "dumpstate": {
+      "path": "/rabbitr1/out/android/target/product/r1/system/bin/dumpstate",
+      "bytes": 486080,
+      "sha256": "d633a11c26c89afb1a55616b369f78f7f8894528ea466387590d2d5515e59b14",
+      "soong_variant": {
+        "path": "/rabbitr1/src/android/out/soong/.intermediates/frameworks/native/cmds/dumpstate/dumpstate/android_arm64_armv8-a_cortex-a53/dumpstate",
+        "bytes": 486080,
+        "sha256": "d633a11c26c89afb1a55616b369f78f7f8894528ea466387590d2d5515e59b14"
+      },
+      "architecture": "ELF64 little-endian AArch64",
+      "needed": [
+        "libaconfig_storage_read_api_cc.so",
+        "android.hardware.dumpstate-V1-ndk.so",
+        "android.os.flags-aconfig-cc-host.so",
+        "libziparchive.so",
+        "libbase.so",
+        "libbinder.so",
+        "libbinder_ndk.so",
+        "libcrypto.so",
+        "libcutils.so",
+        "libdebuggerd_client.so",
+        "libdumpstateaidl.so",
+        "libdumpstateutil.so",
+        "libdumputils.so",
+        "libgui.so",
+        "libhardware_legacy.so",
+        "libhidlbase.so",
+        "liblog.so",
+        "libutils.so",
+        "libvintf.so",
+        "libbinderdebug.so",
+        "packagemanager_aidl-cpp.so",
+        "server_configurable_flags.so",
+        "device_policy_aconfig_flags_c_lib.so",
+        "libc++.so",
+        "libc.so",
+        "libm.so",
+        "libdl.so"
+      ],
+      "backend_api_symbols": [],
+      "present_path_strings": [
+        "/sys/fs/pstore/console-ramoops",
+        "/sys/fs/pstore/console-pstore_blk-0"
+      ]
+    }
+  },
+  "installed_init": {
+    "recovery-persist": {
+      "path": "/rabbitr1/out/android/target/product/r1/system/etc/init/recovery-persist.rc",
+      "bytes": 127,
+      "sha256": "0c5e3bee4329907791a861067722bbea0d56ad6639cd796fba2526c26bc975fa"
+    },
+    "dumpstate": {
+      "path": "/rabbitr1/out/android/target/product/r1/system/etc/init/dumpstate.rc",
+      "bytes": 761,
+      "sha256": "3702ad3e5e0af660f67d6b48310d73921e55feb30826d51f72be3e72b309b3fe"
+    }
+  },
+  "recovery_packaging": {
+    "boot": {
+      "path": "/rabbitr1/out/android/target/product/r1/boot.img",
+      "bytes": 33554432,
+      "sha256": "93a2c656dff7ba7761404b494bf043acd6058b526ada3ded59a778b9bbbde65e"
+    },
+    "ramdisk": {
+      "path": "/rabbitr1/out/android/target/product/r1/ramdisk-recovery.img",
+      "bytes": 16199271,
+      "sha256": "b33b9c7d298ec354569424e6e647aebef1e181a5667fb5e5879a1544f3d131d2"
+    },
+    "member": "system/lib64/liblog.so",
+    "member_bytes": 102608,
+    "member_sha256": "58056884936842dd85f0417c4e350f05b733152b987c93b07c660846a81ca8b0",
+    "mode": "0o100644"
+  },
+  "allocator_backend_compile": {
+    "variables": {
+      "path": "/rabbitr1/out/android/soong/soong.lineage_r1.variables",
+      "bytes": 175191,
+      "sha256": "de47d82d2afb8d14bc025ed8f05d34edca2b603bd1429a648e0c002e223da74d"
+    },
+    "minigbm_config": {
+      "RELEASE_SM_OPEN_DECLARED_PASSTHROUGH_HAL": "true",
+      "platform": "all_arm"
+    },
+    "formerly_failing_compile_edges": [
+      {
+        "target": "out/soong/.intermediates/external/minigbm-upstream/libminigbm_gralloc_upstream/android_vendor_arm64_armv8-a_cortex-a53_shared_apex10000/obj/external/minigbm-upstream/i915.o",
+        "command_sha256": "7fc4b86c13b71bda8c82e807c327ff4f5dcc8a218a7cce448b9b81939006f731",
+        "retained_flags": [
+          "-DDRV_MEDIATEK",
+          "-DDRV_MESON",
+          "-DDRV_MSM",
+          "-DDRV_VC4",
+          "-DDRV_VMWGFX",
+          "-DHAS_DMABUF_SYSTEM_HEAP"
+        ],
+        "intel_flags_absent": true
+      },
+      {
+        "target": "out/soong/.intermediates/external/minigbm-upstream/libminigbm_gralloc_upstream/android_vendor_arm64_armv8-a_cortex-a53_shared_apex10000/obj/external/minigbm-upstream/xe.o",
+        "command_sha256": "291266237db25c6d3be6d43464e22d2ee63e503c95293e0f76f6523725654581",
+        "retained_flags": [
+          "-DDRV_MEDIATEK",
+          "-DDRV_MESON",
+          "-DDRV_MSM",
+          "-DDRV_VC4",
+          "-DDRV_VMWGFX",
+          "-DHAS_DMABUF_SYSTEM_HEAP"
+        ],
+        "intel_flags_absent": true
+      }
+    ]
+  },
+  "allocator_apex": {
+    "path": "/rabbitr1/out/android/target/product/r1/vendor/apex/com.android.hardware.graphics.allocator.minigbm_upstream.apex",
+    "bytes": 1884160,
+    "sha256": "2a34543118b69dad184676c40e420199a78d5f3f9513b58d36e7651ebbe7fc2b",
+    "soong_variant": {
+      "path": "/rabbitr1/src/android/out/soong/.intermediates/external/minigbm-upstream/apex/com.android.hardware.graphics.allocator.minigbm_upstream/android_common_com.android.hardware.graphics.allocator.minigbm_upstream/com.android.hardware.graphics.allocator.minigbm_upstream.apex",
+      "bytes": 1884160,
+      "sha256": "2a34543118b69dad184676c40e420199a78d5f3f9513b58d36e7651ebbe7fc2b"
+    },
+    "manifest": {
+      "name": "com.android.hardware.graphics.allocator",
+      "version": "1",
+      "requireNativeLibs": [
+        "libbinder_ndk.so",
+        "libc.so",
+        "libdl.so",
+        "liblog.so",
+        "libm.so",
+        "libnativewindow.so",
+        "libsync.so",
+        "libvndksupport.so"
+      ],
+      "vendorBootstrap": true
+    },
+    "filesystem": "erofs",
+    "payload": {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/apex_payload.img",
+      "bytes": 1753088,
+      "sha256": "e8bd07d179c40b04ad91fa09aaf6ea793c97916c28aa8c791cd0700e62e74b3f"
+    },
+    "zip_and_payload_protobuf_manifests_identical": true,
+    "vintf_declarations": {
+      "allocator": [
+        "manifest",
+        {
+          "version": "9.0",
+          "type": "device"
+        },
+        "",
+        [
+          [
+            "hal",
+            {
+              "format": "aidl"
+            },
+            "",
+            [
+              [
+                "name",
+                {},
+                "android.hardware.graphics.allocator",
+                []
+              ],
+              [
+                "version",
+                {},
+                "3",
+                []
+              ],
+              [
+                "fqname",
+                {},
+                "IAllocator/default",
+                []
+              ]
+            ]
+          ]
+        ]
+      ],
+      "mapper": [
+        "manifest",
+        {
+          "version": "9.0",
+          "type": "device"
+        },
+        "",
+        [
+          [
+            "hal",
+            {
+              "format": "native"
+            },
+            "",
+            [
+              [
+                "name",
+                {},
+                "mapper",
+                []
+              ],
+              [
+                "fqname",
+                {},
+                "@5.0/minigbm_upstream",
+                []
+              ]
+            ]
+          ]
+        ]
+      ]
+    },
+    "external_needed_declared_in_manifest": [
+      "libbinder_ndk.so",
+      "libc.so",
+      "libdl.so",
+      "liblog.so",
+      "libm.so",
+      "libnativewindow.so",
+      "libsync.so",
+      "libvndksupport.so"
+    ],
+    "elfs": {
+      "/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream": {
+        "bytes": 69088,
+        "sha256": "9696c42c2c53f598a7d5b615d6ecb43e823fc8b92b8337368f63b5e2164bdd80",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libcutils.so",
+          "libdmabufheap.so",
+          "libdrm.so",
+          "libnativewindow.so",
+          "libsync.so",
+          "android.hardware.graphics.allocator-V3-ndk.so",
+          "android.hardware.graphics.mapper@4.0.so",
+          "libbase.so",
+          "libbinder_ndk.so",
+          "libgralloctypes.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "libminigbm_gralloc4_utils_upstream.so",
+          "libminigbm_gralloc_upstream.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libdrm.so": {
+        "bytes": 133744,
+        "sha256": "ffcb10ed9bb88bf5a763f123c59ef66e9ee386b8488864550236f1ab0aa3ddf8",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.allocator-V3-ndk.so": {
+        "bytes": 85512,
+        "sha256": "95c74486bd8374e9b8852636f46f915de498a32868769d2260a7b22d70c5fc94",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libbinder_ndk.so",
+          "android.hardware.graphics.common-V7-ndk.so",
+          "android.hardware.common-V2-ndk.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libminigbm_gralloc_upstream.so": {
+        "bytes": 135464,
+        "sha256": "7505886671f312e5c0fc0cd83804c6e3da888629a401899f5d69f59f525eb749",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libcutils.so",
+          "libdmabufheap.so",
+          "libdrm.so",
+          "libgralloctypes.so",
+          "liblog.so",
+          "libnativewindow.so",
+          "libsync.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.mapper@4.0.so": {
+        "bytes": 169376,
+        "sha256": "03994cbbef2d521e0441c24d47cfd1e7b05626850e65da31819293f4dd4397d5",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "android.hardware.graphics.common@1.0.so",
+          "android.hardware.graphics.common@1.1.so",
+          "android.hardware.graphics.common@1.2.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.common@1.0.so": {
+        "bytes": 35296,
+        "sha256": "9827a88448ca48397e2f9d334447d4fb4284aacad7a1261140a861f40048a881",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libhidlbase.so": {
+        "bytes": 761072,
+        "sha256": "96f7aeccb77da2e7a390fbb16d2ce9002c368990512b69fa3776bbb987b93f4f",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libvndksupport.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libdmabufheap.so": {
+        "bytes": 102032,
+        "sha256": "36b6e664cc337069d77dd42d8daea88f3bab75bc6fc8a5c8639ef16487bc39a5",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "liblog.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libbase.so": {
+        "bytes": 234904,
+        "sha256": "8e3b431b5856c9b2e71bad58d32ee996a444182eabe71dfe7b315af0507062c7",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "liblog.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.common@1.2.so": {
+        "bytes": 35344,
+        "sha256": "b7181c916a71198c5618f1b550eeb80a099dda7c176a90d95bafffbf9d670a90",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "android.hardware.graphics.common@1.0.so",
+          "android.hardware.graphics.common@1.1.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libutils.so": {
+        "bytes": 168704,
+        "sha256": "29ab0c060ceeff46bcb6e0358ddb7ed2bb1bdad43c8fb6b43d84dbd947df876d",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libcutils.so",
+          "liblog.so",
+          "libvndksupport.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libcutils.so": {
+        "bytes": 118320,
+        "sha256": "4f8e8e32d74298bfd98b3f8af89e4ff6566fc4b6d1df4d274f65c68b80a1f062",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "liblog.so",
+          "libbase.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libminigbm_gralloc4_utils_upstream.so": {
+        "bytes": 68632,
+        "sha256": "36349e9fbc10f84d940d8c896b961d9a2ebd6b73ab0ab33ab870e5e632400c10",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libcutils.so",
+          "libdmabufheap.so",
+          "libdrm.so",
+          "liblog.so",
+          "libnativewindow.so",
+          "libsync.so",
+          "android.hardware.graphics.mapper@4.0.so",
+          "libgralloctypes.so",
+          "libhidlbase.so",
+          "libminigbm_gralloc_upstream.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.allocator-V2-ndk.so": {
+        "bytes": 69072,
+        "sha256": "74714b0838462c9206f66dfa936d301fff3589da0abff0e74182b4278b30b72d",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libbinder_ndk.so",
+          "android.hardware.common-V2-ndk.so",
+          "android.hardware.graphics.common-V7-ndk.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libgralloctypes.so": {
+        "bytes": 101592,
+        "sha256": "85a28a55bd96bfcea8c450f551a4497606918ea11cbce25de31640cadad6226f",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "android.hardware.graphics.mapper@4.0.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "android.hardware.graphics.common-V7-ndk.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.common-V2-ndk.so": {
+        "bytes": 51624,
+        "sha256": "dfb3ce375d6004655e80a23f5611a1a1a1ce78839f908aa9b4eb074460c5448b",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libbinder_ndk.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.common-V7-ndk.so": {
+        "bytes": 52000,
+        "sha256": "55a6701cb49551e3e66f94dd86a349fd9dab1238f3238c6d80788687a8fc64b6",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libbinder_ndk.so",
+          "android.hardware.common-V2-ndk.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/android.hardware.graphics.common@1.1.so": {
+        "bytes": 35312,
+        "sha256": "7824041d0b50f22356159a52170eccb259b0f3ab78ad80f577d3db80c2f2831a",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "android.hardware.graphics.common@1.0.so",
+          "libhidlbase.so",
+          "liblog.so",
+          "libutils.so",
+          "libcutils.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/libc++.so": {
+        "bytes": 1152760,
+        "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      },
+      "/lib64/hw/mapper.minigbm_upstream.so": {
+        "bytes": 170184,
+        "sha256": "56488c61c184979e62175ed15468ec57fc8b7abf7fcdfdef20a9ec88ad77fd5f",
+        "architecture": "ELF64 little-endian AArch64",
+        "needed": [
+          "libcutils.so",
+          "libdmabufheap.so",
+          "libdrm.so",
+          "liblog.so",
+          "libnativewindow.so",
+          "libsync.so",
+          "android.hardware.graphics.mapper@4.0.so",
+          "libbase.so",
+          "libgralloctypes.so",
+          "libhidlbase.so",
+          "libutils.so",
+          "android.hardware.graphics.allocator-V2-ndk.so",
+          "libminigbm_gralloc_upstream.so",
+          "libc++.so",
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ]
+      }
+    },
+    "required_files": {
+      "/bin/hw/android.hardware.graphics.allocator-service.minigbm_upstream": {
+        "bytes": 69088,
+        "sha256": "9696c42c2c53f598a7d5b615d6ecb43e823fc8b92b8337368f63b5e2164bdd80"
+      },
+      "/lib64/hw/mapper.minigbm_upstream.so": {
+        "bytes": 170184,
+        "sha256": "56488c61c184979e62175ed15468ec57fc8b7abf7fcdfdef20a9ec88ad77fd5f"
+      },
+      "/lib64/libminigbm_gralloc_upstream.so": {
+        "bytes": 135464,
+        "sha256": "7505886671f312e5c0fc0cd83804c6e3da888629a401899f5d69f59f525eb749"
+      },
+      "/etc/vintf/allocator.minigbm_upstream.xml": {
+        "bytes": 408,
+        "sha256": "040e1bde17bb35c9035b53232cc65cf47797d1a0135feb29090a12168e66d64f"
+      },
+      "/etc/vintf/mapper.minigbm_upstream.xml": {
+        "bytes": 359,
+        "sha256": "31d41ea588966fd3a64ba682328ca8ec194eed0a591f98941bce529b93d43125"
+      },
+      "/etc/linker.config.pb": {
+        "bytes": 18,
+        "sha256": "82320323dc47bd36d5ac076f7a896dcdf97c20ca66405efcccc5f359b33e2029"
+      },
+      "/etc/com.android.hardware.graphics.allocator.minigbm_upstream.rc": {
+        "bytes": 331,
+        "sha256": "76b443e32547225904cc08b4de5a0fecd93c39583370f91144c69aad094b918d"
+      }
+    }
+  },
+  "checker_assumptions_corrected": [
+    "APEX payload is EROFS, not the initial ext4 assumption; inspected with the AOSP-built read-only fsck.erofs extractor.",
+    "APEX manifest is protobuf, and mapper inherits lib64/hw installation; official deapexer decoded the manifest.",
+    "assemble_vintf normalizes schema version, fqnames and comments; verified exact structured HAL declarations instead of source byte equality."
+  ],
+  "preserved_initial_reports": [
+    {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/result-ext4-assumption.json",
+      "bytes": 13236,
+      "sha256": "fd95518f9b27fdf9286aacbe3274253d7abbee912a874f64c510f5c732a53e10"
+    },
+    {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/result-json-manifest-assumption.json",
+      "bytes": 13348,
+      "sha256": "30a6cee7c46ec2f5da1aa3dd2d17b95c2c992eb918c12a6cba44dc54e3755fe8"
+    },
+    {
+      "path": "/rabbitr1/out/android-build-review/pstore-collection/target-verification/result-vintf-normalization-assumption.json",
+      "bytes": 13599,
+      "sha256": "2d0c8ee02d3de607fcdf98fa3790f9ec018757d9dc47ffeb343a46eeb0d0b676"
+    }
+  ],
+  "hardware_tested": false,
+  "target_code_executed": false,
+  "flash_tested": false,
+  "whole_rom_validated": false,
+  "runtime_linker_namespace_resolution_verified": false,
+  "runtime_selinux_enforcement_verified": false,
+  "limitations": [
+    "No target executable, driver, module, device or partition is accessed or run.",
+    "ELF imports/exports and packaged files are build evidence, not runtime linker namespace or SELinux evidence.",
+    "Global SELinux remains permissive by product boot arguments. No enforcing-device behavior is established.",
+    "Allocator compilation/packaging does not establish GPU/display/gralloc functionality on r1.",
+    "Recovery-persist is a system executable; only its liblog provider variant is also packaged in recovery.",
+    "Boot integrity/header/AVB verification is a separate parent-owned audit; this check only compares the packaged recovery liblog."
+  ]
+}
