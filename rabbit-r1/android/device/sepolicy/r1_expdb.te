@@ -6,8 +6,8 @@ type r1_expdb_raw_device, dev_type;
 type r1_expdb_map_device, dev_type;
 type r1_pstore_module_file, vendor_file_type, file_type;
 type sysfs_r1_pstore, fs_type, sysfs_type;
-vendor_internal_prop(r1_expdb_prop)
-get_prop(r1_expdb, r1_expdb_prop)
+vendor_internal_prop(vendor_r1_expdb_prop)
+get_prop(r1_expdb, vendor_r1_expdb_prop)
 
 # Discover the MMC partition and wait for ueventd's UUID/name links.
 allow r1_expdb block_device:dir r_dir_perms;
