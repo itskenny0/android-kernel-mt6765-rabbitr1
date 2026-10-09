@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "problem": "ARM64WebView remained a134-byte GitLFS pointer; AAPT2 rejected it as an invalidZIP.",
+  "asset": {
+    "project": "external/chromium-webview/prebuilt/arm64",
+    "remote": "github",
+    "repository": "LineageOS/android_external_chromium-webview_prebuilt_arm64",
+    "commit": "394b243c2796e36580dd8bae7822609e1c01b1ff",
+    "path": "webview.apk",
+    "sha256": "3b98460ccd41b2a1851c5a46e6dec6f86f1d14302ff2fa4deeb1d781e32f89a4",
+    "bytes": 267260603,
+    "lfs_url": "https://review.lineageos.org/LineageOS/android_external_chromium-webview_prebuilt_arm64.git/info/lfs"
+  },
+  "actual_repair": {
+    "pinned_content_hash_and_size": "pass",
+    "zip_crc_entries": 637,
+    "exact_failed_manifest_command": "pass",
+    "manifest_check": {
+      "path": "out/android-build-review/webview-lfs/manifest-check.json",
+      "sha256": "767907d2e43486fe612076c6514c1c12796270be7fe059f24ee04df99441fade"
+    },
+    "project_head_and_worktree_content_unchanged": true,
+    "git_config_and_hooks_unchanged": true,
+    "git_index_stat_cache_refreshed": true,
+    "provenance": {
+      "path": "out/android-build-review/webview-lfs/provenance.json",
+      "sha256": "c4b1fe5dc5da4691e44c5f26a321c477f126e7b73953f5957a879b459c61efd4"
+    }
+  },
+  "helper": {
+    "path": "src/mainline/rabbit-r1/scripts/ensure-r1-webview.py",
+    "sha256": "bcf6477d77851f9e0a2d1613fdc0ded8d41f3ce9ca006ba05ecb587d6c7f30ee"
+  },
+  "canonical_tests": {
+    "cases": 25,
+    "result": {
+      "path": "out/r1-webview-tests/helper-test-result.json",
+      "sha256": "2b53b718a30ab3f2b42674620df8066c835d3667aefe02875c2334b880d77be6"
+    },
+    "log": {
+      "path": "logs/webview-canonical-tests.log",
+      "sha256": "7b2178f1355c552ffa3836a6b791392b8e519c02c8c27035f54c0c924165ed7f"
+    }
+  },
+  "actual_read_only_preflight": {
+    "path": "logs/webview-canonical-check.json",
+    "sha256": "f45c0f0c75fe5ce8713b4c17e9cf7069e29c66d73543b5cb8b20a95fc00cdcaa"
+  },
+  "behavior": [
+    "Hydrate only the pinned ARM64 asset when the exact committed pointer is present.",
+    "Use command-local filter overrides; ordinary checkout may exit successfully while leaving the pointer.",
+    "Require hash, byte count and ZIP validation after checkout.",
+    "Refuse modified local files, staged changes or mismatched source/endpoint pins."
+  ],
+  "other_abis_hydrated": false,
+  "complete_android_image_build": false,
+  "hardware_tested": false
+}

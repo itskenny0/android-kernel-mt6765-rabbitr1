@@ -129,6 +129,13 @@ The [compiler replay](../android/audio-scheduler-include-build.json) reproduced
 the failure and then compiled the actual translation unit without diagnostics.
 The complete image build remains outstanding.
 
+The build helper verifies the pinned ARM64 WebView APK before invoking Android's
+build. If the checkout contains its Git LFS pointer, it fetches only that asset
+with `git-lfs` and verifies its size, content hash and ZIP entries. Locally edited
+files are preserved. Repo-wide LFS settings and other WebView architectures are
+unchanged. [The repair and preflight tests](../android/webview-lfs-build.json)
+record the exact manifest check and 25 modeled failure cases.
+
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
 by stopping before the build. The pinned Siso tool cannot load an absolute

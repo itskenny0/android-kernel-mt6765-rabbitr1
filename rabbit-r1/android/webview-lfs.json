@@ -1,0 +1,10 @@
+{
+  "project": "external/chromium-webview/prebuilt/arm64",
+  "remote": "github",
+  "repository": "LineageOS/android_external_chromium-webview_prebuilt_arm64",
+  "commit": "394b243c2796e36580dd8bae7822609e1c01b1ff",
+  "path": "webview.apk",
+  "sha256": "3b98460ccd41b2a1851c5a46e6dec6f86f1d14302ff2fa4deeb1d781e32f89a4",
+  "bytes": 267260603,
+  "lfs_url": "https://review.lineageos.org/LineageOS/android_external_chromium-webview_prebuilt_arm64.git/info/lfs"
+}

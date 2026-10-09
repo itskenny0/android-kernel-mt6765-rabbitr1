@@ -36,6 +36,7 @@ else:
     link.symlink_to('../../out/android', target_is_directory=True)
 PY
 export OUT_DIR=out
+python3 "$R1_ROOT/scripts/ensure-r1-webview.py" --pin "$R1_ROOT/android/webview-lfs.json"
 python3 "$R1_ROOT/scripts/apply-android-patches.py" --apply
 python3 "$R1_ROOT/scripts/install-lineage-device.py" --product "$R1_ANDROID_PRODUCT"
 python3 "$R1_ROOT/toolchains/git-repo/repo" manifest -r -o "$R1_ROOT/out/lineage-resolved.xml"
