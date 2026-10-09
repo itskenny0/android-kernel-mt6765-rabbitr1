@@ -86,13 +86,56 @@ stripped of full symbol and type information. Services exports
 ``RGXGetFeatureValue``, but the available headers do not define its signature
 or selectors. The matching DDK's 24 kernel-mode selectors belong to a separate
 accessor and do not name these limits. ``stock-user-metadata.json`` records
-input hashes, observations and the bounded search scope; no vendor code was
-executed, disassembled or imported.
+input hashes, observations and the bounded search scope of that earlier
+metadata-only pass. The separate instruction replay below advances numeric
+extraction without establishing selector names.
 
 Obtain license-permitted exact-BVNC user-mode definitions and the producer's
 ABI enums, classify the extra bits, then implement required handling.
 Actual device tests must establish firmware communication and rendering.
 No speculative names, GE8300 clone or stub device table is supplied.
+
+Stock user-mode configuration replay
+------------------------------------
+
+``stock-feature-config.json`` records a later bounded instruction replay of
+stock ``libsrv_um.so`` (DDK ``1.13@5776728``), SHA-256
+``5b3048e576df364bf82e9d85e2a61e05726fae03778b2c7f6f4c4df036658641``.
+The actual population slice selects BNC ``22.104.18`` and exact BVNC
+``22.87.104.18``. Its 70 anonymous slots contain 27 available numeric values,
+41 unavailable sentinels, and two strings (``Doma`` and ``GE8320``). Numeric
+getter outputs on the string slots are pointer bits, not hardware limits;
+recorded pointers use ELF virtual addresses independent of the load base.
+
+The real producer, numeric/string/BVNC getters and 11 preceding revision-check
+cases run in Unicorn with no device I/O or native vendor loading. Connection
+setup, ioctl acquisition and allocation are omitted; a successful zeroed
+allocation and exact BVNC are explicit inputs. Two load bases with poisoned
+unused state reproduce the same normalized context, matching a separate
+packed-table decoder. Read guards exclude unresolved imports; no imported
+function executes. The library and instruction bytes are not bundled.
+
+This recovers values, not selector identities. Comparisons with seven exact
+BNCs in published Mesa tables produce eight numerical labeling candidates
+and no direct match for three limits. Coincidence, ordering and neighboring
+GPU values do not establish names or units. All eleven missing Mesa limits
+remain unresolved; the extra firmware bitmap definitions remain unresolved.
+The useful next input is a version-matched UM selector definition or an
+independently labeled consumer path establishing a selector and its units.
+
+From the Linux checkout root, with the separately obtained stock library::
+
+    source /rabbitr1/scripts/env.sh
+    /rabbitr1/toolchains/boot-tools/bin/python \
+      rabbit-r1/tests/gpu/firmware/replay-stock-feature-config.py \
+      --library /rabbitr1/out/r1-gpu-audit/stock-user-metadata/dependencies/libsrv_um.so
+
+The helper requires Unicorn and Python's standard library, validates the exact
+library hash before emulation, and emits JSON only after all checks pass.
+It does not import the original investigation scripts, download inputs or
+write files. Wrong input hashes fail with no JSON output. Original replay,
+independent-review and source hashes are recorded as workspace evidence,
+not committed files or reproduction dependencies. No GPU enablement follows.
 
 Reproduce the metadata accounting
 --------------------------------
