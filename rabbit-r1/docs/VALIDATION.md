@@ -1,9 +1,24 @@
-# Offline validation — 2026-10-08
+# Validation
+
+## Hardware attempts — 2026-10-09
+
+The [diagnostic boot-attempt record](../tests/boot-attempt-20261009.json) records
+successful full partition readback and two unconfirmed Linux boot attempts.
+Both produced USB descriptor/address errors (`-71`) without an ACM console.
+Selecting the USB clock parent did not resolve that symptom. A user observed
+the patched splash followed by a black screen with the backlight on during the
+first attempt; LK intentionally stops display output at its handoff, so that
+observation cannot establish whether Linux executed. Persistent kernel logging
+and Android boot remain unverified.
+
+## Offline validation — 2026-10-08
 
 Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
 policy are now enabled experimentally; earlier driver-only stages below record
 their previous disabled state. Android control sources, persistence and build
-hooks are implemented, but no full Android image or physical charging test exists.
+hooks are implemented. The later complete Android image build passes eighteen
+[offline checks](../android/soc-full-image-build.json); physical charging remains
+untested. The table below retains the earlier offline results and their scope.
 
 | Check | Result | Evidence |
 | --- | --- | --- |

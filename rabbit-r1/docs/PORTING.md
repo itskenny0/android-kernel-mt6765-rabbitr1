@@ -4,15 +4,21 @@ Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
 policy are enabled experimentally and remain physically untested. The Android
 charging APK, native services and combined SELinux policy passed their targeted
 build and artifact checks. Boot/DTBO images, recovery policy and the real system
-Binder library also built and passed offline checks. The full filesystem,
-super and vbmeta build is in progress as of 2026-10-09; no complete Android ROM
-or physical charging test exists. See [ANDROID.md](ANDROID.md) for the pinned
-inputs, build evidence and remaining validation.
+Binder library also built and passed offline checks. The complete SOC image
+build passes eighteen offline artifact checks, and a separate raw super image
+contains both slots. Android has not been flashed or booted; charging remains
+physically untested. See [ANDROID.md](ANDROID.md) for the pinned inputs, build
+evidence and remaining validation.
 
 As of the inspected sources on 2026-10-07, the mainline fork reports Linux 7.1.0.
 This is a development fork with downstream MT6765 changes, not an upstream Linux
-release that already supports the rabbit r1. The board has no hardware test in
-this workspace. A complete port cannot be established without a device.
+release that already supports the rabbit r1. Diagnostic hardware testing began
+on 2026-10-09: partition writes passed full readback, but neither boot attempt
+established Linux execution. The host repeatedly reported USB descriptor and
+address errors (`-71`), with no diagnostic ACM console. The USB clock-parent
+update did not resolve that symptom. See the
+[boot-attempt record](../tests/boot-attempt-20261009.json). This is not ready for
+beta testing.
 
 ## Boot boundary
 

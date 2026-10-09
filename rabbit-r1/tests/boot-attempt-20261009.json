@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "date": "2026-10-09",
+  "status": "flashed-and-read-back-linux-boot-unconfirmed",
+  "beta_ready": false,
+  "scope": "Diagnostic initramfs on the authorized primary device; no Android filesystem image flashed.",
+  "attempts": [
+    {
+      "id": "001",
+      "kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+      "boot_partition_sha256": "24e0f0468ef52595cc1a4a99c8d0128e4223aafa5ec151a7e79d1805396caab7",
+      "full_partition_readback_matched": true,
+      "boot_request": "One HOME_SCREEN request after fresh primary identity match.",
+      "host_observation": "Repeated high-speed USB descriptor/address errors (-71); no diagnostic ACM console.",
+      "user_observation": "Patched LK splash, then black screen with backlight on.",
+      "linux_execution_confirmed": false,
+      "recovered_expdb": "No diagnostic pstore rings; vendor records include earlier pre-flash fastboot activity. The recorded kernel phase is set by LK before Linux entry."
+    },
+    {
+      "id": "002",
+      "kernel_source_commit": "212d4578e924ab15143913995a0f9c2432445ec5",
+      "boot_partition_sha256": "93e1055d34d996ac5478b2a8ed50cd5eebac72e67eb93cbb0167821865b29b0a",
+      "change": "USB clock parent selection and bounded UDC discovery in the initramfs.",
+      "partitions_written": [
+        "boot_a"
+      ],
+      "full_partition_readback_matched": true,
+      "write_finished_utc": "2026-10-09T20:36:25.641300Z",
+      "boot_request": "One HOME_SCREEN request after fresh primary CID/chip/capacity match.",
+      "host_observation": "Same descriptor/address errors (-71); no ACM in either observer window.",
+      "observer_windows_utc": [
+        [
+          "2026-10-09T20:36:56.493665Z",
+          "2026-10-09T20:39:56.734603Z"
+        ],
+        [
+          "2026-10-09T20:40:09.704551Z",
+          "2026-10-09T20:43:09.817327Z"
+        ]
+      ],
+      "linux_execution_confirmed": false,
+      "private_evidence": {
+        "write-result.json": {
+          "bytes": 395,
+          "sha256": "bc415c858ccc7b892e909714d726e85e14fa5fb9ce72cd39ce7a9547dd3a406c"
+        },
+        "boot-request.json": {
+          "bytes": 736,
+          "sha256": "eccaa403a0128523380576319203aee9bc59893f9121b6455f425675659d83bf"
+        },
+        "observer.json": {
+          "bytes": 831,
+          "sha256": "8f0149b72afda8fe6ab6118a7a996d518118636a986b7f726f6592b697c45758"
+        },
+        "continued-observer.json": {
+          "bytes": 392,
+          "sha256": "64f8ea67eb996ca90ef15db976d1d4f3c9b4933c13d2b645cae886385d6dcfd0"
+        },
+        "host-dmesg.txt": {
+          "bytes": 350204,
+          "sha256": "83b0ec5566e73d8e1af5bfcda09d086bc5b67eae0c486c0fdb3f800153fcba92"
+        }
+      }
+    }
+  ],
+  "limits": [
+    "DA shutdown acknowledgment is not Linux-entry evidence.",
+    "LK deliberately stops scanout; the screen observation does not locate the failure.",
+    "USB errors alone cannot identify which software stage is active.",
+    "Persistent mainline logging to expdb has not been demonstrated.",
+    "Private captures retain device identifiers and are not published.",
+    "The earlier offline build records describe their original pre-device-test milestones."
+  ]
+}
