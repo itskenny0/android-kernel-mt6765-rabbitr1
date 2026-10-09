@@ -110,7 +110,7 @@ struct mutex { pthread_mutex_t raw; unsigned int owner; bool initialized; };
 struct regmap { int unused; };
 struct power_supply { void *drvdata; };
 union power_supply_propval { int intval; };
-enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY };
+enum power_supply_property { POWER_SUPPLY_PROP_PRESENT, POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_CHARGE_COUNTER, POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_TEMP, POWER_SUPPLY_PROP_CAPACITY };
 #define POWER_SUPPLY_TYPE_BATTERY 1
 struct power_supply_desc {
     const char *name; int type;
@@ -298,9 +298,10 @@ static struct power_supply *devm_power_supply_register(struct device *dev,
     assert(config->drv_data == &gauge && config->fwnode == dev);
     assert(!strcmp(desc->name,"mt6357-battery") && desc->type == POWER_SUPPLY_TYPE_BATTERY);
     assert(desc == &gauge.desc);
-    assert(desc->num_properties == (adc_present ? 4U : 2U) && desc->properties[0] == POWER_SUPPLY_PROP_PRESENT);
+    assert(desc->num_properties == (adc_present ? 5U : 3U) && desc->properties[0] == POWER_SUPPLY_PROP_PRESENT);
+    assert(desc->properties[1] == POWER_SUPPLY_PROP_CURRENT_NOW && desc->properties[2] == POWER_SUPPLY_PROP_CHARGE_COUNTER);
     if (adc_present) {
-        assert(desc->properties[2] == POWER_SUPPLY_PROP_VOLTAGE_NOW && desc->properties[3] == POWER_SUPPLY_PROP_TEMP);
+        assert(desc->properties[3] == POWER_SUPPLY_PROP_VOLTAGE_NOW && desc->properties[4] == POWER_SUPPLY_PROP_TEMP);
         assert(gauge.voltage == &channels[channel_order[0]] && gauge.thermistor == &channels[channel_order[1]]);
         assert(gauge.reference == &channels[channel_order[2]] && gauge.table == table_storage);
         assert(gauge.num_points == (unsigned int)table_count/2 && gauge.pullup_ohms);

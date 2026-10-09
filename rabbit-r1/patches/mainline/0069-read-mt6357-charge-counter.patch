@@ -1,0 +1,149 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Read MT6357 charge counter
+
+Expose the signed hardware charge accumulator in microamp-hours using
+stock conversion and board calibration. Share the guarded latch transaction
+with current reads and require both counter halves and cleanup to succeed.
+This does not initialize state of charge or report remaining capacity.
+
+diff --git a/drivers/power/supply/mt6357-gauge.c b/drivers/power/supply/mt6357-gauge.c
+--- a/drivers/power/supply/mt6357-gauge.c
++++ b/drivers/power/supply/mt6357-gauge.c
+@@ -1,5 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+-/* MT6357 battery current, voltage and thermistor sensing. */
++/* MT6357 battery current, charge counter, voltage and thermistor sensing. */
+ 
+ #include <linux/bitfield.h>
+ #include <linux/cleanup.h>
+@@ -21,6 +21,8 @@
+ #define MT6357_FG_CLEAR		BIT(3)
+ #define MT6357_FG_LATCH_READY	BIT(15)
+ #define MT6357_FG_CURRENT_MASK	GENMASK(15, 0)
++#define MT6357_FG_CAR_MASK	GENMASK(30, 11)
++#define MT6357_FG_CAR_SIGN	BIT(31)
+ #define MT6357_FG_POLL_US	100
+ #define MT6357_FG_TIMEOUT_US	20000
+ #define MT6357_THERMISTOR_MAX_POINTS 64
+@@ -67,6 +69,32 @@
+ 	return 0;
+ }
+ 
++static int mt6357_gauge_convert_charge(struct mt6357_gauge *gauge, unsigned int raw,
++				      int *charge_uah)
++{
++	unsigned int sample = FIELD_GET(MT6357_FG_CAR_MASK, raw);
++	bool negative = raw & MT6357_FG_CAR_SIGN;
++	u64 magnitude;
++
++	/* Stock treats both all-zero and all-one magnitude fields as zero. */
++	if (!sample || sample == 0xfffff)
++		magnitude = 0;
++	else
++		magnitude = negative ? 0xfffff - sample : sample;
++
++	/* Preserve stock rounding in 0.1 mAh before shunt and gain correction. */
++	magnitude = div_u64(magnitude * 11176, 10000);
++	magnitude = div_u64(magnitude + 5, 10);
++	magnitude = div_u64(magnitude * 10000, gauge->shunt_uohms);
++	magnitude = div_u64(magnitude * gauge->gain_permille, 1000);
++	if (magnitude > INT_MAX / 100)
++		return -ERANGE;
++
++	/* Signed accumulation since hardware reset, not remaining capacity. */
++	*charge_uah = negative ? -(int)magnitude * 100 : (int)magnitude * 100;
++	return 0;
++}
++
+ static int mt6357_gauge_release(struct mt6357_gauge *gauge)
+ {
+ 	unsigned int state;
+@@ -95,9 +123,10 @@
+ 	return ret;
+ }
+ 
+-static int mt6357_gauge_read_current(struct mt6357_gauge *gauge, int *current_ua)
+-{
+-	unsigned int state, raw;
++static int mt6357_gauge_read_raw(struct mt6357_gauge *gauge, bool counter,
++				  unsigned int *raw)
++{
++	unsigned int state, low, high = 0;
+ 	int ret, release_ret;
+ 
+ 	guard(mutex)(&gauge->lock);
+@@ -129,11 +158,15 @@
+ 					       state & MT6357_FG_LATCH_READY,
+ 					       MT6357_FG_POLL_US, MT6357_FG_TIMEOUT_US);
+ 	if (!ret)
+-		ret = regmap_read(gauge->regmap, MT6357_FGADC_CUR_CON0, &raw);
++		ret = regmap_read(gauge->regmap,
++				  counter ? MT6357_FGADC_CAR_CON0 : MT6357_FGADC_CUR_CON0,
++				  &low);
++	if (!ret && counter)
++		ret = regmap_read(gauge->regmap, MT6357_FGADC_CAR_CON1, &high);
+ 
+ 	release_ret = mt6357_gauge_release(gauge);
+ 	if (release_ret)
+-		dev_err_ratelimited(gauge->dev, "Failed to release current latch: %d\n",
++		dev_err_ratelimited(gauge->dev, "Failed to release gauge latch: %d\n",
+ 				    release_ret);
+ 	if (ret)
+ 		return ret;
+@@ -141,7 +174,30 @@
+ 		return release_ret;
+ 
+ 	/* Publish only a sample whose complete transaction succeeded. */
++	*raw = (low & 0xffff) | (high << 16);
++	return 0;
++}
++
++static int mt6357_gauge_read_current(struct mt6357_gauge *gauge, int *current_ua)
++{
++	unsigned int raw;
++	int ret;
++
++	ret = mt6357_gauge_read_raw(gauge, false, &raw);
++	if (ret)
++		return ret;
+ 	return mt6357_gauge_convert(gauge, raw, current_ua);
++}
++
++static int mt6357_gauge_read_charge(struct mt6357_gauge *gauge, int *charge_uah)
++{
++	unsigned int raw;
++	int ret;
++
++	ret = mt6357_gauge_read_raw(gauge, true, &raw);
++	if (ret)
++		return ret;
++	return mt6357_gauge_convert_charge(gauge, raw, charge_uah);
+ }
+ 
+ static int mt6357_gauge_read_voltage(struct mt6357_gauge *gauge, int *voltage_uv)
+@@ -247,6 +303,8 @@
+ 		return mt6357_gauge_read_present(gauge, &val->intval);
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+ 		return mt6357_gauge_read_current(gauge, &val->intval);
++	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
++		return mt6357_gauge_read_charge(gauge, &val->intval);
+ 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+ 		return mt6357_gauge_read_voltage(gauge, &val->intval);
+ 	case POWER_SUPPLY_PROP_TEMP:
+@@ -259,6 +317,7 @@
+ static const enum power_supply_property mt6357_gauge_properties[] = {
+ 	POWER_SUPPLY_PROP_PRESENT,
+ 	POWER_SUPPLY_PROP_CURRENT_NOW,
++	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+ 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+ 	POWER_SUPPLY_PROP_TEMP,
+ };
+@@ -268,7 +327,7 @@
+ 	.type = POWER_SUPPLY_TYPE_BATTERY,
+ 	.properties = mt6357_gauge_properties,
+ 	/* The ADC properties are added only when all their inputs are supplied. */
+-	.num_properties = 2,
++	.num_properties = 3,
+ 	.get_property = mt6357_gauge_get_property,
+ };
+ 
