@@ -53,7 +53,8 @@ metadata, partition sizes and AVB configuration. The stock layout evidence is
 recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 The [device notes](../android/device/README.md) track the current hardware and
-release gates, including missing battery capacity, Android `expdb` startup, and
+release gates, including missing battery capacity (which can trigger Android's
+empty-battery shutdown), Android `expdb` startup, and
 the change from stock virtual A/B to dedicated A/B extents. Existing flash and
 restore helpers cover the diagnostic package; an Android package needs its own
 complete backup, layout and restore validation before distribution.

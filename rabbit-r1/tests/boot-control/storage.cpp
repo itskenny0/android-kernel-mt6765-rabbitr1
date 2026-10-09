@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Exercise the real LinuxStorage syscall boundary without opening host devices.
-// Open()/sysfs discovery and SELinux still require Android/device validation.
+// Open()/sysfs fixtures are covered separately; real enumeration and policy
+// still require Android/device validation.
 #include "LinuxStorage.h"
 
 #include <algorithm>

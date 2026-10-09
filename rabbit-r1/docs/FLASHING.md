@@ -139,7 +139,7 @@ to fall back to another slot; record that behavior rather than reflashing both.
 ## Read logs and restore
 
 Once Linux reaches the initramfs, `r1-report` shows logger setup status.
-`/sys/fs/pstore/console-pstore-blk-0` contains the previous boot's recovered
+`/sys/fs/pstore/console-pstore_blk-0` contains the previous boot's recovered
 console when available. The current kernel console is written continuously
 through pstore; it is not a userspace copy of `dmesg`. Setup checks the GPT label,
 device number and exact 20 MiB size, and maps only the first 18 MiB.

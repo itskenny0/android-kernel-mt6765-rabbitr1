@@ -31,7 +31,10 @@ Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL
 reads real power supplies, but battery percentage and combined charging status
 are unfinished. The existing kernel has no capacity property; the default HAL
-can therefore report zero. Do not substitute a simulated battery to hide this.
+therefore reports zero with unknown status. Android's BatteryService can then
+shut down after startup because the battery is present and appears empty. This
+is an Android boot blocker. Implement and validate real fuel-gauge reporting;
+do not substitute a simulated battery or suppress the shutdown check.
 
 Before distributing an Android image, complete the full Soong and SELinux
 build, verify image sizes and the LK/DT handoff, integrate the bounded `expdb`

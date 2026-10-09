@@ -22,3 +22,8 @@ subprocess.run(flags + [str(tests/'storage.cpp'), str(boot/'Control.cpp'), str(b
                        '-Wl,--wrap=pread,--wrap=pwrite,--wrap=fsync,--wrap=ioctl',
                        '-o', str(out/'storage')], check=True)
 subprocess.run([str(out/'storage')], check=True)
+subprocess.run(flags + [str(tests/'discovery.cpp'), str(boot/'Control.cpp'), str(boot/'LinuxStorage.cpp'),
+                       '-Wl,--wrap=realpath,--wrap=open,--wrap=fstat,--wrap=ioctl,--wrap=flock,'
+                       '--wrap=close,--wrap=pread,--wrap=pwrite,--wrap=fsync',
+                       '-o', str(out/'discovery')], check=True)
+subprocess.run([str(out/'discovery'), str(out)], check=True)

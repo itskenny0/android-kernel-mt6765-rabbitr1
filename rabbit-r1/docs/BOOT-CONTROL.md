@@ -153,7 +153,9 @@ then tested for corruption, queries and partial I/O failures. The backend tests
 wrap its actual pread/pwrite/fsync/ioctl calls to check bounds, short transfers,
 interruptions, synchronization failures, readback mismatches and command fields.
 Separate cache and media fixtures check dropped and corrupted device writes.
-They do not open a host block device or exercise sysfs discovery, Binder or policy.
+Discovery tests use real sysfs text fixtures and simulated device syscalls to
+check GPT identity, size, parent disk, descriptor replacement, locking and cleanup.
+They do not open a host block device or validate real enumeration, Binder or policy.
 CI runs these tests without needing the stock vendor image. Regenerate the oracle
 from the verified extracted library with:
 
