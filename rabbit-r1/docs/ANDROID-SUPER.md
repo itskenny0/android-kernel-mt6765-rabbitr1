@@ -37,15 +37,16 @@ builder invocation.
 
 ## Plan and build
 
-The [completed development build](../android/dual-slot-super-build.json) supplies
-an actual verified raw image at
-`out/android-super/lineage-r1-0a2a56a30e/super-both.raw.img`. Its SHA256 is
+The [historical development build](../android/dual-slot-super-build.json) produced
+an actual verified raw image, now preserved in a verified local archive. Its SHA256 is
 `cf5f7ef0de5380358a0dbfaf55c569e8e6645ae0fad804d092a1d59db0467e84`.
 Both logical slots contain the same audited images, using 1,918,767,104 bytes per
 group. The file is 8,792,064,000 bytes, including zero-filled host holes. It is
 not Android sparse format. This proves offline packaging, not a complete flash
 transaction or device boot; the build uses the default SOC-disabled kernel and
-the `trunk_staging` Android development configuration.
+the `trunk_staging` Android development configuration. That build also inherited
+the simulated Cuttlefish Health provider. It must not be distributed; the
+corrected SOC product needs a completed rebuild and fresh content audit.
 
 Keep all inputs under `/rabbitr1` and new outputs under `/rabbitr1/out/android-super`.
 Replace the digest placeholders with the reviewed digests. The audit path below
@@ -82,10 +83,15 @@ raw super image. Existing plans and output directories are not overwritten.
 The independent output parser checks both geometry copies, all six metadata
 copies, checksums, tables, exact groups and attributes, physical bounds and
 nonoverlap, every complete A/B payload hash and the final raw-image hash. Inputs
-are rechecked across construction and validation. The success report is synced
-privately and published atomically after validation. On failure, the tool marks
+are rechecked across construction and validation. The raw image and build log
+are fsynced before validation, and their directory entries are synced before
+report publication. The report is fsynced privately, renamed, and its directory
+synced before success returns. On failure, the tool marks
 its report incomplete and attempts raw cleanup independently of report creation;
 a full disk cannot skip cleanup merely by preventing an error-report write.
+If report publication fails after rename, the exposed report is removed before
+raw cleanup. Persistent I/O or unlink failures cannot guarantee durable rollback;
+the original failure and cleanup errors remain visible to the caller.
 Only `verified-both-slots-populated-raw-super` denotes completed validation.
 
 ## Tests and limits
@@ -97,7 +103,7 @@ existing mismatched files are preserved. CI uses this same tool set without
 syncing an Android tree. The source is pinned to AOSP build-tools commit
 `811c6e2938d53b3c318d7635b03931601a68c765`.
 
-Run the 67-case suite with the real pinned executable into a new directory:
+Run the 84-case suite with the real pinned executable into a new directory:
 
 ```sh
 python3 /rabbitr1/src/mainline/rabbit-r1/scripts/test-android-super.py \
@@ -110,7 +116,11 @@ Tests create their own small distinctive payloads and audit fixtures. They cover
 incomplete-audit rejection, geometry/metadata corruption, semantic extent/group
 errors, shared A/B extents, payload corruption, changed inputs, raw-vs-sparse
 output, actual A-only construction, tool failure and report publication/cleanup
-failures. No real Android filesystem image or device is opened.
+failures. It also checks file and directory synchronization errors, output
+changes during synchronization, and the full-size space preflight boundary.
+Three additional local syscall fault injections covered raw-file ENOSPC/EIO and
+post-rename directory EIO. These checks do not simulate physical power loss.
+No real Android filesystem image or device is opened.
 
 The pinned lpmake prints `Invalid sparse file format at header magic` while
 probing each raw input; liblp falls back to raw input, and the actual successful

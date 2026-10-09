@@ -264,6 +264,171 @@ for fault in ['publish-once', 'publish-persistent', 'report-write-persistent']:
     else:
         assert not (destdir/'result.json').exists()
 
+# Apply the existing regular-file/no-symlink admission rule to synchronization
+# too: neither rejected path may reach os.open.
+pipe=WORK/'rejected-sync.fifo';os.mkfifo(pipe)
+link=WORK/'rejected-sync-link.img';link.symlink_to(source)
+try:
+    with mock.patch.object(m.os,'open') as opened:
+        rejects(lambda:m.sync_file(pipe),'regular output')
+        rejects(lambda:m.sync_file(link),'symlink')
+        assert not opened.called
+finally:pipe.unlink();link.unlink()
+
+# Trace real fsync calls by their open inode, without /proc or mock file data.
+# The synthetic lpmake output remains real for every post-tool fault case.
+def fd_kind(fd, directory):
+    st = os.fstat(fd)
+    for label,path in [('parent',directory.parent),('directory',directory),
+                       ('raw',directory/'super-both.raw.img'),
+                       ('log',directory/'lpmake.log'),
+                       ('report',directory/'result.json.tmp')]:
+        if path.exists():
+            candidate = path.stat()
+            if (st.st_dev,st.st_ino)==(candidate.st_dev,candidate.st_ino):return label
+    raise AssertionError('Unexpected fsync descriptor')
+
+
+def visible_status(directory):
+    path=directory/'result.json'
+    return json.loads(path.read_text())['status'] if path.exists() else None
+
+
+real_fsync=m.os.fsync
+fresh=plan();durable=WORK/'durability-good';events=[]
+real_validate=m.validate_raw
+
+def traced_fsync(fd):
+    events.append(('fsync',fd_kind(fd,durable),visible_status(durable)))
+    return real_fsync(fd)
+
+def traced_replace(source,target):
+    events.append(('replace',Path(target).name,visible_status(durable)))
+    return real_replace(source,target)
+
+def traced_validate(path,expected):
+    events.append(('validate','raw',visible_status(durable)))
+    return real_validate(path,expected)
+
+with mock.patch.object(m.os,'fsync',side_effect=traced_fsync), \
+     mock.patch.object(m.os,'replace',side_effect=traced_replace), \
+     mock.patch.object(m,'validate_raw',side_effect=traced_validate):
+    durable_result=m.build(fresh,durable)
+assert events==[
+    ('fsync','parent',None),('fsync','raw',None),('fsync','log',None),
+    ('validate','raw',None),('fsync','directory',None),
+    ('fsync','report',None),('replace','result.json',None),
+    ('fsync','directory','verified-both-slots-populated-raw-super')],events
+count+=1
+
+faults=['parent','raw-eio','raw-enospc','log','directory-before',
+        'report-once','report-persistent','directory-after-once',
+        'directory-after-persistent','directory-and-report-persistent']
+fsync_cases=[]
+for fault in faults:
+    fresh=plan();destdir=WORK/('fsync-'+fault);events_fault=[];hit=0;armed=False
+    validations=[];tool_runs=[];publication_statuses=[]
+    original_publish=m.publish_result
+    def track_publish(directory,result):
+        publication_statuses.append(result['status'])
+        return original_publish(directory,result)
+    def track_tool(argv,**kwargs):
+        tool_runs.append(argv)
+        return real_run(argv,**kwargs)
+    def track_validate(path,expected):
+        validations.append(str(path))
+        return real_validate(path,expected)
+    def failing_fsync(fd):
+        global hit,armed
+        kind=fd_kind(fd,destdir);status=visible_status(destdir)
+        events_fault.append((kind,status))
+        fail=(fault=='parent' and kind=='parent') or \
+             (fault in ('raw-eio','raw-enospc') and kind=='raw') or \
+             (fault=='log' and kind=='log') or \
+             (fault=='directory-before' and kind=='directory' and status is None and hit==0) or \
+             (fault=='report-once' and kind=='report' and hit==0) or \
+             (fault=='report-persistent' and kind=='report') or \
+             (fault=='directory-after-once' and kind=='directory' and status is not None and hit==0)
+        if fault in ('directory-after-persistent','directory-and-report-persistent'):
+            if kind=='directory' and status=='verified-both-slots-populated-raw-super':armed=True
+            if armed and kind=='directory':fail=True
+            if armed and fault=='directory-and-report-persistent' and kind=='report':fail=True
+        if fail:
+            hit+=1
+            raise OSError(errno.ENOSPC if fault=='raw-enospc' else errno.EIO,
+                          'modeled fsync '+fault)
+        return real_fsync(fd)
+    with mock.patch.object(m.os,'fsync',side_effect=failing_fsync), \
+         mock.patch.object(m.subprocess,'run',side_effect=track_tool), \
+         mock.patch.object(m,'validate_raw',side_effect=track_validate), \
+         mock.patch.object(m,'publish_result',side_effect=track_publish):
+        rejects(lambda:m.build(fresh,destdir),'modeled fsync')
+    assert hit and not (destdir/'super-both.raw.img').exists()
+    assert not (destdir/'result.json.tmp').exists()
+    status=visible_status(destdir)
+    assert status in (None,'incomplete'),(fault,status)
+    if fault=='parent':assert not tool_runs and not validations
+    elif fault in ('raw-eio','raw-enospc','log'):assert tool_runs and not validations
+    else:assert tool_runs and validations
+    if fault in ('report-persistent','directory-after-persistent','directory-and-report-persistent'):
+        assert status is None
+    else:assert status=='incomplete'
+    fsync_cases.append({'fault':fault,'injections':hit,'status':status,
+                        'publication_attempts':publication_statuses,'fsync_events':events_fault})
+
+# Keep the generic full-logical-size preflight: one byte below must reject
+# before directory creation/tool invocation; exactly the logical size suffices.
+fresh=plan();space_output=WORK/'worst-case-space-rejected'
+with mock.patch.object(m.shutil,'disk_usage',return_value=shutil._ntuple_diskusage(1,1,D['super_bytes']-1)), \
+     mock.patch.object(m.subprocess,'run') as tool_call:
+    rejects(lambda:m.build(fresh,space_output),'worst-case raw-output storage')
+    assert not tool_call.called and not space_output.exists()
+space_output=WORK/'worst-case-space-exact'
+with mock.patch.object(m.shutil,'disk_usage',return_value=shutil._ntuple_diskusage(1,1,D['super_bytes'])):
+    space_result=m.build(fresh,space_output)
+assert space_result['status']=='verified-both-slots-populated-raw-super'
+count+=1
+
+# A same-inode write arriving during raw fsync cannot evade the output identity
+# check and then be blessed by a later successful validate/publication step.
+fresh=plan();changed=WORK/'fsync-raw-mutation'
+def changing_fsync(fd):
+    if fd_kind(fd,changed)=='raw':
+        with (changed/'super-both.raw.img').open('r+b') as image:
+            image.seek(4096);image.write(b'!')
+    return real_fsync(fd)
+with mock.patch.object(m.os,'fsync',side_effect=changing_fsync), \
+     mock.patch.object(m,'validate_raw') as validate:
+    rejects(lambda:m.build(fresh,changed),'Output changed during fsync')
+    assert not validate.called
+assert not (changed/'super-both.raw.img').exists()
+assert visible_status(changed)=='incomplete'
+
+# The durable identity must still match after validation and the directory
+# boundary, rather than only while the raw descriptor itself is synchronized.
+fresh=plan();late=WORK/'fsync-late-output-mutation'
+def late_output_fsync(fd):
+    if fd_kind(fd,late)=='directory' and not (late/'result.json').exists():
+        image=late/'super-both.raw.img'
+        if image.exists():
+            before=image.stat()
+            os.utime(image,ns=(before.st_atime_ns,before.st_mtime_ns+1))
+    return real_fsync(fd)
+with mock.patch.object(m.os,'fsync',side_effect=late_output_fsync):
+    rejects(lambda:m.build(fresh,late),'Raw output changed after fsync/validation')
+assert not (late/'super-both.raw.img').exists()
+assert visible_status(late)=='incomplete'
+
+(WORK/'durability-results.json').write_text(json.dumps({
+    'status':'pass','real_fsync_success_order':events,'faults':fsync_cases,
+    'full_size_preflight_lower_boundary_rejected':True,
+    'full_size_preflight_exact_boundary_accepted':True,
+    'output_mutation_during_fsync_rejected':True,
+    'output_mutation_after_fsync_and_validation_rejected':True,
+    'power_loss_or_physical_disk_failure_simulated':False,
+    'permanent_sync_failure_rollback_durability_claimed':False,
+},indent=2)+'\n')
+
 # Pin all original independent tool outputs and explicit synthetic semantics.
 result={'status':'pass','cases':count,'synthetic_payloads_only':True,
         'actual_lpmake':m.digest_file(TOOL),'layout':D,'good_result':r,

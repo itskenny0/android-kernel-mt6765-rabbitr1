@@ -232,15 +232,55 @@ def validate_raw(path, plan):
             'nonoverlapping_extents': ranges, 'source_images_unchanged_by_builder': True}
 
 
+def sync_file(path):
+    """Surface delayed write errors before validating/publishing an output."""
+    path = local(path)
+    require(stat.S_ISREG(path.lstat().st_mode), 'Not a regular output: ' + str(path))
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        before = os.fstat(fd)
+        require(stat.S_ISREG(before.st_mode), 'Not a regular output: ' + str(path))
+        os.fsync(fd)
+        require(identity(before) == identity(os.fstat(fd)) == identity(path.stat()),
+                'Output changed during fsync: ' + str(path))
+        return identity(before)
+    finally:
+        os.close(fd)
+
+
+def sync_directory(path):
+    path = local(path, output=True)
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def publish_result(output_dir, result):
-    """Expose only a complete report; a failed write never publishes success."""
+    """Sync a complete report and its directory; roll back sync failure."""
     temporary = output_dir/'result.json.tmp'
+    final = output_dir/'result.json'
+    published = False
     try:
         with temporary.open('x') as report:
             report.write(json.dumps(result, indent=2)+'\n')
             report.flush()
             os.fsync(report.fileno())
-        os.replace(temporary, output_dir/'result.json')
+        os.replace(temporary, final)
+        published = True
+        sync_directory(output_dir)
+    except Exception as e:
+        # A failed post-rename directory sync must not leave a live success
+        # report while build() removes the raw output. Rollback durability can
+        # itself fail; preserve that error rather than claim a durable rollback.
+        if published:
+            try:
+                final.unlink(missing_ok=True)
+                sync_directory(output_dir)
+            except OSError as cleanup_error:
+                e.add_note('Published result cleanup failed: ' + str(cleanup_error))
+        raise
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -261,12 +301,18 @@ def build(plan, output_dir):
     argv = command(plan, dest)
     result = {'status': 'incomplete', 'command': argv, 'plan': plan, 'hardware_accessed': False}
     try:
+        sync_directory(output_dir.parent)
         with (output_dir/'lpmake.log').open('wb') as log:
             run = subprocess.run(argv, cwd=output_dir, stdout=log, stderr=subprocess.STDOUT)
         require(run.returncode == 0, 'lpmake failed: '+str(run.returncode))
+        synced_output = sync_file(dest)
+        sync_file(output_dir/'lpmake.log')
         checked_record(plan['audit']); checked_record(plan['lpmake'])
         for row in plan['images'].values(): checked_record(row)
         result['validation'] = validate_raw(dest, plan)
+        sync_directory(output_dir)
+        require(identity(local(dest).stat()) == synced_output,
+                'Raw output changed after fsync/validation')
         require(all(identity(local(path).stat()) == before for path, before in before_inputs.items()),
                 'Pinned input changed during build/validation')
         result['status'] = 'verified-both-slots-populated-raw-super'

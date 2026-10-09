@@ -142,7 +142,8 @@ or supply populated B images. A device's existing active slot cannot be assumed.
 
 The [offline super builder](ANDROID-SUPER.md) can construct and verify identical
 populated A/B partition sets from four completed, audited filesystem images.
-Its raw output and metadata checks have 67 synthetic tests using AOSP `lpmake`.
+Its raw output, metadata and synchronization checks have 84 synthetic tests using
+AOSP `lpmake`.
 It has also built the [actual A/B image](../android/dual-slot-super-build.json)
 from the completed product images: all eight payload hashes, both geometry
 copies and all six metadata copies pass. The raw file is 8,792,064,000 bytes.
