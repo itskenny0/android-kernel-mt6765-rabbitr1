@@ -4,7 +4,7 @@ LOCAL_PATH := device/rabbit/r1
 # Keep these explicit: the common bring-up defaults include a simulated battery.
 TARGET_INITIAL_BRINGUP := true
 TARGET_HAS_BATTERY := true
-TARGET_HEALTH_HAL := default-aidl
+$(call inherit-product, device/rabbit/r1/health/product.mk)
 TARGET_GRAPHICS := swiftshader
 TARGET_GRAPHICS_COMPOSER_HAL := drmfb-composer
 # Keep the supported ARM backends without x86-only Intel cache operations.

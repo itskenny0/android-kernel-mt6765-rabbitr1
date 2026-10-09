@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+package { default_applicable_licenses: ["Android-Apache-2.0"] }
+
+cc_binary {
+    name: "android.hardware.health-service.r1",
+    vendor: true,
+    relative_install_path: "hw",
+    defaults: ["libhealth_aidl_impl_user"],
+    static_libs: ["libhealth_aidl_impl"],
+    srcs: ["main.cpp", "Readiness.cpp"],
+    init_rc: ["health.r1.rc"],
+    vintf_fragments: ["health.r1.xml"],
+    overrides: ["charger"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_binary {
+    name: "r1-health-initial-ready",
+    vendor: true,
+    srcs: ["initial-ready.cpp", "Readiness.cpp"],
+    shared_libs: ["libbase", "libbinder_ndk", "liblog", "android.hardware.health-V5-ndk"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

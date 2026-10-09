@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# Experimental normal boot; requires genuine kernel CAPACITY first.
+on post-fs-data
+    start vendor.health-default
+    exec_start r1-health-initial-ready
+
+service vendor.health-default /vendor/bin/hw/android.hardware.health-service.r1
+    class hal
+    user system
+    group system
+    capabilities WAKE_ALARM BLOCK_SUSPEND
+    file /dev/kmsg w
+
+service r1-health-initial-ready /vendor/bin/r1-health-initial-ready
+    disabled
+    oneshot
+    user system
+    group system
+    timeout_period 40
+    reboot_on_failure shutdown,battery-init-failed
+
+service vendor.charger /vendor/bin/hw/android.hardware.health-service.r1 --charger
+    class charger
+    seclabel u:r:charger_vendor:s0
+    user system
+    group system wakelock input
+    capabilities SYS_BOOT
+    file /dev/kmsg w
+    file /sys/fs/pstore/console-ramoops-0 r
+    file /sys/fs/pstore/console-ramoops r
+    file /proc/last_kmsg r

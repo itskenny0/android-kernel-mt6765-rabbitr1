@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "result": "offline checks pass; Android module integration pending",
+  "scope": "Experimental SOC product and initial Health readiness; default SOC stays disabled",
+  "recorded_at": "2026-10-09T07:03:51.965697+00:00",
+  "hardware_tested": false,
+  "default_product": "lineage_r1",
+  "experimental_product": "lineage_r1_soc",
+  "kernel_option": "build-mainline.sh --experimental-soc",
+  "source_files": {
+    "rabbit-r1/android/device/AndroidProducts.mk": "8da626792e53f42f7361ed02bc639d2853c516447e837aaaec0f347db27ca6db",
+    "rabbit-r1/android/device/BoardConfig.mk": "8bfff4237592102a19038fbe3f9249b8c3485c1e47fa286f67aa12c883325c39",
+    "rabbit-r1/android/device/device.mk": "4678c16ee5b3aa3a6e6bf5f0b95b873fa0e20703cbb468185303dd146ad404fc",
+    "rabbit-r1/android/device/health/Android.bp": "8e79dec7cb6e50485e17b0d8ef05859847344e803674963817138fb0d304a95c",
+    "rabbit-r1/android/device/health/Readiness.cpp": "a313d3471750a268106fb9f352a4f73de9108eb34ba02a2e2e85cc337016ebba",
+    "rabbit-r1/android/device/health/Readiness.h": "3059366c4271bd0c56baa5594ef0485a386ed5d31d4f887c440a2530217edc81",
+    "rabbit-r1/android/device/health/StartupOps.h": "1698b8eabbfa94427c36e0bc09c9be18dabe4f7f3491d86bae98ddd9e3efbc97",
+    "rabbit-r1/android/device/health/health.r1.rc": "4fc14d55f19936b3f48cf41067895c8bcbeb2ed4cd28af96f8944686f9587d7d",
+    "rabbit-r1/android/device/health/health.r1.xml": "5492e2b7c3954aa6b6362762f6c499da3652cfb81690977570edb222f7185616",
+    "rabbit-r1/android/device/health/initial-ready.cpp": "06ca4f92bb9ee6d4d558252d7380f457c4f81de92aaca825a44842dc44e96dbc",
+    "rabbit-r1/android/device/health/main.cpp": "93e71c0ba411249e73f8dd912b7c955c1f017067ec51a6f9d0fcf80eac2adc02",
+    "rabbit-r1/android/device/health/product.mk": "919d47651771914e58d7466c2811929d2b87f9f39559693ee4ad7dc6d10ea0d6",
+    "rabbit-r1/android/device/health/sepolicy/file_contexts": "e7c8bf270d6e575702c38da77bf03abd9b6f3155a0b6b0176192a10670c3701f",
+    "rabbit-r1/android/device/health/sepolicy/genfs_contexts": "a36e5cf2cb38af60a8415c0f98ec78269ee5ffd830c74b8915a3274e4c1ec082",
+    "rabbit-r1/android/device/health/sepolicy/r1_health_ready.te": "aac6404e56f9b2770ee139c94ac4ec1e083150f40fe0a83f49b9b1df8e3c0493",
+    "rabbit-r1/android/device/lineage_r1_soc.mk": "e297eefd1c8f433bfc0b9b24ed975cfa7e6679e970b5366dc49d9674e90f5a21",
+    "rabbit-r1/scripts/build-android.sh": "4771478473508202aeb585aac96afd7753d411fd698cd370b51379e365b12a33",
+    "rabbit-r1/scripts/install-lineage-device.py": "14573d9326bbbcc07b44b4b1025dff124a3bdcc104fd48c82876515e2a4c6cc9",
+    "rabbit-r1/scripts/r1-health-mode.py": "a241323c8e883d5fdd0903923048bfa755563c86bb6f003c05911ed1028a5c80",
+    "rabbit-r1/scripts/build-mainline.sh": "c8029118341bc835526c5d1b4be36a3f63b5ed2839cbd66c261d59ba10bce746",
+    "rabbit-r1/scripts/test-health-mode.py": "d7918a81574275c119c5762f81ea4ddae6e1e2b51bc054868c0910db905c99db",
+    "rabbit-r1/scripts/test-health-readiness.py": "7c1908f26aaf251bf0b6bcb7e506b06a25784461682823fc2916e1c3d92acc33",
+    "rabbit-r1/tests/health/readiness.cpp": "7d61f3d535774b127f7047a8f9479d63bd39cd8f38ad0cf16c8b7e7de38c4681",
+    "rabbit-r1/tests/health/deadlines.cpp": "af9e85d3d8f12617c3b47e58598d7e4453bfd0a36a629e274392433a6fb7c5bf"
+  },
+  "private_integration": {
+    "path": "out/battery-review/soc-state/android-startup/prototype/integration/result.json",
+    "sha256": "9fefd33f0a1145df1d7ef01c79d508f3ff8cba4528dfc93234106e504065f4e1"
+  },
+  "independent_review": {
+    "path": "out/battery-review/soc-state/android-startup/independent-review/review.md",
+    "sha256": "63d59fea2c6705e564320d622dfe7066c989de5735823ac9feeeeb6eaacf7339"
+  },
+  "independent_provenance": {
+    "path": "out/battery-review/soc-state/android-startup/independent-review/provenance.json",
+    "sha256": "3a7ef0cb007e47d377ef600dcb51d5ae32f0431ba8c4ca68f0350ed52a3fbded"
+  },
+  "unresolved_review_findings": 0,
+  "corrected_finding": "Installer now stages the immutable kernel record, Image/config and DTB bytes it validated.",
+  "canonical_changes_from_review": "Two comments no longer describe the integration as a private prototype. Tests use canonical source locations and a confined output directory. Runtime code is unchanged.",
+  "checks": {
+    "mode_and_installer_tests": {
+      "passed": 7,
+      "log": {
+        "path": "logs/health-mode-canonical.log",
+        "sha256": "f050e15f0f831007d9bfb8ce2c94c5cead435d087584a608aef23adbd156a0ca"
+      }
+    },
+    "readiness_identity_and_deadlines": {
+      "passed": true,
+      "deadline_cases": 15,
+      "record": {
+        "path": "out/health-readiness-tests/result.json",
+        "sha256": "4c2af2846f407374295320ea2702fa060b3ec69f19f8a08d91ee54d177ba178d"
+      },
+      "log": {
+        "path": "logs/health-readiness-canonical-fixed.log",
+        "sha256": "31a69b894f72d3e716b5a2a922a461cce2bc857373a87c5da19b2591003ca0fb"
+      }
+    },
+    "arm64_translation_units": {
+      "passed": 7,
+      "record": {
+        "path": "out/battery-review/soc-state/android-startup/prototype/target-compile/result.json",
+        "sha256": "b943c7e15eb1179d34a84833718ea15d7efb82a070520413161a9982b0993d2f"
+      },
+      "scope": "Actual vendor/recovery BatteryMonitor and Health plus new service, helper and readiness translation units. New modules used compatible existing Health flags, not their new Soong module build."
+    },
+    "policy": {
+      "combined_checkpolicy_and_neverallows": "pass",
+      "checkfc": "pass",
+      "compiled_label_and_access_queries": "pass",
+      "runtime_enforcement_verified": false,
+      "record": {
+        "path": "out/battery-review/soc-state/android-startup/prototype/integration/result.json",
+        "sha256": "9fefd33f0a1145df1d7ef01c79d508f3ff8cba4528dfc93234106e504065f4e1"
+      }
+    },
+    "kernel_build_option": {
+      "shell_flow_cases": 8,
+      "actual_config_states": [
+        "n",
+        "y",
+        "n"
+      ],
+      "default_reset_byte_identical": true,
+      "only_changed_kconfig_option": "CONFIG_BATTERY_MT6357_R1_SOC",
+      "record": {
+        "path": "out/battery-review/soc-state/build-mode/handoff.json",
+        "sha256": "3603e75e8ba0e8a5586c763c1e682ece8422ca94357e84f03e0e84b482ecd2ad"
+      },
+      "full_kernel_build_via_option": false
+    },
+    "android_patch_helper": {
+      "passed": 40,
+      "log": {
+        "path": "logs/android-patches-health.log",
+        "sha256": "2a3856263fd591f7cc1fe3099f282ebab2d9f0c7ea2e829ef02fe74eda670148"
+      }
+    }
+  },
+  "runtime_semantics": {
+    "same_monitor_primed_before_publication": true,
+    "genuine_zero_accepted": true,
+    "unavailable_initial_data_rejected": true,
+    "ordinary_shutdown_and_runtime_cache_unchanged": true,
+    "service_helper_init_deadlines_seconds": [
+      30,
+      35,
+      40
+    ],
+    "deadlines_measured_on_device": false,
+    "recovery_and_charger_startup_unchanged": true
+  },
+  "remaining_gates": [
+    "Run explicit SOC kernel build after preserving current baseline evidence.",
+    "Build and link actual new Soong modules and split policy.",
+    "Check installed normal/recovery init and VINTF service uniqueness.",
+    "Validate on-device startup, callback ordering, policy labels and enforcing behavior.",
+    "Calibrate the physical battery model and validate charging and runtime failure behavior."
+  ]
+}

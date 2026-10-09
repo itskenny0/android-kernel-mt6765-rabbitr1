@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+type r1_health_ready, domain;
+type r1_health_ready_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(r1_health_ready)
+hal_client_domain(r1_health_ready, hal_health)
+binder_use(r1_health_ready)
+# Directory metadata and traversal only, matching the existing HAL server.
+allow r1_health_ready sysfs:dir r_dir_perms;
+r_dir_file(r1_health_ready, sysfs_batteryinfo)

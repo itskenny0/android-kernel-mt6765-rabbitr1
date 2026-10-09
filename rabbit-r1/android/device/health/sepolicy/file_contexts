@@ -1,0 +1,2 @@
+/vendor/bin/hw/android\.hardware\.health-service\.r1 u:object_r:hal_health_default_exec:s0
+/vendor/bin/r1-health-initial-ready u:object_r:r1_health_ready_exec:s0

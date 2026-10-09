@@ -4,6 +4,11 @@
 set -euo pipefail
 source "$(dirname "$(realpath "$0")")/env.sh"
 
+R1_ANDROID_PRODUCT=${R1_ANDROID_PRODUCT:-lineage_r1}
+case "$R1_ANDROID_PRODUCT" in
+    lineage_r1|lineage_r1_soc) ;;
+    *) echo 'R1_ANDROID_PRODUCT must be lineage_r1 or lineage_r1_soc.' >&2; exit 1 ;;
+esac
 R1_ANDROID_JOBS=${R1_ANDROID_JOBS:-8}
 [[ $R1_ANDROID_JOBS =~ ^[1-9][0-9]*$ ]] || {
     echo 'R1_ANDROID_JOBS must be a positive integer.' >&2
@@ -32,7 +37,7 @@ else:
 PY
 export OUT_DIR=out
 python3 "$R1_ROOT/scripts/apply-android-patches.py" --apply
-python3 "$R1_ROOT/scripts/install-lineage-device.py"
+python3 "$R1_ROOT/scripts/install-lineage-device.py" --product "$R1_ANDROID_PRODUCT"
 python3 "$R1_ROOT/toolchains/git-repo/repo" manifest -r -o "$R1_ROOT/out/lineage-resolved.xml"
 
 targets=("$@")
@@ -40,12 +45,16 @@ if ((${#targets[@]} == 0)); then
     targets=(R1ChargingSettings r1-charging r1-expdb
              android.hardware.boot-service.r1 android.hardware.boot-service.r1_recovery
              selinux_policy)
+    if [[ $R1_ANDROID_PRODUCT == lineage_r1_soc ]]; then
+        targets+=(android.hardware.health-service.r1 r1-health-initial-ready
+                  android.hardware.health-service.example_recovery)
+    fi
 fi
 
 # Android's shell setup expects unset variables and manages command failures.
 set +eu
 source build/envsetup.sh
-lunch lineage_r1 trunk_staging userdebug > "$R1_ROOT/logs/android-lunch.log" 2>&1
+lunch "$R1_ANDROID_PRODUCT" trunk_staging userdebug > "$R1_ROOT/logs/android-lunch.log" 2>&1
 r1_status=$?
 if ((r1_status)); then
     cat "$R1_ROOT/logs/android-lunch.log"

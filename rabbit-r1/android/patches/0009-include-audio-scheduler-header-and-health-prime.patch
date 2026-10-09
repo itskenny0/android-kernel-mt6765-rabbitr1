@@ -1,0 +1,38 @@
+diff --git a/audio/aidl/default/include/core-impl/ChildInterface.h b/audio/aidl/default/include/core-impl/ChildInterface.h
+index 161f6db6c02192c5764cdf338dbbc6d7456fc65b..9caa91e24d2ae8d2cf85725baddadaf437820de2 100644
+--- a/audio/aidl/default/include/core-impl/ChildInterface.h
++++ b/audio/aidl/default/include/core-impl/ChildInterface.h
+@@ -16,6 +16,8 @@
+ 
+ #pragma once
+ 
++#include <sched.h>
++
+ #include <memory>
+ #include <utility>
+ 
+--- a/health/aidl/default/Health.cpp
++++ b/health/aidl/default/Health.cpp
+@@ -67,6 +67,10 @@
+ }
+ 
+ Health::~Health() {}
++
++::android::status_t Health::PrimeBatteryLevel() {
++    return battery_monitor_.primeBatteryLevel();
++}
+ 
+ static inline ndk::ScopedAStatus TranslateStatus(::android::status_t err) {
+     switch (err) {
+--- a/health/aidl/default/include/health-impl/Health.h
++++ b/health/aidl/default/include/health-impl/Health.h
+@@ -45,6 +45,9 @@
+     // See implementation of Health for code samples.
+     Health(std::string_view instance_name, std::unique_ptr<struct healthd_config>&& config);
+     virtual ~Health();
++
++    // Internal startup hook; not a new AIDL method. Call before StartLoop().
++    ::android::status_t PrimeBatteryLevel();
+ 
+     ndk::ScopedAStatus registerCallback(
+             const std::shared_ptr<IHealthInfoCallback>& callback) override;

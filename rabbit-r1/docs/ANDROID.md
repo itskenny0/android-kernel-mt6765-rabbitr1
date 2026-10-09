@@ -195,6 +195,39 @@ the change from stock virtual A/B to dedicated A/B extents. Existing flash and
 restore helpers cover the diagnostic package; an Android package needs its own
 complete backup, layout and restore validation before distribution.
 
+The experimental `lineage_r1_soc` product uses the live battery model and waits
+for a real initial capacity reading before starting Android's framework. Build
+the matching kernel and select the product explicitly:
+
+```sh
+bash scripts/build-mainline.sh --experimental-soc
+R1_ANDROID_PRODUCT=lineage_r1_soc bash scripts/build-android.sh
+```
+
+The kernel command replaces `out/mainline` and `dist/mainline`. Preserve any
+artifacts needed for an ongoing image audit first. A normal
+`bash scripts/build-mainline.sh` rebuild resets SOC to disabled; the default
+Android product remains `lineage_r1`. The installer verifies the compressed
+kernel, its embedded config and the recorded hashes before accepting either
+product, and stages the exact bytes it validated.
+
+The experimental Health service publishes the monitor it successfully primed.
+Its startup helper accepts genuine zero, rejects unavailable data, and requests
+shutdown if initialization fails. The existing runtime cache and Android's
+empty-battery shutdown remain unchanged. Recovery and charger mode retain their
+existing paths. The 30/35/40-second startup budgets and battery model are
+engineering values requiring physical validation. [Review and test evidence](../tests/battery/health-startup.json)
+covers host checks, ARM64 compilation and scoped policy checks; actual Soong
+linkage, installed init/VINTF contents, enforcing runtime behavior and battery
+calibration remain open.
+
+Patch 0009 now also includes the Health priming wrapper, and patch 0010 adds
+the internal BatteryMonitor method. An existing checkout with the older
+audio-only 0009 must first reverse that exact patch after checking its hashes;
+the patch helper rejects the intermediate mixed state. Fresh pinned checkouts
+can apply the complete series directly. Stop any Android build before changing
+these inputs.
+
 The [boot-control adapter](BOOT-CONTROL.md) implements the stock A/B record
 format, eMMC boot-region selection and clearing the `avbbctl` flag. Its core
 and storage boundary have host tests. Both services pass their Android build,

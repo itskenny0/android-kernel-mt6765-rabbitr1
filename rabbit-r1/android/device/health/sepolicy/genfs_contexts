@@ -1,0 +1,6 @@
+# MT6357 cells use PLATFORM_DEVID_NONE; the gauge child has no numeric suffix.
+genfscon sysfs /devices/platform/soc/1000d000.pwrap/1000d000.pwrap:pmic/mt6357-gauge/power_supply/mt6357-battery u:object_r:sysfs_batteryinfo:s0
+# MT6370 cells use PLATFORM_DEVID_AUTO: mt6370-charger.<id>.auto.
+# Legacy genfs lookup matches literal prefixes, including this final dot.
+# Keep this confined to the MT6370 charger child, not the whole I2C controller.
+genfscon sysfs /devices/platform/soc/11016000.i2c/i2c-5/5-0034/mt6370-charger. u:object_r:sysfs_batteryinfo:s0

@@ -27,6 +27,8 @@ def load_script(name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tree', type=Path, default=ROOT / 'src/android')
+    parser.add_argument('--product', choices=['lineage_r1', 'lineage_r1_soc'], default='lineage_r1',
+                        help='Explicit product; experimental Health requires an SOC-enabled kernel')
     args = parser.parse_args()
     tree = args.tree.resolve()
     if tree == ROOT or not tree.is_relative_to(ROOT):
@@ -44,16 +46,29 @@ def main():
                 files[str(Path(target) / path.relative_to(directory))] = path.read_bytes()
 
     dist = ROOT / 'dist/mainline'
-    record = json.loads((dist / 'build.json').read_text())
+    record_data = (dist / 'build.json').read_bytes()
+    record = json.loads(record_data)
+    artifacts = {name: (dist / name).read_bytes()
+                 for name in ['Image.gz', 'Image', 'config', 'mt6765-rabbit-r1.dtb']}
     for name in ['Image.gz', 'Image', 'config', 'mt6765-rabbit-r1.dtb']:
-        if digest((dist / name).read_bytes()) != record['artifacts'][name]['sha256']:
+        if digest(artifacts[name]) != record['artifacts'][name]['sha256']:
             raise SystemExit('Kernel artifact hash mismatch: ' + name)
+    health_mode = load_script('r1-health-mode')
+    try:
+        mode = health_mode.validate(args.product, record,
+                                   artifacts['Image.gz'],
+                                   artifacts['Image'],
+                                   artifacts['config'])
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     package = load_script('package-mtkclient')
     validate = load_script('validate-kernel')
-    validate.check_mainline(dist / 'mt6765-rabbit-r1.dtb')
     prebuilt = 'device/rabbit/r1/prebuilt/'
-    files[prebuilt + 'Image.gz'] = (dist / 'Image.gz').read_bytes()
-    files[prebuilt + 'kernel-build.json'] = (dist / 'build.json').read_bytes()
+    files[prebuilt + 'Image.gz'] = artifacts['Image.gz']
+    files[prebuilt + 'kernel-build.json'] = record_data
+    files[prebuilt + 'kernel-config'] = artifacts['config']
+    files[prebuilt + 'health-prebuilt.mk'] = health_mode.makefile(mode)
+    files[prebuilt + 'health-mode.json'] = (json.dumps(mode, indent=2) + '\n').encode()
     for name, sha in record['modules'].items():
         source = (ROOT / 'out/mainline' / name).resolve()
         if not source.is_relative_to(ROOT / 'out/mainline') or source.suffix != '.ko':
@@ -67,10 +82,11 @@ def main():
     # Android requires eMMC. Preserve every other bring-up gate and property.
     with tempfile.TemporaryDirectory(dir=ROOT / '.tmp', prefix='r1-android-dtb-') as tmp:
         dtb = Path(tmp) / 'r1.dtb'
-        dtb.write_bytes((dist / 'mt6765-rabbit-r1.dtb').read_bytes())
+        dtb.write_bytes(artifacts['mt6765-rabbit-r1.dtb'])
+        validate.check_mainline(dtb)
         subprocess.run(['fdtput', '-t', 's', str(dtb), '/soc/mmc@11230000',
                         'status', 'okay'], check=True)
-        expected = validate.fdt_nodes((dist / 'mt6765-rabbit-r1.dtb').read_bytes())
+        expected = validate.fdt_nodes(artifacts['mt6765-rabbit-r1.dtb'])
         expected['/soc/mmc@11230000']['status'] = b'okay\0'
         if validate.fdt_nodes(dtb.read_bytes()) != expected:
             raise SystemExit('Unexpected change to the Android DTB')
@@ -106,11 +122,11 @@ def main():
             dest.write_bytes(data)
     stamp.write_text(json.dumps({
         'format': 1, 'kernel_source_commit': record['source_commit'],
-        'hardware_tested': False,
+        'hardware_tested': False, 'health_mode': mode,
         'files': {name: digest(data) for name, data in sorted(files.items())},
     }, indent=2) + '\n')
     print(f'Installed {len(files)} files into {tree}')
-    print('Select: lunch lineage_r1 trunk_staging userdebug')
+    print(f'Select: lunch {args.product} trunk_staging userdebug')
     print('eMMC enabled; hardware validation outstanding')
 
 

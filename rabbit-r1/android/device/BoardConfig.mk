@@ -14,6 +14,9 @@ TARGET_KERNEL_MIXED_MODE := false
 include $(MAINLINE_COMMON_PATH)/BoardConfigMainlineCommon.mk
 include $(DEVICE_PATH)/charging/board.mk
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy
+ifeq ($(TARGET_PRODUCT),lineage_r1_soc)
+BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/health/sepolicy
+endif
 # expdb requires its bounded mapper before pstore_blk is loaded.
 BOARD_VENDOR_KERNEL_MODULES_LOAD := false
 

@@ -1,0 +1,32 @@
+--- a/healthd/BatteryMonitor.cpp
++++ b/healthd/BatteryMonitor.cpp
+@@ -377,6 +377,16 @@
+     T value;
+     if (!android::base::ParseInt(buf, &value)) return base::ErrnoError();
+     return value;
++}
++
++status_t BatteryMonitor::primeBatteryLevel() {
++    if (!mHealthdConfig || !mBatteryDevicePresent) return -ENODEV;
++    if (mBatteryFixedCapacity) return -EPERM;
++    const auto value = tryGetIntField<int32_t>(mHealthdConfig->batteryCapacityPath);
++    if (!value.ok()) return -value.error().code();
++    if (value.value() < 0 || value.value() > 100) return -ERANGE;
++    mLastGoodBatteryLevel = {std::chrono::steady_clock::now(), value.value()};
++    return OK;
+ }
+ 
+ static base::Result<std::optional<std::string>, base::Errno, false> getPrintableStringField(
+--- a/healthd/include/healthd/BatteryMonitor.h
++++ b/healthd/include/healthd/BatteryMonitor.h
+@@ -72,6 +72,10 @@
+     BatteryMonitor();
+     ~BatteryMonitor();
+     void init(struct healthd_config *hc);
++    // Before publishing a Health service, seed this monitor's existing level
++    // cache with a real reading. Call only before concurrent monitor access.
++    // Zero is valid. Runtime update/expiry behavior is unchanged.
++    status_t primeBatteryLevel();
+     int getChargeStatus();
+     status_t getProperty(int id, struct BatteryProperty *val);
+     void dumpState(int fd);

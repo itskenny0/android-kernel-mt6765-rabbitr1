@@ -127,10 +127,16 @@ jobs:
           python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
           python3 scripts/test-pstore-credentials.py 2>&1 | tee logs/pstore-credentials-tests.log
+          python3 scripts/test-health-readiness.py 2>&1 | tee logs/health-readiness-tests.log
           python3 android/device/logging/tests/run.py 2>&1 | tee logs/android-expdb-loader-tests.log
 
       - name: Build the kernel and modules
         run: bash scripts/build-mainline.sh
+
+      - name: Check Health product and kernel agreement
+        run: |
+          source scripts/env.sh
+          python3 scripts/test-health-mode.py 2>&1 | tee logs/health-mode-tests.log
 
       - name: Compile the inactive display drivers
         run: |

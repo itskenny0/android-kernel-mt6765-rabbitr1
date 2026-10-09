@@ -716,13 +716,41 @@
   {
     "project": "hardware/interfaces",
     "base_commit": "1b92b77fe1f2f2c820c51b0b1e366c17d6b9911b",
-    "patch": "0009-include-audio-scheduler-header.patch",
-    "sha256": "8e7c8798b190691b4ab2ae366cb3060c0c52df6f1f2a225d0cc414c8f3faee18",
+    "patch": "0009-include-audio-scheduler-header-and-health-prime.patch",
+    "sha256": "ed67323848b520e3105777161c29ada086c2ce075a4fa0c20aace20a69793314",
     "files": [
       {
         "path": "audio/aidl/default/include/core-impl/ChildInterface.h",
         "before_sha256": "f831161cff6610e2936fa25200905333cdb7ba6f3cc7db1a3754be8e9f0c3652",
         "after_sha256": "5829d631947957a8b83b30f7d3ac1d3abef824d2c165daa6d39d515f38a77f42"
+      },
+      {
+        "path": "health/aidl/default/Health.cpp",
+        "before_sha256": "9078170dc915bbba6d0be195676b039317a62230ead340807957cd078fcf770e",
+        "after_sha256": "e8e5b12cff70e170be327a493871b945769c7e8afcedd8a99efb98428fd19ab3"
+      },
+      {
+        "path": "health/aidl/default/include/health-impl/Health.h",
+        "before_sha256": "5cb21c83f4dab63e52123703892c51a7039b78e9303715623424e12126f0fa6e",
+        "after_sha256": "15559c1c6b9bac35ab5342822bf822500a88ada39baafc6468ce82e43d295e4c"
+      }
+    ]
+  },
+  {
+    "project": "system/core",
+    "base_commit": "7c3f32fe89c52b4176fd288ba5bb4f907809c202",
+    "patch": "0010-prime-initial-battery-level.patch",
+    "sha256": "ea65ab5a8332d59f0cb603eb4f63c1386c4728f168d95c4f684acf0043527fe9",
+    "files": [
+      {
+        "path": "healthd/BatteryMonitor.cpp",
+        "before_sha256": "54a134e69b56d32db2782a9f42ef3c30f11c08c6fdb3f7ecdc68fbff5b3701ce",
+        "after_sha256": "75f823cacfbabd1a901ffd5bed389fa6c9fdabd4848ea28431b0d36ce39e6c57"
+      },
+      {
+        "path": "healthd/include/healthd/BatteryMonitor.h",
+        "before_sha256": "cfe869785539bbfe005bede01ae0724dc44e1540e68d0b3a199c2158c71ca9a9",
+        "after_sha256": "257514f99cc5864b0cb141b7c567ca98b894c5013d8af8527f680f8538752889"
       }
     ]
   }

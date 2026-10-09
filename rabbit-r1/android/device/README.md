@@ -34,15 +34,15 @@ checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
 
 Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL
-reads real power supplies. The gauge now reports the bound charger's actual
-status, but battery percentage remains unfinished. The kernel has no capacity
-property, so the default HAL reports zero capacity. Android's BatteryService
-can still shut down because the battery is present and appears empty. This
-is an Android boot blocker. Implement and validate real fuel-gauge reporting;
-do not substitute a simulated battery or suppress the shutdown check.
-The gauge now exposes the signed hardware charge counter in microamp-hours;
-this is relative accumulation, not remaining capacity. Live profile-based
-initialization, counter reset/rollover handling and SOC persistence remain.
+reads real power supplies. The default kernel leaves the experimental battery
+model disabled, so missing capacity can still trigger Android's empty-battery
+shutdown. The explicit `lineage_r1_soc` product requires a kernel built with
+`build-mainline.sh --experimental-soc`; its Health service waits for genuine
+initial capacity and requests shutdown if initialization fails. It retains real
+zero and normal runtime shutdown behavior. The live stock-profile model and
+charge-counter integration have offline tests, but are uncalibrated. Physical
+validation, hidden counter resets and persistence remain open. See
+[Android integration](../../docs/ANDROID.md) for selection and validation scope.
 
 The asynchronous `r1-expdb` service validates the partition and its bounded
 18 MiB mapping before loading pstore. Its mocked discovery, mapping, attachment
