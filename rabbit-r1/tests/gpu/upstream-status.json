@@ -1,0 +1,75 @@
+{
+  "checked_at": "2026-10-09T07:35:21.065207+00:00",
+  "scope": "Official releases, bounded upstream Imagination histories since 2026-09-24, exact device selectors and firmware ABI. Source review only; no runtime validation.",
+  "latest_stable": {
+    "mesa": "26.2.4",
+    "mesa_tag_commit": "96cb43121031992b85767f9c1be8f3f48e22b1d2",
+    "linux": "7.2.9"
+  },
+  "current_driver": {
+    "baseline_manifest": "powervr-7.2.9.json",
+    "backports_manifest": "powervr-backports.json",
+    "verified_source_files": 79,
+    "scheduler_timeout_backport": "2224d6642136767ec01d146d48ffc881b55b32f7",
+    "new_stable_powervr_delta_found": false
+  },
+  "development_tips": {
+    "linux": "af32da41b0327b9c6a37856ba82b6760d6c8d10e",
+    "linux_powervr_matches_previously_reviewed_7_3_rc6": true,
+    "mesa": "8f65701c41f63e851c4696712de24e367ffcb061",
+    "mesa_26_2": "9a0169f2a72d8d844124801b7abbdc75cc37f874",
+    "mesa_stable_imagination_commits_since_2026_10_01": [],
+    "newer_mesa_changes_not_imported": [
+      {
+        "commit": "bfe063f723d436e5cdef8a98f058d4e44a64810c",
+        "scope": "PCO IMAD32 compiler optimization; no exact-device support or correctness established."
+      },
+      {
+        "commit": "78f9b71dd7c15a5c2245ce897e4641c0a63357ff",
+        "scope": "Shared Vulkan memory-report API migration; requires shared implementation, not an isolated PowerVR fix."
+      }
+    ]
+  },
+  "r1_support": {
+    "gpu": "PowerVR GE8320",
+    "bvnc": "22.87.104.18",
+    "mesa_exact_device_entry": false,
+    "mesa_registered_entries": 14,
+    "missing_mesa_numeric_limits": 11,
+    "kernel_firmware_abi_sha256": "d3d9c39a514a0b90dcd8756e9058e89e059fc51c19670766ed30d9d0cc4c84a5",
+    "unmapped_firmware_bits": {
+      "BRN": [
+        26,
+        28,
+        30
+      ],
+      "ERN": [
+        8
+      ],
+      "FEATURE": [
+        102
+      ]
+    },
+    "hardware_acceleration_enabled": false,
+    "Android_renderer": "SwiftShader",
+    "hardware_tested": false
+  },
+  "sources": [
+    "https://docs.mesa3d.org/relnotes/26.2.4.html",
+    "https://www.kernel.org/",
+    "https://gitlab.freedesktop.org/mesa/mesa/-/blob/8f65701c41f63e851c4696712de24e367ffcb061/src/imagination/common/pvr_device_info.c",
+    "https://github.com/torvalds/linux/tree/af32da41b0327b9c6a37856ba82b6760d6c8d10e/drivers/gpu/drm/imagination"
+  ],
+  "local_evidence": {
+    "directory": "/rabbitr1/out/gpu-review/latest-refresh-20261009",
+    "files": {
+      "result.json": "4fd7881dacc524508d612f4a624fb39dbcc89cce66bb372330bd2326e85f1582",
+      "comparison.json": "0616d7b96551262aad151b39af9b6025868aaab94cf465a5024543b9c069be7b",
+      "review.md": "33a484dbc99815ad075009a080c49e2187ab678e3ad9c3ca5bedadf8d8677a89",
+      "fetch-provenance.json": "d312121ba106a8616abad88ef93a3e7df320685ba4a253620a0053faf5f8521e",
+      "followup-provenance.json": "1c1a326b33361911208ea67af385f1fadb346126be31ba06ca8069f9b4f80dc7",
+      "final-fetch-provenance.json": "3359c4c168ad989d381f52ea3c75be6f0d04a71f65abbcb6b6a06e4843ca1b18"
+    },
+    "captured_sources_bundled_in_repository": false
+  }
+}

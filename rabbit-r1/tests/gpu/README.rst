@@ -8,6 +8,14 @@ The remaining driver files and ``include/uapi/drm/pvr_drm.h`` already matched.
 ``powervr-7.2.9.json`` records SHA-256 and Git blob hashes for all 78 driver
 files and the unchanged UAPI header. Original upstream licenses remain intact.
 
+The October 9 upstream review found Mesa 26.2.4 and Linux 7.2.9 still the latest
+stable releases. ``upstream-status.json`` records the checked development tips,
+source comparisons and remaining exact-device support gaps. No additional
+stable PowerVR fix was found. Mesa main has newer compiler and shared-API work;
+the existing pins do not claim to include every development change. The r1's
+exact BVNC is still absent from Mesa main, so production continues to use
+SwiftShader. This refresh adds source evidence, not a rendering test.
+
 Patch 0075 adds upstream commit
 ``2224d6642136767ec01d146d48ffc881b55b32f7``: the scheduler timeout increases
 from 500 ms to 60 seconds, twice the existing 30-second firmware HWR deadline.
