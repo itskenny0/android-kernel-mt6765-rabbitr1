@@ -178,6 +178,13 @@ The fixtures model OF, regmap and allocation; this does not test physical power
 sequencing, full probe lifetime or rendering. The six independent review
 controls remain recorded separately in mt6765-bus-protection.json.
 
+Patch 0080 makes the bus helpers return register-command errors before ACK
+handling. The two controls that previously demonstrated false success now
+require the original errno. ``mt6765-bus-errors.json`` records 28 focused fault
+and caller controls, two independent controls and an ARM64 translation-unit
+compile. Existing partial-state cleanup is unchanged; this is not a physical
+recovery test. The historical 0079 source-contract record remains unchanged.
+
 The subsequent full SOC-enabled kernel build is recorded in
 ``mt6765-power-build.json``. It passed at source ``0d14e48318`` with PowerVR
 still disabled. The earlier source-contract record retains its original

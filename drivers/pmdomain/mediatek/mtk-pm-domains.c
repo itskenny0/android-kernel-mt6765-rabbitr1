@@ -221,13 +221,17 @@ static int scpsys_bus_protect_clear(struct scpsys_domain *pd,
 	u32 sta_mask = bpd->bus_prot_sta_mask;
 	u32 expected_ack;
 	u32 val;
+	int ret;
 
 	expected_ack = (bpd->bus_prot_sta_block == BUS_PROT_BLOCK_INFRA_NAO ? sta_mask : 0);
 
 	if (bpd->flags & BUS_PROT_REG_UPDATE)
-		regmap_clear_bits(regmap, bpd->bus_prot_clr, bpd->bus_prot_set_clr_mask);
+		ret = regmap_clear_bits(regmap, bpd->bus_prot_clr, bpd->bus_prot_set_clr_mask);
 	else
-		regmap_write(regmap, bpd->bus_prot_clr, bpd->bus_prot_set_clr_mask);
+		ret = regmap_write(regmap, bpd->bus_prot_clr, bpd->bus_prot_set_clr_mask);
+
+	if (ret)
+		return ret;
 
 	if (bpd->flags & BUS_PROT_IGNORE_CLR_ACK)
 		return 0;
@@ -244,11 +248,15 @@ static int scpsys_bus_protect_set(struct scpsys_domain *pd,
 	struct regmap *regmap = scpsys_bus_protect_get_regmap(pd, bpd);
 	u32 sta_mask = bpd->bus_prot_sta_mask;
 	u32 val;
+	int ret;
 
 	if (bpd->flags & BUS_PROT_REG_UPDATE)
-		regmap_set_bits(regmap, bpd->bus_prot_set, bpd->bus_prot_set_clr_mask);
+		ret = regmap_set_bits(regmap, bpd->bus_prot_set, bpd->bus_prot_set_clr_mask);
 	else
-		regmap_write(regmap, bpd->bus_prot_set, bpd->bus_prot_set_clr_mask);
+		ret = regmap_write(regmap, bpd->bus_prot_set, bpd->bus_prot_set_clr_mask);
+
+	if (ret)
+		return ret;
 
 	return regmap_read_poll_timeout(sta_regmap, bpd->bus_prot_sta,
 					val, (val & sta_mask) == sta_mask,

@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "scope": "SCPSYS bus-protection write/update error reporting; existing sequencing and caller cleanup unchanged",
+  "baseline_source_commit": "aef4c23a1445f598adf6bfbb449906daa689bdc5",
+  "patch": {
+    "path": "patches/mainline/0080-report-bus-protection-command-errors.patch",
+    "sha256": "608ccfc88f62bc4c25eecd9aced5a62cf4209bb23c6b590348e211a8066f5216"
+  },
+  "kernel_source": {
+    "repository_path": "drivers/pmdomain/mediatek/mtk-pm-domains.c",
+    "before": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-errors/before/drivers/pmdomain/mediatek/mtk-pm-domains.c",
+      "bytes": 38731,
+      "sha256": "4b5cfa32efeea8cbffe2467ddcd403f5bd235454d3802a695a92dd4f8e94f6c7"
+    },
+    "after": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-errors/candidate/drivers/pmdomain/mediatek/mtk-pm-domains.c",
+      "bytes": 38825,
+      "sha256": "98109252738cfa963f268dba55851815bfa157e2770e8149a425104f01f3edec"
+    }
+  },
+  "independent_controls": 2,
+  "hardware_tested": false,
+  "full_kernel_link": false,
+  "canonical_CI_controls": {
+    "total": 35,
+    "changes": "Two former false-success assertions now require the write errno; provider assertions and stock oracle unchanged."
+  },
+  "evidence": {
+    "owner_handoff": {
+      "path": "out/gpu-review/mt6765-bus-errors/handoff.json",
+      "sha256": "3fb9402c197d3b98c162e2cafa9f7304708e9a839b2b05ef3335bbd1ff3744c1"
+    },
+    "source_pins": {
+      "path": "out/gpu-review/mt6765-bus-errors/source-pins.json",
+      "sha256": "1db535717548aebf89f5caf57e46a5d54c0ef4871c7cc1e35dd594eb9dabebdb"
+    },
+    "faults": {
+      "path": "out/gpu-review/mt6765-bus-errors/host-check-v3/result.json",
+      "sha256": "93427793fb9ec125ec5b45f81215cb5e14c99bf61691e34c6edf8f19a1bacc13"
+    },
+    "arm64_translation_unit": {
+      "path": "out/gpu-review/mt6765-bus-errors/target-check/result.json",
+      "sha256": "50b5e1da5faaef943013b893fbd2cd89785345133fccfde8e0b9d44993f4c5af"
+    },
+    "independent": {
+      "path": "out/gpu-review/mt6765-bus-errors/independent-review/result.json",
+      "sha256": "895419cbf6e844f8717d7c7e671ddb29038629070e26746c9e5e73de2e167ee4"
+    },
+    "independent_review": {
+      "path": "out/gpu-review/mt6765-bus-errors/independent-review/provenance.json",
+      "sha256": "8eac53168430cc3d07fba163d707d9a95eca12284b80621c2e2b7c829a8cb569"
+    },
+    "canonical_controls": {
+      "path": "out/gpu-review/mt6765-bus-errors/canonical-controls/result.json",
+      "sha256": "67a9cdd09a36e35cc3f90ae69c9e225dde29f6b15961823dcc805ed028d17b1e"
+    },
+    "patch_series": {
+      "path": "out/gpu-review/mt6765-bus-errors/series-check.log",
+      "sha256": "284e2ddcf11bb74ad576e8d497e9a43d206cdef27ae7100abbb4c985fdeb3bca"
+    }
+  },
+  "limits": [
+    "Existing partial-state caller cleanup retained; no complete power rollback or physical safety proof.",
+    "Regmap error can follow a hardware side effect; no retry or unwind added.",
+    "No physical test, kernel link, configuration change or GPU enablement.",
+    "Historical35-control/stock source record unchanged; only two expected-failure assertions now become regression assertions.",
+    "The exact r1 INFRACFG provider uses MMIO; these injected API errors are not observed physical r1 faults.",
+    "Other SRAM/power-control writes and secondary cleanup errors remain outside this correction."
+  ],
+  "owner_checks": {
+    "baseline_false_successes": 2,
+    "candidate_fault_and_actual_caller_controls": 28,
+    "updated_operation_controls": 9,
+    "unchanged_provider_controls_not_rerun": 26,
+    "host_sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "arm64_translation_unit": true,
+    "arm64_diagnostics": "",
+    "compiler_inputs_unchanged": 730,
+    "patch_exact_after": true,
+    "checkpatch_errors": 0,
+    "checkpatch_warnings": 0
+  },
+  "canonical_checks": {
+    "power_controls": 35,
+    "patches_replayed": 80,
+    "affected_files_matched": 95
+  }
+}

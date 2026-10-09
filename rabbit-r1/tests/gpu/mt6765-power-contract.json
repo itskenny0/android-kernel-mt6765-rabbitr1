@@ -19,8 +19,9 @@
     "operation": 9,
     "provider": 26
   },
-  "unchanged_assertion_blocks": {
-    "operation_sha256": "8450bac010d5d305f97bf68eb5a474df3ad04771ca2eecc0cf2e7448149d377c",
-    "provider_sha256": "3d46b1a3901f67d6503ebf044b919e06fe083d49a40935f2d862c60499824096"
+  "assertion_blocks": {
+    "operation_sha256": "6dd0ff0a33ca13f1a5c575d9af533dde6372e4c8f8bcc3e1d8a9412926a3ff12",
+    "provider_sha256": "3d46b1a3901f67d6503ebf044b919e06fe083d49a40935f2d862c60499824096",
+    "scope": "Operation assertions now reject two reported command failures; the original nine-control result remains historical evidence. Provider assertions remain unchanged."
   }
 }

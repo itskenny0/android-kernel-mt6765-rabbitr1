@@ -76,10 +76,10 @@ int main(void){
  reset();infra.suppress=BIT(25);assert(scpsys_bus_protect_enable(&pd,0)==-ETIMEDOUT);assert(nevents==4);assert(events[0].value==BIT(25));cases++;
  reset();infra.suppress=BIT(21)|BIT(22);assert(scpsys_bus_protect_enable(&pd,0)==-ETIMEDOUT);assert(nevents==6);assert(events[2].value==(BIT(21)|BIT(22)));cases++;
  reset();infra.read_error=-EIO;assert(scpsys_bus_protect_enable(&pd,0)==-EIO);assert(nevents==2);cases++;
- /* Existing generic limitation: clear write errors are ignored, no ACK read. */
- reset();infra.status=0x2600000;infra.write_error=-EIO;assert(scpsys_bus_protect_disable(&pd,0)==0);assert(nevents==2 && infra.status==0x2600000);cases++;
- /* Existing generic limitation: stale asserted ACK can conceal a failed set. */
- reset();infra.status=0x2600000;infra.write_error=-EIO;assert(scpsys_bus_protect_enable(&pd,0)==0);assert(nevents==4);cases++;
- printf("{\"passed\":true,\"controls\":%d,\"scope\":\"actual source helpers/table versus actual stock routine with modeled register IO\",\"generic_write_error_limitations_reproduced\":2}\n",cases);
+ /* Failed clear must return its error even when ACK is intentionally skipped. */
+ reset();infra.status=0x2600000;infra.write_error=-EIO;assert(scpsys_bus_protect_disable(&pd,0)==-EIO);assert(nevents==1 && infra.status==0x2600000);cases++;
+ /* A stale asserted ACK must not conceal a failed set command. */
+ reset();infra.status=0x2600000;infra.write_error=-EIO;assert(scpsys_bus_protect_enable(&pd,0)==-EIO);assert(nevents==1);cases++;
+ printf("{\"passed\":true,\"controls\":%d,\"scope\":\"actual source helpers/table versus actual stock routine with modeled register IO\",\"generic_write_error_regressions\":2}\n",cases);
  return 0;
 }

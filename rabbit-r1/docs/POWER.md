@@ -42,9 +42,19 @@ rebuilt the initramfs and both boot profiles with that kernel and host tooling
 `6a07c408e2`. Image, module and simulated flash-failure checks passed. The package
 has not booted on a device, and Android still uses the earlier staged kernel.
 
-The generic helpers still ignore individual register-write errors. Shared
-VCORE voting, mux order, hardware APM/CORE0 ownership and GPU enablement remain
-separate work; no voltage, OPP, GPU node or firmware change is included.
+Patch 0080 returns bus-protection write/update errors before checking or skipping
+acknowledgments. A failed clear can no longer report success when clear ACK is
+ignored, and a stale set ACK cannot hide a failed command. The existing caller
+branches remain unchanged: an error may leave earlier protection stages or a
+partially powered domain behind. This does not implement complete recovery.
+[Focused checks](../tests/gpu/mt6765-bus-errors.json) cover the API errors and
+caller paths with modeled resources, plus an ARM64 translation-unit compile.
+The kernel and diagnostic package recorded above predate this correction.
+
+Other power-control, SRAM and secondary cleanup errors remain outside this
+change. Shared VCORE voting, mux order, hardware APM/CORE0 ownership and GPU
+enablement remain separate work; no voltage, OPP, GPU node or firmware change
+is included.
 
 ## Corrections implemented
 
