@@ -29,7 +29,11 @@ $(call inherit-product, device/rabbit/r1/charging/product.mk)
 
 PRODUCT_PACKAGES += \
     android.hardware.boot-service.r1 \
-    android.hardware.boot-service.r1_recovery
+    android.hardware.boot-service.r1_recovery \
+    r1-expdb
+
+# The logger validates expdb and bounds its mapping before loading pstore.
+PRODUCT_VENDOR_PROPERTIES += ro.vendor.r1.expdb.enabled=1
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/rootdir/fstab.r1:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.r1 \

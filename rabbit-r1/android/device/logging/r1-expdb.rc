@@ -1,0 +1,10 @@
+service vendor.r1-expdb /vendor/bin/r1-expdb
+    class core
+    user root
+    group root
+    capabilities SYS_ADMIN SYS_MODULE
+    disabled
+    oneshot
+
+on post-fs && property:ro.vendor.r1.expdb.enabled=1
+    start vendor.r1-expdb

@@ -1,0 +1,41 @@
+type r1_expdb, domain;
+type r1_expdb_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(r1_expdb)
+
+type r1_expdb_raw_device, dev_type;
+type r1_expdb_map_device, dev_type;
+type r1_pstore_module_file, vendor_file_type, file_type;
+type sysfs_r1_pstore, fs_type, sysfs_type;
+vendor_internal_prop(r1_expdb_prop)
+get_prop(r1_expdb, r1_expdb_prop)
+
+# Discover the MMC partition and wait for ueventd's UUID/name links.
+allow r1_expdb block_device:dir r_dir_perms;
+allow r1_expdb block_device:lnk_file r_file_perms;
+allow r1_expdb { r1_expdb_raw_device r1_expdb_map_device }:lnk_file r_file_perms;
+allow r1_expdb sysfs:dir r_dir_perms;
+allow r1_expdb sysfs:lnk_file r_file_perms;
+allow r1_expdb sysfs_block:dir r_dir_perms;
+allow r1_expdb sysfs_block:lnk_file r_file_perms;
+r_dir_file(r1_expdb, sysfs_r1_mmc)
+r_dir_file(r1_expdb, sysfs_r1_pstore)
+
+# Validate the physical partition; ordinary raw writes are never requested.
+allow r1_expdb r1_expdb_raw_device:blk_file { open read getattr ioctl };
+allowxperm r1_expdb r1_expdb_raw_device:blk_file ioctl { 0x1272 };
+
+# Only the bounded 18 MiB mapping is opened for pstore's internal writes.
+# pstore_blk retains this opener's credentials for its later callbacks.
+allow r1_expdb r1_expdb_map_device:blk_file { open read write getattr ioctl };
+allowxperm r1_expdb r1_expdb_map_device:blk_file ioctl { 0x1272 };
+
+allow r1_expdb dm_device:chr_file { open read write getattr ioctl };
+# Create, remove, resume, status, table load and table readback.
+allowxperm r1_expdb dm_device:chr_file ioctl { 0xfd03 0xfd04 0xfd06 0xfd07 0xfd09 0xfd0c };
+allow r1_expdb self:global_capability_class_set { sys_admin sys_module };
+
+# Two immutable vendor module files; no generic vendor-file module loading.
+allow r1_expdb r1_pstore_module_file:file r_file_perms;
+allow r1_expdb r1_pstore_module_file:system module_load;
+allow r1_expdb kernel:key search;
+allow r1_expdb kmsg_device:chr_file w_file_perms;

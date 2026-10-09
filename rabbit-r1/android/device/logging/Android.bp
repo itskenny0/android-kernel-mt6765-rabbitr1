@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_binary {
+    name: "r1-expdb",
+    vendor: true,
+    cpp_std: "c++17",
+    srcs: ["main.cpp", "Expdb.cpp"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+    shared_libs: ["libbase"],
+    init_rc: ["r1-expdb.rc"],
+}

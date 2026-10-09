@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Target-only helper: expose the first 18 MiB of the r1's 20 MiB expdb. */
 #define _GNU_SOURCE
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/dm-ioctl.h>
@@ -15,24 +14,15 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 
-#define EXPDB_BYTES (20ULL * 1024 * 1024)
-#define LOG_BYTES (18ULL * 1024 * 1024)
-#define MAP_NAME "r1-expdb"
+#include "../android/device/logging/ExpdbLayout.h"
+
+#define EXPDB_BYTES R1_EXPDB_BYTES
+#define LOG_BYTES R1_EXPDB_LOG_BYTES
+#define MAP_NAME R1_EXPDB_MAP_NAME
 
 static int partition_name(const char *name)
 {
-	if (strncmp(name, "mmcblk", 6))
-		return 0;
-	name += 6;
-	if (!isdigit((unsigned char)*name))
-		return 0;
-	while (isdigit((unsigned char)*name))
-		name++;
-	if (*name++ != 'p' || !isdigit((unsigned char)*name))
-		return 0;
-	while (isdigit((unsigned char)*name))
-		name++;
-	return !*name;
+	return r1_expdb_partition_name(name);
 }
 
 static int has_line(const char *file, const char *expected)
@@ -64,18 +54,11 @@ static struct dm_ioctl *request(unsigned char *buf)
 	return dm;
 }
 
-static void linear_table(unsigned char *buf, dev_t dev)
+static int linear_table(unsigned char *buf, dev_t dev)
 {
 	struct dm_ioctl *dm = request(buf);
-	struct dm_target_spec *target = (void *)(buf + dm->data_start);
-	char *params = (void *)(target + 1);
 
-	dm->target_count = 1;
-	target->sector_start = 0;
-	target->length = LOG_BYTES / 512;
-	strcpy(target->target_type, "linear");
-	sprintf(params, "%u:%u 0", major(dev), minor(dev));
-	target->next = (sizeof(*target) + strlen(params) + 1 + 7) & ~7U;
+	return r1_expdb_linear_table(dm, 4096, dev);
 }
 
 #ifndef EXPDB_TEST
@@ -133,7 +116,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	dm_minor = minor(dm->dev);
-	linear_table(buf, st.st_rdev);
+	if (!linear_table(buf, st.st_rdev)) {
+		errno = EINVAL;
+		goto fail;
+	}
 	if (ioctl(ctl, DM_TABLE_LOAD, buf))
 		goto fail;
 	dm = request(buf); /* Clear DM_SUSPEND_FLAG to activate the table. */

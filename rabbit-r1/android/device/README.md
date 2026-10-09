@@ -35,10 +35,17 @@ therefore reports zero with unknown status. Android's BatteryService can then
 shut down after startup because the battery is present and appears empty. This
 is an Android boot blocker. Implement and validate real fuel-gauge reporting;
 do not substitute a simulated battery or suppress the shutdown check.
+The gauge now exposes the signed hardware charge counter in microamp-hours;
+this is relative accumulation, not remaining capacity. Stock profile-based
+initialization, counter reset/rollover handling and SOC persistence remain.
+
+The asynchronous `r1-expdb` service validates the partition and its bounded
+18 MiB mapping before loading pstore. Its mocked discovery, mapping, attachment
+and failure tests pass; actual module loading, policy and persistence are unverified.
 
 Before distributing an Android image, complete the full Soong and SELinux
-build, verify image sizes and the LK/DT handoff, integrate the bounded `expdb`
-logger into Android init, and test boot and recovery on an r1. Storage, graphics,
+build, verify image sizes and the LK/DT handoff, validate the bounded `expdb`
+logger, and test boot and recovery on an r1. Storage, graphics,
 battery health, charging, temperature limits, input, audio, wireless, cameras,
 modem support and suspend remain hardware validation gates. Native display and
 TCPC are still disabled in the staged DTB.

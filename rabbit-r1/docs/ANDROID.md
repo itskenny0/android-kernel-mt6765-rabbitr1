@@ -40,10 +40,11 @@ Once sync completes, run the actual product configuration and targeted build:
 export GOCACHE=/rabbitr1/.cache/go-build GOPATH=/rabbitr1/.cache/go
 export GRADLE_USER_HOME=/rabbitr1/.cache/gradle ANDROID_USER_HOME=/rabbitr1/.cache/android
 cd /rabbitr1/src/android
+export OUT_DIR=../../out/android
 set +eu
 source build/envsetup.sh
 lunch lineage_r1 trunk_staging userdebug || exit
-m R1ChargingSettings r1-charging android.hardware.boot-service.r1 android.hardware.boot-service.r1_recovery selinux_policy
+m -j8 R1ChargingSettings r1-charging r1-expdb android.hardware.boot-service.r1 android.hardware.boot-service.r1_recovery selinux_policy
 ```
 
 These are the next validation commands, not a claim that the product already
@@ -52,9 +53,13 @@ errors, then inspect the generated boot header, DT table, module hashes, super
 metadata, partition sizes and AVB configuration. The stock layout evidence is
 recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
+Keep `OUT_DIR` relative to the Android source root. The pinned Siso build tool
+fails to find its generated `main.star` when given an absolute config directory;
+`../../out/android` still keeps all output in `/rabbitr1/out/android`.
+
 The [device notes](../android/device/README.md) track the current hardware and
 release gates, including missing battery capacity (which can trigger Android's
-empty-battery shutdown), Android `expdb` startup, and
+empty-battery shutdown), Android `expdb` validation, and
 the change from stock virtual A/B to dedicated A/B extents. Existing flash and
 restore helpers cover the diagnostic package; an Android package needs its own
 complete backup, layout and restore validation before distribution.
@@ -63,3 +68,26 @@ The [boot-control adapter](BOOT-CONTROL.md) implements the stock A/B record
 format, eMMC boot-region selection and clearing the `avbbctl` flag. Its core
 and storage boundary have host tests. The product selects its Android and
 recovery services; their Soong, SELinux and device checks are still required.
+
+The `r1-expdb` service starts asynchronously after `post-fs` when the fixed build
+property `ro.vendor.r1.expdb.enabled=1` is set. It verifies the 20 MiB `expdb`
+partition and creates a UUID-owned, single-target mapping of its first 18 MiB.
+It checks the active table, device identities and ueventd links before loading
+the two fixed pstore modules, then verifies backend registration and parameters.
+The final 2 MiB is excluded. The diagnostic mapper shares the same geometry.
+The service never formats or erases the partition. Failed setup leaves logging
+unavailable and reports the error to the kernel log; Android boot can continue.
+
+The logger's host tests simulate device syscalls and module loading. Run them
+with `python3 android/device/logging/tests/run.py`. The kernel's pstore callbacks
+use the retained opener credentials so readers, console callers and background
+workers do not need raw block-device permissions. Combined policy compilation,
+actual node labels, module attachment and persistence still need validation.
+Best-effort pstore has no dedicated panic writer, so neither panic persistence
+nor logs from before startup are guaranteed.
+
+Recovered files use the `pstore_blk` backend name, for example
+`/sys/fs/pstore/console-pstore_blk-0`. Android's current previous-boot liblog reader
+expects `pmsg-ramoops-0`; use direct collection or the existing expdb decoder for
+these records until that reader is integrated. Do not assume `logcat -L` collects
+them.
