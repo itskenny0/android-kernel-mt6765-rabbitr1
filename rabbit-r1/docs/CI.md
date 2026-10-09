@@ -15,6 +15,10 @@ after transient transport failures. Every completed download must match its lock
 size and SHA-256 before publication. Checksum mismatches, certificate errors
 and permanent HTTP errors stop immediately; existing files are preserved.
 
+The host checks also exercise MFG protection ordering and reject missing or
+incorrect power-domain register mappings before admission, using actual kernel
+helpers with modeled register and device-tree interfaces under ASan/UBSan.
+
 Before compiling, CI prepares the separate patched mtkclient source from its
 pinned archive, verifies every file, and tests the [bulk transport changes](MTKCLIENT.md).
 It also exercises XFlash read framing, exact selected lengths, checked file

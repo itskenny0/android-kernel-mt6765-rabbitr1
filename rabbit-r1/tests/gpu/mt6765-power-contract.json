@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "source_record": "mt6765-bus-protection.json",
+  "source_record_sha256": "dd2a0c72fe041a4485462f551145482a097ed4ed448a8a7f5006c63d158305bf",
+  "stock_source": {
+    "path": "drivers/clk/mediatek/clk-mt6765-pg.c",
+    "git_commit": "8167c8c1087f057d2ef302fc93b47554291687ec",
+    "git_blob": "531f7af6d1b1da35c54e3bddc6e641234f6bc863",
+    "sha256": "990157bf81cf40b412c6d7b981f972c66dfe72fb7df698cb55419cd9b51b3bcc",
+    "bytes": 86455,
+    "url": "https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/clk/mediatek/clk-mt6765-pg.c"
+  },
+  "oracle": {
+    "file": "mt6765-mfg-stock-oracle.h",
+    "sha256": "3dbf1ebe4a2aacdcd2c946c87aef5b356cf75e5ed4b80debfa04c81b5744c5b6",
+    "scope": "Exact frozen spm_mtcmos_ctrl_mfg_bus_prot body and its referenced constant macros, with macro continuation lines joined. Host-only I/O mocks; FPGA ACK bypass not defined."
+  },
+  "controls": {
+    "operation": 9,
+    "provider": 26
+  },
+  "unchanged_assertion_blocks": {
+    "operation_sha256": "8450bac010d5d305f97bf68eb5a474df3ad04771ca2eecc0cf2e7448149d377c",
+    "provider_sha256": "3d46b1a3901f67d6503ebf044b919e06fe083d49a40935f2d862c60499824096"
+  }
+}

@@ -163,3 +163,17 @@ Primary sources
 * `PowerVR kernel documentation <https://docs.kernel.org/gpu/imagination/index.html>`_
 * `Mesa PowerVR documentation <https://docs.mesa3d.org/drivers/powervr.html>`_
 * `Exact GE8320 firmware <https://gitlab.freedesktop.org/imagination/linux-firmware/-/blob/8a58f81883f7be458daa34e418cc4079f995b279/powervr/rogue_22.87.104.18_v1.fw>`_
+
+Reproduce the MFG regression checks
+----------------------------------
+
+CI runs the 35 sequence and provider-admission controls with::
+
+    python3 scripts/test-mt6765-power.py --source /rabbitr1/src/mainline --out /rabbitr1/out/mt6765-power-ci
+
+Choose a new output directory for each run. The runner extracts the current
+kernel helpers, tables and probe admission code and uses the bundled stock
+sequence fixture. It requires GCC with ASan/UBSan and no vendor checkout.
+The fixtures model OF, regmap and allocation; this does not test physical power
+sequencing, full probe lifetime or rendering. The six independent review
+controls remain recorded separately in mt6765-bus-protection.json.
