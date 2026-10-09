@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "result": "pass",
+  "scope": "Completed SOC cp2a Android image build, eighteen-check offline artifact audit and verified raw super with both slots populated. Device boot remains untested at this milestone.",
+  "recorded_on": "2026-10-09",
+  "build_source_commit": "65fcc9e6543bf6c60a0369b2511108ff348ae840",
+  "kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+  "audit_consumer_commit": "d889646f55a30643ee02d5faca6e29622cb3af07",
+  "product": "lineage_r1_soc",
+  "release": "cp2a",
+  "variant": "userdebug",
+  "android_version": "17",
+  "android_api": 37,
+  "android_codename": "REL",
+  "preview_sdk": 0,
+  "lineage_version": "24.0-20261009-UNOFFICIAL-r1_soc",
+  "vendor_api": "202604",
+  "declared_security_patch": "2026-10-01",
+  "experimental_soc_health": true,
+  "powervr_enabled": false,
+  "hardware_tested": false,
+  "device_boot_tested": false,
+  "beta_ready": false,
+  "complete_flash_package": false,
+  "build": {
+    "exit_code": 0,
+    "output_eof": true,
+    "inputs_unchanged": true,
+    "ended_at": "2026-10-09T18:37:35.927990+00:00",
+    "jobs": 8,
+    "targets": [
+      "bootimage",
+      "dtboimage",
+      "sepolicy.recovery",
+      "systemimage",
+      "systemextimage",
+      "productimage",
+      "vendorimage",
+      "superimage",
+      "vbmetaimage",
+      "check-all-partition-sizes"
+    ]
+  },
+  "build_start": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/build-start.json",
+    "bytes": 2730,
+    "sha256": "acb5fe24e0dc09f394b433d395f7127f46843abc02c993705f11576d18493bee"
+  },
+  "build_result": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/build-result.json",
+    "bytes": 1135,
+    "sha256": "782508760df7c76e4607825b571b22a8dd49bb1d2b980b109d79cd5c48add917"
+  },
+  "build_log": {
+    "path": "/rabbitr1/logs/android-soc-cp2a-65fcc9e654-full-images-e98.log",
+    "bytes": 6579,
+    "sha256": "a844b0f9261ff3fa4e4cb4cf6b9185bcdbe162b8a3eea59dd2a16802cab4358a"
+  },
+  "installer": {
+    "path": "/rabbitr1/src/android/.r1-install.json",
+    "bytes": 9499,
+    "sha256": "676f94a43227e71a9cc8208fda68988926e0318bc090b587a7420d6a9c935805"
+  },
+  "managed_files": 77,
+  "android_patch_projects": 10,
+  "android_patch_files": 135,
+  "kernel_record": {
+    "path": "/rabbitr1/src/android/device/rabbit/r1/prebuilt/kernel-build.json",
+    "bytes": 3428,
+    "sha256": "ccded58a70d9dfff20bda522b46dce72ade1d2fc0089498787df8729e695476c"
+  },
+  "detailed_results": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/verification-corrected/results.json",
+    "bytes": 286584,
+    "sha256": "90506015bdb4e1cebf61b04be779a66127dc049a7d0f6c80844776ac185b9033"
+  },
+  "verifier": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/verification-corrected/verify.py",
+    "bytes": 61212,
+    "sha256": "04f03038f1b4c7ae60b30cf1cbb1f49edeb87c14676255233d746d2d6a10a28e"
+  },
+  "guard": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/verification-corrected/provenance.py",
+    "bytes": 12021,
+    "sha256": "36f06211b062b409ae42833c54e3e51e2c3e493861305d040101028644b00473"
+  },
+  "health_checks": {
+    "path": "/rabbitr1/out/android-build-review/soc-cp2a/full-images/retry-e98/verification-corrected/health_checks.py",
+    "bytes": 18458,
+    "sha256": "5562be046530280189632a49b3b9e23b1a10a175ad1df17e4f50d04a402a6176"
+  },
+  "checks": [
+    {
+      "name": "completed build and staged provenance",
+      "status": "pass"
+    },
+    {
+      "name": "image hashes and logical partition budgets",
+      "status": "pass"
+    },
+    {
+      "name": "actual check-all-partition-sizes result",
+      "status": "pass"
+    },
+    {
+      "name": "full vbmeta signature, descriptors and image correspondence",
+      "status": "pass"
+    },
+    {
+      "name": "sparse super metadata, A/B layout and actual extent payloads",
+      "status": "pass"
+    },
+    {
+      "name": "actual ext4 contents: init, fstab, VINTF, services, app and modules",
+      "status": "pass"
+    },
+    {
+      "name": "packaged ARM64 services and charging APK metadata",
+      "status": "pass"
+    },
+    {
+      "name": "all SOC kernel modules and explicit pstore-load packaging",
+      "status": "pass"
+    },
+    {
+      "name": "SOC cp2a product flags and embedded kernel configuration",
+      "status": "pass"
+    },
+    {
+      "name": "actual SOC Health linked binaries and init/VINTF separation",
+      "status": "pass"
+    },
+    {
+      "name": "compiled SOC split and recovery policy",
+      "status": "pass"
+    },
+    {
+      "name": "SOC Health service, helper, init/VINTF and policy inside vendor image",
+      "status": "pass"
+    },
+    {
+      "name": "packaged finalized Android 17 and Lineage 24 property values",
+      "status": "pass"
+    },
+    {
+      "name": "current SOC boot/DTBO headers, AVB coverage and recovery contents",
+      "status": "pass"
+    },
+    {
+      "name": "current packaged pstore collector and liblog implementations",
+      "status": "pass"
+    },
+    {
+      "name": "resolved ARM allocator configuration",
+      "status": "pass"
+    },
+    {
+      "name": "current allocator APEX payload, ARM64 libraries, init and VINTF",
+      "status": "pass"
+    },
+    {
+      "name": "image immutability during read-only audit",
+      "status": "pass"
+    }
+  ],
+  "images": {
+    "system": {
+      "bytes": 913559552,
+      "sha256": "57151f05943137ed34e6896644279d33a8e7a4b71d7a103980acc5466145eea5",
+      "android_sparse": false
+    },
+    "system_ext": {
+      "bytes": 465657856,
+      "sha256": "141f90ba143891b8c421843e842f08517f34c3bee8f297bb07d965a0113d91af",
+      "android_sparse": false
+    },
+    "product": {
+      "bytes": 468512768,
+      "sha256": "f1550b4a39482e186dd0b9088cef9507037bf1eb95bd7cc5ce049b382815278c",
+      "android_sparse": false
+    },
+    "vendor": {
+      "bytes": 125530112,
+      "sha256": "470cdb276e11737beb9089eb0414ac28827d88c7db30b475ad746a435445c6fb",
+      "android_sparse": false
+    },
+    "super": {
+      "bytes": 1965924044,
+      "sha256": "b0dd96133954708237116bef3d3434cf86c8b4a17ff332bf81a48febfe09a4a7",
+      "android_sparse": true
+    },
+    "vbmeta": {
+      "bytes": 65536,
+      "sha256": "1c110fe597e7e6d641ac47bd36275c6d37de9973c9c83657aa0732cadc3d41be",
+      "android_sparse": false
+    },
+    "boot": {
+      "bytes": 33554432,
+      "sha256": "37e7cb578621f1a937505145b3322541076cc17dd43a6e64ea94dc7280732c73",
+      "android_sparse": false
+    },
+    "dtbo": {
+      "bytes": 8388608,
+      "sha256": "3e1e4da1e36a79ca1b8c5cf6fa7570e8f4de3a7ecb02014df8007f694cbe45a5",
+      "android_sparse": false
+    }
+  },
+  "dual_slot_super": {
+    "status": "verified-both-slots-populated-raw-super",
+    "result": {
+      "path": "/rabbitr1/out/android-super/audit-profile-corrected-candidate/actual-raw-super/result.json",
+      "bytes": 10360,
+      "sha256": "488071cd349751865de208e717e54dc02b874ace7e5645b239489f91a328d03f"
+    },
+    "raw_super": {
+      "path": "/rabbitr1/out/android-super/audit-profile-corrected-candidate/actual-raw-super/super-both.raw.img",
+      "bytes": 8792064000,
+      "sha256": "f3c617a26d597d32cb96c3c211cee01b713edf19786f1a1ca38841e25356c57e"
+    },
+    "android_sparse": false,
+    "all_geometry_and_six_metadata_copies_match": true,
+    "both_slot_payload_sha256": {
+      "system_a": "57151f05943137ed34e6896644279d33a8e7a4b71d7a103980acc5466145eea5",
+      "system_b": "57151f05943137ed34e6896644279d33a8e7a4b71d7a103980acc5466145eea5",
+      "system_ext_a": "141f90ba143891b8c421843e842f08517f34c3bee8f297bb07d965a0113d91af",
+      "system_ext_b": "141f90ba143891b8c421843e842f08517f34c3bee8f297bb07d965a0113d91af",
+      "product_a": "f1550b4a39482e186dd0b9088cef9507037bf1eb95bd7cc5ce049b382815278c",
+      "product_b": "f1550b4a39482e186dd0b9088cef9507037bf1eb95bd7cc5ce049b382815278c",
+      "vendor_a": "470cdb276e11737beb9089eb0414ac28827d88c7db30b475ad746a435445c6fb",
+      "vendor_b": "470cdb276e11737beb9089eb0414ac28827d88c7db30b475ad746a435445c6fb"
+    },
+    "group_used_bytes": {
+      "a": 1973260288,
+      "b": 1973260288
+    },
+    "source_images_unchanged_by_builder": true
+  },
+  "limitations": [
+    "Offline build and integrity checks do not establish device boot, Health/charging correctness, graphics operation, APEX/linker behavior or runtime SELinux enforcement.",
+    "The raw super is one firmware component; complete installation, slot handling, backups and restoration require separate validation.",
+    "PowerVR remains disabled; GPU hardware acceleration is not validated.",
+    "Top-level vbmeta uses a public development key and flags 3; the kernel requests permissive SELinux. This is not a production trust or relock-safety claim.",
+    "The declared security-patch date is a configuration value, not proof of custom-kernel or vendor patch coverage.",
+    "AVB hashtree/root integrity was checked; FEC correction parity was not regenerated or verified."
+  ],
+  "kernel_release": "7.1.0-rabbit-r1-bringup+"
+}

@@ -7,19 +7,22 @@ native services and the SELinux policy aggregate, built successfully on
 init/VINTF files and compiled policy. [Results and hashes](../android/targeted-build.json)
 record their scope. The subsequent boot, DTBO, recovery-policy and real Binder
 runtime targets also built; [boot-image evidence](../android/boot-build.json)
-records their artifact checks. The complete default product image build now
-passes all ten [filesystem, AVB and super-image checks](../android/full-image-build.json).
-Hardware testing and the complete Android flash procedure remain outstanding.
-No Android image has been added to the mtkclient package.
+records their artifact checks. The complete `lineage_r1_soc` image build now
+passes all eighteen [offline artifact checks](../android/soc-full-image-build.json).
+It uses Android source `65fcc9e6543b`, the SOC-enabled `e98ffe5fcee6` kernel and
+the finalized Android 17 / LineageOS 24 `cp2a` configuration. A separate raw super
+image also passes validation with all four filesystem images populated in both
+slots. Device boot remains untested at this milestone; hardware validation and
+the complete Android flash procedure remain outstanding. The diagnostic
+mtkclient package still contains no Android filesystem images.
 
-The previously checked build uses `trunk_staging`: Android 17/API 37 and Lineage 24.0,
-with preview SDK 1 and the inherited `Baklava` codename. It is a development
+The [earlier default build](../android/full-image-build.json) uses `trunk_staging`:
+Android 17/API 37 and Lineage 24.0, with preview SDK 1 and the inherited `Baklava` codename. It is a development
 configuration, not finalized `REL`. The [version review](../android/version-status.json)
 traces these values to the pinned release flags. New builds default to the
 finalized `cp2a` configuration: `REL`, preview SDK 0 and vendor API 202604.
-This changes vendor API and feature flags and requires a new build and audit;
-the earlier development build does not validate it. The experimental SOC
-product's [targeted `cp2a` build](../android/health-product-build.json) now passes
+The completed SOC build and eighteen-check audit verify those values in the
+actual filesystem images. The experimental SOC product's earlier [targeted `cp2a` build](../android/health-product-build.json) passed
 Health service/helper/recovery linkage, installed init/VINTF, compiled split and
 recovery policy, and boot kernel/Health ramdisk checks. A subsequent audit found
 both Cuttlefish and example recovery Health services in that ramdisk, declaring
@@ -28,10 +31,12 @@ Cuttlefish Health APEX for normal Android; its implementation reports a simulate
 85% charge. Those checks verified presence, not uniqueness; the affected build
 must not be released. The r1 Health selector is now included directly before
 common inheritance. Both products pass the product inheritance regression,
-including controls that reproduce the old bug. A rebuilt image still needs a
-fresh packaged-image check. The same selection bug also applies to the earlier
-default product configuration. Complete `cp2a` filesystem images and hardware
-validation remain outstanding. The `trunk_staging` build declared June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
+including controls that reproduce the old bug. The completed SOC image audit
+now verifies the normal Health provider's uniqueness and separate recovery
+service, together with their packaged policy and kernel configuration. The
+earlier default product build remains affected and must not be released.
+Hardware validation is still outstanding. The `trunk_staging` build declared
+June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
 and declares October 1, 2026, overriding the AOSP-only flag values. These are
 configuration values; the security-patch property alone does not establish
 security-patch coverage in the custom kernel or vendor implementation.
@@ -48,10 +53,11 @@ image audit does not replace ART/device testing.
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
 Both liblog variants export the private backend reader, recovery-persist imports
-it, and the boot ramdisk contains the checked recovery library. The allocator
-APEX contains 20 AArch64 binaries with the expected service, mapper and VINTF
-declarations. Its external library declarations match the ELF imports; runtime
-APEX/linker behavior still needs testing.
+it, and the boot ramdisk contains the checked recovery library. That earlier
+targeted allocator APEX contained 20 AArch64 binaries. The complete SOC build resolves the mapper
+outside the APEX, in vendor; its fresh audit checks this placement, the allocator
+APEX's ARM64 payload, service and VINTF declarations, and external library
+requirements. Runtime APEX/linker behavior still needs testing.
 
 `android/local_manifests/r1.xml` pins the common mainline device tree and its ten
 direct and transitive dependencies. Use it with the LineageOS manifest commit in `sources.lock.json`.
@@ -143,7 +149,7 @@ R1_ANDROID_RELEASE=cp2a R1_ANDROID_JOBS=12 bash /rabbitr1/scripts/build-android.
 
 These targets exclude the 48 GiB userdata image. The configured super partition
 allows a 4 GiB group per slot, including filesystem and AVB overhead. The checked
-images total 1,918,767,104 bytes per slot; the size check passes without warnings.
+SOC images total 1,973,260,288 bytes per slot; the size check passes.
 Factory super populates only slot A and
 leaves B's logical partitions empty. The future Android flash procedure must
 select and verify A while preserving the previous slot state for restoration,
@@ -152,13 +158,13 @@ or supply populated B images. A device's existing active slot cannot be assumed.
 The [offline super builder](ANDROID-SUPER.md) can construct and verify identical
 populated A/B partition sets from four completed, audited filesystem images.
 Its raw output, metadata and synchronization checks have 84 synthetic tests using
-AOSP `lpmake`. Another 131 tests cover the current eighteen-check SOC audit
-profile and explicit historical-profile selection. These schema tests do not
-execute the current image audit; the corrected SOC build still needs its
-completed content checks and real-record packaging validation.
-It has also built the [actual A/B image](../android/dual-slot-super-build.json)
-from the completed product images: all eight payload hashes, both geometry
-copies and all six metadata copies pass. The raw file is 8,792,064,000 bytes.
+AOSP `lpmake`. Another 135 tests cover the current eighteen-check SOC audit
+profile and explicit historical-profile selection. Those model tests are
+separate from the completed real-image audit. The builder has now produced the
+[actual SOC A/B image](../android/soc-full-image-build.json) from that audit:
+all eight payload hashes, both geometry copies and all six metadata copies pass.
+The raw file is 8,792,064,000 bytes. The earlier default-product
+[A/B record](../android/dual-slot-super-build.json) remains historical evidence.
 This tool does not perform flashing, slot selection or snapshot cleanup.
 
 The pinned mtkclient writes file bytes directly; it does not expand Android

@@ -26,10 +26,11 @@ image is read. The audit digest is a review trust anchor, not a signature or a
 substitute for reviewing the content audit.
 
 This profile is tied to the reviewed SOC/cp2a producer and kernel revision
-`f72592a467a1e289ffbfd0fbee6adac5093bf6db`; producer or kernel changes require a
-reviewed profile update. Schema tests pass, but compatibility with the actual
-completed eighteen-check report remains to be verified after the current build
-and image audit finish.
+`e98ffe5fcee6ce89fb754003059334ba1cf50b5c`; producer or kernel changes require a
+reviewed profile update. The completed eighteen-check report has now passed
+real-input admission, construction and independent raw-output validation.
+The [SOC build record](../android/soc-full-image-build.json) pins the Android
+source, corrected verifier, audit results and resulting image.
 
 The older ten-check format requires explicit `--audit-profile legacy-default-10`.
 It is only for historical reproduction: it did not reject the old simulated
@@ -55,6 +56,14 @@ builder invocation.
 
 ## Plan and build
 
+The [completed SOC `cp2a` build](../android/soc-full-image-build.json) produced a
+verified 8,792,064,000-byte raw image with SHA256
+`f3c617a26d597d32cb96c3c211cee01b713edf19786f1a1ca38841e25356c57e`.
+Both slots contain the four audited filesystem images, using 1,973,260,288 bytes
+per group. Both geometry copies, all six metadata copies and all eight payload
+hashes pass. This is an offline packaging milestone; device boot and complete
+firmware installation remain unvalidated.
+
 The [historical development build](../android/dual-slot-super-build.json) produced
 an actual verified raw image, now preserved in a verified local archive. Its SHA256 is
 `cf5f7ef0de5380358a0dbfaf55c569e8e6645ae0fad804d092a1d59db0467e84`.
@@ -63,8 +72,8 @@ group. The file is 8,792,064,000 bytes, including zero-filled host holes. It is
 not Android sparse format. This proves offline packaging, not a complete flash
 transaction or device boot; the build uses the default SOC-disabled kernel and
 the `trunk_staging` Android development configuration. That build also inherited
-the simulated Cuttlefish Health provider. It must not be distributed; the
-corrected SOC product needs a completed rebuild and fresh content audit.
+the simulated Cuttlefish Health provider. It must not be distributed. The new
+SOC record above covers the rebuilt images and corrected Health inventory.
 
 Keep all inputs under `/rabbitr1` and new outputs under `/rabbitr1/out/android-super`.
 Replace the digest placeholders with the reviewed digests. The audit path below
@@ -121,7 +130,7 @@ existing mismatched files are preserved. CI uses this same tool set without
 syncing an Android tree. The source is pinned to AOSP build-tools commit
 `811c6e2938d53b3c318d7635b03931601a68c765`.
 
-Run the 131-case audit-profile suite and the 84-case construction suite into new
+Run the 135-case audit-profile suite and the 84-case construction suite into new
 directories:
 
 ```sh
