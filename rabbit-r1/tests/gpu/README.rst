@@ -47,8 +47,10 @@ uses the existing kernel 7.1 DRM/scheduler APIs without compatibility changes.
 This checks source composition and compilation, not full kernel linking,
 firmware operation or rendering. No synthetic tests of upstream algorithms
 are substituted for hardware validation.
-The current backport must pass the same subtree compile; the earlier result
-does not establish that the changed source was compiled.
+The timeout backport also passed all 28 ARM64 objects with ``W=1`` and no
+warnings. ``powervr-timeout-build.json`` records the exact source pins, compiler
+and logs. This run used the pending MT6357 diagnostic config option but did
+not compile the gauge; full-link results below still apply to the baseline.
 
 Additional compile results
 --------------------------

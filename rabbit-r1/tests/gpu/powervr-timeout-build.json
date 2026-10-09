@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-09",
+  "scope": "ARM64 PowerVR subtree compile after scheduler timeout backport; no full kernel link or hardware execution",
+  "source_commit": "361dd8467c5a069c9da13dfe2e93f82451adca4d",
+  "upstream_base_commit": "5fce161649b4d779d1b76d9fcd52dc77779774b8",
+  "backport_commit": "2224d6642136767ec01d146d48ffc881b55b32f7",
+  "source_files_verified": 79,
+  "source_manifest_sha256": "f229108403dc941edc359066500f80a2e48db33ef703ea2764613920484d97de",
+  "backports_manifest_sha256": "2047fe361c1a4fc0baa3d9360f9681f43bff25ffb3a5f09a3ddadc07cff4f4ab",
+  "compiler": "aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "exit_code": 0,
+  "warnings": 0,
+  "object_count": 28,
+  "objects": [
+    "pvr_ccb.o",
+    "pvr_cccb.o",
+    "pvr_context.o",
+    "pvr_debugfs.o",
+    "pvr_device.o",
+    "pvr_device_info.o",
+    "pvr_drv.o",
+    "pvr_dump.o",
+    "pvr_free_list.o",
+    "pvr_fw.o",
+    "pvr_fw_meta.o",
+    "pvr_fw_mips.o",
+    "pvr_fw_riscv.o",
+    "pvr_fw_startstop.o",
+    "pvr_fw_trace.o",
+    "pvr_fw_util.o",
+    "pvr_gem.o",
+    "pvr_hwrt.o",
+    "pvr_job.o",
+    "pvr_mmu.o",
+    "pvr_power.o",
+    "pvr_queue.o",
+    "pvr_stream.o",
+    "pvr_stream_defs.o",
+    "pvr_sync.o",
+    "pvr_trace_points.o",
+    "pvr_vm.o",
+    "pvr_vm_mips.o"
+  ],
+  "scratch_config_sha256": "d63b7077dafed56315c39abe35e1fd8a7b41075c83d85bf72416ad1967b183e1",
+  "production_defconfig_sha256": "a436585b8f22d8aa441ea013adb4f4bdaeed5cc9fcfe1157424547bf14152dc8",
+  "configuration_note": "The stable diagnostic defconfig option from the concurrently reviewed MT6357 collector was present. This check compiled only the pinned PowerVR subtree; it does not validate the uncommitted gauge changes.",
+  "evidence": {
+    "audit": {
+      "path": "out/gpu-review/upstream-head/root-compile-audit.json",
+      "bytes": 3385,
+      "sha256": "5f725d1e66f182a995b9bc2422d99da6c2558fd88f2f32882491c9d16fca5843"
+    },
+    "build_log": {
+      "path": "out/gpu-review/upstream-head/root-build.log",
+      "bytes": 3553,
+      "sha256": "12b1b9c527379ef9bc5835d132ce1be209e0e9725a03fc63d0425b8c82e5cf59"
+    },
+    "start_record": {
+      "path": "out/gpu-review/upstream-head/compile-start.json",
+      "bytes": 920,
+      "sha256": "d1aded1bb4aae34ebf8a02cfb4fdc28fb605ddc9e365f2448912fd6fc01ecfce"
+    }
+  },
+  "hardware_tested": false,
+  "full_link_tested_for_backport": false,
+  "production_gpu_enabled": false
+}
