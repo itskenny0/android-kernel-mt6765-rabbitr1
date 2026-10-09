@@ -13,6 +13,10 @@
 #define MT6765_PWR_STATUS 0x180
 #define MT6765_PWR_STATUS_2ND 0x184
 
+static enum scpsys_bus_prot_block scpsys_bus_prot_blocks_mt6765[] = {
+	BUS_PROT_BLOCK_INFRA,
+};
+
 static const struct scpsys_domain_data scpsys_domain_data_mt6765[] = {
 	[MT6765_POWER_DOMAIN_MD1] = {
 		.name = "md1",
@@ -59,6 +63,11 @@ static const struct scpsys_domain_data scpsys_domain_data_mt6765[] = {
 		.pwr_sta2nd_offs = MT6765_PWR_STATUS_2ND,
 		.sram_pdn_bits = GENMASK(8, 8),
 		.sram_pdn_ack_bits = GENMASK(12, 12),
+		.bp_cfg = {
+			BUS_PROT_WR_IGN(INFRA, BIT(25), 0x2a0, 0x2a4, 0x228),
+			BUS_PROT_WR_IGN(INFRA, BIT(21) | BIT(22),
+					0x2a0, 0x2a4, 0x228),
+		},
 	},
 	[MT6765_POWER_DOMAIN_ISP] = {
 		.name = "isp",
@@ -120,6 +129,8 @@ static const struct scpsys_domain_data scpsys_domain_data_mt6765[] = {
 static const struct scpsys_soc_data mt6765_scpsys_data = {
 	.domains_data = scpsys_domain_data_mt6765,
 	.num_domains = ARRAY_SIZE(scpsys_domain_data_mt6765),
+	.bus_prot_blocks = scpsys_bus_prot_blocks_mt6765,
+	.num_bus_prot_blocks = ARRAY_SIZE(scpsys_bus_prot_blocks_mt6765),
 };
 
 #endif /* __MT6765_PM_DOMAINS_H */

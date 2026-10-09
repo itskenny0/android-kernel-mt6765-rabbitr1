@@ -141,6 +141,14 @@ Their meanings and required workarounds remain unresolved.
 The `firmware audit <firmware/README.rst>`_ records source pins, numeric
 coverage and a reproducible metadata decoder.
 
+Patch 0079 adds the stock-derived MFG bus-protection sequence and rejects
+missing command/status register maps before SCPSYS powers any described domain.
+``mt6765-bus-protection.json`` records the source pins and offline checks; the
+`power notes <../../docs/POWER.md#mt6765-mfg-bus-protection>`_ describe its scope.
+It affects domain probe/late-init even with GPU support disabled. Shared VCORE,
+clock order and hardware APM/CORE0 integration remain unresolved; no GPU node,
+firmware, OPP or device feature value is added.
+
 Patch 0072 supplies upstream query, bounds, MMU, context cleanup, paired-job
 and tracing improvements. It does not enable the GPU, add a DT node or
 firmware package, bypass the supported-device gate, or switch Android away

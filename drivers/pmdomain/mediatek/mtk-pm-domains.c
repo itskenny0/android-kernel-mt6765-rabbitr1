@@ -7,6 +7,7 @@
 #include <linux/clk-provider.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/limits.h>
 #include <linux/iopoll.h>
 #include <linux/mfd/syscon.h>
 #include <linux/of.h>
@@ -15,6 +16,7 @@
 #include <linux/pm_domain.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
+#include <linux/string.h>
 #include <linux/soc/mediatek/infracfg.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
 
@@ -74,7 +76,8 @@ struct scpsys {
 	struct device *dev;
 	struct regmap *base;
 	const struct scpsys_soc_data *soc_data;
-	u8 bus_prot_index[BUS_PROT_BLOCK_COUNT];
+	u8 bus_prot_index[BUS_PROT_BLOCK_COUNT];	/* U8_MAX if absent */
+	unsigned int num_bus_prot;
 	struct regmap **bus_prot;
 	struct genpd_onecell_data pd_data;
 	struct generic_pm_domain *domains[];
@@ -1084,6 +1087,8 @@ static int scpsys_get_bus_protection_legacy(struct device *dev, struct scpsys *s
 	if (!scpsys->bus_prot)
 		return -ENOMEM;
 
+	scpsys->num_bus_prot = num_regmaps;
+
 	for (i = 0, j = 0; i < ARRAY_SIZE(bp_blocks); i++) {
 		enum scpsys_bus_prot_block bp_type;
 
@@ -1117,6 +1122,8 @@ static int scpsys_get_bus_protection(struct device *dev, struct scpsys *scpsys)
 	if (!scpsys->bus_prot)
 		return -ENOMEM;
 
+	scpsys->num_bus_prot = soc->num_bus_prot_blocks;
+
 	for (i = 0; i < soc->num_bus_prot_blocks; i++) {
 		enum scpsys_bus_prot_block bp_type;
 		struct device_node *node;
@@ -1131,6 +1138,13 @@ static int scpsys_get_bus_protection(struct device *dev, struct scpsys *scpsys)
 		 * of power sequence(s).
 		 */
 		bp_type = soc->bus_prot_blocks[i];
+		if ((unsigned int)bp_type >= BUS_PROT_BLOCK_COUNT ||
+		    scpsys->bus_prot_index[bp_type] != U8_MAX) {
+			of_node_put(node);
+			return dev_err_probe(dev, -EINVAL,
+					     "Invalid or duplicate bus protection block %u\n",
+					     bp_type);
+		}
 		scpsys->bus_prot_index[bp_type] = i;
 
 		scpsys->bus_prot[i] = device_node_to_regmap(node);
@@ -1139,6 +1153,70 @@ static int scpsys_get_bus_protection(struct device *dev, struct scpsys *scpsys)
 			return dev_err_probe(dev, scpsys->bus_prot[i] ?
 					     PTR_ERR(scpsys->bus_prot[i]) : -ENXIO,
 					     "Cannot get regmap for access controller %d\n", i);
+	}
+
+	return 0;
+}
+
+/* Validate the same node set that probe will register, before powering any domain. */
+static int scpsys_validate_bus_protection_domain(struct scpsys *scpsys,
+						 struct device_node *node)
+{
+	const struct scpsys_soc_data *soc = scpsys->soc_data;
+	const struct scpsys_domain_data *data;
+	u32 id;
+	int i, ret;
+
+	if (of_property_read_u32(node, "reg", &id))
+		return dev_err_probe(scpsys->dev, -EINVAL,
+				     "%pOF: missing domain id\n", node);
+
+	switch (soc->type) {
+	case SCPSYS_MTCMOS_TYPE_DIRECT_CTL:
+		if (id >= soc->num_domains || !soc->domains_data[id].sta_mask)
+			return dev_err_probe(scpsys->dev, -EINVAL,
+					     "%pOF: invalid domain id %u\n", node, id);
+
+		data = &soc->domains_data[id];
+		for (i = 0; i < SPM_MAX_BUS_PROT_DATA; i++) {
+			const struct scpsys_bus_prot_data *bpd = &data->bp_cfg[i];
+			u8 block[2] = { bpd->bus_prot_block, bpd->bus_prot_sta_block };
+			int j;
+
+			if (!bpd->bus_prot_set_clr_mask)
+				continue;
+
+			for (j = 0; j < ARRAY_SIZE(block); j++) {
+				unsigned int index;
+
+				if (block[j] >= BUS_PROT_BLOCK_COUNT)
+					return dev_err_probe(scpsys->dev, -EINVAL,
+							     "%pOF: invalid bus protection block\n",
+							     node);
+
+				index = scpsys->bus_prot_index[block[j]];
+				if (index >= scpsys->num_bus_prot ||
+				    IS_ERR_OR_NULL(scpsys->bus_prot[index]))
+					return dev_err_probe(scpsys->dev, -ENODEV,
+							     "%pOF: missing bus protection block %u\n",
+							     node, block[j]);
+			}
+		}
+		break;
+	case SCPSYS_MTCMOS_TYPE_HW_VOTER:
+		if (id >= soc->num_hwv_domains)
+			return dev_err_probe(scpsys->dev, -EINVAL,
+					     "%pOF: invalid HWV domain id %u\n", node, id);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	/* scpsys_add_subdomain() visits all nested nodes, including disabled ones. */
+	for_each_child_of_node_scoped(node, child) {
+		ret = scpsys_validate_bus_protection_domain(scpsys, child);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -1235,6 +1313,7 @@ static int scpsys_probe(struct platform_device *pdev)
 
 	scpsys->dev = dev;
 	scpsys->soc_data = soc;
+	memset(scpsys->bus_prot_index, U8_MAX, sizeof(scpsys->bus_prot_index));
 
 	scpsys->pd_data.domains = scpsys->domains;
 	scpsys->pd_data.num_domains = num_domains;
@@ -1258,6 +1337,12 @@ static int scpsys_probe(struct platform_device *pdev)
 
 	if (ret)
 		return ret;
+
+	for_each_available_child_of_node_scoped(np, node) {
+		ret = scpsys_validate_bus_protection_domain(scpsys, node);
+		if (ret)
+			return ret;
+	}
 
 	ret = -ENODEV;
 	for_each_available_child_of_node_scoped(np, node) {

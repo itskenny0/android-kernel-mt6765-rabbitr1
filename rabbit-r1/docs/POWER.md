@@ -13,6 +13,29 @@ The fenolf-based fork has the same MT6357 regulator and PMIC-wrapper drivers as
 the previously inspected evilMyQueen tree. Its additional work therefore does
 not itself resolve the reported regulator issue.
 
+## MT6765 MFG bus protection
+
+Patch 0079 adds the stock MFG protection sequence: assert INFRACFG bit 25,
+then bits 21 and 22, polling each acknowledgment before SRAM power-down;
+release the masks in reverse order without polling clear acknowledgments.
+SCPSYS uses the existing INFRACFG syscon at `0x10001000`.
+
+Probe checks the required command and status register maps for every domain
+it will register before powering any domain. A missing INFRACFG map previously
+could alias a discovered SMI map at index zero. Missing maps now reject probe;
+valid legacy mappings and omitted domains remain supported. The old DT cannot
+provide working power domains without the required resources.
+
+[Source pins and checks](../tests/gpu/mt6765-bus-protection.json) record 35 host
+controls plus six additional controls, an ARM64 translation-unit compile and
+board DT compilation. These are offline checks. The provider powers MFG during
+probe and may power it down at late init, so this change has runtime effects
+even without a GPU node. Physical power sequencing remains untested.
+
+The generic helpers still ignore individual register-write errors. Shared
+VCORE voting, mux order, hardware APM/CORE0 ownership and GPU enablement remain
+separate work; no voltage, OPP, GPU node or firmware change is included.
+
 ## Corrections implemented
 
 All register evidence below comes from Rabbit's published driver and register

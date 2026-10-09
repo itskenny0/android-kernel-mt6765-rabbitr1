@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "date": "2026-10-09",
+  "scope": "MT6765 MFG bus-protection prerequisite and missing-provider rejection; no GPU enablement or device test",
+  "patch": {
+    "path": "patches/mainline/0079-protect-mt6765-mfg-power-domain.patch",
+    "sha256": "f73f24269d3dbada57f96449ea109bd89f69bc1a84af7fe7657ef1918ad7af82"
+  },
+  "source_files": [
+    {
+      "path": "drivers/pmdomain/mediatek/mt6765-pm-domains.h",
+      "before_sha256": "1ab21fe01146119e496b0a1c07652b56f7455a0288b2a4438153028269756369",
+      "after_sha256": "56bcf55a6e931cb7af1eea3a21deb001aa71402106e6275d4161e41e0925e56c"
+    },
+    {
+      "path": "arch/arm64/boot/dts/mediatek/mt6765.dtsi",
+      "before_sha256": "bbfaffdef31e9c8433a45895eea4c84a8ec6e3de227d485fda54fb71726a6fe2",
+      "after_sha256": "4d5ddb25d8620a4130588efa7e1fb369c8ceeebf46cdc40bc03d826ffc7684ea"
+    },
+    {
+      "path": "drivers/pmdomain/mediatek/mtk-pm-domains.c",
+      "before_sha256": "9da63c93485a52354225d2ae2cfb733f43f561f47b96cf821d861845ae35600f",
+      "after_sha256": "4b5cfa32efeea8cbffe2467ddcd403f5bd235454d3802a695a92dd4f8e94f6c7"
+    }
+  ],
+  "stock_sources": [
+    {
+      "path": "arch/arm64/boot/dts/mediatek/mt6765.dts",
+      "git_commit": "8167c8c1087f057d2ef302fc93b47554291687ec",
+      "git_blob": "bf82423ee36618c50b3c98b4ad5d1bdeb33edc3e",
+      "sha256": "aaa6bf5af5e6915fe0f3268f52089dffc342bb5300965ce59211c40662a8791a",
+      "bytes": 93117,
+      "url": "https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/arch/arm64/boot/dts/mediatek/mt6765.dts"
+    },
+    {
+      "path": "drivers/clk/mediatek/clk-mt6765-pg.c",
+      "git_commit": "8167c8c1087f057d2ef302fc93b47554291687ec",
+      "git_blob": "531f7af6d1b1da35c54e3bddc6e641234f6bc863",
+      "sha256": "990157bf81cf40b412c6d7b981f972c66dfe72fb7df698cb55419cd9b51b3bcc",
+      "bytes": 86455,
+      "url": "https://github.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/blob/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/clk/mediatek/clk-mt6765-pg.c"
+    }
+  ],
+  "register_contract": {
+    "provider_base": "0x10001000",
+    "set_offset": "0x2a0",
+    "clear_offset": "0x2a4",
+    "status_offset": "0x228",
+    "set_order": [
+      "0x02000000",
+      "0x00600000"
+    ],
+    "clear_order": [
+      "0x00600000",
+      "0x02000000"
+    ],
+    "poll_set_ack": true,
+    "poll_clear_ack": false
+  },
+  "provider_validation": {
+    "absent_kind": "U8_MAX sentinel",
+    "map_index": "below recorded map count and non-null/non-error pointer",
+    "required_kinds": "command and status for every nonzero bp_cfg slot of registered nodes",
+    "traversal": "available top-level nodes, all nested nodes, matching existing driver traversal",
+    "preflight": "complete before first domain registration/power operation",
+    "legacy_index_zero_supported": true,
+    "missing_required_maps": "probe rejection; no functional old-DT fallback"
+  },
+  "checks": {
+    "operation_controls": 9,
+    "provider_controls": 26,
+    "additional_controls": 6,
+    "sanitizers": [
+      "ASan",
+      "UBSan"
+    ],
+    "arm64_translation_unit": "passed saved target warning flags plus -Werror, no diagnostics",
+    "compiler_dependency_paths_unchanged": 730,
+    "board_cpp_dtc": "passed, no diagnostics; compiled phandle resolves to INFRACFG bank",
+    "dts_dependency_paths_unchanged": 20,
+    "patch_replay": "passed exact three files",
+    "checkpatch": "passed strict/no-signoff",
+    "full_kernel_link_for_this_change": false,
+    "dt_schema_executed": false
+  },
+  "runtime_impact_with_gpu_disabled": true,
+  "hardware_tested": false,
+  "remaining_limits": [
+    "Physical probe/late-init power sequencing untested",
+    "Generic register-write errors may be ignored or hidden by stale ACK",
+    "Shared VCORE arbitration/settling",
+    "Mux parent and clock order",
+    "Hardware APM and CORE0 ownership",
+    "Firmware ABI unknown bits",
+    "Eleven Mesa numeric device limits",
+    "Android native-buffer integration and rendering"
+  ],
+  "evidence_location": "Original workspace paths below are not bundled in the repository",
+  "evidence": {
+    "resource_audit": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-resource-contract/handoff.json",
+      "bytes": 1219,
+      "sha256": "5028cefeec986b87c6ffb629ee69b303dc00b85e44e06802dee8f76e288ead6c"
+    },
+    "candidate_handoff": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/handoff.json",
+      "bytes": 5696,
+      "sha256": "d730de9cdbd49e7668fac20977782840bfbe6a2c023efd10358f6c4f282a010f"
+    },
+    "operation_controls": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/checks/result.json",
+      "bytes": 3385,
+      "sha256": "fb9958e6d0734ee086cc332a09713d773c90cc2907b2ceec13a2360bf6260f17"
+    },
+    "provider_controls": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/provider-check/result.json",
+      "bytes": 2432,
+      "sha256": "afdce1b4337550ddc0b99dfe2526c644c0148dc9bfe83d0b3ff9b35d5249de8d"
+    },
+    "additional_controls": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/independent-review/result.json",
+      "bytes": 2061,
+      "sha256": "2a3725453d750ad249a60118f8ae65b4dd91b938850da1c053311efa5da4d1cf"
+    },
+    "review": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/independent-review/review.rst",
+      "bytes": 4995,
+      "sha256": "44e926c173bb2db46f2e4fff8898a3cd3072eea709a423299c40e4e5a2fd2c8a"
+    },
+    "review_provenance": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/independent-review/provenance.json",
+      "bytes": 8162,
+      "sha256": "73205d6fa85be5bb6ad8f0019d3e344db8c42f9ed69fcfe7382b8bcc5c2b4768"
+    },
+    "target_compile": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/target-check/result.json",
+      "bytes": 152347,
+      "sha256": "be28fe517a3be6eaba25191b41f5d3e3466d107b04415f7a73d57f7e0c60a247"
+    },
+    "patch_replay": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/patch-replay.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "style_check": {
+      "path": "/rabbitr1/out/gpu-review/mt6765-bus-protection-v2/checkpatch-final-tabs.log",
+      "bytes": 183,
+      "sha256": "95efaab98bb5680153870421c9e3f48c869e610918885bba980e8f1e10ba0d2f"
+    }
+  }
+}

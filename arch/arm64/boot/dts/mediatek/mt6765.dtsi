@@ -355,6 +355,7 @@
 			/* System Power Manager */
 			spm: power-controller {
 				compatible = "mediatek,mt6765-power-controller";
+				access-controllers = <&infracfg>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				#power-domain-cells = <1>;
