@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "result": "pass",
+  "problem": "System-as-root construction includes first_stage_ramdisk/fstab.r1 from the recovery-as-boot root tree, but neither that directory nor the board fstab had a file_contexts label.",
+  "change": {
+    "path": "android/device/sepolicy/file_contexts",
+    "before_sha256": "96d219ca072e28477c63b000abdf07b3b3d02689b2895c3d0c1d862bee4ad183",
+    "after_sha256": "6aac7a4a014d2702aa144f15e93ec2e91052dad3938d03734682b7e6e870440e",
+    "labels": [
+      "/first_stage_ramdisk u:object_r:rootfs:s0",
+      "/first_stage_ramdisk/fstab\\.r1 u:object_r:rootfs:s0"
+    ]
+  },
+  "failed_build_log": {
+    "path": "/rabbitr1/logs/android-full-images-b55-space-resume.log",
+    "bytes": 267560,
+    "sha256": "4616421b09e2ec64d922f1793cc38befe354474a77cf4be417007cac635c05cc"
+  },
+  "private_replay": {
+    "path": "/rabbitr1/out/android-build-review/first-stage-contexts/result.json",
+    "bytes": 8611,
+    "sha256": "38da06148bc826d6ebd8023c1e2b902c3b388d4443060929bfe509a012cfcd46"
+  },
+  "validation": {
+    "actual_frozen_precompiled_policy_checkfc": "pass",
+    "rebuilt_baseline_context_binary_byte_identical_to_failed_input": true,
+    "actual_mkuserimg_mke2fs_e2fsdroid_baseline": "reproduced ENOENT searching for /first_stage_ramdisk label",
+    "actual_mkuserimg_mke2fs_e2fsdroid_fixed": "exit 0",
+    "debugfs_verified_directory_and_fstab_security_selinux": "u:object_r:rootfs:s0",
+    "fixture_bytes": 16777216
+  },
+  "source_locations": {
+    "device.mk": "device/rabbit/r1/device.mk:43 copies fstab to TARGET_COPY_OUT_ROOT/first_stage_ramdisk",
+    "Makefile": "build/make/core/Makefile:2759 copies TARGET_ROOT_OUT into recovery root",
+    "build_image.py": "build/make/tools/releasetools/build_image.py:183-186 merges root_dir into system-as-root",
+    "perms.c": "external/e2fsprogs/contrib/android/perms.c:82 looks up each exact path with its inode mode"
+  },
+  "source_hashes": {
+    "src/android/build/make/tools/releasetools/build_image.py": "fb4282af1552d445b175bea8018105ef22002fa5e108519b843229069296cc94",
+    "src/android/build/make/core/Makefile": "9eb413b3ac0eea5f111698495c8ea8d9631f76f5e6f5a8fe99647ee17d071be2",
+    "src/android/system/sepolicy/private/file_contexts": "2288d333f5a7a4c8ff20f348c2ab78626c4b819b8d547ce118ef5f0dbec9b77a",
+    "src/android/external/e2fsprogs/contrib/android/perms.c": "fcad0b5d7208ca4702ab5e79671c2b7982e2b634aa17f512531a523c023e3609",
+    "src/android/device/rabbit/r1/device.mk": "85a684fcb895684e64261970b56716221723e250f906f5d44a00b9a81f3a109a",
+    "src/android/device/rabbit/r1/sepolicy/file_contexts": "96d219ca072e28477c63b000abdf07b3b3d02689b2895c3d0c1d862bee4ad183"
+  },
+  "independent_context_coverage": {
+    "path": "/rabbitr1/out/android-build-review/first-stage-contexts/independent-review/coverage.json",
+    "bytes": 1443427,
+    "sha256": "c2a53805aff3a0883aa96d99da3bce29a50a600ec3972763be66f9a663193923"
+  },
+  "limits": [
+    "No production image rebuilt or inspected.",
+    "No actual Android source/output, installer, mirror or patch-series change.",
+    "Full system-image retry and final artifact audit remain required.",
+    "No runtime or hardware validation."
+  ]
+}

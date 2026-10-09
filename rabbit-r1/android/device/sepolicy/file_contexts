@@ -6,3 +6,7 @@
 /dev/block/by-name/expdb u:object_r:r1_expdb_raw_device:s0
 /dev/block/platform/.*/by-name/expdb u:object_r:r1_expdb_raw_device:s0
 /dev/block/mapper/r1-expdb u:object_r:r1_expdb_map_device:s0
+
+# Recovery-as-boot root files are also included in the system-as-root image.
+/first_stage_ramdisk u:object_r:rootfs:s0
+/first_stage_ramdisk/fstab\.r1 u:object_r:rootfs:s0
