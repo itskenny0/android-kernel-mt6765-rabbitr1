@@ -1,0 +1,20 @@
+{
+  "base_manifest": "powervr-7.2.9.json",
+  "base_manifest_sha256": "f229108403dc941edc359066500f80a2e48db33ef703ea2764613920484d97de",
+  "scope": "Reviewed upstream backports applied in order to the unchanged Linux v7.2.9 source pins",
+  "backports": [
+    {
+      "upstream_commit": "2224d6642136767ec01d146d48ffc881b55b32f7",
+      "upstream_url": "https://github.com/torvalds/linux/commit/2224d6642136767ec01d146d48ffc881b55b32f7",
+      "patch": "patches/mainline/0075-powervr-scheduler-timeout.patch",
+      "patch_sha256": "329180bfe7606de579ac707220f020cc6ecb63aeda0c343ed3e206d78f08710d",
+      "files": [
+        {
+          "path": "drivers/gpu/drm/imagination/pvr_queue.c",
+          "before_sha256": "2525659553a95e8987a7d9948c12ffa73ee3049a879c308a6a92fbdf5a12e58d",
+          "after_sha256": "4e7d96283f2e3c94dc3590af959350c83293494a4206552dc0da07432463816b"
+        }
+      ]
+    }
+  ]
+}
