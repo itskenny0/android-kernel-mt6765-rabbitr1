@@ -1,0 +1,23 @@
+{
+  "source_commit": "eb7742aed8",
+  "scope": "Android PowerVR filename mapping, checked without changing the active Android build tree.",
+  "base_commit": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
+  "initial_release_import_provenance": "../../android/patches/mesa-26.2.4.json",
+  "previous_patch_sha256": "59756d6f6329c211d4db1c73bb5f3f6dab65ca136a0e5e189cc7a04a17154923",
+  "current_patch_sha256": "7740ab534dba11a98c5eb7dd720f1a6fa896f24cddf54a572000d7d425dd3034",
+  "changed_file": {
+    "path": "android/Android.mk",
+    "before_sha256": "f3e48e113675e703a6184dbca637e8e2090ff23cfce42128887a7f940069f9af",
+    "after_sha256": "340899802abd768882efe85fe47032a63d9ee3ce6283fe16c6d448202b833253"
+  },
+  "validation": {
+    "patch_apply": "passed",
+    "files_verified": 116,
+    "patch_sha256": "7740ab534dba11a98c5eb7dd720f1a6fa896f24cddf54a572000d7d425dd3034",
+    "make_output": "LIB=/rabbitr1/out/gpu-review/android-mapping/meson/install/usr/local/lib/libvulkan_powervr_mesa.so\nHAL=vulkan.powervr_mesa.so",
+    "actual_android_sources_modified": false,
+    "full_android_build_or_link_verified": false
+  },
+  "hardware_tested": false,
+  "android_target_built": false
+}

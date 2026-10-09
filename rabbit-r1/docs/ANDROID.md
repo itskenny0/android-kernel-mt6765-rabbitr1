@@ -126,10 +126,12 @@ files are preserved. The helper completes all project checks before applying
 any patch.
 
 The graphics sources include the complete [Mesa 26.2.4 release](https://docs.mesa3d.org/relnotes/26.2.4.html)
-delta on the pinned Lineage tree. Its six Android/integration differences remain
-byte-for-byte unchanged. [Source provenance](../android/patches/mesa-26.2.4.json)
-records the upstream revisions, release checksum and retained delta. Source
-application and repeat checks passed. The PowerVR Vulkan library also passed
+delta on the pinned Lineage tree. The [initial import record](../android/patches/mesa-26.2.4.json)
+preserves its six Android/integration differences and records that original
+patch hash. The later [PowerVR filename mapping](../tests/gpu/android-library-mapping.json)
+adds `imagination` → `powervr_mesa` to `android/Android.mk`; its source and patch
+hashes are separate from the initial import. The current 116-file patch applies
+and its output hashes match. Make resolves the correct library and HAL names. The PowerVR Vulkan library also passed
 a separate x86_64 Linux host build; Android/ARM64 userspace compilation remains
 pending. [Compile evidence](../tests/gpu/mesa-host-build.json) records its scope.
 A separate ARM64/bionic attempt reached a direct-display backend that requires
