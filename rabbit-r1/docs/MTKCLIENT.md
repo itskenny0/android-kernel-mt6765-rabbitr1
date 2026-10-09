@@ -64,6 +64,25 @@ converted to `False`, which the command-line handlers could ignore before
 exiting successfully. Latched transport failures now escape those paths so a
 shell using `set -e` stops before its next command.
 
+XFlash reads also require the exact byte count selected by the existing storage
+resolver. Malformed headers, oversized frames, failed commands or acknowledgements,
+and a nonzero terminal status raise an error instead of returning a partial dump.
+The terminal frame must contain exactly four bytes with raw status zero. A read
+failure now reaches the command-line caller as a nonzero exit status.
+
+File reads stream into a private temporary file beside the destination. Exact
+write counts, final size and successful close are checked before replacement.
+An existing dump remains intact on failure. Output paths must have ordinary,
+non-symlink directory parents and an absent or regular, single-link destination;
+paths containing `..` are rejected. Successful dumps have mode `0600`; replacing
+a dump changes its inode and does not preserve its previous ownership or metadata.
+This is not protection against concurrent hostile path changes or power loss.
+
+A local write failure before terminal completion also stops further guarded
+traffic on that instance. Host errors after a validated terminal still fail the
+command, but do not mark the transport as desynchronized. Cleanup removes the
+owned temporary file when possible and issues no device command.
+
 Intentional zero-length writes, explicit short reads (`maxtimeout=-1`) and
 healthy reconnects remain supported. A failed instance cannot reconnect; a new
 session is required. Closing that instance releases host resources without
@@ -82,7 +101,13 @@ still block.
 The guard assumes one serialized caller. Raw control transfers, discovery,
 exploits and direct endpoint access are outside its scope. Handshake entry and
 the old `usbxmlread` method reject an existing failure; their own raw transfer
-logic remains unchanged. Ordinary DA framing and status errors, optional-command
+logic remains unchanged. The XFlash read checks cover its data count, magic,
+acknowledgements and terminal status. Header datatypes and four-byte data/status
+ambiguity remain unresolved: data frames of four bytes or less are rejected.
+The old 1 MiB fallback for an unavailable packet-size query is removed. That
+query cannot distinguish an unsupported command from other failures, so either
+case now stops the read. This can reject a previously usable DA; physical
+compatibility has not been tested. Other DA framing/status paths, optional-command
 semantics, partition selection and media durability remain separate work.
 
 This patch does not establish a complete firmware installation procedure.
@@ -105,6 +130,13 @@ were fixtures, so this is a host-side propagation check, not a device test.
 
 The PyUSB callback tests use official 1.3.1 source. This does not pin every
 user's installed USB backend or establish hardware compatibility.
+
+The read correction passed 61 actual-method controls and six independent
+controls, including incomplete frames, file errors, destination preservation and
+cleanup. Its extracted read/command-handler/exit chain exits nonzero and stops
+the next shell process. The existing 77 bulk controls also pass with the combined
+patch. Query/storage setup remains modeled in the read tests; they do not prove
+the DA's complete protocol or physical read behavior.
 
 The diagnostic migration retains 145 transfer/preflight/readback cases and adds
 checker-failure, bundled-pin, metadata and copy-binding controls. Recording

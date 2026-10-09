@@ -9,8 +9,8 @@
   },
   "patch": {
     "path": "patches/mtkclient/0001-guard-bulk-transfers.patch",
-    "sha256": "b1b193f9cf838bc7b05d03e29a43f288a182b867a3f3f5e45ec9d0eb7cf096b4",
-    "bytes": 18639
+    "sha256": "0e75f67941e756a89459bad84a07bcd29fccc39576dcbd0572b62040dfa0dbd9",
+    "bytes": 31145
   },
   "files": [
     {
@@ -30,9 +30,9 @@
     {
       "path": "mtkclient/Library/DA/xflash/xflash_lib.py",
       "before_sha256": "cd55b262d1acfbda33833aabf3669997cb81d1b58b3c1844d4b4bef71f446b7b",
-      "after_sha256": "155cf23ffd373e24a03b2f1d2bc12104ad77a98e8a716511c172ebebd867320e",
+      "after_sha256": "f72bf84c3f26138237a295908270ecf4914891734ed29cad8d3037a5e2cdd8cb",
       "before_bytes": 53694,
-      "after_bytes": 54268
+      "after_bytes": 57471
     }
   ]
 }

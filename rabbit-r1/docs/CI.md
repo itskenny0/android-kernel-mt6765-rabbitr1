@@ -17,6 +17,8 @@ and permanent HTTP errors stop immediately; existing files are preserved.
 
 Before compiling, CI prepares the separate patched mtkclient source from its
 pinned archive, verifies every file, and tests the [bulk transport changes](MTKCLIENT.md).
+It also exercises XFlash read framing, exact selected lengths, checked file
+publication and command-line failure propagation with actual extracted methods.
 The checks use actual extracted methods with scripted endpoints and PyUSB source
 fixtures. They do not import USB or discover devices. Preparing that source does
 not migrate an existing diagnostic archive or establish physical flash safety.

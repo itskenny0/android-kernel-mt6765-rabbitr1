@@ -75,6 +75,12 @@ failures through XFlash reads and writes. It does not validate every DA status
 or establish physical storage safety. Old packages and prepared scripts do not
 gain these changes automatically; prepare new scripts from this package.
 
+The guarded XFlash reader publishes a dump only after the complete selected
+length, terminal status and local file writes succeed. It preserves an existing
+dump on failure and creates successful dumps with mode `0600`. Use ordinary
+directories and regular, single-link files; symlink paths and paths containing
+`..` are rejected. Packet-size queries must succeed; the old fallback is removed.
+
 Host USB access and the connection sequence must work before attempting a write.
 Follow the [mtkclient usage guide](https://github.com/bkerler/mtkclient/blob/v2.1.4.1/README-USAGE.md)
 and Rabbit's [flashing documentation](https://github.com/rabbit-hmi-oss/community-wiki/blob/main/docs/flashing.md).
