@@ -29,12 +29,15 @@ entry('dev/console', stat.S_IFCHR | 0o600, major=5, minor=1)
 entry('dev/null', stat.S_IFCHR | 0o666, major=1, minor=3)
 entry('bin/busybox', stat.S_IFREG | 0o755, (ROOT/'out/busybox/busybox').read_bytes())
 for name in ['sh','mount','mkdir','uname','cat','echo','sleep','getty','ln','setsid',
-             'cttyhack','tr','ls','dmesg','printf','grep','insmod','sync','dd','tail']:
+             'cttyhack','tr','ls','dmesg','printf','grep','insmod','sync','dd','tail',
+             'poweroff','rmmod']:
     entry('bin/'+name, stat.S_IFLNK | 0o777, b'busybox')
 entry('init', stat.S_IFREG | 0o755, (ROOT/'initramfs/init').read_bytes())
 entry('bin/r1-report', stat.S_IFREG | 0o755, (ROOT/'initramfs/r1-report').read_bytes())
 entry('bin/r1-log-start', stat.S_IFREG | 0o755, (ROOT/'initramfs/r1-log-start').read_bytes())
+entry('bin/r1-log-shutdown', stat.S_IFREG | 0o755, (ROOT/'initramfs/r1-log-shutdown').read_bytes())
 entry('bin/expdb-map', stat.S_IFREG | 0o755, (ROOT/'out/busybox/expdb-map').read_bytes())
+entry('bin/expdb-checkpoint', stat.S_IFREG | 0o755, (ROOT/'out/busybox/expdb-checkpoint').read_bytes())
 for name in ['pstore_zone', 'pstore_blk']:
     entry('lib/modules/'+name+'.ko', stat.S_IFREG | 0o644,
           (ROOT/'out/mainline/fs/pstore'/(name+'.ko')).read_bytes())

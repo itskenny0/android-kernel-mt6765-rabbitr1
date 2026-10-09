@@ -1,0 +1,52 @@
+#!/bin/sh
+# Diagnostic PID1 worker only. Normal boots never unload pstore or power off.
+set -eu
+
+status()
+{
+    printf '%s\n' "$1" > /run/expdb-shutdown.status || :
+    printf '<6>r1: expdb shutdown %s\n' "$1" > /dev/kmsg || :
+    printf '%s\n' "$1"
+}
+
+case " $(cat /proc/cmdline) " in
+    *' r1.log_shutdown=1 '*) ;;
+    *) exit 0 ;;
+esac
+case " $(cat /proc/cmdline) " in
+    *' r1.expdb=1 '*) ;;
+    *) status 'failed: expdb profile required'; exit 1 ;;
+esac
+
+status 'waiting 60s for diagnostic capture'
+if ! sleep 60; then
+    status 'failed: capture wait'; exit 1
+fi
+if [ ! -s /run/expdb-logger ] || [ ! -d /sys/module/pstore_blk ]; then
+    status 'failed: logger not ready'; exit 1
+fi
+mapped=
+if ! IFS= read -r mapped < /run/expdb-device || [ -z "$mapped" ]; then
+    status 'failed: logger device missing'; exit 1
+fi
+if ! boot_id=$(cat /proc/sys/kernel/random/boot_id) || ! release=$(uname -r); then
+    status 'failed: boot identity unavailable'; exit 1
+fi
+status 'writing final checkpoint; stopping pstore console'
+if ! printf '<6>r1: expdb shutdown checkpoint %s %s\n' "$boot_id" "$release" > /dev/kmsg; then
+    status 'failed: checkpoint write'; exit 1
+fi
+# This initramfs starts no /dev/pmsg0 writer. Do not use this worker in Android.
+# The packaged kernel must include the pstore cleaner teardown correction.
+if ! /bin/busybox rmmod pstore_blk || [ -d /sys/module/pstore_blk ]; then
+    status 'failed: pstore unload'; exit 1
+fi
+# Unload does not report flush errors. Require checked flush and direct readback.
+if ! expdb-checkpoint "$mapped" "$boot_id" "$release"; then
+    status 'failed: storage checkpoint verification'; exit 1
+fi
+status 'checkpoint verified; requesting poweroff'
+# PID1 is a shell, so bypass init signalling. BusyBox still syncs before reboot(2).
+/bin/busybox poweroff -f || :
+status 'failed: poweroff returned'
+exit 1

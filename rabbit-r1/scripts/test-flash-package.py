@@ -135,13 +135,14 @@ for profile in ['ram', 'expdb']:
         else:
             assert hashlib.sha256(entries[f'lib/modules/{module}.ko']).hexdigest() == reference['kernel_build']['modules'][f'fs/pstore/{module}.ko']
         assert ('vermagic='+manifest['kernel_release']+' ').encode() in entries[f'lib/modules/{module}.ko']
-    for source in ['init', 'r1-report', 'r1-log-start']:
+    for source in ['init', 'r1-report', 'r1-log-start', 'r1-log-shutdown']:
         name = source if source == 'init' else 'bin/'+source
         assert entries[name] == (ROOT/'initramfs'/source).read_bytes()
         subprocess.run(['qemu-aarch64', str(ROOT/'out/busybox/busybox'), 'sh', '-n',
                         str(ROOT/'initramfs'/source)], check=True)
-    assert entries['bin/expdb-map'] == (ROOT/'out/busybox/expdb-map').read_bytes()
-    assert entries['bin/expdb-map'][:6] == b'\x7fELF\x02\x01'
+    for helper in ['expdb-map', 'expdb-checkpoint']:
+        assert entries['bin/'+helper] == (ROOT/'out/busybox'/helper).read_bytes()
+        assert entries['bin/'+helper][:6] == b'\x7fELF\x02\x01'
     with tempfile.TemporaryDirectory(dir=ROOT/'.tmp', prefix='unpack-test-') as tmp:
         result = subprocess.run(['python3', str(ROOT/'src/mkbootimg/unpack_bootimg.py'),
             '--boot_img', str(PACKAGE/f'boot-{profile}.img'), '--out', tmp],

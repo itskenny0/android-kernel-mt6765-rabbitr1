@@ -13,6 +13,7 @@ echo 'haretic for rabbit r1; hardware support is experimental'
 uname -a
 echo 'Run r1-report for diagnostics. The expdb profile enables storage logging.'
 (r1-log-start > /run/expdb-start.log 2>&1) &
+(r1-log-shutdown > /run/expdb-shutdown.log 2>&1) &
 
 # Keep each phase visible to a later pstore console registration as well as RAM.
 usb_status()

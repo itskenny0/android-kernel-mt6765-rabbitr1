@@ -9,4 +9,5 @@ install -m644 configs/busybox.config out/busybox/.config
 make -C src/busybox-1.37.0 O="$R1_ROOT/out/busybox" CROSS_COMPILE=aarch64-linux-gnu- oldconfig
 make -C src/busybox-1.37.0 O="$R1_ROOT/out/busybox" CROSS_COMPILE=aarch64-linux-gnu- -j"$JOBS"
 aarch64-linux-gnu-gcc -static -Os -Wall -Wextra -Werror -o out/busybox/expdb-map initramfs/expdb-map.c
+aarch64-linux-gnu-gcc -static -Os -Wall -Wextra -Werror -o out/busybox/expdb-checkpoint initramfs/expdb-checkpoint.c
 python3 scripts/make-initramfs.py

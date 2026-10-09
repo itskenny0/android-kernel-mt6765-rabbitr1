@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "status": "compiled-and-host-checked-not-boot-tested",
+  "kernel_commit": "7e95bf4afd05a8161d2f3842060625f0960b3517",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "kernel_artifacts": {
+    "Image": {
+      "bytes": 35342344,
+      "sha256": "d4042da32ed09a231dc4c2e70c81f3940b188c6ff6b6998a158cdb664e20acd8"
+    },
+    "Image.gz": {
+      "bytes": 12561038,
+      "sha256": "95cc215e197fc9117fcd41825a33a6f05189c65d2495129fb72b542ff1ca1196"
+    },
+    "Module.symvers": {
+      "bytes": 858554,
+      "sha256": "606c9dd4852439725db907e37ba89999774b1025d40fb2d881a44cbe2c14a322"
+    },
+    "System.map": {
+      "bytes": 7711006,
+      "sha256": "d9cb7ad5b8661182a5ab185947a4ebadea3171eda25bfcc58920450d60c0b623"
+    },
+    "config": {
+      "bytes": 195221,
+      "sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f"
+    },
+    "defconfig": {
+      "bytes": 17429,
+      "sha256": "935c68830d98de62f693eaf9b4e5e4b2bc8538223320926a373960a687c9a1cb"
+    },
+    "modules.tar.gz": {
+      "bytes": 24249,
+      "sha256": "c9943bbf285cec646a84c81edd6b4c52742ff61d83fb6960ad34d8baff7e4a76"
+    },
+    "mt6765-rabbit-r1.dtb": {
+      "bytes": 28192,
+      "sha256": "2ae6a95ca002aab8f2aa3f6569dafb258561645afba316cf019fc416d35b7ed9"
+    },
+    "vmlinux": {
+      "bytes": 45048112,
+      "sha256": "d3ccae25e27c3115ea598b6894ef3322afff3d535595e9057249af70a0538b74"
+    }
+  },
+  "modules": {
+    "drivers/clk/mediatek/clk-mt8196-disp0.ko": "2253212a3e6cbc95be2024bb6db616f6ad91f8021ad141d80703da172315afe7",
+    "drivers/clk/mediatek/clk-mt8196-disp1.ko": "6f1ecf26031e6c994d5049a2322c9ada9e8e6dccdfa7c2c75254767b3e3e7b8f",
+    "drivers/clk/mediatek/clk-mt8196-mfg.ko": "bc3e7bbefca7cce68a102b5a11a40098de72dff866a87b551e52f72f37692189",
+    "drivers/clk/mediatek/clk-mt8196-ovl0.ko": "b6315d3309193914f35e6578092d3ff6215d02924903983d789a0bd4dc0f0b3f",
+    "drivers/clk/mediatek/clk-mt8196-ovl1.ko": "5e5e413692456a8f5d8d1ad7ed4e31343d2ff2d0f1b8d18fa6320420a3d93806",
+    "drivers/clk/mediatek/clk-mt8196-vdec.ko": "7e5e4c8633a1323beda19da0ad43694764876d9d1674e66dcaebc5acc57c3336",
+    "drivers/clk/mediatek/clk-mt8196-vdisp_ao.ko": "48a06a1560024b27c29d19956559875b2906c7bb0b5d0b780e09872466400f1c",
+    "drivers/clk/mediatek/clk-mt8196-venc.ko": "c03e9d3a2cb4c2c4921378b0c8d51e3b39c64a286f5eed4b9040ed1e304c3f2d",
+    "fs/pstore/pstore_blk.ko": "fc8264d7bf5322a823fef8f830ef96a2d2375f4cb6612994b9815998b2f1e4d5",
+    "fs/pstore/pstore_zone.ko": "c69088f62de35e77f1cbb52a9fc0e37a93762c2ef336c66796454fac9d2c241b"
+  },
+  "kernel_build_log_sha256": "7189cd30bb132b6e11d22956419a0812b698c500d6de5fd22807e2f14ee97ad1",
+  "checks": {
+    "teardown_scenarios": 9,
+    "rejected_teardown_regressions": 3,
+    "checkpoint_controls": 278,
+    "shutdown_policy_controls": 28,
+    "USB_controls": 46
+  },
+  "scope": "Teardown and diagnostic checkpoint support. Physical logging and poweroff remain unverified."
+}

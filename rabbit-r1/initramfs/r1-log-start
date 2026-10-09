@@ -32,6 +32,7 @@ insmod /lib/modules/pstore_zone.ko
 insmod /lib/modules/pstore_blk.ko blkdev="$mapped" best_effort=1 \
     console_size=1024 pmsg_size=64 kmsg_size=64 ftrace_size=0 max_reason=2
 mount -t pstore pstore /sys/fs/pstore
+printf '%s\n' "$mapped" > /run/expdb-device
 echo "$found -> $mapped; first 18 MiB; best-effort pstore console" > /run/expdb-logger
 echo '<6>r1: expdb pstore console enabled; final 2 MiB excluded' > /dev/kmsg
 echo 'expdb kernel logging enabled; earlier records are in /sys/fs/pstore'

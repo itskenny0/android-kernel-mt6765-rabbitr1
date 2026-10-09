@@ -177,6 +177,9 @@ jobs:
           python3 scripts/test-i2c-irq.py 2>&1 | tee logs/i2c-irq-tests.log
           python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
+          python3 scripts/test-expdb-checkpoint.py 2>&1 | tee logs/expdb-checkpoint-tests.log
+          python3 scripts/test-initramfs-shutdown.py \
+            --out /rabbitr1/out/initramfs-shutdown-tests 2>&1 | tee logs/initramfs-shutdown-tests.log
           python3 scripts/test-pstore-credentials.py 2>&1 | tee logs/pstore-credentials-tests.log
           python3 scripts/test-pstore-unregister.py \
             --out /rabbitr1/out/pstore-unregister-tests 2>&1 | tee logs/pstore-unregister-tests.log
