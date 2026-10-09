@@ -282,7 +282,8 @@
     },
     "src/kernel/drivers/rtc/rtc-mt6397.c": {
       "sha256": "d1ac8438fd3e73b7100022c52acf4530e834eac8e22b0c4858cee3792752c8bd",
-      "bytes": 44570
+      "bytes": 44570,
+      "url": "https://raw.githubusercontent.com/rabbit-hmi-oss/android_kernel_rabbit_mt6765/8167c8c1087f057d2ef302fc93b47554291687ec/drivers/rtc/rtc-mt6397.c"
     }
   }
 }

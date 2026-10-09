@@ -37,6 +37,12 @@ def sha(path):
         return hashlib.file_digest(f,'sha256').hexdigest()
 
 lock = json.loads((ROOT/'sources.lock.json').read_text())
+if args.profile == 'ci':
+    # A cached file must not hide a missing URL from clean runners.
+    for name, item in lock['ci_files'].items():
+        if not isinstance(item.get('url'), str) or not item['url'].startswith('https://'):
+            raise SystemExit('CI input needs an HTTPS URL: '+name)
+
 for name, repo in lock['repositories'].items():
     if args.profile == 'ci' and name not in ['mkbootimg', 'mtklkzap']:
         continue
