@@ -61,6 +61,34 @@
           "bytes": 350204,
           "sha256": "83b0ec5566e73d8e1af5bfcda09d086bc5b67eae0c486c0fdb3f800153fcba92"
         }
+      },
+      "recovery": {
+        "fresh_primary_identity_matched": true,
+        "storage_writes": false,
+        "reboot_requested": false,
+        "expdb": "Only the four-byte BOOT_STEP field changed. All existing record descriptors and payloads remain unchanged; no new mainline pstore records.",
+        "boot_step_before": "0x141131",
+        "boot_step_after": "0x1411311",
+        "para_boot_para_seccfg": "Full fresh reads match their pre-boot hashes.",
+        "ram_capture": "Six fixed ranges read successfully with exact identity checks before and after each region.",
+        "printk": "Invalid geometry and pointers; state, infos and text are all 0xff. No finalized descriptors or admitted log records.",
+        "memory_marker": "The only non-0xff descriptor bytes are <<<RAM_RW>>> at physical 0x42000000; the selected DA also contains this literal. Its writer and full affected range were not traced.",
+        "preloader_log": "Validated header and bounds describe 13273 bytes of preloader output and zero LK bytes. The log reports cold boot, disabled DDR retention, fresh log allocation and a jump to the DA.",
+        "conclusion": "Recovery did not preserve evidence that locates the preceding Linux boot attempt. Linux execution remains unconfirmed.",
+        "private_evidence": {
+          "result.json": {
+            "bytes": 1522,
+            "sha256": "539f3da5b8b5f023f0b15fb2a4bcacaaa8f9a3011e6d5b8b41343056e6eee56e"
+          },
+          "analysis.json": {
+            "bytes": 1574,
+            "sha256": "b7b25ab446e2fb7c6f6524b35b9114c53a6bbd27ea8f463a304af9fc7db4d73a"
+          },
+          "remaining-result.json": {
+            "bytes": 661,
+            "sha256": "ea9d935ea06bd4f934404dfdc2f15c8d95f82cd6a2de3cd141d8c158bd5fb450"
+          }
+        }
       }
     }
   ],

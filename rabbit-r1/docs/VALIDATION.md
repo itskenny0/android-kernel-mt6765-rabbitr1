@@ -11,6 +11,12 @@ first attempt; LK intentionally stops display output at its handoff, so that
 observation cannot establish whether Linux executed. Persistent kernel logging
 and Android boot remain unverified.
 
+The second recovery added no saved kernel records. Fresh reads of `para`,
+`boot_para` and `seccfg` match the pre-boot captures. A bounded read of six RAM
+regions found invalid printk structures and a fresh preloader log with no LK
+bytes. The log reports a cold boot without DDR retention. These results do not
+locate the preceding boot failure.
+
 ## Offline validation — 2026-10-08
 
 Current charging integration: [CHARGING.md](CHARGING.md). The charger and board
