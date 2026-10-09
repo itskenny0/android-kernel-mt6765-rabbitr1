@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "status": "compiled-packaged-and-offline-validated-not-boot-tested",
+  "scope": "Select the r1 USB controller clock parent and rebuild diagnostic boot images with the existing bounded UDC-wait initramfs.",
+  "host_source_commit": "212d4578e924ab15143913995a0f9c2432445ec5",
+  "kernel_source_commit": "212d4578e924ab15143913995a0f9c2432445ec5",
+  "previous_kernel_source_commit": "e98ffe5fcee6ce89fb754003059334ba1cf50b5c",
+  "kernel_release": "7.1.0-rabbit-r1-bringup+",
+  "completed_at": "2026-10-09T20:05:58.198929+00:00",
+  "hardware_tested": false,
+  "device_boot_tested": false,
+  "hardware_unconfirmed": true,
+  "kernel_build_record": {
+    "bytes": 3428,
+    "sha256": "1231b8390d714cf8ee16374715773d8336b714518d1dc49d04b56d936a96a964"
+  },
+  "kernel_execution_result": {
+    "bytes": 4327,
+    "sha256": "2ed2a0f675f0469372656b638193339429801ef5eae1fff76f8c45357b214fed"
+  },
+  "package_execution_result": {
+    "bytes": 3505,
+    "sha256": "0625cb296216bd3b81223cd50554a2b18e4311f4ee51109bdae697d12fda1ed7"
+  },
+  "stages": {
+    "kernel": {
+      "exit_code": 0,
+      "output_eof": true,
+      "log": {
+        "bytes": 2246,
+        "sha256": "ced1d6af8163b8b72a111b227f9a30a683158f4f6eb8a7f0594fd88bd0cc4052"
+      }
+    },
+    "initramfs": {
+      "exit_code": 0,
+      "output_eof": true,
+      "log": {
+        "bytes": 28888,
+        "sha256": "2493dc2f34696a88fce8c9ed2966306862935a63d34989227be6d482cf5c551b"
+      }
+    },
+    "package": {
+      "exit_code": 0,
+      "output_eof": true,
+      "log": {
+        "bytes": 63,
+        "sha256": "c506979ce3d9afff3d23d83f26b09f0f423701bd0bc0ea6a25d1b6966e9391ec"
+      }
+    }
+  },
+  "kernel_artifacts": {
+    "Image": {
+      "bytes": 35342344,
+      "sha256": "1eeb117b846aae87cc475f30a93daf511cc33262cb65eac4d92b13dc26dd9855"
+    },
+    "Image.gz": {
+      "bytes": 12561025,
+      "sha256": "6c76df1587987b0491a75329ba401f9eebb620ba6575a8ad9d95ad8b8f3b29db"
+    },
+    "mt6765-rabbit-r1.dtb": {
+      "bytes": 28192,
+      "sha256": "2ae6a95ca002aab8f2aa3f6569dafb258561645afba316cf019fc416d35b7ed9"
+    }
+  },
+  "compiled_dt_review": {
+    "result": {
+      "bytes": 5589,
+      "sha256": "12fc7bd31149146c0c66035fb41f7077c86a86b59570bc4a3d129eebe86bc2ff"
+    },
+    "previous_dtb": {
+      "bytes": 28113,
+      "sha256": "9592be73f9be84c7e37ad764a54d4948a4871f49d3b94ca56610b52da89ab19c"
+    },
+    "new_dtb": {
+      "bytes": 28192,
+      "sha256": "2ae6a95ca002aab8f2aa3f6569dafb258561645afba316cf019fc416d35b7ed9"
+    },
+    "node": "/soc/usb@11200000",
+    "added_properties": {
+      "assigned-clocks": {
+        "provider": "/soc/clock-controller@10000000",
+        "clock": "CLK_TOP_USB_TOP_SEL",
+        "id": 118
+      },
+      "assigned-clock-parents": {
+        "provider": "/soc/clock-controller@10000000",
+        "clock": "CLK_TOP_UNIVPLL3_D4",
+        "id": 32
+      }
+    },
+    "all_other_nodes_and_properties_identical": true
+  },
+  "configuration": {
+    "unchanged_from_previous_kernel": true,
+    "bytes": 195221,
+    "sha256": "9fafd21d772ab9131dd3974ac9e1897c3e83c30fd29775d469636e250e9b770f"
+  },
+  "modules": {
+    "payloads_checked": 10,
+    "changed_payloads": 0,
+    "pstore_modules_match_packaged_kernel": true
+  },
+  "init_sha256": "a247ddd0445eca30a38240fad562bbac683cd61f97f70cc72fac420300eacf3d",
+  "initramfs_sha256": "82551d27747bd8d6d6e1e4736cba6352c56c0a0fdf682688718b5fabb1984e01",
+  "package_manifest": {
+    "bytes": 10732,
+    "sha256": "8b813dff5c37166555a064bc18ac586650a68c3a7441869e14964c207e158f37"
+  },
+  "images": {
+    "boot-ram.img": {
+      "bytes": 33554432,
+      "sha256": "ec8179fc4181b4492a09319169fad4c041fd530dbd38243564569d8f8cea3d87"
+    },
+    "boot-expdb.img": {
+      "bytes": 33554432,
+      "sha256": "93e1055d34d996ac5478b2a8ed50cd5eebac72e67eb93cbb0167821865b29b0a"
+    },
+    "dtbo.img": {
+      "bytes": 8388608,
+      "sha256": "de91deb66ca18aada0e3fd1ad3766cc7d3e96c578cd02c35e9d88bffa815be2e"
+    },
+    "lk.bin": {
+      "bytes": 864000,
+      "sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0"
+    },
+    "logo.bin": {
+      "bytes": 1460959,
+      "sha256": "f08895b8a03caa2c36e20b9e82a1f0fe0b6ee55aae38c4a7508045146dcc484d"
+    },
+    "splash.png": {
+      "bytes": 15738,
+      "sha256": "a6027fe2f968200fc095b0818ade06f5e5dad369fdeb21f248ec7f4ce94e0f44"
+    }
+  },
+  "archive": {
+    "name": "rabbit-r1-mainline-mtkclient.zip",
+    "bytes": 28537840,
+    "sha256": "3921e3ad374de52ac3d93793c7bafce46338c665cc7774a1107b9d05e21fbb8f"
+  },
+  "package_component_review": {
+    "result": {
+      "bytes": 3512,
+      "sha256": "6f3e1a9ce478bb618b2885a2c4239eddf3ffca8bc4c6956d8cbc639ee04bf008"
+    },
+    "both_boot_profiles_verified": true,
+    "boot_v2_headers_addresses_cmdlines_padding_SHA1_pass": true,
+    "profile_dt_changes_limited_to_clock_assignments": true,
+    "all_cpio_file_contents_unchanged": true,
+    "all_nonboot_package_files_unchanged": true,
+    "zip_crc_members_and_hashes_pass": true
+  },
+  "previous_full_package_suite": {
+    "record": "tests/initramfs-udc-build.json",
+    "record_pin": {
+      "bytes": 6408,
+      "sha256": "f6eb89dfae8b93a6ef0a085497bae26a66a2a9d4603416285c098abad02550d0"
+    },
+    "result": {
+      "bytes": 5077,
+      "sha256": "b157a2990c981f28403655d8ebbf5ff383f4e6fde6340d55503d86dd393a2d78"
+    },
+    "log": {
+      "bytes": 1019,
+      "sha256": "2475df18c223813f1f8ce331f755ae2f904d2ecbdd8970c2a969d041cae83930"
+    },
+    "unchanged_scripts": [
+      "scripts/package-mtkclient.py",
+      "scripts/prepare-flash.py",
+      "scripts/prepare-mtkclient.py",
+      "scripts/test-flash-package.py"
+    ],
+    "rerun": false
+  },
+  "limitations": [
+    "These are compilation and offline artifact checks; the new image has not been flashed or boot-tested.",
+    "Clock-parent selection and bounded UDC waiting do not establish USB enumeration or explain the prior hardware failure.",
+    "Previously passing simulated flash/restore tests were reused after verifying their relevant scripts and nonboot package bytes are unchanged. No physical installation or recovery is claimed."
+  ]
+}
