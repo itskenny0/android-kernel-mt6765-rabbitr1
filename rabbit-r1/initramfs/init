@@ -14,30 +14,79 @@ uname -a
 echo 'Run r1-report for diagnostics. The expdb profile enables storage logging.'
 (r1-log-start > /run/expdb-start.log 2>&1) &
 
-# Explicit opt-in for USB ACM. Physical USB/VBUS operation is unverified.
+# Keep each phase visible to a later pstore console registration as well as RAM.
+usb_status()
+{
+    printf '%s\n' "$1" > /run/usb-start.status || :
+    printf '<6>r1: USB ACM %s\n' "$1" > /dev/kmsg || :
+}
+
+usb_start()
+{
+    usb_status 'setup-started'
+    if ! mount -t configfs configfs /sys/kernel/config; then
+        usb_status 'failed: configfs mount'
+        return 1
+    fi
+    gadget=/sys/kernel/config/usb_gadget/r1
+    if ! {
+        mkdir -p "$gadget" &&
+        printf '0x1d6b\n' > "$gadget/idVendor" &&
+        printf '0x0104\n' > "$gadget/idProduct" &&
+        mkdir -p "$gadget/strings/0x409" &&
+        printf 'r1-bringup\n' > "$gadget/strings/0x409/serialnumber" &&
+        printf 'r1 development\n' > "$gadget/strings/0x409/manufacturer" &&
+        printf 'Mainline lab console\n' > "$gadget/strings/0x409/product" &&
+        mkdir -p "$gadget/configs/c.1/strings/0x409" &&
+        printf 'ACM console\n' > "$gadget/configs/c.1/strings/0x409/configuration" &&
+        printf '100\n' > "$gadget/configs/c.1/MaxPower" &&
+        mkdir -p "$gadget/functions/acm.usb0" &&
+        ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/"
+    }; then
+        usb_status 'failed: gadget setup'
+        return 1
+    fi
+
+    usb_status 'waiting for UDC'
+    attempt=0
+    while :; do
+        for controller in /sys/class/udc/*; do
+            [ -e "$controller" ] || continue
+            controller=${controller##*/}
+            if ! printf '%s\n' "$controller" > "$gadget/UDC"; then
+                usb_status "failed: bind $controller"
+                return 1
+            fi
+            bound=
+            if ! IFS= read -r bound < "$gadget/UDC" || [ "$bound" != "$controller" ]; then
+                usb_status "failed: bind readback $controller"
+                return 1
+            fi
+            usb_status "bound: $controller"
+            while :; do
+                getty -L -n -l /bin/sh ttyGS0 115200
+                sleep 2
+            done
+        done
+        if [ "$attempt" -ge 30 ]; then
+            usb_status 'failed: UDC discovery timeout'
+            return 1
+        fi
+        if ! sleep 1; then
+            usb_status 'failed: UDC discovery wait'
+            return 1
+        fi
+        attempt=$((attempt + 1))
+    done
+}
+
+# Explicit opt-in. Discovery/setup run independently of the UART/PID1 shell.
+# A bound gadget is not proof of host enumeration or physical USB operation.
 case " $(cat /proc/cmdline) " in
   *' r1.usb=1 '*)
-    mount -t configfs configfs /sys/kernel/config
-    gadget=/sys/kernel/config/usb_gadget/r1
-    mkdir -p "$gadget"
-    echo 0x1d6b > "$gadget/idVendor"
-    echo 0x0104 > "$gadget/idProduct"
-    mkdir -p "$gadget/strings/0x409"
-    echo 'r1-bringup' > "$gadget/strings/0x409/serialnumber"
-    echo 'r1 development' > "$gadget/strings/0x409/manufacturer"
-    echo 'Mainline lab console' > "$gadget/strings/0x409/product"
-    mkdir -p "$gadget/configs/c.1/strings/0x409"
-    echo 'ACM console' > "$gadget/configs/c.1/strings/0x409/configuration"
-    echo 100 > "$gadget/configs/c.1/MaxPower"
-    mkdir -p "$gadget/functions/acm.usb0"
-    ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/"
-    for controller in /sys/class/udc/*; do
-      [ -e "$controller" ] || continue
-      echo "${controller##*/}" > "$gadget/UDC"
-      break
-    done
-    (while :; do getty -L -n -l /bin/sh ttyGS0 115200; sleep 2; done) &
+    (usb_start > /run/usb-start.log 2>&1) &
     ;;
+  *) usb_status 'disabled by boot profile' ;;
 esac
 
 while :; do

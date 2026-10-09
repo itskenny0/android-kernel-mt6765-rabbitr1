@@ -246,6 +246,19 @@ to fall back to another slot; record that behavior rather than reflashing both.
 
 ## Read logs and restore
 
+USB ACM setup runs in the background, so delayed discovery or setup failure
+does not hold up the UART/PID1 shell. It checks for a UDC immediately and after
+at most 30 one-second waits, then verifies the bind attribute. Setup, timeout,
+bind failure and the bound controller are recorded in `/run/usb-start.status`
+and kernel messages prefixed `r1: USB ACM`; command errors go to
+`/run/usb-start.log`. Earlier kernel messages can reach `expdb` when its logger
+starts. These records are best effort, and the discovery budget does not bound
+a stalled kernel I/O call. A successful bind does not establish host enumeration
+or physical USB operation. The worker does not reboot or change power settings.
+An absent ACM device alone cannot distinguish an earlier boot failure from a
+USB setup problem. This wait handles delayed controller discovery; it does not establish the
+cause of an earlier missing USB console.
+
 Once Linux reaches the initramfs, `r1-report` shows logger setup status.
 `/sys/fs/pstore/console-pstore_blk-0` contains the previous boot's recovered
 console when available. The current kernel console is written continuously
