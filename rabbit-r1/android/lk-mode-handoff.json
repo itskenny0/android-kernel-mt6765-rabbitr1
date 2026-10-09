@@ -1,0 +1,87 @@
+{
+  "stock_sha256": "534c72bea2bbb2173786594f650c2c1ec454258aefaa05de699349e26b71417e",
+  "patched_sha256": "e4299344da5d5dd1a202b4964de764c43557f97203799e77bab55ac962973de0",
+  "unchanged_ranges": [
+    {
+      "start": "0x1d9d4",
+      "end_exclusive": "0x1dc8c",
+      "sha256": "241d0045a22f3ecfb4a94c5ec21f17c2483bc60b59ae0f3bd20349afbd81c064"
+    },
+    {
+      "start": "0x20be4",
+      "end_exclusive": "0x20c8c",
+      "sha256": "350e92663f2c899eac711caf8e487aef1b40335e2dd1c77501f50999ebb305af"
+    },
+    {
+      "start": "0x7a164",
+      "end_exclusive": "0x7a183",
+      "sha256": "305238e0b53f8f7c43d11458ac011e22d257856bd970750199d69955e605e119"
+    }
+  ],
+  "scope": "Bounded binary instruction replay of mode dispatch and command-line append only",
+  "modeled": "Single-thread CPU critical-section enter/exit return; no loader, partition access, firmware authentication, peripheral or full boot execution",
+  "cases": [
+    {
+      "image": "stock",
+      "boot_mode": 0,
+      "mode": "normal",
+      "dispatch_target": "0x1db18",
+      "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1 androidboot.force_normal_boot=1",
+      "normal_boot_token_count": 1,
+      "modeled_critical_calls": [
+        "0x18198",
+        "0x18188"
+      ],
+      "writes": 45
+    },
+    {
+      "image": "stock",
+      "boot_mode": 2,
+      "mode": "recovery",
+      "dispatch_target": "0x1dac2",
+      "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1",
+      "normal_boot_token_count": 0,
+      "modeled_critical_calls": [],
+      "writes": 0
+    },
+    {
+      "image": "patched",
+      "boot_mode": 0,
+      "mode": "normal",
+      "dispatch_target": "0x1db18",
+      "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1 androidboot.force_normal_boot=1",
+      "normal_boot_token_count": 1,
+      "modeled_critical_calls": [
+        "0x18198",
+        "0x18188"
+      ],
+      "writes": 45
+    },
+    {
+      "image": "patched",
+      "boot_mode": 2,
+      "mode": "recovery",
+      "dispatch_target": "0x1dac2",
+      "command_line": "bootopt=64S3,32N2,64N2 androidboot.fstab_suffix=r1",
+      "normal_boot_token_count": 0,
+      "modeled_critical_calls": [],
+      "writes": 0
+    }
+  ],
+  "conclusion": "LK appends force_normal_boot=1 in normal mode and omits it in recovery; the relevant code and string are unchanged by current LK patches. Do not add the token unconditionally to the boot header.",
+  "hardware_tested": false,
+  "date": "2026-10-09",
+  "evidence": [
+    {
+      "path": "/rabbitr1/out/android-build-review/boot-images/lk-normal-boot-replay.json",
+      "bytes": 2458,
+      "sha256": "8b125360fc178ea2de285d51a2db32d94fe8b66bd2281a5607678b54bce3c5c4"
+    },
+    {
+      "path": "/rabbitr1/out/android-build-review/boot-images/replay-lk-normal-boot.py",
+      "bytes": 4191,
+      "sha256": "fd6b9583458a0aa53a418ff033be9a222c5cd7afba76335b5aff6a175922c0c9"
+    }
+  ],
+  "validation_scope": "Normal/recovery branch and command-line append replay with a supplied header prefix. No complete LK execution, image loading or physical boot."
+}

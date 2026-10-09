@@ -59,6 +59,30 @@ Build the full images next, then inspect the generated boot header, DT table,
 module hashes, super metadata, partition sizes and AVB configuration. The stock
 layout evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
+The recovery-as-boot image relies on LK to select normal Android startup.
+Bounded instruction replays of both stock and patched LK confirm that normal
+mode appends `androidboot.force_normal_boot=1`, while recovery mode omits it.
+[Mode-handoff evidence](../android/lk-mode-handoff.json) records the binary and
+code hashes and four replay cases. This does not establish a physical boot.
+Do not add the token unconditionally to the image header: recovery needs its
+own ramdisk path.
+
+After the boot and recovery checks pass, build the filesystem images and their
+AVB/super dependencies with the explicit size check:
+
+```bash
+R1_ANDROID_JOBS=24 bash /rabbitr1/scripts/build-android.sh \
+    systemimage systemextimage productimage vendorimage \
+    superimage vbmetaimage check-all-partition-sizes
+```
+
+These targets exclude the 48 GiB userdata image. The configured super partition
+allows a 4 GiB group per slot, including filesystem and AVB overhead; actual
+image fit still needs the size check. Factory super populates only slot A and
+leaves B's logical partitions empty. The future Android flash procedure must
+select and verify A while preserving the previous slot state for restoration,
+or supply populated B images. A device's existing active slot cannot be assumed.
+
 The helper uses `OUT_DIR=out` and creates `/rabbitr1/src/android/out` as a link
 to `/rabbitr1/out/android`. It preserves an existing path that points elsewhere
 by stopping before the build. The pinned Siso tool cannot load an absolute
