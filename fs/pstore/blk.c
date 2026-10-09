@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
+#include <linux/cred.h>
 #include <linux/string.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -185,18 +186,27 @@ void unregister_pstore_device(struct pstore_device_info *dev)
 }
 EXPORT_SYMBOL_GPL(unregister_pstore_device);
 
+/* Frontends and dirty-zone work can run with different credentials. */
 static ssize_t psblk_generic_blk_read(char *buf, size_t bytes, loff_t pos)
 {
-	return kernel_read(psblk_file, buf, bytes, &pos);
+	ssize_t ret;
+
+	scoped_with_creds(psblk_file->f_cred)
+		ret = kernel_read(psblk_file, buf, bytes, &pos);
+	return ret;
 }
 
 static ssize_t psblk_generic_blk_write(const char *buf, size_t bytes,
 		loff_t pos)
 {
+	ssize_t ret;
+
 	/* Console/Ftrace backend may handle buffer until flush dirty zones */
 	if (in_interrupt() || irqs_disabled())
 		return -EBUSY;
-	return kernel_write(psblk_file, buf, bytes, &pos);
+	scoped_with_creds(psblk_file->f_cred)
+		ret = kernel_write(psblk_file, buf, bytes, &pos);
+	return ret;
 }
 
 /*

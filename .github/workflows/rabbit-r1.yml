@@ -113,6 +113,7 @@ jobs:
           python3 scripts/test-i2c-irq.py 2>&1 | tee logs/i2c-irq-tests.log
           python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
+          python3 scripts/test-pstore-credentials.py 2>&1 | tee logs/pstore-credentials-tests.log
 
       - name: Build the kernel and modules
         run: bash scripts/build-mainline.sh
