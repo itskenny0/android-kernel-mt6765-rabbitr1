@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Run the C core against frozen stock instruction outputs, with sanitizers."""
+"""Run the C core against stock instructions and an exact model reference, with sanitizers."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -19,6 +19,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 os.environ['TMPDIR'] = str(OUT)
 os.environ['ASAN_OPTIONS'] = 'detect_leaks=1:abort_on_error=1'
+os.environ['UBSAN_OPTIONS'] = 'halt_on_error=1:print_stacktrace=1'
 provenance = json.loads((SOURCE/'provenance.json').read_text())
 for name, expected in provenance['generated_sha256'].items():
     if hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() != expected:
@@ -75,3 +76,11 @@ for case in usable['cases'] + usable['zero_tail_boundaries']:
 command[-3:] = [str(SOURCE/'tests/usable-capacity.c'), '-o', str(OUT/'usable-capacity-tests')]
 subprocess.run(command, check=True)
 subprocess.run([str(OUT/'usable-capacity-tests'), str(OUT/'usable-oracles.txt')], check=True)
+
+# New model policy has an exact rational oracle, not stock-policy equivalence.
+# It reads the independently captured rows; it never loads the C library.
+subprocess.run(['python3', str(SOURCE/'tests/model-reference.py'),
+                '--out', str(OUT/'model-reference.txt')], check=True)
+command[-3:] = [str(SOURCE/'tests/model.c'), '-o', str(OUT/'model-tests')]
+subprocess.run(command, check=True)
+subprocess.run([str(OUT/'model-tests'), str(OUT/'model-reference.txt')], check=True)

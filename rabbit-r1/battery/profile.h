@@ -22,6 +22,8 @@ enum r1_battery_error {
     R1_BATTERY_UNNORMALIZED = -3,
     R1_BATTERY_NO_CUTOFF = -4,
     R1_BATTERY_SEARCH_LIMIT = -5,
+    R1_BATTERY_NO_ROOT = -6,
+    R1_BATTERY_AMBIGUOUS = -7,
 };
 
 struct r1_battery_point {
@@ -63,6 +65,32 @@ struct r1_battery_capacity {
     r1_battery_int cutoff_01mv;
 };
 
+/* Rational loaded-profile model, independent of the stock RAC search.
+ * Positive current means charging. No parameter has an implicit default. */
+struct r1_battery_model_parameters {
+    r1_battery_int current_01ma;
+    r1_battery_int shunt_01mohm;
+    r1_battery_int meter_01mohm;
+    r1_battery_int dc_ratio_percent;
+};
+
+struct r1_battery_model_point {
+    r1_battery_int charge_01mah;
+    r1_battery_int ocv_01mv;
+    r1_battery_int resistance_01mohm;
+};
+
+enum r1_battery_model_boundary {
+    R1_BATTERY_MODEL_CROSSING,
+    R1_BATTERY_MODEL_DISCONTINUITY,
+    R1_BATTERY_MODEL_PROFILE_END,
+};
+
+struct r1_battery_model_capacity {
+    struct r1_battery_model_point point;
+    enum r1_battery_model_boundary boundary;
+};
+
 struct r1_battery_state {
     /* Internal model coordinates, deliberately not restricted to 0..10000. */
     r1_battery_int dod;
@@ -96,6 +124,31 @@ int r1_battery_validate_profile(const struct r1_battery_profile *profile);
 int r1_battery_calculate_usable(const struct r1_battery_profile *profile,
                                 const struct r1_battery_load *load,
                                 struct r1_battery_capacity *out);
+
+/* Solve terminal = OCV + current * (Rcell * DC / 100 + shunt + meter)
+ * / 10000 as an exact piecewise-linear rational model on explicit curve rows.
+ * Usable/DOD fields are ignored. Voltage and DC ratio must be positive; extra
+ * resistances must be nonnegative. Return a MODEL ESTIMATE, not measured OCV.
+ * Missing/multiple roots fail. Uniqueness is decided before flooring outputs;
+ * identical repeated points/shared vertices count once, but a root on a flat
+ * interval or a nonidentical zero-charge-width segment is ambiguous.
+ * Failed operations leave the whole output unchanged. */
+int r1_battery_model_seed(const struct r1_battery_profile *profile,
+                          r1_battery_int terminal_01mv,
+                          const struct r1_battery_model_parameters *parameters,
+                          struct r1_battery_model_point *out);
+
+/* Same model under current <= 0. Require first charge zero. The earliest
+ * at/below-minimum boundary ends discharge; later recovery cannot extend it.
+ * A zero-width drop returns DISCONTINUITY, not a uniquely usable seed point.
+ * No crossing returns PROFILE_END: only a truncated-domain bound, not evidence
+ * that the minimum was reached. Starting at/below minimum or a capacity that
+ * floors to zero fails NO_CUTOFF. No implicit normalization or Qmax fallback.
+ * All returned positive physical quantities are floored in their named units. */
+int r1_battery_model_cutoff(const struct r1_battery_profile *profile,
+                            r1_battery_int minimum_01mv,
+                            const struct r1_battery_model_parameters *parameters,
+                            struct r1_battery_model_capacity *out);
 
 /* Positive OCV input is required. These are curve conversions, not evidence
  * that a loaded terminal-voltage measurement is a valid OCV reference. */

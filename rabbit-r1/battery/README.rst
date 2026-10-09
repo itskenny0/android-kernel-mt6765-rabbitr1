@@ -139,13 +139,15 @@ Run from the installed workspace::
     python3 /rabbitr1/battery/tests/run.py
 
 Use ``--out /rabbitr1/out/battery-review/usable-capacity/test`` to redirect test
-artifacts. Both suites run by default.
+artifacts. All three suites run by default.
 
 The normal test requires neither stock firmware nor emulation. It compiles the
-actual C sources with strict warnings, ASan and UBSan. Frozen expected values
-were captured from the stock kernel's ARM64 instructions, independently of this
-C implementation. The runner only serializes those captured values for the C
-test executable; it does not calculate expected interpolation or charge results.
+actual C sources with strict warnings, ASan and UBSan. For the two
+stock-equivalent suites, frozen expected values were captured from the stock
+kernel's ARM64 instructions, independently of this C implementation.
+The runner only serializes those captured values for their C test executables;
+it does not calculate their expected interpolation or charge results. The third
+suite uses the explicit rational reference described below for the new model.
 
 The fixture contains 81 complete temperature profiles, 2358 OCV/DOD conversions,
 8 explicit-Qmax normalizations, 66 repeated-coordinate boundary conversions and
@@ -199,3 +201,94 @@ This library publishes no CAPACITY property and changes no kernel driver, DT,
 Health service, charging limit, RTC byte or hardware accumulator. Those remaining
 integration decisions and real device validation are required before exposing
 a battery percentage to Android.
+
+
+Loaded-profile model estimates
+------------------------------
+
+``r1_battery_model_seed`` and ``r1_battery_model_cutoff`` are new **model**
+primitives. They do not reproduce stock seed policy, require a measured RAC,
+select a seed, or produce SOC. They reuse the independently verified temperature
+curves and work directly in discharged-charge coordinates before normalization.
+They ignore existing DOD/usable fields. All model parameters are explicit:
+signed current in 0.1 mA (positive charging), nonnegative shunt/meter resistance
+in 0.1 milliohms, and positive DC ratio in percent. Explicit zeros support
+no-load/ideal-extra-resistance models; they are not missing-input defaults.
+
+The exact rational model is::
+
+    terminal_01mv = ocv_01mv + current_01ma *
+        (cell_resistance_01mohm * dc_ratio_percent / 100
+         + shunt_01mohm + meter_01mohm) / 10000
+
+Positive current raises terminal voltage above the modeled OCV; negative
+current lowers it. The divisions above are rational units, not intermediate
+integer rounding. The implementation uses checked signed64 residuals::
+
+    (OCV - terminal) * 1000000
+      + current * (Rcell * DC_percent + 100 * (Rshunt + Rmeter))
+
+Each consecutive pair of explicit rows describes a linear model segment.
+``model_seed`` solves for the unique exact root over all segments, then floors
+charge, OCV and cell resistance individually to their named positive units.
+It returns ``NO_ROOT`` outside the modeled loaded-voltage domain and
+``AMBIGUOUS`` for multiple exact roots, a nontrivial flat zero interval, or a
+candidate on a nonidentical zero-charge-width segment, including its endpoints.
+Identical repeated rows are deduplicated; a vertex shared by ordinary segments
+counts once. Uniqueness is checked before flooring, with no nearest-root choice,
+voltage clamp, iterative convergence assumption or guessed impedance. Resistance
+need not be monotonic. This is an inferred open-circuit voltage from a supplied
+loaded observation, **not a measurement of open-circuit voltage**.
+
+``model_cutoff`` requires current <=0 and charge zero at the first row. It
+returns the first at/below-minimum boundary in discharge row order; a later
+loaded-voltage recovery cannot restore capacity already lost. The result's
+charge is a conservatively floored modeled capacity coordinate. Three explicit
+boundary reasons distinguish its meaning:
+
+* ``CROSSING``: the first loaded-voltage minimum is reached within an ordinary
+  segment (including its endpoint).
+* ``DISCONTINUITY``: a zero-charge-width drop reaches minimum. Its interpolated
+  OCV/resistance describe this model boundary and cannot be reused as a unique
+  seed. The same charge coordinate bounds capacity on both sides of the drop.
+* ``PROFILE_END``: all valid points remain above minimum, so only the final
+  explicit profile coordinate is returned. This is a truncated-domain bound,
+  not proof of reaching the voltage limit. The caller must separately justify
+  any normalization to it; the function does not extend the curve or use Qmax.
+
+Starting at/below minimum, or a positive fractional cutoff that floors to zero
+charge, returns ``NO_CUTOFF``. Repeated voltages do not require global monotonic
+loaded voltage: cutoff uses the earliest reachable boundary while seed requires
+global uniqueness. The model APIs return no normalized profile or percentage.
+A future caller may use ``assign_dod`` only after explicitly accepting the
+capacity boundary and its physical model.
+
+The model deliberately differs from the stock RAC-dependent backwards/grid
+search and staged asymmetric rounding. ``tests/model-reference.py`` is an
+independent Python ``Fraction`` reference, expressing the physical rational
+terminal voltages directly and finding exact segment intersections. It reads
+frozen stock instruction profile captures and never loads the C implementation.
+The C suite compares actual production functions against that reference across
+all captured temperature profiles, charging/discharging/zero currents, multiple
+DC ratios and exact/adjacent row-voltage boundaries. Hand-derived fixtures
+separately verify sign, floor rounding, duplicate vertices, flat and multiple
+roots, discontinuities, earliest cutoff despite later recovery, explicit profile
+ends, invalid parameters, overflow and unchanged outputs on all errors. Neither
+this reference nor those tests claim stock instruction equivalence for the new
+model policy. Existing instruction suites retain that role for equivalent math.
+
+Runtime integration remains separate. The gauge currently reads current and
+counter in different latch transactions and ADC values separately, so its
+individual properties do not establish a coherent seed observation. A future
+collector must bracket observations, retain errors and counter alignment, and
+apply explicit caller-supplied motion/duration/model-agreement limits. No physical
+acceptance thresholds or guessed capacity are supplied here. Pack chemistry,
+aging, resistance behavior and sensor calibration need hardware validation.
+Fresh live estimation does not require old PON age or unproven LK RAC provenance.
+
+A future session must preserve the accepted **charge coordinate**, not silently
+round-trip it through ``update(reference_ocv)``. Repeated-voltage plateaus can
+have different charge coordinates: at 0 C, stock rows 38/39 are charge 7604/7804
+at voltage 37590 with resistance 7874/7579. OCV alone loses that position. This
+change adds no session, counter continuity policy, kernel collector, CAPACITY,
+RTC writes or battery-shutdown bypass.
