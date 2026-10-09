@@ -178,7 +178,7 @@ def publish_no_replace(source, destination):
         raise OSError(number, os.strerror(number), str(destination))
 
 
-def prepare(destination, files, directories, changes, patch):
+def prepare(destination, files, directories, changes, patch, *, workspace=ROOT):
     require(not os.path.lexists(destination), 'destination already exists; use --check')
     require(destination.parent.is_dir(), 'destination parent must already exist')
     staging = Path(tempfile.mkdtemp(prefix='.mtkclient-prepare-', dir=destination.parent))
@@ -196,7 +196,7 @@ def prepare(destination, files, directories, changes, patch):
             os.chmod(path, item['mode'])
         env = dict((key, value) for key, value in os.environ.items() if not key.startswith('GIT_'))
         env.update(GIT_CONFIG_NOSYSTEM='1',
-                   GIT_CONFIG_GLOBAL=str(ROOT / '.gitconfig'), GIT_TERMINAL_PROMPT='0')
+                   GIT_CONFIG_GLOBAL=str(workspace / '.gitconfig'), GIT_TERMINAL_PROMPT='0')
         for check in (True, False):
             command = ['git', '-c', 'core.autocrlf=false', 'apply', '--no-index', '--whitespace=nowarn']
             if check:
@@ -234,7 +234,7 @@ def main():
     if args.check:
         verify_tree(destination, files, directories, changes)
     else:
-        prepare(destination, files, directories, changes, patch)
+        prepare(destination, files, directories, changes, patch, workspace=workspace)
     print(json.dumps({'status': 'checked' if args.check else 'prepared',
                       'destination': str(destination), 'files': len(files),
                       'directories': len(directories), 'manifest_sha256': digest(manifest),

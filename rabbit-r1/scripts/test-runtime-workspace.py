@@ -87,8 +87,20 @@ for source,name in [(SCRIPTS/'prepare-mtkclient.py','prepare-mtkclient.py'),
 command = [sys.executable,str(out/'prepare-mtkclient.py'),'--workspace',str(workspace),
            '--manifest',str(out/'mtkclient-transport.json'),'--patch',str(out/'mtkclient-transport.patch'),
            '--archive',str(archive),'--destination',runtime['destination']]
-p = run(command); assert p.returncode == 0, p.stderr
+# Inspect the environment used by the real patch subprocesses, then run them.
+launcher = args.out/'check-git-workspace.py'
+launcher.write_text('import runpy,subprocess,sys\n'+
+    'real_run=subprocess.run\n'+
+    'def checked(*args,**kwargs):\n'+
+    ' assert kwargs["env"]["GIT_CONFIG_GLOBAL"] == '+repr(str(workspace/'.gitconfig'))+'\n'+
+    ' assert kwargs["env"]["GIT_CONFIG_NOSYSTEM"] == "1"\n'+
+    ' return real_run(*args,**kwargs)\n'+
+    'subprocess.run=checked\n'+
+    'sys.argv=sys.argv[1:]\n'+
+    'runpy.run_path(sys.argv[0],run_name="__main__")\n')
+p = run([command[0],str(launcher),*command[1:]]); assert p.returncode == 0, p.stderr
 assert json.loads(p.stdout)['files'] == 1164
+note('patch subprocess uses Git configuration inside the selected workspace')
 p = run(command+['--check']); assert p.returncode == 0, p.stderr
 note('actual archive prepared and fully checked in explicit workspace')
 require_failure(command,'already exists'); note('explicit workspace does not overwrite existing source')
