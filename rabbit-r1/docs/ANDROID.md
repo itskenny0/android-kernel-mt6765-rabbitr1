@@ -73,7 +73,9 @@ The graphics sources include the complete [Mesa 26.2.4 release](https://docs.mes
 delta on the pinned Lineage tree. Its six Android/integration differences remain
 byte-for-byte unchanged. [Source provenance](../android/patches/mesa-26.2.4.json)
 records the upstream revisions, release checksum and retained delta. Source
-application and repeat checks passed; target compilation remains pending.
+application and repeat checks passed. The PowerVR Vulkan library also passed
+a separate x86_64 Linux host build; Android/ARM64 userspace compilation remains
+pending. [Compile evidence](../tests/gpu/mesa-host-build.json) records its scope.
 
 The kernel PowerVR driver matches the complete Linux 7.2.9 subtree, including
 its unchanged UAPI. A separate CI configuration enables the driver, debugfs

@@ -35,6 +35,43 @@ This checks source composition and compilation, not full kernel linking,
 firmware operation or rendering. No synthetic tests of upstream algorithms
 are substituted for hardware validation.
 
+Additional compile results
+--------------------------
+
+A full AArch64 kernel link passed with PowerVR, debugfs and tracing enabled
+in the separate configuration at kernel commit
+``9ab2d3454215448b413014946061b673a1967a6b``. It produced no compiler warnings
+or undefined symbols; the linked image contains the PowerVR probe, init and
+tracepoints. ``kernel-full-link.json`` records the config, image and log hashes.
+After the subtree check above, repeat this optional link check with::
+
+    make -C /rabbitr1/src/mainline O=/rabbitr1/out/powervr-check \
+      ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$JOBS" vmlinux
+
+CI runs the 28-object subtree check. The full-link artifact remains in its
+separate output directory and is not included in the flash package.
+
+Mesa 26.2.4's PowerVR Vulkan shared library also compiled and linked through
+613 Ninja actions, with zero Mesa compiler warnings. This was an x86_64
+Linux/glibc, headless build of the DRM backend. It neither validates Android
+or ARM64 userspace nor tests rendering. No driver was loaded or GPU opened.
+``mesa-host-build.json`` records source revisions, Meson options, tool hashes,
+dependency versions and the output hash. Its private libdrm build produced
+three existing ignored-asprintf compiler warnings, retained in the log.
+
+The native build used the pinned Lineage Mesa base plus patch 0005, a private
+libdrm 2.4.124 build, the existing mesa-build-dep generators and a source-built
+Mesa 26.2.4 ``pco_clc``. The existing bundled generator produced identical
+C/header output for the default device list on the actual PowerVR SPIR-V
+input. This comparison does not cover other devices or shader correctness.
+
+The JSON files name original workspace logs and a reproduction script under
+``/rabbitr1/out/``; those artifacts are not bundled in the repository. An
+Android compile still needs the actual ARM64 bionic/vendor dependency inputs
+from the platform build. Packaging also needs the imagination-to-powervr_mesa
+suffix mapping and Android buffer-sharing support; the host check supplies
+neither. Production continues to use SwiftShader.
+
 The r1 GPU remains disabled
 -------------------------
 

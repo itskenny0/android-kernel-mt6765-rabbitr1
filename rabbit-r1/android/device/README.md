@@ -29,10 +29,10 @@ SELinux and physical-device checks remain. See `rabbit-r1/docs/BOOT-CONTROL.md`.
 
 Initial bring-up uses one CPU, permissive SELinux, retained firmware clocks and
 regulators, and software graphics with the firmware framebuffer. The health HAL
-reads real power supplies, but battery percentage and combined charging status
-are unfinished. The existing kernel has no capacity property; the default HAL
-therefore reports zero with unknown status. Android's BatteryService can then
-shut down after startup because the battery is present and appears empty. This
+reads real power supplies. The gauge now reports the bound charger's actual
+status, but battery percentage remains unfinished. The kernel has no capacity
+property, so the default HAL reports zero capacity. Android's BatteryService
+can still shut down because the battery is present and appears empty. This
 is an Android boot blocker. Implement and validate real fuel-gauge reporting;
 do not substitute a simulated battery or suppress the shutdown check.
 The gauge now exposes the signed hardware charge counter in microamp-hours;
