@@ -230,8 +230,10 @@
     "sdk_full": "37.0",
     "codename": "REL",
     "preview_sdk": "0",
-    "security_patch": "2026-06-05",
-    "board_api_level": "202604"
+    "security_patch": "2026-10-01",
+    "board_api_level": "202604",
+    "clang": "clang-r596125",
+    "scope": "AOSP plus Lineage vendor release maps; resolved by initial failed SOC/cp2a configuration, no target compilation claimed"
   },
   "vndk": "No ro.vndk.version is emitted; build/make/core/config.mk clears BOARD_VNDK_VERSION and PLATFORM_VNDK_VERSION. Current vendor surface is board API202704. ro.vendor.api_level is initialized by init at runtime when absent; no device value was observed.",
   "findings": [
@@ -243,5 +245,64 @@
   "source_or_output_changed": false,
   "network_refresh": false,
   "build_or_ninja_parser_run": false,
-  "runtime_or_security_compliance_proved": false
+  "runtime_or_security_compliance_proved": false,
+  "cp2a_comparison_correction": {
+    "reason": "Original future cp2a comparison inspected only AOSP release flags and omitted the automatically included Lineage vendor release map.",
+    "original_comparison": {
+      "release": "17",
+      "sdk": "37",
+      "sdk_full": "37.0",
+      "codename": "REL",
+      "preview_sdk": "0",
+      "security_patch": "2026-06-05",
+      "board_api_level": "202604"
+    },
+    "original_version_record_sha256": "7d03b8b2fa0a4917c693c17d0a7ffc5e2e2591e4832a429eba702c503832852b",
+    "configuration_only_evidence": {
+      "path": "/rabbitr1/out/android-build-review/soc-cp2a/verification/failed-configuration-flags.json",
+      "sha256": "37478f3f2ed973fd776ae02badd58310bbdd52c40e6dd67e2bf84dbeb90857c5",
+      "values": {
+        "DeviceProduct": "lineage_r1_soc",
+        "DeviceName": "r1",
+        "Platform_version_name": "17",
+        "Platform_sdk_version": 37,
+        "Platform_sdk_codename": "REL",
+        "Platform_sdk_final": true,
+        "Platform_preview_sdk_version": "0",
+        "Platform_security_patch": "2026-10-01",
+        "VendorApiLevel": "202604",
+        "BoardSepolicyVers": "202604",
+        "PlatformSepolicyVersion": "202604",
+        "BuildFlags": {
+          "RELEASE_BUILD_CLANG_VERSION": "clang-r596125",
+          "RELEASE_PLATFORM_SECURITY_PATCH": "2026-10-01",
+          "RELEASE_AIDL_USE_UNFROZEN": ""
+        }
+      }
+    },
+    "release_map_sources": {
+      "src/android/vendor/lineage/release/release_config_map.textproto": {
+        "bytes": 300,
+        "sha256": "1b89892e852ac1e0c5f304b8678ab8f2edf9341e4d0479d6219ff8d1db017140"
+      },
+      "src/android/vendor/lineage/release/release_configs/cp2a.textproto": {
+        "bytes": 112,
+        "sha256": "3270677c0c844493c9cd404eadddda156d21d100ff3516a0b69861dd5e6773f7"
+      },
+      "src/android/vendor/lineage/release/flag_values/cp2a/RELEASE_BUILD_CLANG_VERSION.textproto": {
+        "bytes": 79,
+        "sha256": "ea70b0e341595520986c82965ae80a892ba47f5c432247ed2a2dfc91687c6e60"
+      },
+      "src/android/vendor/lineage/release/flag_values/cp2a/RELEASE_PLATFORM_SECURITY_PATCH.textproto": {
+        "bytes": 79,
+        "sha256": "86525e24bd59d057d9ca03910a02fce9f5b2d9475a20c96d76982ba164c5ecff"
+      },
+      "src/android/build/make/core/release_config.mk": {
+        "bytes": 9104,
+        "sha256": "9ca07283e3bccaded590bceb4d4b050cddb30d2249d7877cb0d117050571025b"
+      }
+    },
+    "completed_cp2a_artifact_audit": false,
+    "security_patch_coverage_proved": false
+  }
 }

@@ -18,8 +18,11 @@ configuration, not finalized `REL`. The [version review](../android/version-stat
 traces these values to the pinned release flags. New builds default to the
 finalized `cp2a` configuration: `REL`, preview SDK 0 and vendor API 202604.
 This changes vendor API and feature flags and requires a new build and audit;
-the earlier development build does not validate it. The declared security patch
-level remains June 5, 2026.
+the earlier development build does not validate it. That `trunk_staging` build
+declared June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
+and declares October 1, 2026, overriding the AOSP-only flag values. These are
+configuration values; the security-patch property alone does not establish
+security-patch coverage in the custom kernel or vendor implementation.
 
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
