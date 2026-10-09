@@ -643,12 +643,17 @@
     "project": "bootable/recovery",
     "base_commit": "37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd",
     "patch": "0006-fix-recovery-algorithm-include.patch",
-    "sha256": "807eeb4418df2a876545f49ad7b436cc23dd0a152d45e5512d36c42bd9f2eb0d",
+    "sha256": "9c746d4172715e762363520bdfc12aed358bba6b42c6ee6f945483d602d50714",
     "files": [
       {
         "path": "volume_manager/PublicVolume.cpp",
         "before_sha256": "0a9a1a7fa3129e5c12cc904635ee5a6214102da5c6bdeffe813cc3490dc0cacc",
         "after_sha256": "7281faeb8bfee4bc3c7ca6b79f62556682e924f0c18bc563b0b49c47f92cda60"
+      },
+      {
+        "path": "volume_manager/include/volume_manager/VolumeManager.h",
+        "before_sha256": "bbad7bae25778bc161def31d046ce2781cd67cccd1ec4dec669a4533acd90929",
+        "after_sha256": "ca05ed6002eb73c7fa7bcee4bb3903b8e0bdc50421198b5ae11cf5b8cb63b7f8"
       }
     ]
   }
