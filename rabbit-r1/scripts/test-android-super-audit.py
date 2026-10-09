@@ -157,6 +157,58 @@ for key,value in [('exit_code',1),('inputs_unchanged',False),('build_source_comm
     reject('completed-'+key,lambda o,bad=bad:details(o,0)['build_identity'].__setitem__('build_result',bad))
 badproducer=WORK/'changed-producer';shutil.copytree(producer,badproducer);(badproducer/'health_checks.py').write_bytes((badproducer/'health_checks.py').read_bytes()+b'\n# changed producer\n')
 reject('changed-imported-producer',lambda o:o.__setitem__('verifier',m.digest_file(badproducer/'verify.py')))
+# Exact historical kernel/helper bindings must not enter the current profile.
+# Keep the modeled old-kernel JSON chain internally consistent so these fail
+# the intended admission boundary, not an incidental stale file/hash pointer.
+historical_rejections=[]
+def reject_historical(label, obj, expected_error):
+    global count
+    try:inspect(obj)
+    except ValueError as error:
+        assert str(error)==expected_error,(label,str(error))
+        count+=1;failures.append(label)
+        historical_rejections.append({'case':label,'error':str(error)})
+    else:raise AssertionError('Historical binding accepted: '+label)
+
+old_kernel='f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+old=copy.deepcopy(audit)
+old_installer_data=json.loads(Path(installer['path']).read_text())
+old_installer_data['kernel_source_commit']=old_kernel
+old_installer=js('historical-kernel/installer.json',old_installer_data)
+old_record_data=json.loads(Path(kernel_record['path']).read_text())
+old_record_data['source_commit']=old_kernel
+old_record=js('historical-kernel/kernel-build.json',old_record_data)
+old_start_data=json.loads(Path(start['path']).read_text())
+old_start_data['inputs']['installer_sha256']=old_installer['sha256']
+old_start=js('historical-kernel/start.json',old_start_data)
+old_result_data=json.loads(Path(completed['path']).read_text())
+old_result_data.update(build_start=old_start['path'],build_start_sha256=old_start['sha256'])
+old_result=js('historical-kernel/result.json',old_result_data)
+old_provenance=details(old,0);old_identity=old_provenance['build_identity']
+old_provenance.update(kernel_source_commit=old_kernel,installer_manifest=old_installer)
+old_identity.update(expected_kernel_commit=old_kernel,build_start=old_start,build_result=old_result)
+old_identity['source_identity'].update(kernel_source_commit=old_kernel,installer_manifest=old_installer)
+old['source_inputs']=[old_installer,old_record,*old['source_inputs'][2:]]
+details(old,8)['kernel_record']=old_record
+assert old_identity['source_identity']=={k:old_provenance[k] for k in initial}
+assert old_start_data['inputs']['installer_sha256']==old_provenance['installer_manifest']['sha256']
+assert old_result_data['build_start']==old_identity['build_start']['path']
+assert old_result_data['build_start_sha256']==old_identity['build_start']['sha256']
+reject_historical('historical-f725-kernel',old,'Incomplete SOC build identity')
+
+for name,constant,wanted in (
+    ('provenance.py','EXPECTED_KERNEL=','82aad6709888a0779a380a71e263192e313bb425fcc239314a5c307443c05f3b'),
+    ('health_checks.py','KERNEL_SOURCE = ','72a336069bc0ccabc70c058fabb5a0f8d19e9af6a96e311949050e09409aff8c')):
+    directory=badproducer/('historical-'+name.removesuffix('.py'))
+    shutil.copytree(producer,directory)
+    path=directory/name;data=path.read_text();current=constant+repr(kernel)
+    assert data.count(current)==1
+    path.write_text(data.replace(current,constant+repr(old_kernel)))
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==wanted
+    old=copy.deepcopy(audit);old['verifier']=m.digest_file(directory/'verify.py')
+    details(old,0)['build_identity']['guard']=m.digest_file(directory/'provenance.py')
+    reject_historical('historical-'+name,old,'Unreviewed SOC audit producer: '+name)
+
 # Explicit historical profile preserves reproduction while default SOC refuses
 # to bless the known incomplete old Health-provider coverage.
 legacy=copy.deepcopy(audit);legacy['checks']=[{'name':n,'status':'pass','details':{}} for n in m.LEGACY_CHECKS]
@@ -215,4 +267,4 @@ assert output_path(WORK/'new-output')==WORK/'new-output';count+=1
 # Verify all data fixtures and production consumer are still unchanged.
 assert {name:hashlib.sha256((producer/name).read_bytes()).hexdigest() for name in m.SOC_PRODUCER}==m.SOC_PRODUCER
 
-r={'status':'pass','cases':count,'rejections':failures,'scope':'Static source-schema and synthetic record fixtures ONLY; no current auditor or real Android image opened/executed','source_checks_match_ast':True,'producer_sha256':m.SOC_PRODUCER,'current_actual_audit_success_observed':False,'current_actual_images_ready':False,'cli_plan_argv':argv,'cli_exercised_in_process':True,'producer_execution_forbidden':True,'tool_execution_forbidden':True,'fixture_lookup':'relative to repository scripts directory','lpmake_sha256':tool_sha,'candidate_sha256':hashlib.sha256(BUILDER.read_bytes()).hexdigest(),'runner_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'fixture_provenance_sha256':hashlib.sha256((FIXTURES/'provenance.json').read_bytes()).hexdigest()};(WORK/'test-result.json').write_text(json.dumps(r,indent=2)+'\n');print('PASS',count,'synthetic schema/profile cases; current real audit readiness remains unestablished')
+r={'status':'pass','cases':count,'rejections':failures,'historical_binding_rejections':historical_rejections,'scope':'Static source-schema and synthetic record fixtures ONLY; no current auditor or real Android image opened/executed','source_checks_match_ast':True,'producer_sha256':m.SOC_PRODUCER,'current_actual_audit_success_observed':False,'current_actual_images_ready':False,'cli_plan_argv':argv,'cli_exercised_in_process':True,'producer_execution_forbidden':True,'tool_execution_forbidden':True,'fixture_lookup':'relative to repository scripts directory','lpmake_sha256':tool_sha,'candidate_sha256':hashlib.sha256(BUILDER.read_bytes()).hexdigest(),'runner_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'fixture_provenance_sha256':hashlib.sha256((FIXTURES/'provenance.json').read_bytes()).hexdigest()};(WORK/'test-result.json').write_text(json.dumps(r,indent=2)+'\n');print('PASS',count,'synthetic schema/profile cases; current real audit readiness remains unestablished')

@@ -23,7 +23,7 @@ CANONICAL = ROOT / 'src/mainline'
 OUT = ROOT / 'out/android'
 PRODUCT = OUT / 'target/product/r1'
 SOURCE = None  # supplied by the full-image guard
-KERNEL_SOURCE = 'f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+KERNEL_SOURCE = 'e98ffe5fcee6ce89fb754003059334ba1cf50b5c'
 TARGETS = ['android.hardware.health-service.r1', 'r1-health-initial-ready',
            'android.hardware.health-service.example_recovery', 'selinux_policy',
            'sepolicy.recovery', 'bootimage', 'dtboimage']

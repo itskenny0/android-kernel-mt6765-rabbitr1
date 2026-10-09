@@ -53,9 +53,10 @@ existing /rabbitr1 and out/android-super confinement; this change does not make
 production outputs arbitrary host paths. Use a fresh --out each time. Existing,
 outside-tree and symlink output paths reject before creation.
 
-The 131 cases preserve the prior 119 admission controls and add actual CLI
-legacy/default/unknown selection, fixture-execution and image-open guard controls,
-and --out boundaries. Current soc-cp2a-18 is the actual default. Legacy is accepted
+The 134 cases preserve the prior 131 admission, CLI, fixture-execution,
+image-open and --out controls. Three additional negatives coherently bind the
+old f725 kernel, or restore one exact historical imported producer at a time,
+and require the intended kernel/producer rejection before any image is opened. Current soc-cp2a-18 is the actual default. Legacy is accepted
 only with explicit legacy-default-10 and carries its historical mock-Health
 coverage limitation. There is no automatic fallback or claim of current release
 readiness. Source snapshots, expected shapes and pins require review together
@@ -65,3 +66,16 @@ The existing 84-case actual-lpmake suite must retain its explicit historical
 profile selection from the production candidate. Both commands belong in CI.
 Successful schema tests cannot replace terminal Android build records, the
 executed eighteen-check image audit or its real-record compatibility check.
+
+E98 producer rebinding
+----------------------
+
+The current SOC profile is bound to kernel
+e98ffe5fcee6ce89fb754003059334ba1cf50b5c. Only the two imported helpers' kernel
+constants changed; the main eighteen-check verifier is byte-identical. Fixture
+provenance preserves the prior review pin and separately names the new producer
+preparation handoff. This rebinding is not an executed Android image audit.
+
+The previous f725 SOC producer is not an automatic compatibility profile. The
+current default must reject its kernel/producer bindings. The separate explicit
+legacy-default-10 mode keeps its existing historical scope and limitation.

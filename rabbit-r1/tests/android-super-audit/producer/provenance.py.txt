@@ -3,7 +3,7 @@ import hashlib,json,re,subprocess
 from pathlib import Path,PurePosixPath
 
 ROOT=Path('/rabbitr1')
-EXPECTED_KERNEL='f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+EXPECTED_KERNEL='e98ffe5fcee6ce89fb754003059334ba1cf50b5c'
 EXPECTED_PRODUCT='lineage_r1_soc'
 EXPECTED_RELEASE='cp2a'
 REQUIRED_TARGETS={'systemimage','systemextimage','productimage','vendorimage','superimage','vbmetaimage','check-all-partition-sizes','bootimage','dtboimage','sepolicy.recovery'}

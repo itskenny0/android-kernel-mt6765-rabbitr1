@@ -43,10 +43,10 @@ SOC_CHECKS = ('completed build and staged provenance',
  'current allocator APEX payload, ARM64 libraries, init and VINTF',
  'image immutability during read-only audit')
 AUDIT_PROFILES = {'soc-cp2a-18': SOC_CHECKS, 'legacy-default-10': LEGACY_CHECKS}
-SOC_KERNEL = 'f72592a467a1e289ffbfd0fbee6adac5093bf6db'
+SOC_KERNEL = 'e98ffe5fcee6ce89fb754003059334ba1cf50b5c'
 SOC_PRODUCER = {'verify.py': 'd1a0b5105d5d8df05382b45385d10720c7368d779be572d0087d8e2b62ae9670',
- 'provenance.py': '82aad6709888a0779a380a71e263192e313bb425fcc239314a5c307443c05f3b',
- 'health_checks.py': '72a336069bc0ccabc70c058fabb5a0f8d19e9af6a96e311949050e09409aff8c'}
+ 'provenance.py': '36f06211b062b409ae42833c54e3e51e2c3e493861305d040101028644b00473',
+ 'health_checks.py': '5562be046530280189632a49b3b9e23b1a10a175ad1df17e4f50d04a402a6176'}
 SOC_TARGETS = {'bootimage',
  'check-all-partition-sizes',
  'dtboimage',
