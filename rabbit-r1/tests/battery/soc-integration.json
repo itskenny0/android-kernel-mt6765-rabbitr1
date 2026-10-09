@@ -141,7 +141,7 @@
   },
   "original_workspace_directory": "/rabbitr1/out/battery-review/soc-state/kernel-integration",
   "pending": [
-    "Full kernel and module link",
+    "Gauge module .ko modpost",
     "Android same-monitor priming and readiness integration",
     "Hardware measurements and calibration"
   ],
@@ -165,5 +165,9 @@
       "result": "/rabbitr1/out/battery-review/soc-state/kernel-integration/canonical-test/result.json",
       "result_sha256": "72f273bdbe51e745b6132d0ae8a73a95298e513099c70124ed83780bf30c86bd"
     }
+  },
+  "full_kernel_link": {
+    "record": "soc-kernel-link.json",
+    "result": "passed; built-in gauge,10 other modules"
   }
 }

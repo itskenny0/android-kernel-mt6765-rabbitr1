@@ -134,3 +134,12 @@ or hardware test. Largest individual frame is the existing pure candidate1952 B;
 step960, read224, collector768 and worker80 B. This is not a complete kernel
 call-chain or interrupt-stack bound. Coordinated Android same-monitor priming
 and readiness gating remain required before any experimental ROM installation.
+
+The integrated code also passed an incremental full ARM64 kernel, modules and
+Image link with SOC, diagnostics and PowerVR enabled. All ten modules and the
+kernel are AArch64; the kernel has no undefined symbols. This build emitted no
+warnings or errors and reused objects from the earlier full kernel build.
+`tests/battery/soc-kernel-link.json` records the source fingerprint, config,
+artifact hashes and scope. The gauge was built-in for this check; a modular
+gauge `.ko` modpost remains separate. The shipping config, diagnostic package
+and Android kernel were not replaced.

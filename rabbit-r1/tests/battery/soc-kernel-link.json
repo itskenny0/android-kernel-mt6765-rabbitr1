@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "result": "pass",
+  "scope": "Incremental full scratch ARM64 kernel, modules and Image link with experimental SOC, diagnostics and PowerVR enabled",
+  "source_commit": "ab23cfd441f21f4a5e933540ca117981746d288b",
+  "source_file_count": 82928,
+  "source_fingerprint_sha256": "3f6fe1131498df2348684ff7a40f3ec6dbea2f294f6ceffd52102b485c980914",
+  "config_sha256": "eed34757fb2ef23a6c28049bde09fe32952e030bc14fde2b43f39d4a71be3319",
+  "make_exit_code": 0,
+  "elapsed_seconds": 83.34,
+  "warnings_in_this_build": 0,
+  "errors_in_this_build": 0,
+  "reused_objects": "Existing full kernel objects from the previously recorded 0074/0075 build; this is not a clean rebuild of every object",
+  "undefined_vmlinux_symbols": 0,
+  "aarch64_modules": 10,
+  "linked_symbols_checked": [
+    "mt6357_soc_work",
+    "mt6357_soc_capacity_locked",
+    "mt6357_soc_consume_locked",
+    "r1_battery_session_step",
+    "r1_battery_session_read",
+    "devm_power_supply_get_by_parent"
+  ],
+  "inlined_probe_calls_checked": [
+    "mt6357_gauge_collect_live",
+    "mt6357_soc_consume_locked",
+    "msleep"
+  ],
+  "compiler": "aarch64-linux-gnu-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "build_environment": {
+    "SOURCE_DATE_EPOCH": "1791527058",
+    "KBUILD_BUILD_TIMESTAMP": "Fri Oct 09 06:24:18 UTC 2026",
+    "KBUILD_BUILD_USER": "r1-builder",
+    "KBUILD_BUILD_HOST": "r1-workspace",
+    "KBUILD_BUILD_VERSION": "1"
+  },
+  "command": [
+    "make",
+    "-C",
+    "/rabbitr1/src/mainline",
+    "O=/rabbitr1/out/powervr-check",
+    "ARCH=arm64",
+    "CROSS_COMPILE=aarch64-linux-gnu-",
+    "-j8",
+    "W=1",
+    "vmlinux",
+    "modules",
+    "Image"
+  ],
+  "artifacts": {
+    "Module.symvers": {
+      "bytes": 861561,
+      "sha256": "c5186d36ae85124f7d5c73e1ff12eb2046fab6c4ab15025bb832dbe26479d624"
+    },
+    "System.map": {
+      "bytes": 7743263,
+      "sha256": "a2ddcfbd77d03e5f8e4941d8482dbf6ebdc83a065f15e4bbc46e0b65490f21a5"
+    },
+    "arch/arm64/boot/Image": {
+      "bytes": 35543048,
+      "sha256": "d1b69f1d92c17bb102ffa0f602e252b86818d17a522105b7fec986d6d78ec1d3"
+    },
+    "drivers/clk/mediatek/clk-mt8196-disp0.ko": {
+      "bytes": 18496,
+      "sha256": "2253212a3e6cbc95be2024bb6db616f6ad91f8021ad141d80703da172315afe7"
+    },
+    "drivers/clk/mediatek/clk-mt8196-disp1.ko": {
+      "bytes": 19064,
+      "sha256": "6f1ecf26031e6c994d5049a2322c9ada9e8e6dccdfa7c2c75254767b3e3e7b8f"
+    },
+    "drivers/clk/mediatek/clk-mt8196-mfg.ko": {
+      "bytes": 9712,
+      "sha256": "bc3e7bbefca7cce68a102b5a11a40098de72dff866a87b551e52f72f37692189"
+    },
+    "drivers/clk/mediatek/clk-mt8196-ovl0.ko": {
+      "bytes": 19408,
+      "sha256": "b6315d3309193914f35e6578092d3ff6215d02924903983d789a0bd4dc0f0b3f"
+    },
+    "drivers/clk/mediatek/clk-mt8196-ovl1.ko": {
+      "bytes": 19640,
+      "sha256": "5e5e413692456a8f5d8d1ad7ed4e31343d2ff2d0f1b8d18fa6320420a3d93806"
+    },
+    "drivers/clk/mediatek/clk-mt8196-vdec.ko": {
+      "bytes": 12112,
+      "sha256": "7e5e4c8633a1323beda19da0ad43694764876d9d1674e66dcaebc5acc57c3336"
+    },
+    "drivers/clk/mediatek/clk-mt8196-vdisp_ao.ko": {
+      "bytes": 8112,
+      "sha256": "48a06a1560024b27c29d19956559875b2906c7bb0b5d0b780e09872466400f1c"
+    },
+    "drivers/clk/mediatek/clk-mt8196-venc.ko": {
+      "bytes": 13760,
+      "sha256": "c03e9d3a2cb4c2c4921378b0c8d51e3b39c64a286f5eed4b9040ed1e304c3f2d"
+    },
+    "drivers/gpu/drm/imagination/built-in.a": {
+      "bytes": 2142,
+      "sha256": "fa22144a5ad2cf06e37ecb9569721382948f9dce902ee35df311b80d23a47917"
+    },
+    "drivers/power/supply/mt6357-gauge.o": {
+      "bytes": 30224,
+      "sha256": "1700f95df816970ff8ddb1ce23aa432d3b6e2c77690ca8153f66159dae1d6398"
+    },
+    "drivers/power/supply/mt6357-r1-model/profile.o": {
+      "bytes": 8296,
+      "sha256": "5d5d5be2cdac41de20f4245b6fa469eda0fb16ddbd36d1c7c195fb6118978d1a"
+    },
+    "drivers/power/supply/mt6357-r1-model/session.o": {
+      "bytes": 8048,
+      "sha256": "ae33d76f130b9274bf7b38ffbcdf7210758e248f245e7457f15d13683a8b5432"
+    },
+    "drivers/power/supply/mt6357-r1-model/stock_profiles.o": {
+      "bytes": 6336,
+      "sha256": "70d5d1fc2be1380c73b60845bbc479e76854e7a636f7360c72f869b965438278"
+    },
+    "drivers/power/supply/power_supply_core.o": {
+      "bytes": 40568,
+      "sha256": "486471baada3032b2efe604f5060184826a03e168173bda98b2c542b83377ca5"
+    },
+    "fs/pstore/pstore_blk.ko": {
+      "bytes": 18024,
+      "sha256": "fc8264d7bf5322a823fef8f830ef96a2d2375f4cb6612994b9815998b2f1e4d5"
+    },
+    "fs/pstore/pstore_zone.ko": {
+      "bytes": 21128,
+      "sha256": "c1efcae655d9a448252a73b4e37b88b0ae092104be2502f41244ed946759dd51"
+    },
+    "modules.builtin": {
+      "bytes": 28712,
+      "sha256": "cd7d1dbb41612fdb51829f51215daf729cba065ebcccb442613f724857585cf0"
+    },
+    "modules.order": {
+      "bytes": 364,
+      "sha256": "99a478427ad770134f2621bb102f0788c714fbec53e4ad8cd0e7f7dace5441e7"
+    },
+    "vmlinux": {
+      "bytes": 45291016,
+      "sha256": "d5a03e49183a6059b4faf782c186ca0b4c2a8bd55430cf05984a80049f832df8"
+    },
+    "vmlinux.symvers": {
+      "bytes": 861057,
+      "sha256": "6a152d8c2b7b5888e367083a3f815349faa63af4faa7481fb156da505f43992e"
+    }
+  },
+  "source_and_config_unchanged": true,
+  "shipping_config_enabled": false,
+  "dist_or_android_replaced": false,
+  "hardware_tested": false,
+  "original_workspace_directory": "/rabbitr1/out/powervr-check/full-link-0076-0077",
+  "evidence": {
+    "audit.json": "822b37c70f94168a6f609596a7b18ddfbf7c92ca5ac7d4b9cc8bfdcd5f2d80f1",
+    "before.json": "a6a44e398b371b29290d5e4b3a4ce402be3db2236d7aafe501a0aa70546e91dd",
+    "after.json": "8782f6f6518f7c9c9c95ac3c98c94fbd1455feed0746afccd5b04a01ca172b57",
+    "build.log": "c7988d1f6772256f5e4de8e6bd4fb9ee101d27559ee4c132e3e75bc9c0c55152",
+    "elf-header.txt": "5077f8c640db887596f3f9e6e66b28ad7863a4a32ca16a24886bba118a84aec7",
+    "undefined-symbols.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "linked-symbols.txt": "ea77c8c0db37e2979c23e01390231a7a6b505aa6d399114df1ced8ef6e10214f",
+    "probe-disassembly.txt": "90ed7a2c0cb3df03001a2bc3cd9f5af95ccaf4e1d166a53ed876d6bfb934d8a1",
+    "initial-review-assumption.json": "dc75dfa424383fca90d470ce8a5dbf1f59be4aae15454739dd9d4f04a330f6ab",
+    "prior-artifacts.json": "35f0c7a67747ced2f734b27a2846b93d29ef6a0eda65c863f183e6bacc99a010",
+    "review.py": "6f371bb04cc1972a62e2f33d15095231e2dfe4fcfc8c4e7d656ca3f241fd4320"
+  },
+  "limitations": [
+    "No device execution, battery calibration, runtime locking/stack measurement or Android boot proof.",
+    "The gauge is built-in for this complete kernel link; earlier external MODULE aggregate checks were not a gauge .ko modpost."
+  ]
+}
