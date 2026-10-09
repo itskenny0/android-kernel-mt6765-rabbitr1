@@ -37,25 +37,31 @@ patched LK into an Android OTA.
 Once sync completes, run the actual product configuration and targeted build:
 
 ```bash
-export GOCACHE=/rabbitr1/.cache/go-build GOPATH=/rabbitr1/.cache/go
-export GRADLE_USER_HOME=/rabbitr1/.cache/gradle ANDROID_USER_HOME=/rabbitr1/.cache/android
-cd /rabbitr1/src/android
-export OUT_DIR=../../out/android
-set +eu
-source build/envsetup.sh
-lunch lineage_r1 trunk_staging userdebug || exit
-m -j8 R1ChargingSettings r1-charging r1-expdb android.hardware.boot-service.r1 android.hardware.boot-service.r1_recovery selinux_policy
+bash /rabbitr1/scripts/build-android.sh
 ```
 
-These are the next validation commands, not a claim that the product already
-passes them. Build the full images after resolving product, HAL and policy
-errors, then inspect the generated boot header, DT table, module hashes, super
+The helper checks and applies the pinned Android compatibility patches, stages
+the device files and kernel, records the resolved manifest, selects the product
+and builds charging controls, the expdb logger, both boot services and policy.
+It defaults to eight jobs (`R1_ANDROID_JOBS` overrides this) and accepts explicit
+Android build targets as arguments. Logs remain under `/rabbitr1/logs`.
+
+The product has not yet passed this build. Build the full images after resolving
+product, HAL and policy errors, then inspect the generated boot header, DT table,
+module hashes, super
 metadata, partition sizes and AVB configuration. The stock layout evidence is
 recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 Keep `OUT_DIR` relative to the Android source root. The pinned Siso build tool
 fails to find its generated `main.star` when given an absolute config directory;
 `../../out/android` still keeps all output in `/rabbitr1/out/android`.
+
+The pinned vendor image libraries need vendor builds of several dependencies.
+The tracked patches enable only the required library variants. Patch
+application checks repository commits, patch hashes and exact touched-file
+contents before changing anything; it accepts its already-applied changes and
+refuses unrecognized edits. A resolved manifest identifies repository commits;
+the patch series records the intentional differences from those commits.
 
 The [device notes](../android/device/README.md) track the current hardware and
 release gates, including missing battery capacity (which can trigger Android's

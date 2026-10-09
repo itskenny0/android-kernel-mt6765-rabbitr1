@@ -1,0 +1,41 @@
+[
+  {
+    "project": "external/google-highway",
+    "base_commit": "94b90ab8cb9df9b3719a64751ea2fcb62caa3391",
+    "patch": "0001-enable-vendor-libhwy.patch",
+    "sha256": "e1f59fd959dbf72b5924deb8748dd7015f90690d9f3e65ae66fa6b19cacbce1b",
+    "files": [
+      {
+        "path": "Android.bp",
+        "before_sha256": "043564212b6144f4dbf84b1cbc5b0248f388a3d454d0be96a88a648232dc0dc8",
+        "after_sha256": "1b55ec8dab5eafbe8fd44479e5b5471febde2eb12fafb9a8a0973bb8323ad485"
+      }
+    ]
+  },
+  {
+    "project": "external/skia",
+    "base_commit": "508606366e71a3daa933a4e08bc49b84e387ec18",
+    "patch": "0002-enable-vendor-skcms.patch",
+    "sha256": "a2f3836d3eab8664e63e9b991857b6a6aaaa2d40bc2c6809f67c06e0b7804c68",
+    "files": [
+      {
+        "path": "Android.bp",
+        "before_sha256": "0b3e8a4595941e2a0151dc3faeeb1fd1a84ee3ef51f5ad7652e4afc21cbbaa1c",
+        "after_sha256": "14acd0fa5df66b3fe9ded651bb265c1e10742b7797903f19d1658b8cba86e50f"
+      }
+    ]
+  },
+  {
+    "project": "external/XMP-Toolkit-SDK",
+    "base_commit": "45acb237cd13c19708f963247c732250cd43a4a5",
+    "patch": "0003-enable-vendor-xmp.patch",
+    "sha256": "624e4665dad7f0d301c9a8223094d422b5d3c91dcecdac626b308b7ac990c6f0",
+    "files": [
+      {
+        "path": "Android.bp",
+        "before_sha256": "2c888a382881b1604579c270de34f4f1cc195e7b1afd1280028e055b3a77796a",
+        "after_sha256": "b25e70abbc5558bea99514a3266d6bdb610013ff15799189991b72b8526dd9a2"
+      }
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Enable vendor skcms
+
+libjxl exposes a vendor variant and links this library. Build the
+vendor variant of its dependency as well.
+
+---
+--- a/Android.bp
++++ b/Android.bp
+@@ -1158,6 +1158,7 @@
+ cc_library_static {
+     name: "libskia_skcms",
+     host_supported: true,
++    vendor_available: true,
+     sdk_version: "current",
+     srcs: [
+         "modules/skcms/skcms.cc",

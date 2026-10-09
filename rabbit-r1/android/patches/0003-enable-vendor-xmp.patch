@@ -1,0 +1,25 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Enable vendor XMP libraries
+
+libdng_sdk exposes a vendor variant and links xmp_toolkit_sdk. Build
+vendor variants of the toolkit and its private MD5 dependency.
+
+---
+--- a/Android.bp
++++ b/Android.bp
+@@ -16,6 +16,7 @@
+ cc_library {
+     name: "zuid_md5",
+     host_supported: true,
++    vendor_available: true,
+     sdk_version: "current",
+     stl: "c++_shared",
+     target: {
+@@ -37,6 +38,7 @@
+ cc_library {
+     name: "xmp_toolkit_sdk",
+     host_supported: true,
++    vendor_available: true,
+     sdk_version: "current",
+     stl: "c++_shared",
+     export_include_dirs: [
