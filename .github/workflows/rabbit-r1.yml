@@ -178,6 +178,8 @@ jobs:
           python3 scripts/test-cst836.py 2>&1 | tee logs/cst836-tests.log
           python3 scripts/test-expdb.py 2>&1 | tee logs/expdb-tests.log
           python3 scripts/test-pstore-credentials.py 2>&1 | tee logs/pstore-credentials-tests.log
+          python3 scripts/test-pstore-unregister.py \
+            --out /rabbitr1/out/pstore-unregister-tests 2>&1 | tee logs/pstore-unregister-tests.log
           python3 scripts/test-health-readiness.py 2>&1 | tee logs/health-readiness-tests.log
           python3 android/device/logging/tests/run.py 2>&1 | tee logs/android-expdb-loader-tests.log
 

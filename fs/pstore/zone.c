@@ -1447,9 +1447,11 @@ void unregister_pstore_zone(struct pstore_zone_info *info)
 	/* Stop incoming writes from pstore. */
 	pstore_unregister(&cxt->pstore);
 
-	/* Flush any pending writes. */
+	/* Drain the cleaner before the final flush. It can requeue on errors. */
+	cancel_delayed_work_sync(&psz_cleaner);
 	psz_flush_all_dirty_zones(NULL);
-	flush_delayed_work(&psz_cleaner);
+	/* The synchronous flush can schedule another retry; don't free its data. */
+	cancel_delayed_work_sync(&psz_cleaner);
 
 	/* Clean up allocations. */
 	kfree(cxt->pstore.buf);
