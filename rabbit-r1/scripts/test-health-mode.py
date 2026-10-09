@@ -20,6 +20,12 @@ OFF=b'CONFIG_IKCONFIG=y\nCONFIG_BATTERY_MT6357=y\n# CONFIG_BATTERY_MT6357_R1_SOC
 ON=OFF.replace(b'# CONFIG_BATTERY_MT6357_R1_SOC is not set',b'CONFIG_BATTERY_MT6357_R1_SOC=y')
 def validate(product,record,files):return mode.validate(product,record,files['Image.gz'],files['Image'],files['config'])
 class ModeTests(unittest.TestCase):
+ def test_deferred_product_inheritance_selects_only_real_health(self):
+  selection=load('health_product_selection',CANDIDATE/'scripts/test-health-product-selection.py')
+  with tempfile.TemporaryDirectory(dir=Path('/rabbitr1/.tmp'),prefix='health-product-') as temp:
+   with patch.object(sys,'argv',['test-health-product-selection','--output',temp]),contextlib.redirect_stdout(io.StringIO()):selection.main()
+   result=json.loads((Path(temp)/'result.json').read_text())
+   self.assertEqual(result['status'],'pass');self.assertEqual(len(result['cases']),4)
  def test_explicit_product_config_pair(self):
   for config,selected,other in [(OFF,'lineage_r1','lineage_r1_soc'),(ON,'lineage_r1_soc','lineage_r1')]:
    record,files=kernel(config);attestation=validate(selected,record,files)

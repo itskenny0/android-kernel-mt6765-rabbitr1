@@ -47,8 +47,11 @@ validation, hidden counter resets and persistence remain open. The SOC Health
 service, readiness helper and recovery service now pass their actual `cp2a`
 product build and [offline artifact checks](../health-product-build.json),
 including ARM64 linkage, installed init/VINTF, compiled split/recovery policy and
-the SOC kernel/recovery Health files in boot. Complete SOC filesystem images and
-physical startup remain unverified. See
+the SOC kernel/recovery Health files in boot. A subsequent inspection found
+an inherited simulated Health provider and duplicate recovery Health services
+in that configuration; the scoped checks did not verify uniqueness. The selector
+now runs before common defaults and passes the inheritance regression; rebuilt images still need a uniqueness check.
+Complete SOC filesystem images and physical startup remain unverified. See
 [Android integration](../../docs/ANDROID.md) for selection and validation scope.
 
 The asynchronous `r1-expdb` service validates the partition and its bounded

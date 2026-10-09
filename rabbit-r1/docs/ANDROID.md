@@ -21,9 +21,17 @@ This changes vendor API and feature flags and requires a new build and audit;
 the earlier development build does not validate it. The experimental SOC
 product's [targeted `cp2a` build](../android/health-product-build.json) now passes
 Health service/helper/recovery linkage, installed init/VINTF, compiled split and
-recovery policy, and boot kernel/Health ramdisk checks. Complete `cp2a` filesystem
-images and hardware validation remain outstanding. That `trunk_staging` build
-declared June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
+recovery policy, and boot kernel/Health ramdisk checks. A subsequent audit found
+both Cuttlefish and example recovery Health services in that ramdisk, declaring
+the same default instance. Deferred product inheritance also selected the
+Cuttlefish Health APEX for normal Android; its implementation reports a simulated
+85% charge. Those checks verified presence, not uniqueness; the affected build
+must not be released. The r1 Health selector is now included directly before
+common inheritance. Both products pass the product inheritance regression,
+including controls that reproduce the old bug. A rebuilt image still needs a
+fresh packaged-image check. The same selection bug also applies to the earlier
+default product configuration. Complete `cp2a` filesystem images and hardware
+validation remain outstanding. The `trunk_staging` build declared June 5, 2026. The pinned Lineage `cp2a` release map selects Clang-r596125
 and declares October 1, 2026, overriding the AOSP-only flag values. These are
 configuration values; the security-patch property alone does not establish
 security-patch coverage in the custom kernel or vendor implementation.
@@ -268,7 +276,9 @@ covers the host and compilation checks. The actual `lineage_r1_soc cp2a userdebu
 [targeted build and audit](../android/health-product-build.json) also pass:
 all three Health executables link as ARM64, normal/recovery init and VINTF remain
 separate, compiled policy grants the required access, and the boot image contains
-the attested SOC kernel and checked recovery Health files. This verifies vendor
+the attested SOC kernel and checked recovery Health files. A later inspection
+found the duplicate Cuttlefish recovery Health service described above; this
+scoped pass does not establish a unique recovery service. It verifies vendor
 installation staging, not membership in a completed SOC vendor image. The earlier
 full-image audit covers the default product with SOC disabled. Physical startup,
 enforcing runtime behavior, battery calibration and complete SOC images remain open.

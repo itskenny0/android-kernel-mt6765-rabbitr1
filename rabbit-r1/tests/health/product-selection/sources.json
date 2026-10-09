@@ -1,0 +1,40 @@
+{
+  "scope": "Pinned source fixtures for actual AOSP deferred/sorted product inheritance and mainline Health package selection; unrelated product leaves are stubbed by runner",
+  "files": {
+    "build/make/core/node_fns.mk": {
+      "source_sha256": "ea999b1e8a81ad41255e8760664dd16bbd4005b404382227e9d33c84f3a5de05",
+      "fixture_sha256": "ea999b1e8a81ad41255e8760664dd16bbd4005b404382227e9d33c84f3a5de05",
+      "project_commit": "92a87b9506e5d1c961292cc8138036ccbe190ada",
+      "source_path": "/rabbitr1/src/android/build/make/core/node_fns.mk",
+      "extraction": "complete unchanged file"
+    },
+    "build/make/core/product.mk": {
+      "source_sha256": "82d1ee8504124cd75f81398f35db6bea204064ce12b30454c195318caa739a69",
+      "fixture_sha256": "3aa7c4dca18dc98f4b1abb64f146a44bae33e5a068808b93a7a4f6bc6acc360e",
+      "project_commit": "92a87b9506e5d1c961292cc8138036ccbe190ada",
+      "source_path": "/rabbitr1/src/android/build/make/core/product.mk",
+      "extraction": "license header plus exact inherit-product macro"
+    },
+    "device/mainline/common/optional/options.mk": {
+      "source_sha256": "d51a06c806e31bffd17f03a7d04062949d4786474097e85f4c441f37c5fdf521",
+      "fixture_sha256": "d51a06c806e31bffd17f03a7d04062949d4786474097e85f4c441f37c5fdf521",
+      "project_commit": "1cd4a6850df2ce31d4e5c77a41210e2c590325ab",
+      "source_path": "/rabbitr1/src/android/device/mainline/common/optional/options.mk",
+      "extraction": "complete unchanged file"
+    },
+    "device/mainline/common/optional/health-hal_cuttlefish/product.mk": {
+      "source_sha256": "a85edcb3b420e59ec43c4c1eef8e80ca5fee165e8159dd689c234a20cfec42c6",
+      "fixture_sha256": "a85edcb3b420e59ec43c4c1eef8e80ca5fee165e8159dd689c234a20cfec42c6",
+      "project_commit": "1cd4a6850df2ce31d4e5c77a41210e2c590325ab",
+      "source_path": "/rabbitr1/src/android/device/mainline/common/optional/health-hal_cuttlefish/product.mk",
+      "extraction": "complete unchanged file"
+    },
+    "device/mainline/common/optional/health-hal_default-aidl/product.mk": {
+      "source_sha256": "59e1259af2b8d72dbf68d2fe48c488deae2d943f4ec0d4e0ab04420f9afd016e",
+      "fixture_sha256": "59e1259af2b8d72dbf68d2fe48c488deae2d943f4ec0d4e0ab04420f9afd016e",
+      "project_commit": "1cd4a6850df2ce31d4e5c77a41210e2c590325ab",
+      "source_path": "/rabbitr1/src/android/device/mainline/common/optional/health-hal_default-aidl/product.mk",
+      "extraction": "complete unchanged file"
+    }
+  }
+}

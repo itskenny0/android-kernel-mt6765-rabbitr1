@@ -364,5 +364,49 @@
     "Product boot arguments request global permissive SELinux. Per-domain permissive checks do not prove enforcement.",
     "The kernel SOC model remains experimental; genuine zero and existing runtime shutdown semantics remain unchanged.",
     "No target program, driver or device is executed or accessed. No Ninja graph is parsed."
+  ],
+  "subsequent_findings": [
+    {
+      "issue": "Inherited simulated Health provider and duplicate recovery Health services",
+      "evidence": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/packaged.json",
+      "evidence_sha256": "83e2e35a680ee9045a268c904bc6a4843d8d51446de245fd474baf7c8651ee06",
+      "details": "Deferred product inheritance evaluated mainline common before the r1 Health selector. Common therefore selected Cuttlefish, adding com.google.cf.health and cuttlefish_recovery alongside the requested r1/example services. The Cuttlefish implementation reports a simulated 85% charge. Both recovery binaries, class-hal init services and IHealth/default v5 VINTF fragments are present in the audited ramdisk. The earlier checks established presence and correspondence, not uniqueness.",
+      "status": "Fixed in product source by including the r1 selector before deferred common inheritance; rebuilt image validation remains pending.",
+      "affected_build_source_commit": "f72592a467a1e289ffbfd0fbee6adac5093bf6db",
+      "release_blocker": true,
+      "source_correction": "android/device/device.mk directly includes health/product.mk before inheriting mainline_common.mk",
+      "portable_regression": "scripts/test-health-mode.py invokes actual pinned AOSP inheritance macros; both products and both old-line negative controls pass.",
+      "evidence_files": {
+        "review.rst": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/review.rst",
+          "sha256": "21f0b58b62ae61a7db2c41a8c55b1bd6b4008bf1dffe113b501a7e46959e8255"
+        },
+        "default-health-apex.json": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/default-health-apex.json",
+          "sha256": "bac69c3c571c74a0e1574f4ce9842b3720216f63b37cbec5d1c606ffc823ad1b"
+        },
+        "source-pins.json": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/source-pins.json",
+          "sha256": "271f74c1e8200974387d71f9322e4e9f3d5d4b8e496a5e9f69c2b86145309cd3"
+        },
+        "portable-selection/result.json": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/portable-selection/result.json",
+          "sha256": "ac6be7cfbc12d7df62f6ad92f4ebb97bae97eaf3f871f926ecd6a1ff6398f206"
+        },
+        "final-host-tests.log": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/final-host-tests.log",
+          "sha256": "9a58e12e61d7cc4b2f5a3b01e826f2f3a9c0e56a14cd22bcedc85f28f99b1006"
+        },
+        "stale-install-tracking.json": {
+          "path": "/rabbitr1/out/android-build-review/soc-cp2a/recovery-health-review/stale-install-tracking.json",
+          "sha256": "0558f5d1d9a831de1c4c9244b66c3fb2cd5bb4b28e04331bf60cfadeef10cd20"
+        }
+      },
+      "earlier_default_build": {
+        "build_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+        "vendor_image_sha256": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb",
+        "finding": "Verified vendor payload contains com.google.cf.health APEX and no real example Health service."
+      }
+    }
   ]
 }
