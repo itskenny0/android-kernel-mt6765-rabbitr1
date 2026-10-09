@@ -101,6 +101,12 @@ leaves B's logical partitions empty. The future Android flash procedure must
 select and verify A while preserving the previous slot state for restoration,
 or supply populated B images. A device's existing active slot cannot be assumed.
 
+The [offline super builder](ANDROID-SUPER.md) can construct and verify identical
+populated A/B partition sets from four completed, audited filesystem images.
+Its raw output and metadata checks have 67 synthetic tests using AOSP `lpmake`.
+Real image generation still requires the completed full-image audit, and this
+tool does not perform flashing, slot selection or snapshot cleanup.
+
 The pinned mtkclient writes file bytes directly; it does not expand Android
 sparse images. `scripts/expand-android-sparse.py` validates a pinned sparse-file
 hash and expected partition size, checks chunk bounds and CRCs, and produces a

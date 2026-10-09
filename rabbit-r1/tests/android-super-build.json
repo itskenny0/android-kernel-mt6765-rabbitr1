@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "result": "pass",
+  "scope": "Canonical offline dual-slot super builder using synthetic payloads and actual pinned AOSP lpmake; no real Android images or devices.",
+  "source_files": {
+    "scripts/build-android-super.py": {
+      "sha256": "c62db25dbcf651cf303ed77b884990df92faacf9711d614a226a73edcd293800",
+      "bytes": 17066
+    },
+    "scripts/test-android-super.py": {
+      "sha256": "539cbac1b76fa8488d1a5f5cecc28181e489af98f7ad1f20324e6b5a351d16be",
+      "bytes": 14348
+    },
+    "docs/ANDROID-SUPER.md": {
+      "sha256": "0388e3116f60eba028b85df704b31f88fc566c04637c5d63baf66fbbf2748bec",
+      "bytes": 5886
+    },
+    "scripts/prepare-lp-tools.py": {
+      "sha256": "0a86637102c9f2e2f67da22cf44b04ebe0aa13838b5a2e23d34e22d1001f1fdb",
+      "bytes": 2459
+    },
+    "android/lp-tools.json": {
+      "sha256": "88df5463541c2adcd7dd306d549fbd3be3b4ee988462c196866157dc8682c04b",
+      "bytes": 5405
+    }
+  },
+  "test_command": [
+    "python3",
+    "/rabbitr1/src/mainline/rabbit-r1/scripts/test-android-super.py",
+    "--lpmake",
+    "/rabbitr1/src/android/prebuilts/kernel-build-tools/linux-x86/bin/lpmake",
+    "--lpmake-sha256",
+    "e36cd66b46a04fedb9f23cc891b5b296f6779de7afcf6f08e3c67ee4b0bc7313",
+    "--out",
+    "/rabbitr1/out/android-super/canonical-final-tests-67"
+  ],
+  "cases": 67,
+  "failed": 0,
+  "log": {
+    "path": "/rabbitr1/out/android-super/canonical-final-test-67.log",
+    "sha256": "ef362af0905664117414216e8809c3f2cb2c53ec35be80616f3667f23c52319d",
+    "bytes": 175
+  },
+  "results": {
+    "path": "/rabbitr1/out/android-super/canonical-final-tests-67/test-results.json",
+    "sha256": "ce2b69f4c156feabe99a5ad9da4de343f2f4ec09a65dda2c8393eb5bad5494a3",
+    "bytes": 6507
+  },
+  "tool_project": "kernel/prebuilts/build-tools",
+  "tool_project_commit": "811c6e2938d53b3c318d7635b03931601a68c765",
+  "tool_and_workspace_runtime_libraries": {
+    "linux-x86/bin/lpmake": {
+      "sha256": "e36cd66b46a04fedb9f23cc891b5b296f6779de7afcf6f08e3c67ee4b0bc7313",
+      "bytes": 192624
+    },
+    "linux-x86/lib64/libbase.so": {
+      "sha256": "ba2986ba5f36bfb256195453c004fcfeb9fd5316dda11a866221aa35b36ec9a5",
+      "bytes": 862328
+    },
+    "linux-x86/lib64/liblog.so": {
+      "sha256": "ce9f616e46d748313f08e7a707dad4058c56c9bd643e8d11de62592d10239fb3",
+      "bytes": 207568
+    },
+    "linux-x86/lib64/liblp.so": {
+      "sha256": "00b363e11ed8f870694e9a2711d9a04dcffe1d531e781a178b2d80768541bac8",
+      "bytes": 911256
+    },
+    "linux-x86/lib64/libc++.so": {
+      "sha256": "ae96f11d788644103731b2087e6136ac059e781f4cf7a5d9ab8bc343c879cd2f",
+      "bytes": 1674816
+    },
+    "linux-x86/lib64/libcrypto-host.so": {
+      "sha256": "68fb1c250ce7195c7db1bbb80d2b783a51a4ed018f9b81bee3843040945ca416",
+      "bytes": 4977344
+    },
+    "linux-x86/lib64/libcrypto_utils.so": {
+      "sha256": "5ebadb8555da63da15371519fc8b577b408fc52cae13bab1d5a8ccda18c3eab5",
+      "bytes": 17840
+    },
+    "linux-x86/lib64/libsparse-host.so": {
+      "sha256": "4f7749be120e0ce7770d6648f06da59bb36ac9ba993d172776d85addf364302d",
+      "bytes": 104400
+    },
+    "linux-x86/lib64/libext4_utils.so": {
+      "sha256": "34843c2f6027b97bbe17ede64a81c26056394254e35f87b20214e8bbed0e9f26",
+      "bytes": 35464
+    },
+    "linux-x86/lib64/libz-host.so": {
+      "sha256": "11aef575951fa0136d2e712545d8018cc2d6362ebe6903bd72efa99198a9a66c",
+      "bytes": 195400
+    }
+  },
+  "synthetic_result": {
+    "layout": {
+      "super_bytes": 16777216,
+      "group_bytes": 4194304,
+      "metadata_bytes": 65536,
+      "metadata_slots": 3,
+      "block_bytes": 4096,
+      "alignment_bytes": 1048576
+    },
+    "raw_super": {
+      "path": "/rabbitr1/out/android-super/canonical-final-tests-67/good/super-both.raw.img",
+      "bytes": 16777216,
+      "sha256": "adb345f77f3ad819a4edf80cbdbb08c3521d03f2c5446eae18aeb23253398373"
+    },
+    "metadata_copies_checked": 6,
+    "slot_payloads_checked": 8,
+    "physical_extents": 8,
+    "group_used_bytes": {
+      "a": 40960,
+      "b": 40960
+    },
+    "result": {
+      "path": "/rabbitr1/out/android-super/canonical-final-tests-67/good/result.json",
+      "sha256": "f8276eea0f43cc11a183dce955e2be5b3ecbe929d1e3d7efc0b36d0711f7ecb2",
+      "bytes": 5592
+    }
+  },
+  "coverage": [
+    "Pinned completed-audit gate including self-contained incomplete CLI fixture",
+    "Groups, geometry/header/table checksums, all metadata copies and semantic corruption",
+    "Independent A/B payload hashes, extent ownership and physical nonoverlap",
+    "Raw size/sparse rejection and actual lpmake A-only negative control",
+    "Source/tool pins, source mutation, tool failure and output corruption",
+    "Atomic result publication, incomplete status and raw cleanup despite persistent report failure"
+  ],
+  "real_image_audit_completed": false,
+  "real_r1_super_built": false,
+  "device_access": false,
+  "android_source_or_output_changed": false,
+  "limits": [
+    "Synthetic inputs are not ext4/AVB validation or hardware boot evidence.",
+    "Real output requires the completed reviewed full-image audit and fresh pinned plan.",
+    "Runtime host libraries are recorded provenance; plan enforcement pins lpmake executable and payloads.",
+    "Physical boot/dtbo/vbmeta/LK packaging, stock snapshot/BCB handling, userdata compatibility and backups/restore remain separate."
+  ],
+  "tool_source_url": "https://android.googlesource.com/kernel/prebuilts/build-tools",
+  "downloaded_tool_check": {
+    "official_downloads": {
+      "path": "out/lp-tools-fetch-review/downloaded.json",
+      "bytes": 5518,
+      "sha256": "eebdcbbef6a071850bcc4000032dd0230747a82e29aff816b2992a8b582d66b0"
+    },
+    "encoded_and_decoded_pins_verified": 10,
+    "decoded_files_match_original_tool_set": true,
+    "canonical_helper_completed": true,
+    "actual_lpmake_test_cases": 67,
+    "test_log": {
+      "path": "logs/android-super-downloaded-tool-tests.log",
+      "bytes": 175,
+      "sha256": "ef362af0905664117414216e8809c3f2cb2c53ec35be80616f3667f23c52319d"
+    },
+    "result": {
+      "path": "out/android-super/downloaded-tool-tests/test-results.json",
+      "bytes": 6375,
+      "sha256": "afcc246fb80bf1bb751aed79efbfae420babb72386f1f216feffbd6455d0dd3e"
+    },
+    "workflow_actionlint_1_7_12": "pass"
+  }
+}

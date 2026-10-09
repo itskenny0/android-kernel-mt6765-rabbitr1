@@ -1,0 +1,116 @@
+{
+  "source": "https://android.googlesource.com/kernel/prebuilts/build-tools",
+  "commit": "811c6e2938d53b3c318d7635b03931601a68c765",
+  "files": [
+    {
+      "path": "bin/lpmake",
+      "bytes": 192624,
+      "sha256": "e36cd66b46a04fedb9f23cc891b5b296f6779de7afcf6f08e3c67ee4b0bc7313",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/bin/lpmake?format=TEXT",
+        "bytes": 256832,
+        "sha256": "73d9bef5f3778a35ce5a68cc4f1e22fe3c91c1675f08756d1db00109e036bcb1",
+        "cache": "downloads/android-lp/bin/lpmake.base64"
+      }
+    },
+    {
+      "path": "lib64/libbase.so",
+      "bytes": 862328,
+      "sha256": "ba2986ba5f36bfb256195453c004fcfeb9fd5316dda11a866221aa35b36ec9a5",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libbase.so?format=TEXT",
+        "bytes": 1149772,
+        "sha256": "f2ba3d94f40e4f17a7d86a99caa1e7b80704bd005398c19b52f05a9b0855059b",
+        "cache": "downloads/android-lp/lib64/libbase.so.base64"
+      }
+    },
+    {
+      "path": "lib64/liblog.so",
+      "bytes": 207568,
+      "sha256": "ce9f616e46d748313f08e7a707dad4058c56c9bd643e8d11de62592d10239fb3",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/liblog.so?format=TEXT",
+        "bytes": 276760,
+        "sha256": "af58349aacdce436786b2f54db6f68012a6912a7eb7b9516c045215637ba3c9b",
+        "cache": "downloads/android-lp/lib64/liblog.so.base64"
+      }
+    },
+    {
+      "path": "lib64/liblp.so",
+      "bytes": 911256,
+      "sha256": "00b363e11ed8f870694e9a2711d9a04dcffe1d531e781a178b2d80768541bac8",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/liblp.so?format=TEXT",
+        "bytes": 1215008,
+        "sha256": "e0c6c60b3b24ff7b74429e1b1cb7d6e085c8bb8d99775edec6dd76e94289a5fb",
+        "cache": "downloads/android-lp/lib64/liblp.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libc++.so",
+      "bytes": 1674816,
+      "sha256": "ae96f11d788644103731b2087e6136ac059e781f4cf7a5d9ab8bc343c879cd2f",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libc++.so?format=TEXT",
+        "bytes": 2233088,
+        "sha256": "b95396efc72a03ae52f1fa4b50b97bac6977046c1c51c9914d2a8bd2a6248c47",
+        "cache": "downloads/android-lp/lib64/libc++.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libcrypto-host.so",
+      "bytes": 4977344,
+      "sha256": "68fb1c250ce7195c7db1bbb80d2b783a51a4ed018f9b81bee3843040945ca416",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libcrypto-host.so?format=TEXT",
+        "bytes": 6636460,
+        "sha256": "7252334e3b9fb684aac3c462b872d943a0f24265944e740e083b1284dba3a569",
+        "cache": "downloads/android-lp/lib64/libcrypto-host.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libcrypto_utils.so",
+      "bytes": 17840,
+      "sha256": "5ebadb8555da63da15371519fc8b577b408fc52cae13bab1d5a8ccda18c3eab5",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libcrypto_utils.so?format=TEXT",
+        "bytes": 23788,
+        "sha256": "868d276de5b5e7c4092ed9ae61caa169c364d32a96187b736e04ed375c47067c",
+        "cache": "downloads/android-lp/lib64/libcrypto_utils.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libsparse-host.so",
+      "bytes": 104400,
+      "sha256": "4f7749be120e0ce7770d6648f06da59bb36ac9ba993d172776d85addf364302d",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libsparse-host.so?format=TEXT",
+        "bytes": 139200,
+        "sha256": "65a9fb4a8f668ad49b7d2ca1c03a4f3ed4dbd95a4cc56075ada9e5c287b4b826",
+        "cache": "downloads/android-lp/lib64/libsparse-host.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libext4_utils.so",
+      "bytes": 35464,
+      "sha256": "34843c2f6027b97bbe17ede64a81c26056394254e35f87b20214e8bbed0e9f26",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libext4_utils.so?format=TEXT",
+        "bytes": 47288,
+        "sha256": "0994e6909bc48909aac861d4de4f38180cda63a1b2602bab571bf4aca80c3fcb",
+        "cache": "downloads/android-lp/lib64/libext4_utils.so.base64"
+      }
+    },
+    {
+      "path": "lib64/libz-host.so",
+      "bytes": 195400,
+      "sha256": "11aef575951fa0136d2e712545d8018cc2d6362ebe6903bd72efa99198a9a66c",
+      "download": {
+        "url": "https://android.googlesource.com/kernel/prebuilts/build-tools/+/811c6e2938d53b3c318d7635b03931601a68c765/linux-x86/lib64/libz-host.so?format=TEXT",
+        "bytes": 260536,
+        "sha256": "8935d437fe787182c7ed70a3b71172aa0300152810607882b17bd52c4d206389",
+        "cache": "downloads/android-lp/lib64/libz-host.so.base64"
+      }
+    }
+  ]
+}

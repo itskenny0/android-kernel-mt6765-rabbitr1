@@ -71,7 +71,8 @@ jobs:
           import hashlib, json
           from pathlib import Path
           data = Path('sources.lock.json').read_bytes()
-          print('cache-key=' + hashlib.sha256(data).hexdigest())
+          tool_pins = Path('android/lp-tools.json').read_bytes()
+          print('cache-key=' + hashlib.sha256(data + tool_pins).hexdigest())
           print('patch-base=' + json.loads(data)['repositories']['mainline']['commit'])
           PY
 
@@ -82,6 +83,7 @@ jobs:
             /rabbitr1/downloads/busybox-1.37.0.tar.bz2
             /rabbitr1/downloads/rabbit_OS_v0.8.293.zip
             /rabbitr1/downloads/mtklogo-v0.1.2.tgz
+            /rabbitr1/downloads/android-lp
           key: r1-sources-v1-${{ runner.os }}-${{ steps.pins.outputs.cache-key }}
 
       - name: Fetch build inputs
@@ -99,6 +101,10 @@ jobs:
           python3 scripts/check-patches.py 2>&1 | tee logs/patch-check.log
           python3 scripts/test-android-patches.py 2>&1 | tee logs/android-patches-tests.log
           python3 scripts/test-r1-webview-lfs.py 2>&1 | tee logs/webview-lfs-tests.log
+          python3 scripts/prepare-lp-tools.py 2>&1 | tee logs/lp-tools-prepare.log
+          python3 scripts/test-android-super.py \
+            --lpmake /rabbitr1/toolchains/android-lp/bin/lpmake \
+            --out /rabbitr1/out/android-super/ci-tests 2>&1 | tee logs/android-super-tests.log
           python3 scripts/test-android-sparse.py 2>&1 | tee logs/android-sparse-tests.log
           python3 scripts/test-android-pmsg.py 2>&1 | tee logs/android-pmsg-tests.log
           python3 scripts/test-android-pstore-collection.py 2>&1 | tee logs/android-pstore-collection-tests.log
