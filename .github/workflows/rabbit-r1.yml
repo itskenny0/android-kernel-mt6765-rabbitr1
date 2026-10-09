@@ -137,6 +137,12 @@ jobs:
             drivers/gpu/drm/mediatek/mtk_ddp_comp.o \
             2>&1 | tee logs/mt6765-dsi-build.log
 
+      - name: Compile the inactive PowerVR driver
+        run: |
+          source scripts/env.sh
+          trap 'for file in audit.json build.log; do if [[ -f "out/powervr-check/$file" ]]; then cp "out/powervr-check/$file" "logs/powervr-$file"; fi; done' EXIT
+          bash scripts/compile-powervr.sh 2>&1 | tee logs/powervr-compile.log
+
       - name: Build the diagnostic initramfs
         run: bash scripts/build-initramfs.sh
 

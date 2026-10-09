@@ -1,0 +1,433 @@
+{
+  "repository": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git",
+  "tag": "v7.2.9",
+  "commit": "5fce161649b4d779d1b76d9fcd52dc77779774b8",
+  "scope": "Complete PowerVR driver subtree; unchanged pvr_drm.h UAPI",
+  "files": [
+    {
+      "path": "drivers/gpu/drm/imagination/Kconfig",
+      "git_blob_sha1": "1fd4c635c2c966259fea2aa905676eda03389b2b",
+      "sha256": "e6caff2a48c62ada59a5e6797a1c93726272668607004c7bd16e9158686cc61c"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/Makefile",
+      "git_blob_sha1": "a5c5e386f16a7cb63fc4b97470505dc537bd458a",
+      "sha256": "94a7d5690b98b4b2420bb4c781fce2712e138cc20fd69feed0386cd06e373d76"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_ccb.c",
+      "git_blob_sha1": "4accf18e234186dbced9ed8ae6e96c065339af2e",
+      "sha256": "da8fcc63cf8adfd2eaecc2f0fe72be749d7f1e7711ff99d3563cdd1c90d80e9b"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_ccb.h",
+      "git_blob_sha1": "4c8aef31eeb049e2552c562c99535cd56d21763d",
+      "sha256": "6c28806c76b92c40a52bac5f2dc257e202afa965756171b7075efb76c2fa6d2f"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_cccb.c",
+      "git_blob_sha1": "4fabab41bea79016d9cc596149d18811f4e2e20b",
+      "sha256": "34fec5973a97f04992ad69148f371ab774b805780450edd249ef051c1b754f5f"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_cccb.h",
+      "git_blob_sha1": "943fe8f2c963be6c7e63d68442ff0f53ac0a9098",
+      "sha256": "5de47a0e4d4502dee6d41647bde4d3c9a330b468b4d7cc40977097ea9c6b893f"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_context.c",
+      "git_blob_sha1": "406e0758e860f23e29d5be24905bc8f385985f68",
+      "sha256": "ffadf504899263d8c20973ee5206250ffc275070fe43a23ebc500f565397fc53"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_context.h",
+      "git_blob_sha1": "07afa179cdf421c0adc258640fac9595a0059023",
+      "sha256": "d1185a8a859154c5511669b59c89e19467517e1ebf14ce78ddaee6eb3ddd3918"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_debugfs.c",
+      "git_blob_sha1": "ebdb05de4072856ee95e68d6349725ee0e8cacb6",
+      "sha256": "6c12fc933a7dfe6d1a7a22bc3218ac03abd80085fb8fccaf232ad1939d24deab"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_debugfs.h",
+      "git_blob_sha1": "ebacbd13b84a0086a28cb13248a6e38a420b913e",
+      "sha256": "4598e070ea4c511afab23c1132e0390583795f9fdcfcfb2c90d4b1b4336872d4"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_device.c",
+      "git_blob_sha1": "2691ef9af0ca83a8687eed72b15ff134b7bed0a0",
+      "sha256": "dc5b3e0499eea76ec243204dca1de838e22f39d8b1daea14b50c85366ef361f8"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_device.h",
+      "git_blob_sha1": "d51c57cf93323227c2dd6b303115c6cd2a3fe482",
+      "sha256": "f1b64893aa153280e5826ee45ef2e64f2ca38fadeb87c4a2e161974ad889eb83"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_device_info.c",
+      "git_blob_sha1": "d3301cde7d119e7dc0f04f5a069d49e187ef7925",
+      "sha256": "8fa613f77f42c651135fa208a74c0d68ec01f827976bf895ef277139a0fc6ac2"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_device_info.h",
+      "git_blob_sha1": "f61fb988b5539238f2210ff293e2931df09a64bc",
+      "sha256": "aa4dc593df38efe9527938f692434d9d24b5cd9f3e8d65e8ffdc265023c626e0"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_drv.c",
+      "git_blob_sha1": "58087e8517d60780c0bdb763b9486fdae8aba044",
+      "sha256": "17fc9315a18d84500833cdaa0d8b2f7859d0ee6cdf16aae35789a018f8b699ee"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_drv.h",
+      "git_blob_sha1": "7fa147312dd1108e8ebc64c592d8dad4c135a7ac",
+      "sha256": "fd581fde855f8c0eac4b8f3078ea38836a47b2a8cf270d10c30819e3a479063b"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_dump.c",
+      "git_blob_sha1": "52e95fce28178f3d1488d5651061795382b3545d",
+      "sha256": "811e08edd499328dd45e5d0de23d8ed49fe99887761f84a4652a06558e40ec5e"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_dump.h",
+      "git_blob_sha1": "3c0728c05596bc41e0ebf7b3e020fdb4d34240a7",
+      "sha256": "ff155c50530c507cc5fc0df5e78ffd6687f113168eabfdd3e346e90cc5796141"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_free_list.c",
+      "git_blob_sha1": "faf5e586d8dc178d229b68582f91145ff32e7c71",
+      "sha256": "49495b59b6ea6b053672ba7e5863ffe62a8406a87413e5f647c9d7ec66697a85"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_free_list.h",
+      "git_blob_sha1": "bfb4f5fc622c9cbc7a5aac86108e39fbe080f23a",
+      "sha256": "ec32777b45f7673a3cdc8de476125a24088a52cbc57275b24c3ae3b6764a5159"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw.c",
+      "git_blob_sha1": "850a3ec8e7750fd88fc73c3991df5c4b7eb60079",
+      "sha256": "c55b994aa005f727f6708879162c83f86d8c35201f2cda036795cbd39470daea"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw.h",
+      "git_blob_sha1": "3390c84e4fd31624833d87614836cdbd97538191",
+      "sha256": "bb38d16e0397b8b48606e6b5380a8ac327fd64a9bc5d038fd6671b0f689cdb06"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_info.h",
+      "git_blob_sha1": "c3639440610eb16ce7118d32d0f90410db76d1be",
+      "sha256": "d79454e2cb1e2dfc8e8a12ce6d455e6d18e7d9c0b33b31359ed913ee6fe187a6"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_meta.c",
+      "git_blob_sha1": "9ff03bc60a08153b32e8cf25e2f524790db2adf3",
+      "sha256": "631fde81e228fdd4e360ac9526bc29ee8d6e3679989896870d7e75f7c76d7031"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_meta.h",
+      "git_blob_sha1": "911ad700cba6627d533b1d3c171d16aa49f17a96",
+      "sha256": "f3641d42946259b6a61d699bfa15fde19192a61e573d80cf2bec73d3d4777c15"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_mips.c",
+      "git_blob_sha1": "6914fc46db50131aa158ed752d5dab67774ee9ce",
+      "sha256": "2e4a9a791a41d9f9e2d2bc713904e7fc3a081ea7e5e556002641c03f8e0ad6d0"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_mips.h",
+      "git_blob_sha1": "a0c5c41c8aa24a454c7c6ec10529ef8062ee3e9d",
+      "sha256": "89001df1ec8b9f0da7ea4e89e617356e2c1d43663d1a4573d3597292ef97c9ce"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_riscv.c",
+      "git_blob_sha1": "fc13d483be9a3edd97cad3850e4edf312d5b16b6",
+      "sha256": "896516d6d8245f2ef310e781a46ff270ff2c2131883edabed30a62270b21725e"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_startstop.c",
+      "git_blob_sha1": "e24ed6fc4362f3c86c439a8b6a39ec800d5e1167",
+      "sha256": "5c33d75b4101b012cc21ff47e6eb71dbc7187c881d1542e7f533c6ddb62d8130"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_startstop.h",
+      "git_blob_sha1": "a3cef061bd601fc514c88056d71690f321605ae9",
+      "sha256": "fffc23073c44da01307bfae731e3f001e1f49ba6fdc9a01bbbb511529ce1aa7f"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_trace.c",
+      "git_blob_sha1": "805d9f9bc1dd9e7d710558c146edfd169e767604",
+      "sha256": "fcafbf8e86a3f0a54a613560e39a5b46ff10b2e7ee5fb8e50abb8f25c8344359"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_trace.h",
+      "git_blob_sha1": "0cc57f66675d809869c9ef42969277960a82401f",
+      "sha256": "cef0ec4d095756db97ba2ec92275b0c1bc5b16cf52d7437b9fa4eb3e939b03c7"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_fw_util.c",
+      "git_blob_sha1": "377fe72d86b8b3b58b8ae387135baa825347e181",
+      "sha256": "d871d443a5f8720609d4aa69d724cccb1cd1032eca7d9686282ebaa405e1ea2d"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_gem.c",
+      "git_blob_sha1": "d8660d6a8e01b73832dddf7aeaa40aadbe4d4a46",
+      "sha256": "0846df19f5c23e9538dae8fd9af67592cca989c50623a0e4a10419f18a32273d"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_gem.h",
+      "git_blob_sha1": "c99f30cc62088c030bd8a806df79b738b62a968f",
+      "sha256": "b58db32230d93c30b853b8127b923368a738e1cf37d2f9d09daa0e318d9d0a70"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_hwrt.c",
+      "git_blob_sha1": "05c68c78da229591ef2ac8ce927a6422a04c53f7",
+      "sha256": "5f99a591785909bb0caae12914d0553d4861024ef2d733596b6a5424ed77a1e4"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_hwrt.h",
+      "git_blob_sha1": "676070b20c3ba552319057cfcabe69c890dbc832",
+      "sha256": "c56b322c6d737f4086ccb862670a0debaa0571e658f7131700a13a86621db31a"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_job.c",
+      "git_blob_sha1": "b8a58d817009b69db90c05231e7870209d0baf73",
+      "sha256": "e6f0f54d39e1ae03dde1fd8926b129885ea635ea1fbdcbd82dadcbccaf1f8a0e"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_job.h",
+      "git_blob_sha1": "0ca003c5c4751e6fb5a9fda84b37dd1787e6196a",
+      "sha256": "d315bc41ccfba8f1bab84288e8bf082c6a050a823fc040109dfff2afcb3fd859"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_mmu.c",
+      "git_blob_sha1": "62eae7fcd5a26a53ae8f549cf7116154250de076",
+      "sha256": "f637771e335223c947b1d294f9f84bfc7d60bf91279d07a175f49470f5d2d9f1"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_mmu.h",
+      "git_blob_sha1": "2c02d61ba0a29fcb2c732a1532a2fcb8d44f5e47",
+      "sha256": "584cc5f31ae741a4c2a9752336b59ac2f8a414b82aa2c6fa2be124b48b41ecec"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_power.c",
+      "git_blob_sha1": "a71d5b35601e7b996428312028a4c0542a5b1350",
+      "sha256": "96b7aae204436104c8540b22aaf3131f7cd77d24a016c061685cbae21dd794c3"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_power.h",
+      "git_blob_sha1": "c34252bda078791d531a1d6aa69799029735ed67",
+      "sha256": "c08cae6c590d93c4dab72c2be5036a07416d037284c8178b4589f9272e661cf2"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_queue.c",
+      "git_blob_sha1": "2d52ee321367a9d8ebe9a5b50e137256b5a395dc",
+      "sha256": "2525659553a95e8987a7d9948c12ffa73ee3049a879c308a6a92fbdf5a12e58d"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_queue.h",
+      "git_blob_sha1": "149cc6d124bf46af2015f8b94b3374c47efae8f5",
+      "sha256": "25032bc28ed3c75ced1183593ccbe36ffc9e8b93cf897f842d8b54bd062a0969"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_cr_defs.h",
+      "git_blob_sha1": "790c97f80a2ac03ac76b933d009a2f9cfc6003f7",
+      "sha256": "7421bd9524a485e729421fa1452e09d6687d7a34b092c2502a3c1271b0295b7c"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_cr_defs_client.h",
+      "git_blob_sha1": "46186b56effc97b47c9671431de8515c4174f2e3",
+      "sha256": "db239d46ed0d3adf22ea8cb52fddf8583a1a3c6004c23f2a1c38ddcedacc5e13"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_defs.h",
+      "git_blob_sha1": "932b0168600896639216c5d2787a99fab28e760d",
+      "sha256": "7c4c6902f7e456694bd3d64608eae48cdfccc223750773f07648de712e2d4ced"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif.h",
+      "git_blob_sha1": "5d590c4c25663e431601dd26944465b62c31526b",
+      "sha256": "ac934aafc4a129e9af197ebb1a9b9d49d3214ad12951a5aaa0140f9f68608457"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_check.h",
+      "git_blob_sha1": "51dc37e78f41d7bdf45d1f434dd1aa5b9eca700a",
+      "sha256": "f33aea3a53414d4e4e95abbe1754ac126ae44a44723a4ff46a22e33021ab88cd"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_client.h",
+      "git_blob_sha1": "6e224400083a2c5c85cffb76e8858d61ce47e729",
+      "sha256": "3abfc8228e208f9d3dfa79b40f783e94ef5d68887e61270f5e6a2d698b8f4a71"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_client_check.h",
+      "git_blob_sha1": "54aa4474163e6792973a49542bd5bd9a46b87dd1",
+      "sha256": "a262f8781a34d8d60422cb1fd3eb05086a9ca664e89f5292c79936f792d5c8cc"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_common.h",
+      "git_blob_sha1": "6ebb95ba98a60fc29d4c3bd1ed1219cc097b64d8",
+      "sha256": "979ae32fdc3c96e4b0ae38e3b288b4230a66d87b7aa07fb7d5f4d5f6fb8cdcce"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_dev_info.h",
+      "git_blob_sha1": "168277bce9485cef1e9de69de3cdeb8d84e39089",
+      "sha256": "d3d9c39a514a0b90dcd8756e9058e89e059fc51c19670766ed30d9d0cc4c84a5"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_resetframework.h",
+      "git_blob_sha1": "1db1f4c532bc6b07bbd78fb582350bc08f49dff7",
+      "sha256": "b2eb0ef0f8aa7da5bb463034b7df74b185f757aa13eb62a254f9c0b0d11eded7"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_sf.h",
+      "git_blob_sha1": "56e11009e1230ad552e8bad9a1b12e1cf22b6aca",
+      "sha256": "79f7428080af03b5c4dad8b9b8014dff948e4f0be15e8697ee9d24b930990edc"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_shared.h",
+      "git_blob_sha1": "fe54c1cad7a9c5383b09607c64421a70631226a4",
+      "sha256": "c84297ec46c7cbf3f15abf0407cfa78a654af32d902dd79495ae820244c0ad2e"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_shared_check.h",
+      "git_blob_sha1": "597ed54bbd3af5a21af233fc57d90d6f9b5a8a43",
+      "sha256": "bbaba75dcb161c554b17b3d696ea78717dd4e7af047522786ada1bd03176a076"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_fwif_stream.h",
+      "git_blob_sha1": "1c2c4ebedc2575ce99eb3ac75ad59fc1f58b7429",
+      "sha256": "76cec5527dd3515acd3e46e2628d9f0142ca3a2d2f4632b622cb6c51ff78756a"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_heap_config.h",
+      "git_blob_sha1": "684766006703379efa16e42da5af5ba4bf4003e9",
+      "sha256": "36f17282ef7f8ac9947d51ea33184e8fd9f8ec97e604e243df1e622422b6ad3d"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_meta.h",
+      "git_blob_sha1": "3020e6582daab4975444d3b61928ef4fd19872e3",
+      "sha256": "85574b1ec29fa91a192a831b5506e029e029873f96727a274e4729991aa6286a"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_mips.h",
+      "git_blob_sha1": "41ed618fda3f9de369818c3e26b4ecd7687ed40c",
+      "sha256": "c2a89bd580c94506179c6dccc29dbd04f3bea1994b7788395058a040c69416db"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_mips_check.h",
+      "git_blob_sha1": "824b4bf33ac1404ed864e80290596f2f2bc0d1b9",
+      "sha256": "120d7d8de9ae3ed530f6f44c74caef7c80aca34432b5493ab4af790af8d6255d"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_mmu_defs.h",
+      "git_blob_sha1": "f361ccdd540517d78009ebb854e830c13644fde9",
+      "sha256": "123701eb6a9bb2ce408e2f2da2ad8a52c654dac9c78c46ec64426bca9c5ea6d7"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_rogue_riscv.h",
+      "git_blob_sha1": "9a070e24fa6a8bb44ff1e421ae6750cbf724d346",
+      "sha256": "5795b711f9e196e3b98110b666d88754f21f7937505ea68d595ab5fd17b33e03"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_stream.c",
+      "git_blob_sha1": "679aa618b7a9cd2853c7f580e326461c58b535bb",
+      "sha256": "18ecbf64c1cc043f641ad6419f77ffbefbdf9e78dd7c826f8469201bb8cfcd10"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_stream.h",
+      "git_blob_sha1": "d92acb3a61d7f78ece36fd709be3ecb3795eae13",
+      "sha256": "df6f22a0ee91b0e2b04f7788a3c1586e932735d29ed388408d0470cf11aa797e"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_stream_defs.c",
+      "git_blob_sha1": "f8bd1a8c01db489035313e2c4d80e0d9e2df70fd",
+      "sha256": "036cd6d4c7e01fc5c0ec2021d4ceaf7862b3fb2d7b204ecbaad04c0631817d81"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_stream_defs.h",
+      "git_blob_sha1": "f33b821658334fc2038fc5957a0f08913f95b07b",
+      "sha256": "d783237305701f552610969395de644c7db7e5de673e4d727a612774436165d9"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_sync.c",
+      "git_blob_sha1": "936f840a52218943ce251a6ac3c2e1db49749425",
+      "sha256": "89484cb9903c6a173008530a2de42ac39a78c959070afaaac9cb3b60c84449a7"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_sync.h",
+      "git_blob_sha1": "48501ad2779421a6a23e3d861a9b98db1d9614f8",
+      "sha256": "26b8a06febae9535670b80b722a16031b8e2d79ae7b3c999d279d98172fdf42b"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_test.c",
+      "git_blob_sha1": "506cfa5a02f1ecdfa7b2265d1018ebac4d60b10d",
+      "sha256": "15a9c5269521697746097d1afb8a8065576bb63187b595a6b6fc6f13fa3e3e47"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_trace.h",
+      "git_blob_sha1": "943d6b2418cba4d1c5f68a0e15494b73eb3fc8f6",
+      "sha256": "bbee9e32961b738d50574369c82307ec43373e066a449842aef7f5408d6575d5"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_trace_points.c",
+      "git_blob_sha1": "71b53f267af025b390aa477c0d3247eb7f4c4f55",
+      "sha256": "ecda5f83740febc325589c5957c583b48841ba3374bba5881148c42cfb2c73bc"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_vm.c",
+      "git_blob_sha1": "55cc999f3708b678b9d4d2fa68b3f20b74eb4d58",
+      "sha256": "efaeea9a1f2ef56d998c75642898d43bee5dbe1dbe9e08ed66b1f4aed5072b04"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_vm.h",
+      "git_blob_sha1": "b0528dffa7f1ba4342c98c2abd7fac31d254d0e7",
+      "sha256": "005eff5adc1031a12772001b898e8f9c828ac6adc3df43fae081a566c45e61f6"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_vm_mips.c",
+      "git_blob_sha1": "5847a1c92bea8b0923628ad7b72913e8977d4b97",
+      "sha256": "8778f1195def444131d325a4d41ff3ad3c99e5bfd240d54072b65c5b3aff15b9"
+    },
+    {
+      "path": "drivers/gpu/drm/imagination/pvr_vm_mips.h",
+      "git_blob_sha1": "0fd59f68fb5b8ed7610099e1f4d897fc967b70ab",
+      "sha256": "f9f41bb397a0ea3392dce2d9a34f4661a700c307bc143976f6b4d6d710ccf0b9"
+    },
+    {
+      "path": "include/uapi/drm/pvr_drm.h",
+      "sha256": "29ba017ceed95d4f023bc76c349f4dabbff361f3afdacdcea07087342f445a4a",
+      "git_blob_sha1": "ccf6c2112468f3f53b093bc298dac2bbbfd35e6e"
+    }
+  ],
+  "compile_objects": [
+    "pvr_ccb.o",
+    "pvr_cccb.o",
+    "pvr_context.o",
+    "pvr_debugfs.o",
+    "pvr_device.o",
+    "pvr_device_info.o",
+    "pvr_drv.o",
+    "pvr_dump.o",
+    "pvr_free_list.o",
+    "pvr_fw.o",
+    "pvr_fw_meta.o",
+    "pvr_fw_mips.o",
+    "pvr_fw_riscv.o",
+    "pvr_fw_startstop.o",
+    "pvr_fw_trace.o",
+    "pvr_fw_util.o",
+    "pvr_gem.o",
+    "pvr_hwrt.o",
+    "pvr_job.o",
+    "pvr_mmu.o",
+    "pvr_power.o",
+    "pvr_queue.o",
+    "pvr_stream.o",
+    "pvr_stream_defs.o",
+    "pvr_sync.o",
+    "pvr_trace_points.o",
+    "pvr_vm.o",
+    "pvr_vm_mips.o"
+  ]
+}

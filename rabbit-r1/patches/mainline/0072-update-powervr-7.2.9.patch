@@ -1,0 +1,1181 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Update PowerVR to Linux 7.2.9
+
+Import the complete drivers/gpu/drm/imagination subtree delta from stable
+Linux v7.2.9, commit 5fce161649b4d779d1b76d9fcd52dc77779774b8.
+Keep upstream source bytes and the existing pvr_drm.h UAPI unchanged.
+
+This brings query, bounds, MMU, context cleanup and paired-job fixes plus
+tracepoints. It does not add GE8320 support or enable the r1 GPU.
+
+Source: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tag/?h=v7.2.9
+
+diff --git a/drivers/gpu/drm/imagination/Makefile b/drivers/gpu/drm/imagination/Makefile
+index 1222a14262e4a2e5ccf236232ff3446baaa569bd..a5c5e386f16a7cb63fc4b97470505dc537bd458a 100644
+--- a/drivers/gpu/drm/imagination/Makefile
++++ b/drivers/gpu/drm/imagination/Makefile
+@@ -32,6 +32,9 @@ powervr-y := \
+ powervr-$(CONFIG_DEBUG_FS) += \
+ 	pvr_debugfs.o
+ 
++powervr-$(CONFIG_TRACEPOINTS) += \
++	pvr_trace_points.o
++
+ obj-$(CONFIG_DRM_POWERVR) += powervr.o
+ 
+ obj-$(CONFIG_DRM_POWERVR_KUNIT_TEST) += pvr_test.o
+diff --git a/drivers/gpu/drm/imagination/pvr_context.c b/drivers/gpu/drm/imagination/pvr_context.c
+index 8de70c30b9de0e4aca1160ddb83eca1c0d597e29..406e0758e860f23e29d5be24905bc8f385985f68 100644
+--- a/drivers/gpu/drm/imagination/pvr_context.c
++++ b/drivers/gpu/drm/imagination/pvr_context.c
+@@ -161,22 +161,24 @@ ctx_fw_data_init(void *cpu_ptr, void *priv)
+ /**
+  * pvr_context_destroy_queues() - Destroy all queues attached to a context.
+  * @ctx: Context to destroy queues on.
++ * @cleanup_queue_entity: Whether to cleanup the queue entity e.g. context
++ * creation failure path.
+  *
+  * Should be called when the last reference to a context object is dropped.
+  * It releases all resources attached to the queues bound to this context.
+  */
+-static void pvr_context_destroy_queues(struct pvr_context *ctx)
++static void pvr_context_destroy_queues(struct pvr_context *ctx, bool cleanup_queue_entity)
+ {
+ 	switch (ctx->type) {
+ 	case DRM_PVR_CTX_TYPE_RENDER:
+-		pvr_queue_destroy(ctx->queues.fragment);
+-		pvr_queue_destroy(ctx->queues.geometry);
++		pvr_queue_destroy(ctx->queues.fragment, cleanup_queue_entity);
++		pvr_queue_destroy(ctx->queues.geometry, cleanup_queue_entity);
+ 		break;
+ 	case DRM_PVR_CTX_TYPE_COMPUTE:
+-		pvr_queue_destroy(ctx->queues.compute);
++		pvr_queue_destroy(ctx->queues.compute, cleanup_queue_entity);
+ 		break;
+ 	case DRM_PVR_CTX_TYPE_TRANSFER_FRAG:
+-		pvr_queue_destroy(ctx->queues.transfer);
++		pvr_queue_destroy(ctx->queues.transfer, cleanup_queue_entity);
+ 		break;
+ 	}
+ }
+@@ -240,7 +242,7 @@ static int pvr_context_create_queues(struct pvr_context *ctx,
+ 	return -EINVAL;
+ 
+ err_destroy_queues:
+-	pvr_context_destroy_queues(ctx);
++	pvr_context_destroy_queues(ctx, true);
+ 	return err;
+ }
+ 
+@@ -307,8 +309,8 @@ int pvr_context_create(struct pvr_file *pvr_file, struct drm_pvr_ioctl_create_co
+ 		goto err_free_ctx;
+ 
+ 	ctx->vm_ctx = pvr_vm_context_lookup(pvr_file, args->vm_context_handle);
+-	if (IS_ERR(ctx->vm_ctx)) {
+-		err = PTR_ERR(ctx->vm_ctx);
++	if (!ctx->vm_ctx) {
++		err = -EINVAL;
+ 		goto err_free_ctx;
+ 	}
+ 
+@@ -318,10 +320,14 @@ int pvr_context_create(struct pvr_file *pvr_file, struct drm_pvr_ioctl_create_co
+ 		goto err_put_vm;
+ 	}
+ 
+-	err = pvr_context_create_queues(ctx, args, ctx->data);
++	err = xa_alloc(&pvr_dev->ctx_ids, &ctx->ctx_id, ctx, xa_limit_32b, GFP_KERNEL);
+ 	if (err)
+ 		goto err_free_ctx_data;
+ 
++	err = pvr_context_create_queues(ctx, args, ctx->data);
++	if (err)
++		goto err_free_ctx_id;
++
+ 	err = init_fw_objs(ctx, args, ctx->data);
+ 	if (err)
+ 		goto err_destroy_queues;
+@@ -329,23 +335,12 @@ int pvr_context_create(struct pvr_file *pvr_file, struct drm_pvr_ioctl_create_co
+ 	err = pvr_fw_object_create(pvr_dev, ctx_size, PVR_BO_FW_FLAGS_DEVICE_UNCACHED,
+ 				   ctx_fw_data_init, ctx, &ctx->fw_obj);
+ 	if (err)
+-		goto err_free_ctx_data;
++		goto err_destroy_queues;
+ 
+-	err = xa_alloc(&pvr_dev->ctx_ids, &ctx->ctx_id, ctx, xa_limit_32b, GFP_KERNEL);
++	err = xa_alloc(&pvr_file->ctx_handles, &args->handle, ctx, xa_limit_32b, GFP_KERNEL);
+ 	if (err)
+ 		goto err_destroy_fw_obj;
+ 
+-	err = xa_alloc(&pvr_file->ctx_handles, &args->handle, ctx, xa_limit_32b, GFP_KERNEL);
+-	if (err) {
+-		/*
+-		 * It's possible that another thread could have taken a reference on the context at
+-		 * this point as it is in the ctx_ids xarray. Therefore instead of directly
+-		 * destroying the context, drop a reference instead.
+-		 */
+-		pvr_context_put(ctx);
+-		return err;
+-	}
+-
+ 	spin_lock(&pvr_dev->ctx_list_lock);
+ 	list_add_tail(&ctx->file_link, &pvr_file->contexts);
+ 	spin_unlock(&pvr_dev->ctx_list_lock);
+@@ -356,7 +351,16 @@ int pvr_context_create(struct pvr_file *pvr_file, struct drm_pvr_ioctl_create_co
+ 	pvr_fw_object_destroy(ctx->fw_obj);
+ 
+ err_destroy_queues:
+-	pvr_context_destroy_queues(ctx);
++	pvr_context_destroy_queues(ctx, true);
++
++err_free_ctx_id:
++	/*
++	 * Ctx_id is not exposed to userspace and not visible yet within
++	 * the kernel/FW, plus a matching context handle (exposed to userspace)
++	 * hasn't been allocated yet, so it is safe to remove ctx_id
++	 * from the ctx_ids xarray.
++	 */
++	xa_erase(&pvr_dev->ctx_ids, ctx->ctx_id);
+ 
+ err_free_ctx_data:
+ 	kfree(ctx->data);
+@@ -382,7 +386,7 @@ pvr_context_release(struct kref *ref_count)
+ 	spin_unlock(&pvr_dev->ctx_list_lock);
+ 
+ 	xa_erase(&pvr_dev->ctx_ids, ctx->ctx_id);
+-	pvr_context_destroy_queues(ctx);
++	pvr_context_destroy_queues(ctx, false);
+ 	pvr_fw_object_destroy(ctx->fw_obj);
+ 	kfree(ctx->data);
+ 	pvr_vm_context_put(ctx->vm_ctx);
+diff --git a/drivers/gpu/drm/imagination/pvr_device.c b/drivers/gpu/drm/imagination/pvr_device.c
+index dbb6f5a8ded12a422433a85b47abe0c3f9a5a516..2691ef9af0ca83a8687eed72b15ff134b7bed0a0 100644
+--- a/drivers/gpu/drm/imagination/pvr_device.c
++++ b/drivers/gpu/drm/imagination/pvr_device.c
+@@ -213,7 +213,7 @@ static irqreturn_t pvr_device_irq_thread_handler(int irq, void *data)
+ 	while (pvr_fw_irq_pending(pvr_dev)) {
+ 		pvr_fw_irq_clear(pvr_dev);
+ 
+-		if (pvr_dev->fw_dev.booted) {
++		if (READ_ONCE(pvr_dev->fw_dev.initialised)) {
+ 			pvr_fwccb_process(pvr_dev);
+ 			pvr_kccb_wake_up_waiters(pvr_dev);
+ 			pvr_device_process_active_queues(pvr_dev);
+diff --git a/drivers/gpu/drm/imagination/pvr_drv.c b/drivers/gpu/drm/imagination/pvr_drv.c
+index 268900464ab693a239be529458931f1aa49474cc..58087e8517d60780c0bdb763b9486fdae8aba044 100644
+--- a/drivers/gpu/drm/imagination/pvr_drv.c
++++ b/drivers/gpu/drm/imagination/pvr_drv.c
+@@ -14,6 +14,7 @@
+ #include "pvr_rogue_defs.h"
+ #include "pvr_rogue_fwif_client.h"
+ #include "pvr_rogue_fwif_shared.h"
++#include "pvr_trace.h"
+ #include "pvr_vm.h"
+ 
+ #include <uapi/drm/pvr_drm.h>
+@@ -29,7 +30,6 @@
+ #include <linux/fs.h>
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+-#include <linux/mod_devicetable.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/of_device.h>
+@@ -514,7 +514,8 @@ pvr_dev_query_quirks_get(struct pvr_device *pvr_dev,
+ 	if (err < 0)
+ 		return err;
+ 
+-	args->size = sizeof(query);
++	if (args->size > sizeof(query))
++		args->size = sizeof(query);
+ 	return 0;
+ }
+ 
+@@ -595,7 +596,8 @@ pvr_dev_query_enhancements_get(struct pvr_device *pvr_dev,
+ 	if (err < 0)
+ 		return err;
+ 
+-	args->size = sizeof(query);
++	if (args->size > sizeof(query))
++		args->size = sizeof(query);
+ 	return 0;
+ }
+ 
+@@ -1150,6 +1152,8 @@ pvr_ioctl_submit_jobs(struct drm_device *drm_dev, void *raw_args,
+ 	int idx;
+ 	int err;
+ 
++	trace_pvr_job_submit_ioctl(pvr_dev, args->jobs.count);
++
+ 	if (!drm_dev_enter(drm_dev, &idx))
+ 		return -EIO;
+ 
+@@ -1252,14 +1256,13 @@ pvr_set_uobj_array(const struct drm_pvr_obj_array *out, u32 min_stride, u32 obj_
+ 			if (copy_to_user(out_ptr, in_ptr, cpy_elem_size))
+ 				return -EFAULT;
+ 
+-			out_ptr += obj_size;
+-			in_ptr += out->stride;
+-		}
++			if (out->stride > obj_size &&
++			    clear_user(out_ptr + cpy_elem_size, out->stride - obj_size)) {
++				return -EFAULT;
++			}
+ 
+-		if (out->stride > obj_size &&
+-		    clear_user(u64_to_user_ptr(out->array + obj_size),
+-			       out->stride - obj_size)) {
+-			return -EFAULT;
++			out_ptr += out->stride;
++			in_ptr += obj_size;
+ 		}
+ 	}
+ 
+diff --git a/drivers/gpu/drm/imagination/pvr_free_list.c b/drivers/gpu/drm/imagination/pvr_free_list.c
+index e85cac83834c6354178ba2472419751175dae2d2..faf5e586d8dc178d229b68582f91145ff32e7c71 100644
+--- a/drivers/gpu/drm/imagination/pvr_free_list.c
++++ b/drivers/gpu/drm/imagination/pvr_free_list.c
+@@ -8,6 +8,7 @@
+ #include "pvr_vm.h"
+ 
+ #include <drm/drm_gem.h>
++#include <drm/drm_print.h>
+ #include <linux/slab.h>
+ #include <linux/xarray.h>
+ #include <uapi/drm/pvr_drm.h>
+@@ -612,13 +613,21 @@ pvr_free_list_process_reconstruct_req(struct pvr_device *pvr_dev,
+ 	};
+ 	struct rogue_fwif_freelists_reconstruction_data *resp =
+ 		&resp_cmd.cmd_data.free_lists_reconstruction_data;
++	u32 count = min_t(u32, req->freelist_count,
++			  ARRAY_SIZE(req->freelist_ids));
+ 
+-	for (u32 i = 0; i < req->freelist_count; i++)
++	if (count != req->freelist_count) {
++		drm_warn_once(from_pvr_device(pvr_dev),
++			      "Requested reconstruction of %u freelists, limiting to %u\n",
++			      req->freelist_count, count);
++	}
++
++	for (u32 i = 0; i < count; i++)
+ 		pvr_free_list_reconstruct(pvr_dev, req->freelist_ids[i]);
+ 
+-	resp->freelist_count = req->freelist_count;
++	resp->freelist_count = count;
+ 	memcpy(resp->freelist_ids, req->freelist_ids,
+-	       req->freelist_count * sizeof(resp->freelist_ids[0]));
++	       count * sizeof(resp->freelist_ids[0]));
+ 
+ 	WARN_ON(pvr_kccb_send_cmd(pvr_dev, &resp_cmd, NULL));
+ }
+diff --git a/drivers/gpu/drm/imagination/pvr_fw.c b/drivers/gpu/drm/imagination/pvr_fw.c
+index 288516dc2560f1380d44fd756203a3abaaa30aeb..850a3ec8e7750fd88fc73c3991df5c4b7eb60079 100644
+--- a/drivers/gpu/drm/imagination/pvr_fw.c
++++ b/drivers/gpu/drm/imagination/pvr_fw.c
+@@ -1004,7 +1004,7 @@ pvr_fw_init(struct pvr_device *pvr_dev)
+ 		goto err_fw_stop;
+ 	}
+ 
+-	fw_dev->booted = true;
++	WRITE_ONCE(fw_dev->initialised, true);
+ 
+ 	return 0;
+ 
+@@ -1044,7 +1044,7 @@ pvr_fw_fini(struct pvr_device *pvr_dev)
+ {
+ 	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
+ 
+-	fw_dev->booted = false;
++	WRITE_ONCE(fw_dev->initialised, false);
+ 
+ 	pvr_fw_destroy_structures(pvr_dev);
+ 	pvr_fw_object_unmap_and_destroy(pvr_dev->kccb.rtn_obj);
+diff --git a/drivers/gpu/drm/imagination/pvr_fw.h b/drivers/gpu/drm/imagination/pvr_fw.h
+index 1404dd492d7cd82d62dd407a780efcae34d9bf2d..3390c84e4fd31624833d87614836cdbd97538191 100644
+--- a/drivers/gpu/drm/imagination/pvr_fw.h
++++ b/drivers/gpu/drm/imagination/pvr_fw.h
+@@ -295,8 +295,11 @@ struct pvr_fw_device {
+ 	/** @mem: Structure containing objects representing firmware memory allocations. */
+ 	struct pvr_fw_mem mem;
+ 
+-	/** @booted: %true if the firmware has been booted, %false otherwise. */
+-	bool booted;
++	/**
++	 * @initialised: %true if the firmware has been successfully initialised,
++	 *               %false otherwise.
++	 */
++	bool initialised;
+ 
+ 	/**
+ 	 * @processor_type: FW processor type for this device. Must be one of
+diff --git a/drivers/gpu/drm/imagination/pvr_fw_trace.c b/drivers/gpu/drm/imagination/pvr_fw_trace.c
+index 6193811ef7bebb6157b7a50272178af3ab761672..805d9f9bc1dd9e7d710558c146edfd169e767604 100644
+--- a/drivers/gpu/drm/imagination/pvr_fw_trace.c
++++ b/drivers/gpu/drm/imagination/pvr_fw_trace.c
+@@ -71,13 +71,13 @@ pvr_fw_trace_init_mask_set(const char *val, const struct kernel_param *kp)
+ 	return 0;
+ }
+ 
+-const struct kernel_param_ops pvr_fw_trace_init_mask_ops = {
++static const struct kernel_param_ops pvr_fw_trace_init_mask_ops = {
+ 	.set = pvr_fw_trace_init_mask_set,
+ 	.get = param_get_hexint,
+ };
+ 
+ param_check_hexint(init_fw_trace_mask, &pvr_fw_trace_init_mask);
+-module_param_cb(init_fw_trace_mask, &pvr_fw_trace_init_mask_ops, &pvr_fw_trace_init_mask, 0600);
++module_param_cb(init_fw_trace_mask, &pvr_fw_trace_init_mask_ops, &pvr_fw_trace_init_mask, 0400);
+ __MODULE_PARM_TYPE(init_fw_trace_mask, "hexint");
+ MODULE_PARM_DESC(init_fw_trace_mask,
+ 		 "Enable FW trace for the specified groups at device init time");
+diff --git a/drivers/gpu/drm/imagination/pvr_job.c b/drivers/gpu/drm/imagination/pvr_job.c
+index 0c2f511a617852d80eda03e99775dbeef2535c15..b8a58d817009b69db90c05231e7870209d0baf73 100644
+--- a/drivers/gpu/drm/imagination/pvr_job.c
++++ b/drivers/gpu/drm/imagination/pvr_job.c
+@@ -14,6 +14,7 @@
+ #include "pvr_stream.h"
+ #include "pvr_stream_defs.h"
+ #include "pvr_sync.h"
++#include "pvr_trace.h"
+ 
+ #include <drm/drm_exec.h>
+ #include <drm/drm_gem.h>
+@@ -326,7 +327,7 @@ prepare_job_syncs(struct pvr_file *pvr_file,
+ 		  struct pvr_job_data *job_data,
+ 		  struct xarray *signal_array)
+ {
+-	struct dma_fence *done_fence;
++	struct dma_fence *finished_fence;
+ 	int err = pvr_sync_signal_array_collect_ops(signal_array,
+ 						    from_pvr_file(pvr_file),
+ 						    job_data->sync_op_count,
+@@ -359,13 +360,13 @@ prepare_job_syncs(struct pvr_file *pvr_file,
+ 			return err;
+ 	}
+ 
+-	/* We need to arm the job to get the job done fence. */
+-	done_fence = pvr_queue_job_arm(job_data->job);
++	/* We need to arm the job to get the job finished fence. */
++	finished_fence = pvr_queue_job_arm(job_data->job);
+ 
+ 	err = pvr_sync_signal_array_update_fences(signal_array,
+ 						  job_data->sync_op_count,
+ 						  job_data->sync_ops,
+-						  done_fence);
++						  finished_fence);
+ 	return err;
+ }
+ 
+@@ -510,6 +511,8 @@ static int pvr_job_data_init(struct pvr_device *pvr_dev,
+ 		}
+ 
+ 		job_data_out[i].sync_op_count = job_args[i].sync_ops.count;
++
++		trace_pvr_job_create(pvr_dev, job_data_out[i].job, job_data_out[i].sync_op_count);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/gpu/drm/imagination/pvr_mmu.c b/drivers/gpu/drm/imagination/pvr_mmu.c
+index 2e4da5b2c4996265afcac1b9ff5139ea95e7fab4..62eae7fcd5a26a53ae8f549cf7116154250de076 100644
+--- a/drivers/gpu/drm/imagination/pvr_mmu.c
++++ b/drivers/gpu/drm/imagination/pvr_mmu.c
+@@ -12,6 +12,7 @@
+ #include "pvr_rogue_mmu_defs.h"
+ 
+ #include <drm/drm_drv.h>
++#include <drm/drm_print.h>
+ #include <linux/atomic.h>
+ #include <linux/bitops.h>
+ #include <linux/dma-mapping.h>
+@@ -133,8 +134,8 @@ int pvr_mmu_flush_exec(struct pvr_device *pvr_dev, bool wait)
+ 	if (!drm_dev_enter(from_pvr_device(pvr_dev), &idx))
+ 		return -EIO;
+ 
+-	/* Can't flush MMU if the firmware hasn't booted yet. */
+-	if (!pvr_dev->fw_dev.booted)
++	/* Can't flush MMU if the firmware hasn't been initialised yet. */
++	if (!READ_ONCE(pvr_dev->fw_dev.initialised))
+ 		goto err_drm_dev_exit;
+ 
+ 	cmd_mmu_cache_data->cache_flags =
+@@ -2335,6 +2336,7 @@ void pvr_mmu_op_context_destroy(struct pvr_mmu_op_context *op_ctx)
+  * pvr_mmu_op_context_create() - Create an MMU op context.
+  * @ctx: MMU context associated with owning VM context.
+  * @sgt: Scatter gather table containing pages pinned for use by this context.
++ * @device_addr: Virtual device address at the start of the requested mapping.
+  * @sgt_offset: Start offset of the requested device-virtual memory mapping.
+  * @size: Size in bytes of the requested device-virtual memory mapping. For an
+  * unmapping, this should be zero so that no page tables are allocated.
+@@ -2346,8 +2348,9 @@ void pvr_mmu_op_context_destroy(struct pvr_mmu_op_context *op_ctx)
+  */
+ struct pvr_mmu_op_context *
+ pvr_mmu_op_context_create(struct pvr_mmu_context *ctx, struct sg_table *sgt,
+-			  u64 sgt_offset, u64 size)
++			  u64 device_addr, u64 sgt_offset, u64 size)
+ {
++	u64 start_addr = device_addr + sgt_offset;
+ 	int err;
+ 
+ 	struct pvr_mmu_op_context *op_ctx = kzalloc_obj(*op_ctx);
+@@ -2363,16 +2366,16 @@ pvr_mmu_op_context_create(struct pvr_mmu_context *ctx, struct sg_table *sgt,
+ 	if (size) {
+ 		/*
+ 		 * The number of page table objects we need to prealloc is
+-		 * indicated by the mapping size, start offset and the sizes
++		 * indicated by the mapping size, start address and the sizes
+ 		 * of the areas mapped per PT or PD. The range calculation is
+ 		 * identical to that for the index into a table for a device
+ 		 * address, so we reuse those functions here.
+ 		 */
+-		const u32 l1_start_idx = pvr_page_table_l2_idx(sgt_offset);
+-		const u32 l1_end_idx = pvr_page_table_l2_idx(sgt_offset + size);
++		const u32 l1_start_idx = pvr_page_table_l2_idx(start_addr);
++		const u32 l1_end_idx = pvr_page_table_l2_idx(start_addr + size);
+ 		const u32 l1_count = l1_end_idx - l1_start_idx + 1;
+-		const u32 l0_start_idx = pvr_page_table_l1_idx(sgt_offset);
+-		const u32 l0_end_idx = pvr_page_table_l1_idx(sgt_offset + size);
++		const u32 l0_start_idx = pvr_page_table_l1_idx(start_addr);
++		const u32 l0_end_idx = pvr_page_table_l1_idx(start_addr + size);
+ 		const u32 l0_count = l0_end_idx - l0_start_idx + 1;
+ 
+ 		/*
+@@ -2553,7 +2556,9 @@ pvr_mmu_map_sgl(struct pvr_mmu_op_context *op_ctx, struct scatterlist *sgl,
+ 
+ err_destroy_pages:
+ 	memcpy(&op_ctx->curr_page, &ptr_copy, sizeof(op_ctx->curr_page));
+-	err = pvr_mmu_op_context_unmap_curr_page(op_ctx, page);
++	if (pvr_mmu_op_context_unmap_curr_page(op_ctx, page))
++		drm_err(from_pvr_device(op_ctx->mmu_ctx->pvr_dev),
++			"%s : Failure in unmapping pages\n", __func__);
+ 
+ 	return err;
+ }
+diff --git a/drivers/gpu/drm/imagination/pvr_mmu.h b/drivers/gpu/drm/imagination/pvr_mmu.h
+index a8ecd460168dcd417f4369548f0757999e411a79..2c02d61ba0a29fcb2c732a1532a2fcb8d44f5e47 100644
+--- a/drivers/gpu/drm/imagination/pvr_mmu.h
++++ b/drivers/gpu/drm/imagination/pvr_mmu.h
+@@ -99,7 +99,7 @@ dma_addr_t pvr_mmu_get_root_table_dma_addr(struct pvr_mmu_context *ctx);
+ void pvr_mmu_op_context_destroy(struct pvr_mmu_op_context *op_ctx);
+ struct pvr_mmu_op_context *
+ pvr_mmu_op_context_create(struct pvr_mmu_context *ctx,
+-			  struct sg_table *sgt, u64 sgt_offset, u64 size);
++			  struct sg_table *sgt, u64 device_addr, u64 sgt_offset, u64 size);
+ 
+ int pvr_mmu_map(struct pvr_mmu_op_context *op_ctx, u64 size, u64 flags,
+ 		u64 device_addr);
+diff --git a/drivers/gpu/drm/imagination/pvr_power.c b/drivers/gpu/drm/imagination/pvr_power.c
+index 88fcce433d12328dd1c585b031816d44f834dbaa..a71d5b35601e7b996428312028a4c0542a5b1350 100644
+--- a/drivers/gpu/drm/imagination/pvr_power.c
++++ b/drivers/gpu/drm/imagination/pvr_power.c
+@@ -216,7 +216,7 @@ pvr_watchdog_worker(struct work_struct *work)
+ 	if (pm_runtime_get_if_in_use(from_pvr_device(pvr_dev)->dev) <= 0)
+ 		goto out_requeue;
+ 
+-	if (!pvr_dev->fw_dev.booted)
++	if (!READ_ONCE(pvr_dev->fw_dev.initialised))
+ 		goto out_pm_runtime_put;
+ 
+ 	stalled = pvr_watchdog_kccb_stalled(pvr_dev);
+@@ -378,7 +378,7 @@ pvr_power_device_suspend(struct device *dev)
+ 	if (!drm_dev_enter(drm_dev, &idx))
+ 		return -EIO;
+ 
+-	if (pvr_dev->fw_dev.booted) {
++	if (READ_ONCE(pvr_dev->fw_dev.initialised)) {
+ 		err = pvr_power_fw_disable(pvr_dev, false, true);
+ 		if (err)
+ 			goto err_drm_dev_exit;
+@@ -408,7 +408,7 @@ pvr_power_device_resume(struct device *dev)
+ 	if (err)
+ 		goto err_drm_dev_exit;
+ 
+-	if (pvr_dev->fw_dev.booted) {
++	if (READ_ONCE(pvr_dev->fw_dev.initialised)) {
+ 		err = pvr_power_fw_enable(pvr_dev, true);
+ 		if (err)
+ 			goto err_power_off;
+@@ -548,7 +548,7 @@ pvr_power_reset(struct pvr_device *pvr_dev, bool hard_reset)
+ 		err = pvr_power_fw_disable(pvr_dev, hard_reset, false);
+ 		if (!err) {
+ 			if (hard_reset) {
+-				pvr_dev->fw_dev.booted = false;
++				WRITE_ONCE(pvr_dev->fw_dev.initialised, false);
+ 				WARN_ON(pvr_power_device_suspend(from_pvr_device(pvr_dev)->dev));
+ 
+ 				err = pvr_fw_hard_reset(pvr_dev);
+@@ -556,7 +556,7 @@ pvr_power_reset(struct pvr_device *pvr_dev, bool hard_reset)
+ 					goto err_device_lost;
+ 
+ 				err = pvr_power_device_resume(from_pvr_device(pvr_dev)->dev);
+-				pvr_dev->fw_dev.booted = true;
++				WRITE_ONCE(pvr_dev->fw_dev.initialised, true);
+ 				if (err)
+ 					goto err_device_lost;
+ 			} else {
+diff --git a/drivers/gpu/drm/imagination/pvr_queue.c b/drivers/gpu/drm/imagination/pvr_queue.c
+index dd88949f61944c82a66e19d6a98c11c31dc99aff..2d52ee321367a9d8ebe9a5b50e137256b5a395dc 100644
+--- a/drivers/gpu/drm/imagination/pvr_queue.c
++++ b/drivers/gpu/drm/imagination/pvr_queue.c
+@@ -10,6 +10,7 @@
+ #include "pvr_drv.h"
+ #include "pvr_job.h"
+ #include "pvr_queue.h"
++#include "pvr_trace.h"
+ #include "pvr_vm.h"
+ 
+ #include "pvr_rogue_fwif_client.h"
+@@ -177,11 +178,36 @@ static const struct dma_fence_ops pvr_queue_job_fence_ops = {
+ 	.release = pvr_queue_fence_release,
+ };
+ 
++/**
++ * pvr_queue_fence_is_ufo_backed() - Check if a dma_fence is backed by a UFO.
++ * @f: The dma_fence to check.
++ *
++ * Return:
++ * * true if the dma_fence is backed by a UFO, or
++ * * false otherwise.
++ */
++static inline bool
++pvr_queue_fence_is_ufo_backed(struct dma_fence *f)
++{
++	/*
++	 * Currently the only dma_fence backed by a UFO object is the job fence,
++	 * e.g. pvr_job::done_fence, wrapped by a pvr_queue_fence object.
++	 */
++	return f && f->ops == &pvr_queue_job_fence_ops;
++}
++
+ /**
+  * to_pvr_queue_job_fence() - Return a pvr_queue_fence object if the fence is
+- * backed by a UFO.
++ * already backed by a UFO.
+  * @f: The dma_fence to turn into a pvr_queue_fence.
+  *
++ * This could be called on:
++ * - a job fence directly, in which case it simply returns the containing pvr_queue_fence;
++ * - a drm_sched_fence's scheduled or finished fence, in which case it will first try to follow
++ *   the parent pointer to find the job fence (note that the parent pointer is initialized
++ *   only after the run_job() callback is called on the drm_sched_fence's owning job);
++ * - any other dma_fence, in which case it will return NULL.
++ *
+  * Return:
+  *  * A non-NULL pvr_queue_fence object if the dma_fence is backed by a UFO, or
+  *  * NULL otherwise.
+@@ -194,7 +220,7 @@ to_pvr_queue_job_fence(struct dma_fence *f)
+ 	if (sched_fence)
+ 		f = sched_fence->parent;
+ 
+-	if (f && f->ops == &pvr_queue_job_fence_ops)
++	if (pvr_queue_fence_is_ufo_backed(f))
+ 		return container_of(f, struct pvr_queue_fence, base);
+ 
+ 	return NULL;
+@@ -349,11 +375,23 @@ static u32 ufo_cmds_size(u32 elem_count)
+ 
+ static u32 job_cmds_size(struct pvr_job *job, u32 ufo_wait_count)
+ {
+-	/* One UFO cmd for the fence signaling, one UFO cmd per native fence native,
+-	 * and a command for the job itself.
++	/*
++	 * One UFO command per native fence this job will be waiting on (unless any are
++	 * signaled by the time the job is submitted), plus a command for the job itself,
++	 * plus one UFO command for the fence signaling.
+ 	 */
+-	return ufo_cmds_size(1) + ufo_cmds_size(ufo_wait_count) +
+-	       pvr_cccb_get_size_of_cmd_with_hdr(job->cmd_len);
++	return ufo_cmds_size(ufo_wait_count) +
++	       pvr_cccb_get_size_of_cmd_with_hdr(job->cmd_len) +
++	       ufo_cmds_size(1);
++}
++
++static bool
++is_paired_job_fence(struct dma_fence *fence, struct pvr_job *job)
++{
++	/* This assumes "fence" is one of "job"'s drm_sched_job::dependencies */
++	return job->type == DRM_PVR_JOB_TYPE_FRAGMENT &&
++	       job->paired_job &&
++	       &job->paired_job->base.s_fence->scheduled == fence;
+ }
+ 
+ /**
+@@ -371,6 +409,17 @@ static unsigned long job_count_remaining_native_deps(struct pvr_job *job)
+ 	xa_for_each(&job->base.dependencies, index, fence) {
+ 		struct pvr_queue_fence *jfence;
+ 
++		if (is_paired_job_fence(fence, job)) {
++			/*
++			 * A fence between paired jobs won't resolve to a pvr_queue_fence (i.e.
++			 * be backed by a UFO) until the jobs have been submitted, together.
++			 * The submitting code will insert a partial render fence command for this.
++			 */
++			WARN_ON(dma_fence_is_signaled(fence));
++			remaining_count++;
++			continue;
++		}
++
+ 		jfence = to_pvr_queue_job_fence(fence);
+ 		if (!jfence)
+ 			continue;
+@@ -468,29 +517,37 @@ pvr_queue_get_job_kccb_fence(struct pvr_queue *queue, struct pvr_job *job)
+ }
+ 
+ static struct dma_fence *
+-pvr_queue_get_paired_frag_job_dep(struct pvr_queue *queue, struct pvr_job *job)
++pvr_queue_get_paired_frag_job_dep(struct pvr_job *job)
+ {
+ 	struct pvr_job *frag_job = job->type == DRM_PVR_JOB_TYPE_GEOMETRY ?
+ 				   job->paired_job : NULL;
++	struct pvr_queue *frag_queue = frag_job ? frag_job->ctx->queues.fragment : NULL;
+ 	struct dma_fence *f;
+ 	unsigned long index;
+ 
+ 	if (!frag_job)
+ 		return NULL;
+ 
++	/* Have the geometry job wait on the paired fragment job's dependencies as well. */
+ 	xa_for_each(&frag_job->base.dependencies, index, f) {
+ 		/* Skip already signaled fences. */
+ 		if (dma_fence_is_signaled(f))
+ 			continue;
+ 
+-		/* Skip our own fence. */
++		/*
++		 * The paired job fence won't be signaled until both jobs have
++		 * been submitted, so we can't wait on it to schedule them.
++		 */
+ 		if (f == &job->base.s_fence->scheduled)
+ 			continue;
+ 
+ 		return dma_fence_get(f);
+ 	}
+ 
+-	return frag_job->base.sched->ops->prepare_job(&frag_job->base, &queue->entity);
++	/* Initialize the paired fragment job's done_fence, so we can signal it. */
++	pvr_queue_job_fence_init(frag_job->done_fence, frag_queue);
++
++	return pvr_queue_get_job_cccb_fence(frag_queue, frag_job);
+ }
+ 
+ /**
+@@ -509,32 +566,25 @@ pvr_queue_prepare_job(struct drm_sched_job *sched_job,
+ 	struct pvr_queue *queue = container_of(s_entity, struct pvr_queue, entity);
+ 	struct dma_fence *internal_dep = NULL;
+ 
+-	/*
+-	 * Initialize the done_fence, so we can signal it. This must be done
+-	 * here because otherwise by the time of run_job() the job will end up
+-	 * in the pending list without a valid fence.
+-	 */
+ 	if (job->type == DRM_PVR_JOB_TYPE_FRAGMENT && job->paired_job) {
+ 		/*
+-		 * This will be called on a paired fragment job after being
+-		 * submitted to firmware. We can tell if this is the case and
+-		 * bail early from whether run_job() has been called on the
+-		 * geometry job, which would issue a pm ref.
++		 * This will be called on a paired fragment job after being submitted
++		 * to the firmware as part of the paired geometry job's submission.
++		 * We can tell if this is the case and bail early from whether run_job()
++		 * has been called on the geometry job, which would issue a pm ref on
++		 * this job as well.
+ 		 */
+-		if (job->paired_job->has_pm_ref)
++		if (job->has_pm_ref)
+ 			return NULL;
+-
+-		/*
+-		 * In this case we need to use the job's own ctx to initialise
+-		 * the done_fence.  The other steps are done in the ctx of the
+-		 * paired geometry job.
+-		 */
+-		pvr_queue_job_fence_init(job->done_fence,
+-					 job->ctx->queues.fragment);
+-	} else {
+-		pvr_queue_job_fence_init(job->done_fence, queue);
+ 	}
+ 
++	/*
++	 * Initialize the done_fence, so we can signal it. This must be done
++	 * here because otherwise by the time of run_job() the job will end up
++	 * in the pending list without a valid fence.
++	 */
++	pvr_queue_job_fence_init(job->done_fence, queue);
++
+ 	/* CCCB fence is used to make sure we have enough space in the CCCB to
+ 	 * submit our commands.
+ 	 */
+@@ -555,7 +605,7 @@ pvr_queue_prepare_job(struct drm_sched_job *sched_job,
+ 
+ 	/* The paired job fence should come last, when everything else is ready. */
+ 	if (!internal_dep)
+-		internal_dep = pvr_queue_get_paired_frag_job_dep(queue, job);
++		internal_dep = pvr_queue_get_paired_frag_job_dep(job);
+ 
+ 	return internal_dep;
+ }
+@@ -630,11 +680,7 @@ static void pvr_queue_submit_job_to_cccb(struct pvr_job *job)
+ 		if (!jfence)
+ 			continue;
+ 
+-		/* Skip the partial render fence, we will place it at the end. */
+-		if (job->type == DRM_PVR_JOB_TYPE_FRAGMENT && job->paired_job &&
+-		    &job->paired_job->base.s_fence->scheduled == fence)
+-			continue;
+-
++		/* Some dependencies might have been signaled since prepare_job() */
+ 		if (dma_fence_is_signaled(&jfence->base))
+ 			continue;
+ 
+@@ -649,8 +695,13 @@ static void pvr_queue_submit_job_to_cccb(struct pvr_job *job)
+ 		}
+ 	}
+ 
+-	/* Partial render fence goes last. */
+ 	if (job->type == DRM_PVR_JOB_TYPE_FRAGMENT && job->paired_job) {
++		/*
++		 * The loop above will only process dependencies backed by a UFO i.e. with
++		 * a valid parent fence assigned, but the paired job dependency won't have
++		 * one until both jobs have been submitted. Access the parent fence directly
++		 * here instead, submitting it last as partial render fence.
++		 */
+ 		jfence = to_pvr_queue_job_fence(job->paired_job->done_fence);
+ 		if (!WARN_ON(!jfence)) {
+ 			pvr_fw_object_get_fw_addr(jfence->queue->timeline_ufo.fw_obj,
+@@ -679,7 +730,7 @@ static void pvr_queue_submit_job_to_cccb(struct pvr_job *job)
+ 	pvr_cccb_write_command_with_header(cccb, job->fw_ccb_cmd_type, job->cmd_len, job->cmd,
+ 					   job->id, job->id);
+ 
+-	/* Signal the job fence. */
++	/* Update command to signal the job fence. */
+ 	pvr_fw_object_get_fw_addr(queue->timeline_ufo.fw_obj, &ufos[0].addr);
+ 	ufos[0].value = job->done_fence->seqno;
+ 	pvr_cccb_write_command_with_header(cccb, ROGUE_FWIF_CCB_CMD_TYPE_UPDATE,
+@@ -709,10 +760,8 @@ static struct dma_fence *pvr_queue_run_job(struct drm_sched_job *sched_job)
+ 	}
+ 
+ 	/* The only kind of jobs that can be paired are geometry and fragment, and
+-	 * we bail out early if we see a fragment job that's paired with a geomtry
+-	 * job.
+-	 * Paired jobs must also target the same context and point to the same
+-	 * HWRT.
++	 * we bail out early if we see a fragment job that's paired with a geometry job.
++	 * Paired jobs must also target the same context and point to the same HWRT.
+ 	 */
+ 	if (WARN_ON(job->paired_job &&
+ 		    (job->type != DRM_PVR_JOB_TYPE_GEOMETRY ||
+@@ -751,6 +800,9 @@ static struct dma_fence *pvr_queue_run_job(struct drm_sched_job *sched_job)
+ 						 job->hwrt,
+ 						 frag_job->fw_ccb_cmd_type ==
+ 						 ROGUE_FWIF_CCB_CMD_TYPE_FRAG_PR);
++
++		trace_pvr_job_submit_fw(geom_job);
++		trace_pvr_job_submit_fw(frag_job);
+ 	} else {
+ 		struct pvr_queue *queue = container_of(job->base.sched,
+ 						       struct pvr_queue, scheduler);
+@@ -758,6 +810,8 @@ static struct dma_fence *pvr_queue_run_job(struct drm_sched_job *sched_job)
+ 		pvr_cccb_send_kccb_kick(pvr_dev, &queue->cccb,
+ 					pvr_context_get_fw_addr(job->ctx) + queue->ctx_offset,
+ 					job->hwrt);
++
++		trace_pvr_job_submit_fw(job);
+ 	}
+ 
+ 	return dma_fence_get(job->done_fence);
+@@ -803,7 +857,9 @@ static void pvr_queue_start(struct pvr_queue *queue)
+  * the scheduler, and re-assign parent fences in the middle.
+  *
+  * Return:
+- *  * DRM_GPU_SCHED_STAT_RESET.
++ *  *%DRM_GPU_SCHED_STAT_NO_HANG if the job fence has already been
++ *   signaled, or
++ *  *%DRM_GPU_SCHED_STAT_RESET otherwise.
+  */
+ static enum drm_gpu_sched_stat
+ pvr_queue_timedout_job(struct drm_sched_job *s_job)
+@@ -814,6 +870,9 @@ pvr_queue_timedout_job(struct drm_sched_job *s_job)
+ 	struct pvr_job *job;
+ 	u32 job_count = 0;
+ 
++	if (dma_fence_is_signaled(s_job->s_fence->parent))
++		return DRM_GPU_SCHED_STAT_NO_HANG;
++
+ 	dev_err(sched->dev, "Job timeout\n");
+ 
+ 	/* Before we stop the scheduler, make sure the queue is out of any list, so
+@@ -882,16 +941,16 @@ static const struct drm_sched_backend_ops pvr_queue_sched_ops = {
+ };
+ 
+ /**
+- * pvr_queue_fence_is_ufo_backed() - Check if a dma_fence is backed by a UFO object
++ * pvr_queue_fence_is_native() - Check if a dma_fence is native to this driver.
+  * @f: Fence to test.
+  *
+- * A UFO-backed fence is a fence that can be signaled or waited upon FW-side.
+- * pvr_job::done_fence objects are backed by the timeline UFO attached to the queue
+- * they are pushed to, but those fences are not directly exposed to the outside
+- * world, so we also need to check if the fence we're being passed is a
+- * drm_sched_fence that was coming from our driver.
++ * Check if the fence we're being passed is a drm_sched_fence that is coming from this driver.
++ *
++ * It may be a UFO-backed fence i.e. a fence that can be signaled or waited upon FW-side,
++ * such as pvr_job::done_fence objects that are backed by the timeline UFO attached to the queue
++ * they are pushed to.
+  */
+-bool pvr_queue_fence_is_ufo_backed(struct dma_fence *f)
++bool pvr_queue_fence_is_native(struct dma_fence *f)
+ {
+ 	struct drm_sched_fence *sched_fence = f ? to_drm_sched_fence(f) : NULL;
+ 
+@@ -899,10 +958,7 @@ bool pvr_queue_fence_is_ufo_backed(struct dma_fence *f)
+ 	    sched_fence->sched->ops == &pvr_queue_sched_ops)
+ 		return true;
+ 
+-	if (f && f->ops == &pvr_queue_job_fence_ops)
+-		return true;
+-
+-	return false;
++	return pvr_queue_fence_is_ufo_backed(f);
+ }
+ 
+ /**
+@@ -934,9 +990,8 @@ pvr_queue_signal_done_fences(struct pvr_queue *queue)
+ }
+ 
+ /**
+- * pvr_queue_check_job_waiting_for_cccb_space() - Check if the job waiting for CCCB space
+- * can be unblocked
+- * pushed to the CCCB
++ * pvr_queue_check_job_waiting_for_cccb_space() - Check if a job waiting for CCCB space
++ * can be unblocked and pushed to the CCCB.
+  * @queue: Queue to check
+  *
+  * If we have a job waiting for CCCB, and this job now fits in the CCCB, we signal
+@@ -1149,6 +1204,8 @@ void pvr_queue_job_cleanup(struct pvr_job *job)
+ 
+ 	if (job->base.s_fence)
+ 		drm_sched_job_cleanup(&job->base);
++
++	trace_pvr_job_done(job);
+ }
+ 
+ /**
+@@ -1386,11 +1443,12 @@ void pvr_queue_kill(struct pvr_queue *queue)
+ /**
+  * pvr_queue_destroy() - Destroy a queue.
+  * @queue: The queue to destroy.
++ * @cleanup_queue_entity: Whether to cleanup the queue entity.
+  *
+  * Cleanup the queue and free the resources attached to it. Should be
+  * called from the context release function.
+  */
+-void pvr_queue_destroy(struct pvr_queue *queue)
++void pvr_queue_destroy(struct pvr_queue *queue, bool cleanup_queue_entity)
+ {
+ 	if (!queue)
+ 		return;
+@@ -1400,7 +1458,8 @@ void pvr_queue_destroy(struct pvr_queue *queue)
+ 	mutex_unlock(&queue->ctx->pvr_dev->queues.lock);
+ 
+ 	drm_sched_fini(&queue->scheduler);
+-	drm_sched_entity_fini(&queue->entity);
++	if (cleanup_queue_entity)
++		drm_sched_entity_fini(&queue->entity);
+ 
+ 	if (WARN_ON(queue->last_queued_job_scheduled_fence))
+ 		dma_fence_put(queue->last_queued_job_scheduled_fence);
+diff --git a/drivers/gpu/drm/imagination/pvr_queue.h b/drivers/gpu/drm/imagination/pvr_queue.h
+index fc1986d73fc88e8454d16935d549a550d12f2ef5..149cc6d124bf46af2015f8b94b3374c47efae8f5 100644
+--- a/drivers/gpu/drm/imagination/pvr_queue.h
++++ b/drivers/gpu/drm/imagination/pvr_queue.h
+@@ -141,7 +141,7 @@ struct pvr_queue {
+ 	u64 callstack_addr;
+ };
+ 
+-bool pvr_queue_fence_is_ufo_backed(struct dma_fence *f);
++bool pvr_queue_fence_is_native(struct dma_fence *f);
+ 
+ int pvr_queue_job_init(struct pvr_job *job, u64 drm_client_id);
+ 
+@@ -158,7 +158,7 @@ struct pvr_queue *pvr_queue_create(struct pvr_context *ctx,
+ 
+ void pvr_queue_kill(struct pvr_queue *queue);
+ 
+-void pvr_queue_destroy(struct pvr_queue *queue);
++void pvr_queue_destroy(struct pvr_queue *queue, bool cleanup_queue_entity);
+ 
+ void pvr_queue_process(struct pvr_queue *queue);
+ 
+diff --git a/drivers/gpu/drm/imagination/pvr_rogue_fwif_shared.h b/drivers/gpu/drm/imagination/pvr_rogue_fwif_shared.h
+index 869d904e3649f99bb4d38e18560bcc9ab14c5221..fe54c1cad7a9c5383b09607c64421a70631226a4 100644
+--- a/drivers/gpu/drm/imagination/pvr_rogue_fwif_shared.h
++++ b/drivers/gpu/drm/imagination/pvr_rogue_fwif_shared.h
+@@ -14,15 +14,7 @@
+ 
+ #define ROGUE_NUM_GEOM_CORES_SIZE 2U
+ 
+-/*
+- * Maximum number of UFOs in a CCB command.
+- * The number is based on having 32 sync prims (as originally), plus 32 sync
+- * checkpoints.
+- * Once the use of sync prims is no longer supported, we will retain
+- * the same total (64) as the number of sync checkpoints which may be
+- * supporting a fence is not visible to the client driver and has to
+- * allow for the number of different timelines involved in fence merges.
+- */
++/* Maximum number of UFOs in a CCB command. */
+ #define ROGUE_FWIF_CCB_CMD_MAX_UFOS (32U + 32U)
+ 
+ /*
+diff --git a/drivers/gpu/drm/imagination/pvr_sync.c b/drivers/gpu/drm/imagination/pvr_sync.c
+index 3582616ff72208799349a4a884004abd2c3e48c9..936f840a52218943ce251a6ac3c2e1db49749425 100644
+--- a/drivers/gpu/drm/imagination/pvr_sync.c
++++ b/drivers/gpu/drm/imagination/pvr_sync.c
+@@ -160,7 +160,7 @@ int
+ pvr_sync_signal_array_update_fences(struct xarray *array,
+ 				    u32 sync_op_count,
+ 				    const struct drm_pvr_sync_op *sync_ops,
+-				    struct dma_fence *done_fence)
++				    struct dma_fence *finished_fence)
+ {
+ 	for (u32 i = 0; i < sync_op_count; i++) {
+ 		struct dma_fence *old_fence;
+@@ -175,7 +175,7 @@ pvr_sync_signal_array_update_fences(struct xarray *array,
+ 			return -EINVAL;
+ 
+ 		old_fence = sig_sync->fence;
+-		sig_sync->fence = dma_fence_get(done_fence);
++		sig_sync->fence = dma_fence_get(finished_fence);
+ 		dma_fence_put(old_fence);
+ 
+ 		if (WARN_ON(!sig_sync->fence))
+@@ -211,7 +211,7 @@ pvr_sync_add_dep_to_job(struct drm_sched_job *job, struct dma_fence *f)
+ 	int err = 0;
+ 
+ 	dma_fence_unwrap_for_each(uf, &iter, f) {
+-		if (pvr_queue_fence_is_ufo_backed(uf))
++		if (pvr_queue_fence_is_native(uf))
+ 			native_fence_count++;
+ 	}
+ 
+@@ -227,7 +227,7 @@ pvr_sync_add_dep_to_job(struct drm_sched_job *job, struct dma_fence *f)
+ 		if (err)
+ 			continue;
+ 
+-		if (pvr_queue_fence_is_ufo_backed(uf)) {
++		if (pvr_queue_fence_is_native(uf)) {
+ 			struct drm_sched_fence *s_fence = to_drm_sched_fence(uf);
+ 
+ 			/* If this is a native dependency, we wait for the scheduled fence,
+diff --git a/drivers/gpu/drm/imagination/pvr_sync.h b/drivers/gpu/drm/imagination/pvr_sync.h
+index db6ccfda104a3ad7d2901af494bc8c49f88da9b3..48501ad2779421a6a23e3d861a9b98db1d9614f8 100644
+--- a/drivers/gpu/drm/imagination/pvr_sync.h
++++ b/drivers/gpu/drm/imagination/pvr_sync.h
+@@ -70,7 +70,7 @@ int
+ pvr_sync_signal_array_update_fences(struct xarray *array,
+ 				    u32 sync_op_count,
+ 				    const struct drm_pvr_sync_op *sync_ops,
+-				    struct dma_fence *done_fence);
++				    struct dma_fence *finished_fence);
+ 
+ void
+ pvr_sync_signal_array_push_fences(struct xarray *array);
+diff --git a/drivers/gpu/drm/imagination/pvr_trace.h b/drivers/gpu/drm/imagination/pvr_trace.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..943d6b2418cba4d1c5f68a0e15494b73eb3fc8f6
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_trace.h
+@@ -0,0 +1,123 @@
++/* SPDX-License-Identifier: GPL-2.0 OR MIT */
++/* Copyright (c) 2026 Imagination Technologies Ltd. */
++
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM pvr
++
++#if !defined(PVR_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define PVR_TRACE_H
++
++#include "pvr_context.h"
++#include "pvr_device.h"
++#include "pvr_fw.h"
++#include "pvr_hwrt.h"
++#include "pvr_job.h"
++#include "pvr_sync.h"
++
++#include <linux/stringify.h>
++#include <linux/types.h>
++#include <linux/tracepoint.h>
++
++/*
++ * NOTE:
++ * When adding trace points, or extra data to existing ones - you must capture
++ * all the data in the TP_fast_assign section that you wish to use in the
++ * TP_printk section. This is because the printk is performed on demand from the
++ * captured data when you `cat /sys/kernel/tracing/trace` and by the time this
++ * happens any pointers you captured will likely no longer point to valid data.
++ */
++
++/* Job submit */
++
++TRACE_EVENT(pvr_job_submit_ioctl,
++	    TP_PROTO(struct pvr_device *pvr_dev, u32 count),
++	    TP_ARGS(pvr_dev, count),
++	    TP_STRUCT__entry(__field(struct pvr_device *, pvr_dev)
++			     __field(u32, count)),
++	    TP_fast_assign(__entry->pvr_dev = pvr_dev;
++			   __entry->count = count;),
++	    TP_printk("pvr_dev=%p count=%u",
++		      __entry->pvr_dev,
++		      __entry->count)
++);
++
++#define PVR_JOB_GET_HWRT_FW_ADDR(job)                                                  \
++	({                                                                             \
++		struct pvr_job *_job = (job);                                          \
++		u32 _hwrt_fw_addr = 0;                                                 \
++										       \
++		if (_job && _job->hwrt)                                                \
++			pvr_fw_object_get_fw_addr(_job->hwrt->fw_obj, &_hwrt_fw_addr); \
++										       \
++		_hwrt_fw_addr;                                                         \
++	})
++
++#define PVR_JOB_TYPE_TO_STR(val)                                         \
++	__print_symbolic(val,                                            \
++			 { DRM_PVR_JOB_TYPE_GEOMETRY, "geometry" },      \
++			 { DRM_PVR_JOB_TYPE_FRAGMENT, "fragment" },      \
++			 { DRM_PVR_JOB_TYPE_COMPUTE, "compute" },        \
++			 { DRM_PVR_JOB_TYPE_TRANSFER_FRAG, "transfer" })
++
++TRACE_EVENT(pvr_job_create,
++	    TP_PROTO(struct pvr_device *pvr_dev, struct pvr_job *job,
++		     u32 sync_op_count),
++	    TP_ARGS(pvr_dev, job, sync_op_count),
++	    TP_STRUCT__entry(__field(struct pvr_device *, pvr_dev)
++			     __field(struct pvr_context *, ctx)
++			     __field(struct pvr_fw_object *, fw_obj)
++			     __field(u32, fw_addr)
++			     __field(u32, hwrt_addr)
++			     __field(struct pvr_job *, job)
++			     __field(enum drm_pvr_job_type, job_type)
++			     __field(u32, sync_op_count)),
++	    TP_fast_assign(__entry->pvr_dev = pvr_dev;
++			   __entry->ctx = job->ctx;
++			   __entry->fw_obj = job->ctx->fw_obj;
++			   pvr_fw_object_get_fw_addr(job->ctx->fw_obj, &__entry->fw_addr);
++			   __entry->hwrt_addr = PVR_JOB_GET_HWRT_FW_ADDR(job);
++			   __entry->job = job;
++			   __entry->job_type = job->type;
++			   __entry->sync_op_count = sync_op_count;),
++	    TP_printk("pvr_dev=%p ctx=%p fw_obj=%p fw_addr=0x%x hwrt_addr=0x%x job=%p job_type=%s sync_op_count=%u",
++		      __entry->pvr_dev,
++		      __entry->ctx,
++		      __entry->fw_obj,
++		      __entry->fw_addr,
++		      __entry->hwrt_addr,
++		      __entry->job,
++		      PVR_JOB_TYPE_TO_STR(__entry->job_type),
++		      __entry->sync_op_count)
++);
++
++#undef PVR_JOB_TYPE_TO_STR
++#undef PVR_JOB_GET_HWRT_FW_ADDR
++
++TRACE_EVENT(pvr_job_submit_fw,
++	    TP_PROTO(struct pvr_job *job),
++	    TP_ARGS(job),
++	    TP_STRUCT__entry(__field(struct pvr_job *, job)
++			     __field(u32, done_seqno)),
++	    TP_fast_assign(__entry->job = job;
++			   __entry->done_seqno = job->done_fence->seqno;),
++	    TP_printk("job=%p done_seqno=%u",
++		      __entry->job,
++		      __entry->done_seqno)
++);
++
++TRACE_EVENT(pvr_job_done,
++	    TP_PROTO(struct pvr_job *job),
++	    TP_ARGS(job),
++	    TP_STRUCT__entry(__field(struct pvr_job *, job)),
++	    TP_fast_assign(__entry->job = job;),
++	    TP_printk("job=%p", __entry->job)
++);
++
++#endif /* PVR_TRACE_H */
++
++/* This part must be outside protection */
++#undef TRACE_INCLUDE_PATH
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/imagination
++#define TRACE_INCLUDE_FILE pvr_trace
++#include <trace/define_trace.h>
+diff --git a/drivers/gpu/drm/imagination/pvr_trace_points.c b/drivers/gpu/drm/imagination/pvr_trace_points.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..71b53f267af025b390aa477c0d3247eb7f4c4f55
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_trace_points.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0 OR MIT
++/* Copyright (c) 2026 Imagination Technologies Ltd. */
++
++#ifndef __CHECKER__
++#define CREATE_TRACE_POINTS
++#include "pvr_trace.h"
++#endif
+diff --git a/drivers/gpu/drm/imagination/pvr_vm.c b/drivers/gpu/drm/imagination/pvr_vm.c
+index e1ec60f34b6e64ed6519c8b40aacb179164de0f9..55cc999f3708b678b9d4d2fa68b3f20b74eb4d58 100644
+--- a/drivers/gpu/drm/imagination/pvr_vm.c
++++ b/drivers/gpu/drm/imagination/pvr_vm.c
+@@ -276,7 +276,7 @@ pvr_vm_bind_op_map_init(struct pvr_vm_bind_op *bind_op,
+ 		goto err_bind_op_fini;
+ 
+ 	bind_op->mmu_op_ctx =
+-		pvr_mmu_op_context_create(vm_ctx->mmu_ctx, sgt, offset, size);
++		pvr_mmu_op_context_create(vm_ctx->mmu_ctx, sgt, device_addr, offset, size);
+ 	err = PTR_ERR_OR_ZERO(bind_op->mmu_op_ctx);
+ 	if (err) {
+ 		bind_op->mmu_op_ctx = NULL;
+@@ -318,7 +318,7 @@ pvr_vm_bind_op_unmap_init(struct pvr_vm_bind_op *bind_op,
+ 	}
+ 
+ 	bind_op->mmu_op_ctx =
+-		pvr_mmu_op_context_create(vm_ctx->mmu_ctx, NULL, 0, 0);
++		pvr_mmu_op_context_create(vm_ctx->mmu_ctx, NULL, device_addr, 0, 0);
+ 	err = PTR_ERR_OR_ZERO(bind_op->mmu_op_ctx);
+ 	if (err) {
+ 		bind_op->mmu_op_ctx = NULL;
+@@ -747,6 +747,7 @@ pvr_vm_map(struct pvr_vm_context *vm_ctx, struct pvr_gem_object *pvr_obj,
+ 
+ 	pvr_gem_object_get(pvr_obj);
+ 
++	mutex_lock(&vm_ctx->lock);
+ 	err = drm_gpuvm_exec_lock(&vm_exec);
+ 	if (err)
+ 		goto err_cleanup;
+@@ -756,6 +757,7 @@ pvr_vm_map(struct pvr_vm_context *vm_ctx, struct pvr_gem_object *pvr_obj,
+ 	drm_gpuvm_exec_unlock(&vm_exec);
+ 
+ err_cleanup:
++	mutex_unlock(&vm_ctx->lock);
+ 	pvr_vm_bind_op_fini(&bind_op);
+ 
+ 	return err;
+@@ -1019,7 +1021,8 @@ pvr_static_data_areas_get(const struct pvr_device *pvr_dev,
+ 	if (err < 0)
+ 		return err;
+ 
+-	args->size = sizeof(query);
++	if (args->size > sizeof(query))
++		args->size = sizeof(query);
+ 	return 0;
+ }
+ 
+@@ -1069,7 +1072,8 @@ pvr_heap_info_get(const struct pvr_device *pvr_dev,
+ 	if (err < 0)
+ 		return err;
+ 
+-	args->size = sizeof(query);
++	if (args->size > sizeof(query))
++		args->size = sizeof(query);
+ 	return 0;
+ }
+ 

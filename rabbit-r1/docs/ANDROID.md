@@ -75,6 +75,12 @@ byte-for-byte unchanged. [Source provenance](../android/patches/mesa-26.2.4.json
 records the upstream revisions, release checksum and retained delta. Source
 application and repeat checks passed; target compilation remains pending.
 
+The kernel PowerVR driver matches the complete Linux 7.2.9 subtree, including
+its unchanged UAPI. A separate CI configuration enables the driver, debugfs
+and tracing and compiles all 28 ARM64 objects with `W=1`; warnings fail the
+check. [Driver pins and compile scope](../tests/gpu/README.rst) record the
+source and validation. The shipping configuration keeps PowerVR disabled.
+
 The r1 GPU is PowerVR Rogue GE8320, BVNC `22.87.104.18`. This revision is absent
 from Mesa 26.2.4's device table and the kernel's documented supported GPU list.
 Matching upstream firmware exists, but the current kernel reports unhandled
