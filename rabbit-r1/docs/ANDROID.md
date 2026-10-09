@@ -5,8 +5,10 @@ service remain under `android/charging`. The six integration targets, including
 native services and the SELinux policy aggregate, built successfully on
 2026-10-09. Artifact checks passed for the ARM64 binaries, charging APK,
 init/VINTF files and compiled policy. [Results and hashes](../android/targeted-build.json)
-record their scope. No Android image has been produced or added to the
-mtkclient package.
+record their scope. The subsequent boot, DTBO, recovery-policy and real Binder
+runtime targets also built; [boot-image evidence](../android/boot-build.json)
+records their artifact checks. Complete filesystem images and hardware testing
+remain outstanding. No Android image has been added to the mtkclient package.
 
 `android/local_manifests/r1.xml` pins the common mainline device tree and its ten
 direct and transitive dependencies. Use it with the LineageOS manifest commit in `sources.lock.json`.
@@ -49,15 +51,23 @@ and builds charging controls, the expdb logger, both boot services and policy.
 It defaults to eight jobs (`R1_ANDROID_JOBS` overrides this) and accepts explicit
 Android build targets as arguments. Logs remain under `/rabbitr1/logs`.
 
-The product passed this targeted build. Recovery policy remains a separate
-`sepolicy.recovery` target. The vendor boot service linked against the normal
-LLNDK stub; the full product still needs its real system `libbinder_ndk` and
-linker namespace checks. The APK has a valid platform test signature and
-16 KiB-aligned, uncompressed ARM64 JNI libraries. Policy checks confirm the r1
-domain definitions; current boot arguments still request global permissive mode.
-Build the full images next, then inspect the generated boot header, DT table,
-module hashes, super metadata, partition sizes and AVB configuration. The stock
-layout evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
+The additional boot build includes the separate `sepolicy.recovery` target and
+the real system `libbinder_ndk` implementation. Static dependency inventories
+found the required libraries for recovery and normal services; Android linker
+namespace/APEX visibility and runtime operation still need validation. The APK
+has a valid platform test signature and 16 KiB-aligned, uncompressed ARM64 JNI
+libraries. Compiled recovery policy includes the boot service's rootfs execution
+and domain-transition permissions. Current boot arguments still request global
+permissive mode.
+
+The boot image retains the stock v2 header, load addresses and Android DT table.
+Its normal-boot fstab must be copied to `root/first_stage_ramdisk`, which the
+recovery-as-boot rule includes in its CPIO. The stock DTBO payload is unchanged;
+Android replaces its AVB footer. Both boot and DTBO footers use algorithm `NONE`
+with valid hash descriptors, and do not establish a complete or trusted vbmeta
+chain. Vendor module installation, super metadata, complete partition sizes and
+top-level vbmeta remain to be checked after the filesystem build. The stock layout
+evidence is recorded in [stock-android-layout.json](research/stock-android-layout.json).
 
 The recovery-as-boot image relies on LK to select normal Android startup.
 Bounded instruction replays of both stock and patched LK confirm that normal
@@ -132,9 +142,9 @@ complete backup, layout and restore validation before distribution.
 
 The [boot-control adapter](BOOT-CONTROL.md) implements the stock A/B record
 format, eMMC boot-region selection and clearing the `avbbctl` flag. Its core
-and storage boundary have host tests. Both services now pass their Android
-build and artifact checks; image dependencies, recovery policy and device
-operation remain to be checked.
+and storage boundary have host tests. Both services pass their Android build,
+artifact and compiled recovery-policy checks. Runtime dependencies and device
+operation remain to be checked on the complete system.
 
 The `r1-expdb` service starts asynchronously after `post-fs` when the fixed build
 property `ro.vendor.r1.expdb.enabled=1` is set. It verifies the 20 MiB `expdb`
@@ -148,8 +158,8 @@ unavailable and reports the error to the kernel log; Android boot can continue.
 The logger's host tests simulate device syscalls and module loading. Run them
 with `python3 android/device/logging/tests/run.py`. The kernel's pstore callbacks
 use the retained opener credentials so readers, console callers and background
-workers do not need raw block-device permissions. Combined policy compilation,
-actual node labels, module attachment and persistence still need validation.
+workers do not need raw block-device permissions. Combined policy compilation
+passed; actual node labels, module attachment and persistence still need validation.
 Best-effort pstore has no dedicated panic writer, so neither panic persistence
 nor logs from before startup are guaranteed.
 
@@ -162,8 +172,8 @@ before the expdb backend no longer permanently disables pmsg writes. Earlier
 messages are not replayed; the 64 KiB pmsg ring retains only a rolling tail.
 
 Both full reader/writer sources pass host sanitizer tests, including delayed
-availability and concurrent writers. Target compilation and reboot persistence
-remain unverified. Kernel console records still require direct collection or
+availability and concurrent writers, and compiled in the Android build. Reboot
+persistence remains unverified. Kernel console records still require direct collection or
 the expdb decoder; Android's separate LAST KMSG and recovery/erase paths retain
 their ramoops filenames. See [the logging tests](../tests/pmsg/README.md) for
 the access checks and remaining limitations.
