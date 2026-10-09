@@ -1,0 +1,247 @@
+{
+  "classification": "Android17/API37 Lineage24.0 UNOFFICIAL development build using pinned trunk_staging; not an Android16 source tree and not a finalized REL configuration.",
+  "audited_project_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+  "manifest_pin_matches_sources_lock": true,
+  "source_project_heads": {
+    ".repo/manifests": "2a50ca061bffe4e73918ae2e0b99b7a05f647154",
+    "build/make": "92a87b9506e5d1c961292cc8138036ccbe190ada",
+    "build/release": "c85f4aebe46714235599a9bd6430a0fe30c6e8d5",
+    "build/soong": "5ea236479501d50a4a0eafb568f4f35d1bdda3cb",
+    "vendor/lineage": "b3d63c6da0df32d283ce339b48f8fd5bacce6660",
+    "frameworks/base": "a886ea52ddd7ebe77ddce9cbf38e9d65c1a81ea2"
+  },
+  "emitted_properties": {
+    "system": {
+      "file": {
+        "path": "/rabbitr1/out/android/target/product/r1/system/build.prop",
+        "bytes": 5726,
+        "sha256": "a9891b0b65010057b2931d7afc4996fe80119391fb1bb2780b854339b7d69945"
+      },
+      "values": {
+        "ro.system.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.system.build.id": "CP2A.260605.016",
+        "ro.system.build.version.release": "17",
+        "ro.system.build.version.release_or_codename": "Baklava",
+        "ro.system.build.version.sdk": "37",
+        "ro.system.build.version.sdk_full": "37.0",
+        "ro.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.build.id": "CP2A.260605.016",
+        "ro.build.version.sdk": "37",
+        "ro.build.version.sdk_full": "37.0",
+        "ro.build.version.preview_sdk": "1",
+        "ro.build.version.preview_sdk_fingerprint": "8c8608f452f2b65f7914071c3c326840",
+        "ro.build.version.codename": "Baklava",
+        "ro.build.version.release": "17",
+        "ro.build.version.release_or_codename": "Baklava",
+        "ro.build.version.release_or_preview_display": "Baklava",
+        "ro.build.version.security_patch": "2026-06-05",
+        "ro.lineage.device": "r1"
+      }
+    },
+    "vendor": {
+      "file": {
+        "path": "/rabbitr1/out/android/target/product/r1/vendor/build.prop",
+        "bytes": 3289,
+        "sha256": "1adfb6c635e7552c466820721058a33963fe2307f6ccea44f97710325a71c3a1"
+      },
+      "values": {
+        "ro.vendor.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.vendor.build.id": "CP2A.260605.016",
+        "ro.vendor.build.version.release": "17",
+        "ro.vendor.build.version.release_or_codename": "Baklava",
+        "ro.vendor.build.version.sdk": "37",
+        "ro.vendor.build.version.sdk_full": "37.0",
+        "ro.product.first_api_level": "33",
+        "ro.board.api_level": "202704",
+        "ro.vendor.build.security_patch": "2026-06-05"
+      }
+    },
+    "product": {
+      "file": {
+        "path": "/rabbitr1/out/android/target/product/r1/product/etc/build.prop",
+        "bytes": 3984,
+        "sha256": "d94c3a193afb6f9bb554730167ed0ae79ddb7ee90d767dc677f24065a73e0b0c"
+      },
+      "values": {
+        "ro.product.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.product.build.id": "CP2A.260605.016",
+        "ro.product.build.version.release": "17",
+        "ro.product.build.version.release_or_codename": "Baklava",
+        "ro.product.build.version.sdk": "37",
+        "ro.product.build.version.sdk_full": "37.0",
+        "ro.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.build.id": "CP2A.260605.016",
+        "ro.build.version.sdk": "37",
+        "ro.build.version.sdk_full": "37.0",
+        "ro.build.version.preview_sdk": "1",
+        "ro.build.version.preview_sdk_fingerprint": "8c8608f452f2b65f7914071c3c326840",
+        "ro.build.version.codename": "Baklava",
+        "ro.build.version.release": "17",
+        "ro.build.version.release_or_codename": "Baklava",
+        "ro.build.version.release_or_preview_display": "Baklava",
+        "ro.build.version.security_patch": "2026-06-05",
+        "ro.lineage.device": "r1",
+        "ro.lineage.version": "24.0-20261009-UNOFFICIAL-r1",
+        "ro.lineage.display.version": "24-20261009-UNOFFICIAL-r1",
+        "ro.lineage.build.version": "24.0",
+        "ro.lineage.releasetype": "UNOFFICIAL"
+      }
+    },
+    "system_ext": {
+      "file": {
+        "path": "/rabbitr1/out/android/target/product/r1/system_ext/etc/build.prop",
+        "bytes": 1280,
+        "sha256": "fe389b3d0046ebd106820fc9b2604628539511803c3e2348acbf0f116aebd1d8"
+      },
+      "values": {
+        "ro.system_ext.build.fingerprint": "Rabbit/lineage_r1/r1:Baklava/CP2A.260605.016/eng.root:userdebug/test-keys",
+        "ro.system_ext.build.id": "CP2A.260605.016",
+        "ro.system_ext.build.version.release": "17",
+        "ro.system_ext.build.version.release_or_codename": "Baklava",
+        "ro.system_ext.build.version.sdk": "37",
+        "ro.system_ext.build.version.sdk_full": "37.0"
+      }
+    }
+  },
+  "source_files": {
+    ".repo/manifests/default.xml": {
+      "sha256": "3cb3acb590e9bfd7830e9bf0fd5073c5cceb2832722c4c363b8aa97e44668e84",
+      "matches_project_head": true
+    },
+    "build/make/core/version_util.mk": {
+      "sha256": "9872b19f2691311714d135e7575f5f1070d07fabf5f675e507ac40d1fe57cd63",
+      "matches_project_head": true
+    },
+    "build/make/core/config.mk": {
+      "sha256": "febde0f48f3a86c911146db1112a29309e4b9d02cbf3f37d0ae292e8dd1a313e",
+      "matches_project_head": true
+    },
+    "build/make/core/build_id.mk": {
+      "sha256": "35097652a75fd45c7a7c4e7501b66ae168c27480eafff1254135b72c4e016375",
+      "matches_project_head": true
+    },
+    "build/release/release_configs/trunk_staging.textproto": {
+      "sha256": "58956fe0c695a9bfa11159afecbb6ecdb48e57cae50864bbf2b6c3ea8ca0d880",
+      "matches_project_head": true
+    },
+    "build/release/release_configs/cp2a.textproto": {
+      "sha256": "1a6905eafca4677efbf78a176721ead1e8d8dab832e5f0539371db191ee1c252",
+      "matches_project_head": true
+    },
+    "build/release/flag_declarations/RELEASE_PLATFORM_PREVIEW_SDK_INT.textproto": {
+      "sha256": "2054fcb777c3c425174b42ba01bc423e83dc677d36bdd8433dab3a98c7d183ea",
+      "matches_project_head": true
+    },
+    "build/release/flag_declarations/RELEASE_BOARD_API_LEVEL_FROZEN.textproto": {
+      "sha256": "bd2e005e2f0bedb436201ae9d80cc4a2a8e6ed0a9615e636505e4bf895c68375",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto": {
+      "sha256": "3dc294c87b809df4900e140eb84410804e8b450711a00a0665bf180de3f9dd64",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_VERSION_CODENAME.textproto": {
+      "sha256": "cf94559ce1d624f5ab153f217c871656995a81e07ca95b36597a2d3ed5216bb1",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_VERSION_ALL_CODENAMES.textproto": {
+      "sha256": "3fd01e01b1f277f32887f059390d8c14c3ba30185c7b632696e37ced5e3d0faf",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_SDK_VERSION.textproto": {
+      "sha256": "8441ad6bb303cce43a07c5858d04be95a0c6a0417993adee4ae3f0bb92550f9b",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_SDK_VERSION_FULL.textproto": {
+      "sha256": "789c047415a37a088b29df66968b9467938ac2d48d1e995d2a319e73ee4f7149",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_PLATFORM_SECURITY_PATCH.textproto": {
+      "sha256": "12b1d7ca05493ba80874fba5d8c03cc0373c74418259b395836cc2c2ba0ef386",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/trunk_staging/RELEASE_BOARD_API_LEVEL.textproto": {
+      "sha256": "04f28d7e2df02e36c413322a39e8f61c28c2b7e1ac234a79c6df418af54a79f4",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_VERSION_LAST_STABLE.textproto": {
+      "sha256": "3dc294c87b809df4900e140eb84410804e8b450711a00a0665bf180de3f9dd64",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_VERSION_CODENAME.textproto": {
+      "sha256": "5d5f4e92e9da23f05bd44b28ad844edf75f1dd4a22291b9d6aef2a8397db68a7",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_VERSION_ALL_CODENAMES.textproto": {
+      "sha256": "6e072a7980998df0ddde18fea3b0c7a22d9f4c5b6e205542135acc7bf1817901",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_SDK_VERSION.textproto": {
+      "sha256": "8441ad6bb303cce43a07c5858d04be95a0c6a0417993adee4ae3f0bb92550f9b",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_SDK_VERSION_FULL.textproto": {
+      "sha256": "789c047415a37a088b29df66968b9467938ac2d48d1e995d2a319e73ee4f7149",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_SECURITY_PATCH.textproto": {
+      "sha256": "f78b0d26a05fa7a30db981d53f2e6dde71e676891671d26d85b83a74d65dda32",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_BOARD_API_LEVEL.textproto": {
+      "sha256": "6d4e5a42c7686c00390ad8d941fa3ed0d4059b866e9511a7701ca7026cb64afd",
+      "matches_project_head": true
+    },
+    "build/release/flag_values/cp2a/RELEASE_PLATFORM_PREVIEW_SDK_INT.textproto": {
+      "sha256": "6fbb4d62b9381ecf5def75f44fa5d7599b7fd2d1d6d66d950d03c7f782b9177b",
+      "matches_project_head": true
+    },
+    "build/soong/scripts/gen_build_prop.py": {
+      "sha256": "136b6af627dd53e82604bed863238021eb740f53c80504ce365148a6fed0a6d1",
+      "matches_project_head": true
+    },
+    "vendor/lineage/config/version.mk": {
+      "sha256": "2d57fd999a994977c28432ce36a50bc74b05918c9e43559c748d360bfa0661dc",
+      "matches_project_head": true
+    },
+    "frameworks/base/core/java/android/os/Build.java": {
+      "sha256": "710f5dedfc70541f5bac3427f206e19d561038e8f8df51134909e3353e98ca42",
+      "matches_project_head": true
+    }
+  },
+  "build_wrapper": {
+    "path": "/rabbitr1/out/android-build-review/version-status/build-wrapper-at-audited-commit.sh",
+    "bytes": 3128,
+    "sha256": "9972035b3edc73b2868dbf856ceaf7fce8a6c772bf4f94f7d1291ff497e2e655"
+  },
+  "expected_trunk_staging": {
+    "release": "17",
+    "sdk": "37",
+    "sdk_full": "37.0",
+    "codename": "Baklava",
+    "preview_sdk": "1",
+    "security_patch": "2026-06-05",
+    "board_api_level": "202704",
+    "lineage": "24.0"
+  },
+  "pinned_cp2a_comparison": {
+    "release": "17",
+    "sdk": "37",
+    "sdk_full": "37.0",
+    "codename": "REL",
+    "preview_sdk": "0",
+    "security_patch": "2026-06-05",
+    "board_api_level": "202604"
+  },
+  "vndk": "No ro.vndk.version is emitted; build/make/core/config.mk clears BOARD_VNDK_VERSION and PLATFORM_VNDK_VERSION. Current vendor surface is board API202704. ro.vendor.api_level is initialized by init at runtime when absent; no device value was observed.",
+  "findings": [
+    "Baklava spelling is stale/misleading relative to framework VERSION_CODES BAKLAVA36/CINNAMON_BUN37, but matches pinned trunk_staging source exactly.",
+    "The selected configuration is explicitly non-finalized, with preview SDK1. Do not describe this artifact as finalized REL solely because manifest defaults to android-17.0.0_r1.",
+    "A deliberate cp2a switch would change feature flags and vendor API202704->202604; it requires its own rebuild/audit, not a cosmetic fingerprint edit.",
+    "SPL2026-06-05 is the pinned declared build level, not a claim of later security updates."
+  ],
+  "source_or_output_changed": false,
+  "network_refresh": false,
+  "build_or_ninja_parser_run": false,
+  "runtime_or_security_compliance_proved": false
+}

@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "project": "haretic",
+  "result": "pass",
+  "scope": "Offline creation and validation of raw Android super with both logical slots populated; no flash or target execution.",
+  "build_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+  "kernel_source_commit": "994681e23bb067d85fe3de243f979c5ae68960d3",
+  "product": "lineage_r1",
+  "release_configuration": "trunk_staging",
+  "experimental_soc_health": false,
+  "builder_source_commit": "9807f104c8830af393e20b5119b573f06270bc4d",
+  "builder": {
+    "path": "src/mainline/rabbit-r1/scripts/build-android-super.py",
+    "bytes": 17066,
+    "sha256": "c62db25dbcf651cf303ed77b884990df92faacf9711d614a226a73edcd293800"
+  },
+  "lp_tools_manifest": {
+    "path": "src/mainline/rabbit-r1/android/lp-tools.json",
+    "bytes": 5405,
+    "sha256": "88df5463541c2adcd7dd306d549fbd3be3b4ee988462c196866157dc8682c04b"
+  },
+  "lp_tools_check": "prepare-lp-tools.py verified all ten pinned executable/runtime-library files immediately before planning.",
+  "full_image_evidence_commit": "a17233377445ce65f727cad12e7699ecd27fa508",
+  "plan_file": {
+    "path": "out/android-super/lineage-r1-0a2a56a30e-plan.json",
+    "bytes": 1757,
+    "sha256": "f313ed54257328ad22795122f332a85278d54fbd9dfc3554d55758fa4c60acc0"
+  },
+  "detailed_result": {
+    "path": "out/android-super/lineage-r1-0a2a56a30e/result.json",
+    "bytes": 5510,
+    "sha256": "a11dd1d38b8aa170e2f2d2a5807a536ac8030851b273a8655420e34c3b495988"
+  },
+  "lpmake_log": {
+    "path": "out/android-super/lineage-r1-0a2a56a30e/lpmake.log",
+    "bytes": 1432,
+    "sha256": "8552e0aef565748c52d4f10dd5d017ced8becfadd39028458aebf2871e845e1c"
+  },
+  "raw_image": {
+    "path": "/rabbitr1/out/android-super/lineage-r1-0a2a56a30e/super-both.raw.img",
+    "bytes": 8792064000,
+    "sha256": "cf5f7ef0de5380358a0dbfaf55c569e8e6645ae0fad804d092a1d59db0467e84"
+  },
+  "raw_host_allocated_bytes": 3837943808,
+  "validation": {
+    "all_geometry_and_six_metadata_copies_match": true,
+    "raw_super": {
+      "path": "/rabbitr1/out/android-super/lineage-r1-0a2a56a30e/super-both.raw.img",
+      "bytes": 8792064000,
+      "sha256": "cf5f7ef0de5380358a0dbfaf55c569e8e6645ae0fad804d092a1d59db0467e84"
+    },
+    "both_slot_payload_sha256": {
+      "system_a": "c2ec28b5e0ad2e85cae8cfea9799f1eb673b8be19eb893d3d367cb5c93938161",
+      "system_b": "c2ec28b5e0ad2e85cae8cfea9799f1eb673b8be19eb893d3d367cb5c93938161",
+      "system_ext_a": "7dbc2a4a5eac528b7b23ae4596baf01700cdc3ee42d4bb01f5d9fd86cdb9b263",
+      "system_ext_b": "7dbc2a4a5eac528b7b23ae4596baf01700cdc3ee42d4bb01f5d9fd86cdb9b263",
+      "product_a": "13b9e97d5856896807b532df876adbc1070b5231e68fc54c989d82c7f62ccb05",
+      "product_b": "13b9e97d5856896807b532df876adbc1070b5231e68fc54c989d82c7f62ccb05",
+      "vendor_a": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb",
+      "vendor_b": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb"
+    },
+    "group_used_bytes": {
+      "a": 1918767104,
+      "b": 1918767104
+    },
+    "nonoverlapping_extents": [
+      [
+        1048576,
+        886845440,
+        "system_a"
+      ],
+      [
+        887095296,
+        1772892160,
+        "system_b"
+      ],
+      [
+        1773142016,
+        2251755520,
+        "system_ext_a"
+      ],
+      [
+        2252341248,
+        2730954752,
+        "system_ext_b"
+      ],
+      [
+        2731540480,
+        3200110592,
+        "product_a"
+      ],
+      [
+        3200253952,
+        3668824064,
+        "product_b"
+      ],
+      [
+        3668967424,
+        3754754048,
+        "vendor_a"
+      ],
+      [
+        3754950656,
+        3840737280,
+        "vendor_b"
+      ]
+    ],
+    "source_images_unchanged_by_builder": true
+  },
+  "plan": {
+    "schema": 1,
+    "status": "verified-input-plan-only",
+    "audit": {
+      "path": "/rabbitr1/out/android-build-review/first-stage-contexts/upcoming-audits/full-v2/results.json",
+      "bytes": 176277,
+      "sha256": "5b7f1d7c82dcb7fdb6e2e1bf01a9292681a0cabf95c8cf24d7a69e2ed81cd50e"
+    },
+    "build_start_source_commit": "0a2a56a30ea33f4b0ad97c31bd7dd7c40c9d9058",
+    "lpmake": {
+      "path": "/rabbitr1/toolchains/android-lp/bin/lpmake",
+      "bytes": 192624,
+      "sha256": "e36cd66b46a04fedb9f23cc891b5b296f6779de7afcf6f08e3c67ee4b0bc7313"
+    },
+    "layout": {
+      "super_bytes": 8792064000,
+      "group_bytes": 4294967296,
+      "metadata_bytes": 65536,
+      "metadata_slots": 3,
+      "block_bytes": 4096,
+      "alignment_bytes": 1048576
+    },
+    "images": {
+      "system": {
+        "path": "/rabbitr1/out/android/target/product/r1/system.img",
+        "bytes": 885796864,
+        "sha256": "c2ec28b5e0ad2e85cae8cfea9799f1eb673b8be19eb893d3d367cb5c93938161"
+      },
+      "system_ext": {
+        "path": "/rabbitr1/out/android/target/product/r1/system_ext.img",
+        "bytes": 478613504,
+        "sha256": "7dbc2a4a5eac528b7b23ae4596baf01700cdc3ee42d4bb01f5d9fd86cdb9b263"
+      },
+      "product": {
+        "path": "/rabbitr1/out/android/target/product/r1/product.img",
+        "bytes": 468570112,
+        "sha256": "13b9e97d5856896807b532df876adbc1070b5231e68fc54c989d82c7f62ccb05"
+      },
+      "vendor": {
+        "path": "/rabbitr1/out/android/target/product/r1/vendor.img",
+        "bytes": 85786624,
+        "sha256": "2655e7e0b734c1ed6a4760d152ce0a315d1e700877a03ce5f99dfd8dc12c5ccb"
+      }
+    },
+    "group_used_bytes": 1918767104,
+    "conservative_allocation_end": 3840933888,
+    "device_access": false,
+    "populates_slots": [
+      "a",
+      "b"
+    ],
+    "source_factory_super_used_as_payload": false
+  },
+  "command": [
+    "/rabbitr1/toolchains/android-lp/bin/lpmake",
+    "--metadata-size",
+    "65536",
+    "--metadata-slots",
+    "3",
+    "--super-name",
+    "super",
+    "--block-size",
+    "4096",
+    "--device",
+    "super:8792064000:1048576:0",
+    "--group",
+    "r1_dynamic_partitions_a:4294967296",
+    "--group",
+    "r1_dynamic_partitions_b:4294967296",
+    "--partition",
+    "system_a:none:885796864:r1_dynamic_partitions_a",
+    "--image",
+    "system_a=/rabbitr1/out/android/target/product/r1/system.img",
+    "--partition",
+    "system_b:none:885796864:r1_dynamic_partitions_b",
+    "--image",
+    "system_b=/rabbitr1/out/android/target/product/r1/system.img",
+    "--partition",
+    "system_ext_a:none:478613504:r1_dynamic_partitions_a",
+    "--image",
+    "system_ext_a=/rabbitr1/out/android/target/product/r1/system_ext.img",
+    "--partition",
+    "system_ext_b:none:478613504:r1_dynamic_partitions_b",
+    "--image",
+    "system_ext_b=/rabbitr1/out/android/target/product/r1/system_ext.img",
+    "--partition",
+    "product_a:none:468570112:r1_dynamic_partitions_a",
+    "--image",
+    "product_a=/rabbitr1/out/android/target/product/r1/product.img",
+    "--partition",
+    "product_b:none:468570112:r1_dynamic_partitions_b",
+    "--image",
+    "product_b=/rabbitr1/out/android/target/product/r1/product.img",
+    "--partition",
+    "vendor_a:none:85786624:r1_dynamic_partitions_a",
+    "--image",
+    "vendor_a=/rabbitr1/out/android/target/product/r1/vendor.img",
+    "--partition",
+    "vendor_b:none:85786624:r1_dynamic_partitions_b",
+    "--image",
+    "vendor_b=/rabbitr1/out/android/target/product/r1/vendor.img",
+    "--output",
+    "/rabbitr1/out/android-super/lineage-r1-0a2a56a30e/super-both.raw.img"
+  ],
+  "hardware_tested": false,
+  "flash_tested": false,
+  "complete_flash_package": false,
+  "beta_ready": false,
+  "limitations": [
+    "The image is an ordinary raw file with host holes representing zeroes; it is not Android sparse format.",
+    "This artifact only replaces shared super. Matching physical boot, DTBO, vbmeta and patched LK copies, stock snapshot/BCB handling, data provisioning and coherent backup/restore are not implemented by this builder.",
+    "The staged default kernel has experimental SOC disabled; Android battery startup, GPU support and other device functionality remain release gates.",
+    "No slot selector, userdata, metadata, bootloader or device was accessed. Hardware validation remains outstanding."
+  ]
+}

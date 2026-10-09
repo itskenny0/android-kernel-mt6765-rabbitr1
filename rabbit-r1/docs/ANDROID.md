@@ -12,6 +12,13 @@ passes all ten [filesystem, AVB and super-image checks](../android/full-image-bu
 Hardware testing and the complete Android flash procedure remain outstanding.
 No Android image has been added to the mtkclient package.
 
+The checked build uses `trunk_staging`: Android 17/API 37 and Lineage 24.0,
+with preview SDK 1 and the inherited `Baklava` codename. It is a development
+configuration, not finalized `REL`. The [version review](../android/version-status.json)
+traces these values to the pinned release flags. Selecting the finalized `cp2a`
+configuration would also change vendor API and feature flags and requires a new
+build and audit. The declared security patch level remains June 5, 2026.
+
 The updated recovery log collector, dumpstate, system/recovery liblog and ARM
 graphics allocator also built and passed [artifact checks](../android/pstore-graphics-build.json).
 Both liblog variants export the private backend reader, recovery-persist imports
@@ -112,9 +119,10 @@ or supply populated B images. A device's existing active slot cannot be assumed.
 The [offline super builder](ANDROID-SUPER.md) can construct and verify identical
 populated A/B partition sets from four completed, audited filesystem images.
 Its raw output and metadata checks have 67 synthetic tests using AOSP `lpmake`.
-The completed full-image audit now supplies its verified input images; generating
-the populated A/B image is the next packaging step. This tool does not perform
-flashing, slot selection or snapshot cleanup.
+It has also built the [actual A/B image](../android/dual-slot-super-build.json)
+from the completed product images: all eight payload hashes, both geometry
+copies and all six metadata copies pass. The raw file is 8,792,064,000 bytes.
+This tool does not perform flashing, slot selection or snapshot cleanup.
 
 The pinned mtkclient writes file bytes directly; it does not expand Android
 sparse images. `scripts/expand-android-sparse.py` validates a pinned sparse-file

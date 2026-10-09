@@ -262,5 +262,7 @@
     "The default staged kernel keeps the experimental capacity estimator disabled. Normal Android battery startup remains a separate release gate.",
     "GPU remains disabled; the product uses SwiftShader.",
     "A complete clean-install/restore transaction and hardware validation remain required."
-  ]
+  ],
+  "release_configuration": "trunk_staging",
+  "version_status_record": "android/version-status.json"
 }
