@@ -1,0 +1,683 @@
+{
+  "schema_version": 1,
+  "mesa_version": "26.2.4",
+  "result": "blocked: direct-display WSI requires pthread cancellation APIs absent from bionic",
+  "configured_successfully": true,
+  "build_exit_code": 1,
+  "last_reported_ninja_progress": {
+    "reported": 409,
+    "total": 605
+  },
+  "final_driver_library_linked": false,
+  "final_link_attempted": false,
+  "artifact": null,
+  "source": {
+    "base_revision": "400e673cf8ba515d3aace56ed3acc3bb300869a5",
+    "upstream_release": "96cb43121031992b85767f9c1be8f3f48e22b1d2",
+    "canonical_release_patch_sha256": "59756d6f6329c211d4db1c73bb5f3f6dab65ca136a0e5e189cc7a04a17154923",
+    "tracked_path_comparison_entries": 12818,
+    "source_file_manifest_entries": 12816,
+    "symlink_targets_checked": 10,
+    "matches_existing_canonical_patch_validation_tree": true,
+    "original_and_scratch_source_unchanged_after_build": true,
+    "source_code_patch_applied": false
+  },
+  "target": {
+    "compiler": "AOSP clang-r584948b",
+    "triple": "aarch64-linux-android37",
+    "cpu": "cortex-a53",
+    "bionic": true,
+    "vendor_api": 202704,
+    "mesa_android_api_macro": 37,
+    "window_scope": "headless plus automatically selected direct-DRM display WSI; Android/X11/Wayland WSI disabled",
+    "meson_options": {
+      "platforms": [],
+      "platform-sdk-version": 37,
+      "vulkan-drivers": [
+        "imagination"
+      ],
+      "gallium-drivers": [],
+      "imagination-srv": false,
+      "android-stub": false,
+      "shader-cache": "disabled",
+      "zlib": "disabled",
+      "zstd": "disabled",
+      "expat": "disabled",
+      "xmlconfig": "disabled",
+      "mesa-clc": "system",
+      "precomp-compiler": "system"
+    }
+  },
+  "failure": {
+    "object": "src/vulkan/wsi/libvulkan_wsi.a.p/wsi_common_display.c.o",
+    "source": "src/vulkan/wsi/wsi_common_display.c",
+    "locations": [
+      2112,
+      2142,
+      3784
+    ],
+    "absent_api_names": [
+      "pthread_setcanceltype",
+      "PTHREAD_CANCEL_ASYNCHRONOUS",
+      "pthread_cancel"
+    ],
+    "diagnostics": [
+      "FAILED: src/vulkan/wsi/libvulkan_wsi.a.p/wsi_common_display.c.o ",
+      "../source/src/vulkan/wsi/wsi_common_display.c:2112:4: error: call to undeclared function 'pthread_setcanceltype'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]",
+      "../source/src/vulkan/wsi/wsi_common_display.c:2112:26: error: use of undeclared identifier 'PTHREAD_CANCEL_ASYNCHRONOUS'",
+      "../source/src/vulkan/wsi/wsi_common_display.c:2142:7: error: call to undeclared function 'pthread_cancel'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]",
+      "../source/src/vulkan/wsi/wsi_common_display.c:3784:10: error: call to undeclared function 'pthread_cancel'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]"
+    ],
+    "command": {
+      "time_ns": 1791520367723097788,
+      "pid": 1624480,
+      "cwd": "/rabbitr1/out/gpu-review/android-build/build",
+      "tool": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/clang",
+      "argv": [
+        "-Isrc/vulkan/wsi/libvulkan_wsi.a.p",
+        "-Isrc/vulkan/wsi",
+        "-I../source/src/vulkan/wsi",
+        "-Iinclude",
+        "-I../source/include",
+        "-Isrc",
+        "-I../source/src",
+        "-Isrc/vulkan/util",
+        "-I../source/src/vulkan/util",
+        "-Isrc/vulkan/runtime",
+        "-I../source/src/vulkan/runtime",
+        "-I../source/src/vulkan/runtime/bvh",
+        "-Isrc/compiler/spirv",
+        "-Isrc/util",
+        "-Isrc/util/format",
+        "-I/rabbitr1/src/android/external/libdrm",
+        "-I/rabbitr1/src/android/external/libdrm/include/drm",
+        "-I/rabbitr1/src/android/system/logging/liblog/include",
+        "-I/rabbitr1/src/android/system/core/libcutils/include",
+        "-I/rabbitr1/src/android/system/core/libsync/include",
+        "-fvisibility=hidden",
+        "-fdiagnostics-color=always",
+        "-DNDEBUG",
+        "-D_FILE_OFFSET_BITS=64",
+        "-Wall",
+        "-Winvalid-pch",
+        "-std=c11",
+        "-O3",
+        "-D__STDC_CONSTANT_MACROS",
+        "-D__STDC_FORMAT_MACROS",
+        "-D__STDC_LIMIT_MACROS",
+        "-DPACKAGE_VERSION=\"26.2.4\"",
+        "-DPACKAGE_BUGREPORT=\"https://gitlab.freedesktop.org/mesa/mesa/-/issues\"",
+        "-DHAVE_OPENGL=0",
+        "-DHAVE_OPENGL_ES_1=0",
+        "-DHAVE_OPENGL_ES_2=0",
+        "-DMESA_SYSTEM_HAS_KMS_DRM=1",
+        "-DVIDEO_CODEC_VC1DEC=0",
+        "-DVIDEO_CODEC_H264DEC=0",
+        "-DVIDEO_CODEC_H264ENC=0",
+        "-DVIDEO_CODEC_H265DEC=0",
+        "-DVIDEO_CODEC_H265ENC=0",
+        "-DVIDEO_CODEC_AV1DEC=1",
+        "-DVIDEO_CODEC_AV1ENC=1",
+        "-DVIDEO_CODEC_VP9DEC=1",
+        "-DVIDEO_CODEC_MPEG12DEC=1",
+        "-DVIDEO_CODEC_JPEGDEC=1",
+        "-DUSE_LIBGLVND=0",
+        "-DHAVE_GFX_COMPUTE",
+        "-DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1",
+        "-DALLOW_KCMP",
+        "-DMESA_DEBUG=0",
+        "-DHAVE___BUILTIN_BSWAP32",
+        "-DHAVE___BUILTIN_BSWAP64",
+        "-DHAVE___BUILTIN_CLZ",
+        "-DHAVE___BUILTIN_CLZLL",
+        "-DHAVE___BUILTIN_CTZ",
+        "-DHAVE___BUILTIN_EXPECT",
+        "-DHAVE___BUILTIN_FFS",
+        "-DHAVE___BUILTIN_FFSLL",
+        "-DHAVE___BUILTIN_POPCOUNT",
+        "-DHAVE___BUILTIN_POPCOUNTLL",
+        "-DHAVE___BUILTIN_UNREACHABLE",
+        "-DHAVE___BUILTIN_TYPES_COMPATIBLE_P",
+        "-DHAVE___BUILTIN_ADD_OVERFLOW",
+        "-DHAVE_FUNC_ATTRIBUTE_CONST",
+        "-DHAVE_FUNC_ATTRIBUTE_FLATTEN",
+        "-DHAVE_FUNC_ATTRIBUTE_MALLOC",
+        "-DHAVE_FUNC_ATTRIBUTE_PURE",
+        "-DHAVE_FUNC_ATTRIBUTE_UNUSED",
+        "-DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT",
+        "-DHAVE_FUNC_ATTRIBUTE_WEAK",
+        "-DHAVE_FUNC_ATTRIBUTE_FORMAT",
+        "-DHAVE_FUNC_ATTRIBUTE_PACKED",
+        "-DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL",
+        "-DHAVE_FUNC_ATTRIBUTE_ALIAS",
+        "-DHAVE_FUNC_ATTRIBUTE_NORETURN",
+        "-DHAVE_FUNC_ATTRIBUTE_COLD",
+        "-DHAVE_FUNC_ATTRIBUTE_VISIBILITY",
+        "-DHAVE_UINT128",
+        "-DHAVE_REALLOCARRAY",
+        "-DHAVE_FMEMOPEN",
+        "-D_GNU_SOURCE",
+        "-DUSE_GCC_ATOMIC_BUILTINS",
+        "-DMAJOR_IN_SYSMACROS",
+        "-DHAS_SCHED_H",
+        "-DHAS_SCHED_GETAFFINITY",
+        "-DHAVE_XLOCALE_H",
+        "-DHAVE_LINUX_FUTEX_H",
+        "-DHAVE_ENDIAN_H",
+        "-DHAVE_DLFCN_H",
+        "-DHAVE_SYS_SHM_H",
+        "-DHAVE_CET_H",
+        "-DHAVE_POLL_H",
+        "-DHAVE_SYS_INOTIFY_H",
+        "-DHAVE_LINUX_UDMABUF_H",
+        "-DHAVE_STRTOF",
+        "-DHAVE_MKOSTEMP",
+        "-DHAVE_MEMFD_CREATE",
+        "-DHAVE_FLOCK",
+        "-DHAVE_STRTOK_R",
+        "-DHAVE_GETRANDOM",
+        "-DHAVE_POSIX_FALLOCATE",
+        "-DHAVE_SYSCONF",
+        "-DHAVE_GNU_QSORT_R",
+        "-DHAVE_STRUCT_TIMESPEC",
+        "-DHAVE_POSIX_MEMALIGN",
+        "-DHAVE_DIRENT_D_TYPE",
+        "-DHAVE_STRTOD_L",
+        "-DHAVE_DLADDR",
+        "-DHAVE_DL_ITERATE_PHDR",
+        "-DHAVE_PTHREAD",
+        "-DHAVE_PTHREAD_SETAFFINITY",
+        "-DHAVE_LIBDRM",
+        "-DDRAW_LLVM_AVAILABLE=0",
+        "-DAMD_LLVM_AVAILABLE=0",
+        "-DGALLIVM_USE_ORCJIT=0",
+        "-DTHREAD_SANITIZER=0",
+        "-DHAVE_DRI2",
+        "-DHAVE_RENDERDOC_INTEGRATION=1",
+        "-Werror=implicit-function-declaration",
+        "-Werror=missing-prototypes",
+        "-Werror=return-type",
+        "-Werror=empty-body",
+        "-Werror=incompatible-pointer-types",
+        "-Werror=int-conversion",
+        "-Wimplicit-fallthrough",
+        "-Wmisleading-indentation",
+        "-Wno-missing-field-initializers",
+        "-Wno-format-truncation",
+        "-fno-math-errno",
+        "-fno-trapping-math",
+        "-Qunused-arguments",
+        "-fno-common",
+        "-Wno-unknown-pragmas",
+        "-Wno-microsoft-enum-value",
+        "-Wno-unused-function",
+        "-Werror=format",
+        "-Wformat-security",
+        "-Werror=thread-safety",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wno-unused-variable",
+        "-Wno-unused-but-set-variable",
+        "-target",
+        "aarch64-linux-android37",
+        "-march=armv8-a",
+        "-mcpu=cortex-a53",
+        "-nostdlibinc",
+        "-DANDROID",
+        "-D__ANDROID_VENDOR__",
+        "-D__ANDROID_VNDK__",
+        "-D__ANDROID_VENDOR_API__=202704",
+        "-D__BIONIC_NO_PAGE_SIZE_MACRO",
+        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+        "-fPIC",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-fno-short-enums",
+        "-funwind-tables",
+        "-fstack-protector-strong",
+        "-mbranch-protection=standard",
+        "-fno-strict-aliasing",
+        "-fno-exceptions",
+        "-ffp-contract=off",
+        "-D_FORTIFY_SOURCE=3",
+        "-ftrivial-auto-var-init=zero",
+        "-Wa,--noexecstack",
+        "-isystem",
+        "/rabbitr1/src/android/bionic/libc/include",
+        "-isystem",
+        "/rabbitr1/src/android/bionic/libc/kernel/uapi/asm-arm64",
+        "-isystem",
+        "/rabbitr1/src/android/bionic/libc/kernel/uapi",
+        "-isystem",
+        "/rabbitr1/src/android/bionic/libc/kernel/android/scsi",
+        "-isystem",
+        "/rabbitr1/src/android/bionic/libc/kernel/android/uapi",
+        "-DANDROID_API_LEVEL=37",
+        "-fPIC",
+        "-pthread",
+        "-DXXH_FORCE_ALIGN_CHECK=0",
+        "-DXXH_FORCE_MEMORY_ACCESS=0",
+        "-DVK_USE_PLATFORM_DISPLAY_KHR",
+        "-MD",
+        "-MQ",
+        "src/vulkan/wsi/libvulkan_wsi.a.p/wsi_common_display.c.o",
+        "-MF",
+        "src/vulkan/wsi/libvulkan_wsi.a.p/wsi_common_display.c.o.d",
+        "-o",
+        "src/vulkan/wsi/libvulkan_wsi.a.p/wsi_common_display.c.o",
+        "-c",
+        "../source/src/vulkan/wsi/wsi_common_display.c"
+      ],
+      "response_files": []
+    },
+    "source_evidence": [
+      {
+        "path": "/rabbitr1/out/gpu-review/android-build/source/src/vulkan/wsi/wsi_common_display.c",
+        "sha256": "ec4e8af58554011a89a684cce6c6c9baffafed3623b2ac5504015dca28f86656"
+      },
+      {
+        "path": "/rabbitr1/out/gpu-review/android-build/source/src/vulkan/wsi/meson.build",
+        "sha256": "58e4d0db6c91c9baf559aa7b6773c4ff15ac384f027609d4e6908a62750f06e0"
+      },
+      {
+        "path": "/rabbitr1/out/gpu-review/android-build/source/src/vulkan/meson.build",
+        "sha256": "c76011df9317a812c7117741ea011c10c07446f9f751df781f9211c3d95b9e2e"
+      },
+      {
+        "path": "/rabbitr1/out/gpu-review/android-build/source/meson.build",
+        "sha256": "2ef3a9d67e66903f12b030203e5160c1a40ac5deae9073409ec105451ef43785"
+      },
+      {
+        "path": "/rabbitr1/out/gpu-review/android-build/source/meson.options",
+        "sha256": "594059789faf5e0e58aa30b60967f66975a421484d45c6a59c54b234f5ded06c"
+      },
+      {
+        "path": "/rabbitr1/src/android/bionic/docs/status.md",
+        "sha256": "aacf81e6acf5b53d9888c1220504d4d91b5c43b6e7cf07e5d052dc1971bb9db6"
+      },
+      {
+        "path": "/rabbitr1/src/android/bionic/libc/include/pthread.h",
+        "sha256": "73a88d689de69920cf61b5bf6d5531e757bdb3f6b947ab8ca4bed5f8947d77f7"
+      },
+      {
+        "path": "/rabbitr1/src/android/bionic/libc/libc.map.txt",
+        "sha256": "5831b40390f17a34536513c79735bc632aa3d3f4d81fc4ed5f5ea8ff6ed5107c"
+      }
+    ],
+    "selection_condition": "system_has_kms_drm and not with_platform_android; enabled for Android host with platforms=[]",
+    "separate_display_disable_option_available": false
+  },
+  "commands": {
+    "configure": [
+      "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/meson",
+      "setup",
+      "/rabbitr1/out/gpu-review/android-build/build",
+      "/rabbitr1/out/gpu-review/android-build/source",
+      "--cross-file",
+      "/rabbitr1/out/gpu-review/android-build/aosp-arm64.ini",
+      "--wrap-mode=nofallback",
+      "--buildtype=release",
+      "-Dplatforms=[]",
+      "-Dvulkan-drivers=imagination",
+      "-Dgallium-drivers=[]",
+      "-Dopengl=false",
+      "-Dgles1=disabled",
+      "-Dgles2=disabled",
+      "-Dglx=disabled",
+      "-Degl=disabled",
+      "-Dgbm=disabled",
+      "-Dllvm=disabled",
+      "-Dmesa-clc=system",
+      "-Dprecomp-compiler=system",
+      "-Dimagination-srv=false",
+      "-Dbuild-tests=false",
+      "-Dlmsensors=disabled",
+      "-Dlibunwind=disabled",
+      "-Dvalgrind=disabled",
+      "-Dglvnd=disabled",
+      "-Dandroid-libbacktrace=disabled",
+      "-Dandroid-libperfetto=disabled",
+      "-Dshader-cache=disabled",
+      "-Dzlib=disabled",
+      "-Dzstd=disabled",
+      "-Dexpat=disabled",
+      "-Dxmlconfig=disabled",
+      "-Ddisplay-info=disabled",
+      "-Dcpp_rtti=false",
+      "-Dplatform-sdk-version=37"
+    ],
+    "build": [
+      "ninja",
+      "-C",
+      "/rabbitr1/out/gpu-review/android-build/build",
+      "-j2",
+      "-v",
+      "src/imagination/vulkan/libvulkan_powervr_mesa.so"
+    ],
+    "environment": {
+      "PATH": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin:/usr/bin:/bin",
+      "PYTHONPATH": "/rabbitr1/src/android/external/python/mako:/rabbitr1/src/android/external/python/markupsafe/src",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TMPDIR": "/rabbitr1/out/gpu-review/android-build/tmp",
+      "PKG_CONFIG_LIBDIR": "/rabbitr1/out/gpu-review/android-build/pkgconfig",
+      "PKG_CONFIG_PATH": ""
+    }
+  },
+  "input_files": [
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libc/libc/android_vendor_arm64_armv8-a_cortex-a53_shared/libc.so",
+      "role": "AOSP vendor LLNDK link interface; not runtime implementation",
+      "bytes": 286560,
+      "sha256": "1500795267d5618db7e06b85b1eb7ef9df98fb064d8a9f37cf069e8f416387d6",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libc.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libm/libm/android_vendor_arm64_armv8-a_cortex-a53_shared/libm.so",
+      "role": "AOSP vendor LLNDK link interface; not runtime implementation",
+      "bytes": 90376,
+      "sha256": "0bda871d4dc607441621e1d5af016725b58a964f41d3b6081acbbda65d9e8dd9",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libm.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libdl/libdl/android_vendor_arm64_armv8-a_cortex-a53_shared/libdl.so",
+      "role": "AOSP vendor LLNDK link interface; not runtime implementation",
+      "bytes": 37360,
+      "sha256": "9d1306cf9f32ec901afcb9843533d4926c6ddb650d94bc8ffd014a3047481d9f",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libdl.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/system/logging/liblog/liblog/android_vendor_arm64_armv8-a_cortex-a53_shared/liblog.so",
+      "role": "AOSP vendor LLNDK link interface; not runtime implementation",
+      "bytes": 41480,
+      "sha256": "15d6e516f23b67b36363af0cf06580550e5a1282c1deb873f49b6eb9cec62b2f",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/liblog.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/prebuilts/clang/host/linux-x86/libc++/android_vendor_arm64_armv8-a_cortex-a53_shared_apex10000/libc++.so",
+      "role": "AOSP ARM64 platform libc++ vendor/APEX prebuilt implementation",
+      "bytes": 1152760,
+      "sha256": "cb118e98c74d3454858921123b9b51ba13df9cad7dfa141dd892c453661a4d78",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libc++.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/external/libdrm/libdrm/android_vendor_arm64_armv8-a_cortex-a53_shared_apex10000/libdrm.so",
+      "role": "AOSP ARM64 vendor/APEX libdrm implementation",
+      "bytes": 133744,
+      "sha256": "ffcb10ed9bb88bf5a763f123c59ef66e9ee386b8488864550236f1ab0aa3ddf8",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libdrm.so"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libc/crtbegin_so/android_vendor_arm64_armv8-a_cortex-a53_apex10000/crtbegin_so.o",
+      "role": "AOSP ARM64 vendor shared-object start CRT",
+      "bytes": 8640,
+      "sha256": "840eb2b724f9a0c57e22ee069609bf1294dbbe18c134f4af8c4d80af6e2f5317",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/crtbegin_so.o"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libc/crtend_so/android_vendor_arm64_armv8-a_cortex-a53_apex10000/crtend_so.o",
+      "role": "AOSP ARM64 vendor shared-object end CRT",
+      "bytes": 912,
+      "sha256": "67526086a5d71ae54a431a6419a06c5d87cf951e4b5d58f978d4cc378b08855e",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/crtend_so.o"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/bionic/libc/crt_pad_segment/android_vendor_arm64_armv8-a_cortex-a53_apex10000/crt_pad_segment.o",
+      "role": "AOSP ARM64 vendor CRT segment padding",
+      "bytes": 840,
+      "sha256": "6b63c18ff3aa943e476225b6fb9ef4901bd0fe31db17ff9c6ba1d04e6f6c8c99",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/crt_pad_segment.o"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/lib/clang/22/lib/linux/libclang_rt.builtins-aarch64-android.a",
+      "role": "AOSP ARM64 Android compiler builtins",
+      "bytes": 519610,
+      "sha256": "1184a30e94d6aaa4c122e7eaf363861a61cf7a013f86e1b093b66027bbb9f2e5",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libclang_rt.builtins-aarch64-android.a"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/android_libc++/platform/aarch64/lib/libc++demangle.a",
+      "role": "AOSP ARM64 libc++ demangler",
+      "bytes": 3834924,
+      "sha256": "dadb45140fd80c3408766b3c24d90dd818e7b8956ca3eb6cf42badd47a678067",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libc++demangle.a"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/clang",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 3805269,
+      "sha256": "15261046b6ea9504da0ae57b9d65ebc869ab1942aecb1af2819762b9b5251957"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/clang++",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 3805269,
+      "sha256": "15261046b6ea9504da0ae57b9d65ebc869ab1942aecb1af2819762b9b5251957"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/ld.lld",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 77272008,
+      "sha256": "bbf9306936ea48ab0da4b56e76e8557fdc712ae96ff426699ed2b70d7b0913af"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/llvm-ar",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 17115024,
+      "sha256": "6e75f58a802c05f88ed5036ebdac5cb62719ac259036a656c3f540ec555b3de8"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/llvm-strip",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 5384856,
+      "sha256": "80d3ed195ba6ad67670506dfe265d344832ef8344d913fb9e46b7b71e5744007"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/clang/host/linux-x86/clang-r584948b/bin/llvm-readelf",
+      "role": "AOSP host tool producing or inspecting ARM64 target files",
+      "bytes": 6818576,
+      "sha256": "4e6528df071ce0d90a5b51d76dc2a2d6d1f275f07619c91328d8ddf37edf3fe7"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/mesa_clc.real",
+      "role": "host-only Mesa generator/build tool, never target ABI dependency",
+      "bytes": 16631848,
+      "sha256": "1261c22efdffc596aeea485578d983abe513f9e91a95d1a125dc5e12fce3da71"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/vtn_bindgen2.real",
+      "role": "host-only Mesa generator/build tool, never target ABI dependency",
+      "bytes": 26692464,
+      "sha256": "4f68664c4c95568850c6b7d9d3fe06a0b9c3245cc164d356a8deb4b5ac2d292a"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/pco_clc.real",
+      "role": "host-only Mesa generator/build tool, never target ABI dependency",
+      "bytes": 35459672,
+      "sha256": "f31e73e605c9bd13333e6256c594b482ae72131f3649ac5cb7e257b07084b6b9"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/meson",
+      "role": "host-only Mesa generator/build tool, never target ABI dependency",
+      "bytes": 908,
+      "sha256": "a84abd47e78259ea318a48163bcc3bc4e686c447e6cac4e20a709e1db6b187f0"
+    },
+    {
+      "path": "/rabbitr1/src/android/prebuilts/mesa-build-dep/bin/.mesa-build-dep_wrapper",
+      "role": "host-only Mesa generator/build tool, never target ABI dependency",
+      "bytes": 210,
+      "sha256": "679419669cc28e6d9af7227226b3bc4da83b2fd4935679e024d0d6c1f91e7895"
+    },
+    {
+      "path": "/rabbitr1/src/android/external/libdrm/meson.build",
+      "role": "source/provenance",
+      "bytes": 11791,
+      "sha256": "e84a9f235256ee2f8ec12312fbd4044c05b14090dfc36b63fcfea9b67c3c3e72"
+    },
+    {
+      "path": "/rabbitr1/src/android/bionic/libc/Android.bp",
+      "role": "source/provenance",
+      "bytes": 88500,
+      "sha256": "12bef6c4a8da7159e6e03e542e0067093101712e35f212aef04f897ab8f3effb"
+    },
+    {
+      "path": "/rabbitr1/src/android/bionic/libm/Android.bp",
+      "role": "source/provenance",
+      "bytes": 21006,
+      "sha256": "9eb6a4daf4503ca7eac194c8396be60d70d415c42dffebd68e5f032c230e8b62"
+    },
+    {
+      "path": "/rabbitr1/src/android/bionic/libdl/Android.bp",
+      "role": "source/provenance",
+      "bytes": 6012,
+      "sha256": "e925fe9d1edf10080e605e3dc499aae2f708e53f4a3e5f56103e04a9ba5fb8f4"
+    },
+    {
+      "path": "/rabbitr1/src/android/system/logging/liblog/Android.bp",
+      "role": "source/provenance",
+      "bytes": 6450,
+      "sha256": "6d338a6006e1b7aff334cca19930f45c6c5d7fcd67823591ad0636e29be7c1b4"
+    },
+    {
+      "path": "/rabbitr1/src/android/external/zlib/Android.bp",
+      "role": "source/provenance",
+      "bytes": 10842,
+      "sha256": "b0ab8994edaf0222b326a142959f312dbaf0be6129eddaece1d9a92c418c6ab7"
+    },
+    {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/tests/gpu/mesa-host-build.json",
+      "role": "source/provenance",
+      "bytes": 4395,
+      "sha256": "bb9e871c57cba2a11eb2156258aa3b3464f3b95412c7f8b5b99e07bea239b6dc"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/mesa-update-provenance.json",
+      "role": "source/provenance",
+      "bytes": 2717,
+      "sha256": "41f9e4f29d0bdc372760336754d519c885038f158d28e39e08a5476f9f5d34bb"
+    },
+    {
+      "path": "/rabbitr1/out/android/soong/.intermediates/system/core/libsync/libsync/android_vendor_arm64_armv8-a_cortex-a53_shared/libsync.so",
+      "snapshot": "/rabbitr1/out/gpu-review/android-build/target-deps/libsync.so",
+      "role": "AOSP vendor LLNDK link interface for Android sync; not runtime implementation",
+      "bytes": 36912,
+      "sha256": "b6a8e959e6b4085b6132ac89a16c1b4fe3eefbf6a6faadfd6c65f51b1098f31a"
+    },
+    {
+      "path": "/rabbitr1/src/android/system/core/libsync/Android.bp",
+      "role": "source/provenance for libsync LLNDK interface",
+      "bytes": 1346,
+      "sha256": "003ee49d362d469cf56ed08169c7cf65f4511715139ddc1bf7a44ee52f59299b"
+    }
+  ],
+  "post_build_checks": {
+    "binary_and_source_input_checks": 44,
+    "all_unchanged": true,
+    "checked_header_files": 3603,
+    "independent_normalized_header_dependency_paths": 1451,
+    "no_host_target_headers_found": true
+  },
+  "limitations": [
+    "No complete ARM64 PowerVR shared library or final-link result.",
+    "Android platform/native-buffer/AHardwareBuffer integration was not built or tested.",
+    "Official AOSP LLNDK input files are link interfaces, not runtime implementations.",
+    "Shader cache/compression/XML features disabled because matching vendor inputs were not available for the bounded experiment.",
+    "GE8320 table and firmware ABI gaps remain unresolved.",
+    "No target code execution, device I/O, driver loading, installation or product renderer change."
+  ],
+  "original_workspace_evidence": [
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/plan.md",
+      "sha256": "e7a01a22a8a031b4b342c6849799e91207382b2b9c995d9caa822ce94b82185a"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/prepare.py",
+      "sha256": "1fccef6aa16e31b12a78ba3c482d465792b35a43e646efab3c8f04bd8d0f7ddf"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/run-build.py",
+      "sha256": "7cd5ea7ec424baf8671df483a9d6c48445003a54ae380ab1b6490707f49a339b"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/commands.json",
+      "sha256": "fa32be06fbb17fed78876cca0adc208087b902c232082e54aa02734d208d2040"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/aosp-arm64.ini",
+      "sha256": "e77b8e974fd148c891acdd46fbf08c2e9b45368fbfae2a9ad08b4ed7c273c4e3"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/source-comparison.json",
+      "sha256": "3b5a6464323b852b2f4dfecaba88ea9a54a33cf0e16c58530abb0920bd26f207"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/source-before.json",
+      "sha256": "0b4b3a0530de0a44b8ba021276f31282715a7b62b574e26c235eedd13e611cd3"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/source-symlinks.json",
+      "sha256": "f7ebbae2f61ae5de8716d6a4c0a5303570edd9da6a032ce55e549def156a9bc2"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/headers-before.json",
+      "sha256": "63fb308bdbc6be486eaccdd0306cd8dc0f210f81039d1042e21adbaff3f40a23"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/inputs-before.json",
+      "sha256": "5b34406203bc5e8dbe71fa63cc23575d488b794703af41b2fe656bac33304d53"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/inputs-after.json",
+      "sha256": "6336bd40a19cf5fa0bb3f8be2b5e35460d81048ad216648abca04a2f4187e3cd"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/configure.log",
+      "sha256": "e05537c71d9c9377a949f84b0fc956006e98ab1401b0f5123e35316a1844d1b6"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/build.log",
+      "sha256": "bb6fa772aac9d8eb2c291daf2c9b7dc5bbb6df763869b82ea34e8d3c52bd6802"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/run-result.json",
+      "sha256": "630c2378d62d7729d5a025935741a59fec6cf8c7f81a27c248ede9c0ea64dbee"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/failed-command.json",
+      "sha256": "d14311b10afe8379ee75644710bd64b2287952d668fd2a6b9da678a05212dc60"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/failed-command.txt",
+      "sha256": "206412f24e6a0b7c4faa1930bf8745c196208e3d1cdbaf299f2fd528299e554b"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/failed-diagnostics.txt",
+      "sha256": "352ec879f67c0d8d81de0f61cc263ed1dcd8f065269e56c0bb8f55060b312a99"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/compiler-invocations.jsonl",
+      "sha256": "f05b5559e0f7007da223f16d3dffac900a4bb4f87a1c8936d1899421b44d6197"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/ninja-dependencies.txt",
+      "sha256": "6096f17f94a1209dbef72443b3ae5f05a98067f9540808cc4cfde78c24d6ce92"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/controls-before-build.json",
+      "sha256": "46474ef0b5ec29dfd5c74e9a6a4b27438fcc5cd56058c69b5fce19656fc9230a"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/preparatory-attempts.json",
+      "sha256": "c860c162287a92414f75a487a5906d78268f3230fbc80b77b533e4c36ad73ad1"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/dependency-revisions.json",
+      "sha256": "431bcdad2b8d9a61b5929c596089cefcebc273e0fc004d6af819d33a9137c27e"
+    },
+    {
+      "path": "/rabbitr1/out/gpu-review/android-build/independent-review/failure-review.json",
+      "sha256": "9bd6a10d4e74f6f400105ee2aa939d83a3589572a90c491ff13222da4f0804c2"
+    }
+  ],
+  "recorded_utc": "2026-10-09T04:38:32Z",
+  "disk_free_bytes_after": 27944566784
+}

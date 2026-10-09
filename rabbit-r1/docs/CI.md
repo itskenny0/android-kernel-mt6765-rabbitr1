@@ -10,8 +10,8 @@ The Ubuntu 24.04 runner puts the checkout, downloads, caches and build outputs
 under `/rabbitr1`. Build tools are installed on the disposable runner. No local
 host packages or device partitions are changed by this workflow.
 
-Pinned HTTP downloads retry transient transport failures at most three times,
-with one- and two-second delays. Every completed download must match its locked
+Pinned HTTP downloads allow three attempts, with one- and two-second delays
+after transient transport failures. Every completed download must match its locked
 size and SHA-256 before publication. Checksum mismatches, certificate errors
 and permanent HTTP errors stop immediately; existing files are preserved.
 

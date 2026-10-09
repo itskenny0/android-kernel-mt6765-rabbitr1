@@ -93,11 +93,20 @@ C/header output for the default device list on the actual PowerVR SPIR-V
 input. This comparison does not cover other devices or shader correctness.
 
 The JSON files name original workspace logs and a reproduction script under
-``/rabbitr1/out/``; those artifacts are not bundled in the repository. An
-Android compile still needs the actual ARM64 bionic/vendor dependency inputs
-from the platform build. Packaging also needs the imagination-to-powervr_mesa
-suffix mapping and Android buffer-sharing support; the host check supplies
-neither. Production continues to use SwiftShader.
+``/rabbitr1/out/``; those artifacts are not bundled in the repository.
+
+An ARM64/bionic build attempt used the platform compiler, Android API 37 headers
+and vendor link interfaces. It stopped in ``wsi_common_display.c`` because that
+direct-display backend requires pthread cancellation, which bionic does not
+implement. Mesa enables that backend with ``platforms=[]`` even for an Android
+target. No shared library was produced, and no cancellation shim or Mesa source
+patch was added. ``mesa-android-build-attempt.json`` records the failed build
+and its verified inputs; this is distinct from the successful Linux host build.
+
+The next build needs ``platforms=android`` and its real vendor dependencies,
+including currently missing libhardware and libui outputs. Packaging also needs
+the imagination-to-powervr_mesa suffix mapping and Android buffer-sharing
+support. Production continues to use SwiftShader.
 
 The r1 GPU remains disabled
 -------------------------

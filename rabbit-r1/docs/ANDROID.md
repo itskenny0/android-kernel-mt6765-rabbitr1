@@ -132,6 +132,11 @@ records the upstream revisions, release checksum and retained delta. Source
 application and repeat checks passed. The PowerVR Vulkan library also passed
 a separate x86_64 Linux host build; Android/ARM64 userspace compilation remains
 pending. [Compile evidence](../tests/gpu/mesa-host-build.json) records its scope.
+A separate ARM64/bionic attempt reached a direct-display backend that requires
+unsupported pthread cancellation. The [failed build record](../tests/gpu/mesa-android-build-attempt.json)
+pins its inputs; the next attempt needs Mesa's Android platform configuration
+and its remaining vendor library dependencies. No GPU library from this attempt
+is installed in the product.
 
 The kernel PowerVR driver uses the complete Linux 7.2.9 subtree, including
 its unchanged UAPI, plus the upstream scheduler timeout fix in patch 0075.
