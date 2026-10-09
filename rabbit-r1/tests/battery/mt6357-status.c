@@ -11,6 +11,10 @@
 #define PTR_ERR(p) ((intptr_t)(p))
 #define dev_err_probe(d,e,...) (e)
 #define DL_FLAG_AUTOREMOVE_CONSUMER 1
+#define DL_DEV_DRIVER_BOUND 0
+#define DL_DEV_UNBINDING 1
+#define DL_DEV_NO_DRIVER 2
+#define READ_ONCE(x) (x)
 #define container_of(p,t,m) ((t *)((char *)(p)-offsetof(t,m)))
 #define to_delayed_work(p) container_of(p,struct delayed_work,work)
 #define INIT_DELAYED_WORK(p,f) ((p)->work.fn=(f))
@@ -25,7 +29,14 @@
 struct platform_device { struct device dev; };
 struct power_supply_config { void *drv_data; void *fwnode; };
 struct mt6397_chip { struct regmap *regmap; };
-static struct device charger_dev, battery_dev;
+static struct platform_device charger_provider;
+#define charger_dev charger_provider.dev
+static struct device battery_dev;
+struct device_node { int unused; };
+static struct device_node charger_node;
+static unsigned int node_refs, provider_refs, provider_lookups, supply_lookups;
+static bool provider_locked, provider_busy, provider_unbound;
+static bool missing_node, missing_provider, self_provider;
 static struct power_supply charger={.dev={.parent=&charger_dev}};
 static struct mt6397_chip pmic={.regmap=&map};
 static struct device pmic_dev={.driver_data=&pmic};
@@ -190,9 +201,40 @@ static int device_property_read_u32(struct device *d, const char *name, u32 *out
 { assert(!strcmp(name,"shunt-resistor-micro-ohms")); *out=10000; return 0; }
 static int of_count_phandle_with_args(void *node, const char *name, void *args)
 { assert(node == pdev.dev.of_node && !strcmp(name,"power-supplies") && !args); return reference_count; }
-static struct power_supply *devm_power_supply_get_by_reference(struct device *d, const char *name)
+static struct device_node *of_parse_phandle(void *node, const char *name, int index)
 {
-    assert(d == &pdev.dev && !strcmp(name,"power-supplies"));
+    assert(node == pdev.dev.of_node && !strcmp(name,"power-supplies") && !index);
+    if (missing_node) return NULL;
+    node_refs++; return &charger_node;
+}
+static struct platform_device *of_find_device_by_node(struct device_node *node)
+{
+    assert(node == &charger_node && node_refs == 1); provider_lookups++;
+    if (missing_provider) return NULL;
+    provider_refs++; return self_provider ? &pdev : &charger_provider;
+}
+static void of_node_put(struct device_node *node)
+{ assert(node == &charger_node && node_refs == 1); node_refs--; }
+static int device_trylock(struct device *d)
+{
+    assert(d == &charger_dev && provider_refs == 1 && !provider_locked);
+    if (provider_busy) return 0;
+    provider_locked=true; return 1;
+}
+static bool device_is_bound(struct device *d)
+{ assert(d == &charger_dev && provider_locked); return !provider_unbound; }
+static void device_unlock(struct device *d)
+{ assert(d == &charger_dev && provider_locked); provider_locked=false; }
+static void put_device(struct device *d)
+{
+    assert(d == (self_provider ? &pdev.dev : &charger_dev));
+    assert(provider_refs == 1 && !provider_locked); provider_refs--;
+}
+static struct power_supply *devm_power_supply_get_by_parent(struct device *d, struct device *parent)
+{
+    assert(d == &pdev.dev && parent == &charger_dev && provider_refs == 1);
+    assert(provider_locked && !provider_unbound && charger_dev.links.status == DL_DEV_DRIVER_BOUND);
+    assert(linked); supply_lookups++;
     if (reference_error) return ERR_PTR(reference_error);
     if (null_reference) return NULL;
     refs++; return &charger;
@@ -200,6 +242,8 @@ static struct power_supply *devm_power_supply_get_by_reference(struct device *d,
 static void *device_link_add(struct device *consumer, struct device *supplier, unsigned int flags)
 {
     assert(consumer == &pdev.dev && supplier == &charger_dev && flags == DL_FLAG_AUTOREMOVE_CONSUMER);
+    assert(provider_locked && provider_refs == 1 && !provider_unbound);
+    assert(charger_dev.links.status == DL_DEV_DRIVER_BOUND);
     if (link_error) return NULL;
     links++; linked=true; return &charger_dev;
 }
@@ -248,6 +292,7 @@ static int devm_add_action_or_reset(struct device *d, void (*fn)(void *), void *
 /* INSERT PRODUCTION STATUS FUNCTIONS HERE */
 static void release_resources(void)
 {
+    assert(!node_refs && !provider_refs && !provider_locked);
     if (stop_action) { stop_action(stop_data); stop_action=NULL; }
     assert(!pending && !running && !registered_notifier);
     registered=false; /* devm_power_supply_unregister, after the stop action */
@@ -260,6 +305,8 @@ static void reset_fixture(void)
     release_resources();
     memset(&gauge,0,sizeof(gauge));
     reference_present=true; reference_count=1; adc_present=true;
+    missing_node=missing_provider=self_provider=provider_busy=provider_unbound=false;
+    charger_dev.links.status=DL_DEV_DRIVER_BOUND; provider_lookups=supply_lookups=0;
     reference_error=registration_error=notifier_error=action_error=mutex_error=0;
     link_error=null_reference=feedback=event_during_read=false;
     read_blocked=read_entered=read_release=false;
@@ -330,6 +377,22 @@ int main(void)
         reset_fixture(); reference_count=counts[i];
         assert(mt6357_gauge_probe(&pdev) == (counts[i]<0 ? counts[i] : -EINVAL));
         assert(!registrations && !pending && !refs); probe_cases++;
+    }
+    for (unsigned int f=0; f<7; f++) {
+        reset_fixture(); int expected_error=-EPROBE_DEFER;
+        switch (f) {
+        case 0: missing_node=true; expected_error=-EINVAL; break;
+        case 1: missing_provider=true; break;
+        case 2: self_provider=true; expected_error=-EINVAL; break;
+        case 3: provider_busy=true; break;
+        case 4: provider_unbound=true; break;
+        case 5: charger_dev.links.status=DL_DEV_UNBINDING; break;
+        default: charger_dev.links.status=DL_DEV_NO_DRIVER; break;
+        }
+        assert(mt6357_gauge_probe(&pdev) == expected_error);
+        assert(!node_refs && !provider_refs && !provider_locked);
+        assert(!links && !refs && !supply_lookups && !registrations && !pending);
+        assert(provider_lookups == (f == 0 ? 0U : 1U)); probe_cases++;
     }
     for (unsigned int f=0; f<7; f++) {
         reset_fixture(); int expected_error;

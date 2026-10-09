@@ -27,6 +27,10 @@ subprocess.run([sys.executable, str(Path(__file__).with_name('test-mt6357-charge
 s = source.read_text()
 host = (ROOT/'out/mt6357-charge-counter/host.c').read_text()
 host = host[:host.index('int main(void)')]
+# STATUS tests also exercise the supplier's device-core state under its lock.
+old_device = 'struct device { struct device *parent; void *driver_data; void *of_node; };'
+assert host.count(old_device) == 1
+host = host.replace(old_device, 'struct device { struct device *parent; void *driver_data; void *of_node; struct { int status; } links; };')
 host = host.replace('static int mt6357_gauge_read_status(struct mt6357_gauge *g, int *out) { return -ENODATA; }',
                     'static int mt6357_gauge_read_status(struct mt6357_gauge *g, int *out);')
 fixture = Path(__file__).resolve().parent.parent/'tests/battery/mt6357-status.c'

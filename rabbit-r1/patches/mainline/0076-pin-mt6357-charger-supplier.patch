@@ -1,0 +1,143 @@
+From: itskenny0 <0@kenny.cat>
+Subject: [PATCH] Retain the charger during battery setup
+
+Hold the platform supplier and require its bound state before linking it.
+Look up its power supply by parent identity without dereferencing other
+supplies' parent devices. Keep supply references and driver lifetime
+distinct.
+
+diff --git a/drivers/power/supply/mt6357-gauge.c b/drivers/power/supply/mt6357-gauge.c
+index eb14034c7c7f56712fef17e2e5e80c9640f0a370..9a1629b1be96547e1ded704c3d5263774546e77d 100644
+--- a/drivers/power/supply/mt6357-gauge.c
++++ b/drivers/power/supply/mt6357-gauge.c
+@@ -845,6 +845,9 @@ static int mt6357_gauge_init_adc(struct mt6357_gauge *gauge)
+ static int mt6357_gauge_init_status(struct mt6357_gauge *gauge)
+ {
+ 	struct device *dev = gauge->dev;
++	struct platform_device *provider;
++	struct device_node *node;
++	struct power_supply *charger;
+ 	int ret;
+ 
+ 	if (!device_property_present(dev, "power-supplies"))
+@@ -853,14 +856,42 @@ static int mt6357_gauge_init_status(struct mt6357_gauge *gauge)
+ 	ret = of_count_phandle_with_args(dev->of_node, "power-supplies", NULL);
+ 	if (ret != 1)
+ 		return ret < 0 ? ret : -EINVAL;
+-	gauge->charger = devm_power_supply_get_by_reference(dev, "power-supplies");
+-	if (IS_ERR(gauge->charger))
+-		return PTR_ERR(gauge->charger);
+-	if (!gauge->charger)
++	node = of_parse_phandle(dev->of_node, "power-supplies", 0);
++	if (!node)
++		return -EINVAL;
++	provider = of_find_device_by_node(node);
++	of_node_put(node);
++	if (!provider)
+ 		return -EPROBE_DEFER;
+-	/* A power_supply reference alone does not retain supplier driver data. */
+-	if (!device_link_add(dev, gauge->charger->dev.parent, DL_FLAG_AUTOREMOVE_CONSUMER))
+-		return -ENOMEM;
++	ret = -EINVAL;
++	if (&provider->dev == dev)
++		goto put_provider;
++	ret = -EPROBE_DEFER;
++	if (!device_trylock(&provider->dev))
++		goto put_provider;
++	if (!device_is_bound(&provider->dev) ||
++	    READ_ONCE(provider->dev.links.status) != DL_DEV_DRIVER_BOUND)
++		goto unlock_provider;
++	ret = -ENOMEM;
++	if (!device_link_add(dev, &provider->dev, DL_FLAG_AUTOREMOVE_CONSUMER))
++		goto unlock_provider;
++	/* Retain the supplier before looking up or using its power supply. */
++	charger = devm_power_supply_get_by_parent(dev, &provider->dev);
++	if (IS_ERR(charger)) {
++		ret = PTR_ERR(charger);
++		goto unlock_provider;
++	}
++	ret = -EPROBE_DEFER;
++	if (!charger)
++		goto unlock_provider;
++	gauge->charger = charger;
++	ret = 0;
++unlock_provider:
++	device_unlock(&provider->dev);
++put_provider:
++	put_device(&provider->dev);
++	if (ret)
++		return ret;
+ 	ret = devm_mutex_init(dev, &gauge->status_lock);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/power/supply/power_supply_core.c b/drivers/power/supply/power_supply_core.c
+index a446d3d086fcd235a1b20e5e6e235388f0eaa3c0..4c1f4764149ed87ca6261ec0642a0be4b6886373 100644
+--- a/drivers/power/supply/power_supply_core.c
++++ b/drivers/power/supply/power_supply_core.c
+@@ -577,6 +577,53 @@ struct power_supply *devm_power_supply_get_by_reference(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(devm_power_supply_get_by_reference);
+ 
++static int power_supply_match_parent(struct device *dev, const void *parent)
++{
++	return dev->parent == parent;
++}
++
++/**
++ * devm_power_supply_get_by_parent() - Get a supply registered by a known device
++ * @dev: Consumer managing the returned power supply reference
++ * @parent: Referenced parent device of the requested power supply
++ *
++ * The caller must keep @parent alive during lookup. Matching compares parent
++ * pointers without accessing other supplies' parent devices. If a parent
++ * registers multiple supplies, this returns the first match.
++ *
++ * The returned reference retains the power supply allocation, not its driver's
++ * resources. Callers that access those resources must separately synchronize
++ * with supplier unbind, for example with a managed device link established
++ * while the supplier is bound.
++ *
++ * Return: A managed reference, NULL if no supply matches, or an error pointer.
++ */
++struct power_supply *devm_power_supply_get_by_parent(struct device *dev,
++						     struct device *parent)
++{
++	struct power_supply **ptr, *psy;
++	struct device *supply;
++
++	if (!parent)
++		return ERR_PTR(-EINVAL);
++	ptr = devres_alloc(devm_power_supply_put, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	supply = class_find_device(&power_supply_class, NULL, parent,
++				   power_supply_match_parent);
++	if (!supply) {
++		devres_free(ptr);
++		return NULL;
++	}
++	psy = dev_to_psy(supply);
++	atomic_inc(&psy->use_cnt);
++	*ptr = psy;
++	devres_add(dev, ptr);
++	return psy;
++}
++EXPORT_SYMBOL_GPL(devm_power_supply_get_by_parent);
++
+ int power_supply_get_battery_info(struct power_supply *psy,
+ 				  struct power_supply_battery_info **info_out)
+ {
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index 7a5e4c3242a01d862b89df5d10cdf6045d117ff9..a6ca5e752f4daf2b7f72d54956d477578069b8f0 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -816,6 +816,8 @@ extern struct power_supply *power_supply_get_by_reference(struct fwnode_handle *
+ 							  const char *property);
+ extern struct power_supply *devm_power_supply_get_by_reference(
+ 				    struct device *dev, const char *property);
++struct power_supply *devm_power_supply_get_by_parent(struct device *dev,
++						     struct device *parent);
+ 
+ extern const enum power_supply_property power_supply_battery_info_properties[];
+ extern const size_t power_supply_battery_info_properties_size;

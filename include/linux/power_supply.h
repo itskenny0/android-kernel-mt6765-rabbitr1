@@ -816,6 +816,8 @@ extern struct power_supply *power_supply_get_by_reference(struct fwnode_handle *
 							  const char *property);
 extern struct power_supply *devm_power_supply_get_by_reference(
 				    struct device *dev, const char *property);
+struct power_supply *devm_power_supply_get_by_parent(struct device *dev,
+						     struct device *parent);
 
 extern const enum power_supply_property power_supply_battery_info_properties[];
 extern const size_t power_supply_battery_info_properties_size;

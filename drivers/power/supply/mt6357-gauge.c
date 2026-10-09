@@ -845,6 +845,9 @@ static int mt6357_gauge_init_adc(struct mt6357_gauge *gauge)
 static int mt6357_gauge_init_status(struct mt6357_gauge *gauge)
 {
 	struct device *dev = gauge->dev;
+	struct platform_device *provider;
+	struct device_node *node;
+	struct power_supply *charger;
 	int ret;
 
 	if (!device_property_present(dev, "power-supplies"))
@@ -853,14 +856,42 @@ static int mt6357_gauge_init_status(struct mt6357_gauge *gauge)
 	ret = of_count_phandle_with_args(dev->of_node, "power-supplies", NULL);
 	if (ret != 1)
 		return ret < 0 ? ret : -EINVAL;
-	gauge->charger = devm_power_supply_get_by_reference(dev, "power-supplies");
-	if (IS_ERR(gauge->charger))
-		return PTR_ERR(gauge->charger);
-	if (!gauge->charger)
+	node = of_parse_phandle(dev->of_node, "power-supplies", 0);
+	if (!node)
+		return -EINVAL;
+	provider = of_find_device_by_node(node);
+	of_node_put(node);
+	if (!provider)
 		return -EPROBE_DEFER;
-	/* A power_supply reference alone does not retain supplier driver data. */
-	if (!device_link_add(dev, gauge->charger->dev.parent, DL_FLAG_AUTOREMOVE_CONSUMER))
-		return -ENOMEM;
+	ret = -EINVAL;
+	if (&provider->dev == dev)
+		goto put_provider;
+	ret = -EPROBE_DEFER;
+	if (!device_trylock(&provider->dev))
+		goto put_provider;
+	if (!device_is_bound(&provider->dev) ||
+	    READ_ONCE(provider->dev.links.status) != DL_DEV_DRIVER_BOUND)
+		goto unlock_provider;
+	ret = -ENOMEM;
+	if (!device_link_add(dev, &provider->dev, DL_FLAG_AUTOREMOVE_CONSUMER))
+		goto unlock_provider;
+	/* Retain the supplier before looking up or using its power supply. */
+	charger = devm_power_supply_get_by_parent(dev, &provider->dev);
+	if (IS_ERR(charger)) {
+		ret = PTR_ERR(charger);
+		goto unlock_provider;
+	}
+	ret = -EPROBE_DEFER;
+	if (!charger)
+		goto unlock_provider;
+	gauge->charger = charger;
+	ret = 0;
+unlock_provider:
+	device_unlock(&provider->dev);
+put_provider:
+	put_device(&provider->dev);
+	if (ret)
+		return ret;
 	ret = devm_mutex_init(dev, &gauge->status_lock);
 	if (ret)
 		return ret;

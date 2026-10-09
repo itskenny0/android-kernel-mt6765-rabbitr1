@@ -1,0 +1,109 @@
+{
+  "scope": "Charger supplier lifetime during MT6357 probe and parent-identity power-supply lookup. No battery SOC or CAPACITY publication is added.",
+  "base_commit": "a1ab1319535faee26a7b32498dca11854dfd54f0",
+  "sources": {
+    "drivers/power/supply/mt6357-gauge.c": {
+      "path": "/rabbitr1/src/mainline/drivers/power/supply/mt6357-gauge.c",
+      "bytes": 31638,
+      "sha256": "3a0c98701d3e59f20a951f2f6e82ca2677f866709dcb4cace0e8d0c842b10b5c"
+    },
+    "drivers/power/supply/power_supply_core.c": {
+      "path": "/rabbitr1/src/mainline/drivers/power/supply/power_supply_core.c",
+      "bytes": 52673,
+      "sha256": "c2448e55ce430ddb688de62a5df8dc0ae7bc9af92099ad8fc9297b3bc131c722"
+    },
+    "include/linux/power_supply.h": {
+      "path": "/rabbitr1/src/mainline/include/linux/power_supply.h",
+      "bytes": 42548,
+      "sha256": "4eb79755476f32d3e672d4016a37c5c8298c292a8f6a43e1cf8250267679d77d"
+    },
+    "rabbit-r1/scripts/test-mt6357-status.py": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/scripts/test-mt6357-status.py",
+      "bytes": 4631,
+      "sha256": "83d25b3f4725ee4d6aed4a6855c2696128c988211ad65219415fb8ca26a6c1f2"
+    },
+    "rabbit-r1/scripts/test-power-supply-parent.py": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/scripts/test-power-supply-parent.py",
+      "bytes": 9494,
+      "sha256": "5bb1c9332ecbe632942bc50713b8d5ce0ccabbdb43527a18b3a31f92ef50223a"
+    },
+    "rabbit-r1/tests/battery/mt6357-status.c": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/tests/battery/mt6357-status.c",
+      "bytes": 27739,
+      "sha256": "648e6ecbca9e897114d8abc5ca9d72927333cd0fdbade0df90f5058e1d14960f"
+    },
+    "rabbit-r1/patches/mainline/0076-pin-mt6357-charger-supplier.patch": {
+      "path": "/rabbitr1/src/mainline/rabbit-r1/patches/mainline/0076-pin-mt6357-charger-supplier.patch",
+      "bytes": 5498,
+      "sha256": "47bcd7520cdec2b9fd17db95f1e418153af7ccedf2b9e9ae5709985e868116a2"
+    }
+  },
+  "validation": {
+    "status_fixture": "PASS: 22 probe cases, 40 charger mappings, notifier/work teardown and measurement concurrency; prerequisites include stock counter vectors and exhaustive conversions.",
+    "core_helper": "10 helper scenarios pass; allocations=9 frees=9 managed_put_callbacks=6; all child/use_cnt/provider references balanced",
+    "patch_replay": "76 patches, 88 result files match",
+    "checkpatch": "No errors, warnings or checks with existing local-series MISSING_SIGN_OFF exemption",
+    "arm64_objects": {
+      "compiler": "aarch64-linux-gnu-gcc 13.3.0",
+      "W": 1,
+      "warnings": 0,
+      "errors": 0,
+      "objects": [
+        {
+          "path": "/rabbitr1/out/charger-lifetime-kernel/drivers/power/supply/mt6357-gauge.o",
+          "bytes": 23168,
+          "sha256": "1ecc50e8cfc50cbbac6a93e8b671b174cceceb1d769f58793544fa054edc35e3"
+        },
+        {
+          "path": "/rabbitr1/out/charger-lifetime-kernel/drivers/power/supply/power_supply_core.o",
+          "bytes": 40568,
+          "sha256": "486471baada3032b2efe604f5060184826a03e168173bda98b2c542b83377ca5"
+        }
+      ]
+    }
+  },
+  "logs": [
+    {
+      "path": "/rabbitr1/logs/mt6357-status-parent-lifetime.log",
+      "bytes": 469,
+      "sha256": "c3a74b757de7e65392f29a7bd82bdfa170a55fd859e4838b26e0994655619475"
+    },
+    {
+      "path": "/rabbitr1/logs/power-supply-parent-tests.log",
+      "bytes": 120,
+      "sha256": "77326e5aa62841fdbe839a014c25f98b104d86fbac15a8b1a212c45aa453cd2a"
+    },
+    {
+      "path": "/rabbitr1/logs/charger-lifetime-kernel-final.log",
+      "bytes": 232,
+      "sha256": "229cfa23421e3224289ef5c4c135e206ed5a9a6c3c32d9c731a3f070971fade8"
+    },
+    {
+      "path": "/rabbitr1/logs/charger-lifetime-patches.log",
+      "bytes": 3823,
+      "sha256": "32c3a8b119ff89af80a3912afa67821c2a766a9ae62b7a1738924421abe2dec2"
+    },
+    {
+      "path": "/rabbitr1/logs/charger-lifetime-checkpatch.log",
+      "bytes": 230,
+      "sha256": "17d847c50955a3a36188855f2a0b69988034d7b5a25b6dd3f9aec77285bbc224"
+    }
+  ],
+  "independent_review": {
+    "path": "/rabbitr1/out/battery-review/charger-lifetime/independent-review/implementation-review.md",
+    "bytes": 2971,
+    "sha256": "d6dd2ff82d439e399dc776400edcbeff485b7714072b4f118bda2d25c4f12530"
+  },
+  "helper_audit": {
+    "path": "/rabbitr1/out/power-supply-parent/helper-result.json",
+    "bytes": 3433,
+    "sha256": "439855f97c8544f0b5870dc1ee09f5bbd0911df0b3a5c790d17cc5673dfc5caf"
+  },
+  "limitations": [
+    "Host tests model device/devres/class iteration and link state. They do not execute concurrent in-kernel unbind.",
+    "Separate ARM64 object compilation; this record does not claim a full kernel relink.",
+    "The old generic fwnode lookup API is unchanged; the gauge uses the new parent-identity API.",
+    "No physical device testing."
+  ],
+  "hardware_tested": false
+}

@@ -577,6 +577,53 @@ struct power_supply *devm_power_supply_get_by_reference(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(devm_power_supply_get_by_reference);
 
+static int power_supply_match_parent(struct device *dev, const void *parent)
+{
+	return dev->parent == parent;
+}
+
+/**
+ * devm_power_supply_get_by_parent() - Get a supply registered by a known device
+ * @dev: Consumer managing the returned power supply reference
+ * @parent: Referenced parent device of the requested power supply
+ *
+ * The caller must keep @parent alive during lookup. Matching compares parent
+ * pointers without accessing other supplies' parent devices. If a parent
+ * registers multiple supplies, this returns the first match.
+ *
+ * The returned reference retains the power supply allocation, not its driver's
+ * resources. Callers that access those resources must separately synchronize
+ * with supplier unbind, for example with a managed device link established
+ * while the supplier is bound.
+ *
+ * Return: A managed reference, NULL if no supply matches, or an error pointer.
+ */
+struct power_supply *devm_power_supply_get_by_parent(struct device *dev,
+						     struct device *parent)
+{
+	struct power_supply **ptr, *psy;
+	struct device *supply;
+
+	if (!parent)
+		return ERR_PTR(-EINVAL);
+	ptr = devres_alloc(devm_power_supply_put, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	supply = class_find_device(&power_supply_class, NULL, parent,
+				   power_supply_match_parent);
+	if (!supply) {
+		devres_free(ptr);
+		return NULL;
+	}
+	psy = dev_to_psy(supply);
+	atomic_inc(&psy->use_cnt);
+	*ptr = psy;
+	devres_add(dev, ptr);
+	return psy;
+}
+EXPORT_SYMBOL_GPL(devm_power_supply_get_by_parent);
+
 int power_supply_get_battery_info(struct power_supply *psy,
 				  struct power_supply_battery_info **info_out)
 {

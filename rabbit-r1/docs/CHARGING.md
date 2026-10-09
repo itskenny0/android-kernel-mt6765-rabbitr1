@@ -100,8 +100,24 @@ The kernel ABI is documented in
 its coherent status snapshot. Applied values are commanded limits, not measured
 current, and are unconfirmed whenever `error` is nonzero.
 
+The gauge resolves its charger to an owned platform-device reference, checks
+that the driver is fully bound under its device lock, and establishes the managed
+link before looking up the power supply. A parent-identity lookup avoids reading
+unrelated supplies' parent devices during removal. Busy or unbinding suppliers
+cause probe deferral; notification and worker teardown still precede supply and
+supplier-reference release. This does not add battery capacity reporting.
+
 ## Verification
 
+* The charger-parent lookup executes the actual core getter, class search and
+  release callbacks in ten ASan/UBSan scenarios, with balanced device/use-count
+  references and devres cleanup. Guarded inaccessible unrelated-parent memory
+  verifies that lookup does not dereference it. The battery STATUS harness adds
+  seven deferred-probe and invalid-provider cases, while retaining notifier,
+  worker-removal and measurement-concurrency checks. Device-core services are
+  modeled; these checks do not execute a concurrent in-kernel unbind.
+  [Validation record](../tests/battery/charger-parent-lifetime.json) includes the
+  final source hashes, patch replay and warning-free ARM64 object compilation.
 * The native policy harness executes production decisions and transactions under
   ASan/UBSan: 815,304 temperature/voltage/source/current combinations, threshold
   hysteresis, bad caps, sensor/write failures, superseded grants, timer latching,
